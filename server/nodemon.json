@@ -1,0 +1,5 @@
+{
+  "exec": "node --loader ts-node/esm server.ts",
+  "watch": ["*.ts"],
+  "ext": "ts,json"
+}

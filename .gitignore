@@ -1,0 +1,29 @@
+# Node modules
+node_modules/
+
+# Environment variables
+.env
+
+# Logs
+logs/
+*.log
+
+# Build files
+dist/
+build/
+
+# Vite cache
+.cache/
+
+# IDE/Editor files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Frontend-specific (inside server/client)
+server/client/node_modules/
+server/client/dist/
+server/client/.env
