@@ -1,0 +1,152 @@
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { FaUserCircle, FaUserCog, FaSignOutAlt } from "react-icons/fa";
+import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "../../context/AuthContext";
+import { toast } from "react-toastify";
+
+interface ProfileMenuProps {
+  variant?: "header" | "sidebar";
+  isOpen?: boolean;
+  onToggle?: () => void;
+}
+
+export function ProfileMenu({
+  variant = "header",
+  isOpen,
+  onToggle,
+}: ProfileMenuProps) {
+  const navigate = useNavigate();
+  const { signOut, user } = useAuth();
+  const [isLocalOpen, setIsLocalOpen] = useState(false);
+
+  // Add console.log to see the user data
+  console.log("User data in ProfileMenu:", user);
+
+  const getInitials = () => {
+    if (!user) return "??";
+    return `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`;
+  };
+
+  // Get full name
+  const getFullName = () => {
+    if (!user) return "Loading...";
+    return `${user.firstName || ""} ${user.lastName || ""}`.trim();
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast.success("Successfully signed out!", {
+        position: "top-right",
+        autoClose: 2000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        style: {
+          backgroundColor: "#ffffff",
+          color: "#1f2937",
+          border: "1px solid #e5e7eb",
+          borderRadius: "0.5rem",
+          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+        },
+      });
+
+      setTimeout(() => {
+        navigate("/", { replace: true });
+      }, 100);
+    } catch (error) {
+      toast.error("Failed to sign out", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        style: {
+          backgroundColor: "#ffffff",
+          color: "#1f2937",
+          border: "1px solid #e5e7eb",
+          borderRadius: "0.5rem",
+          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+        },
+      });
+    }
+  };
+
+  const isMenuOpen = typeof isOpen === "boolean" ? isOpen : isLocalOpen;
+  const toggleMenu = onToggle || (() => setIsLocalOpen(!isLocalOpen));
+
+  return (
+    <div className="relative" id="profile-menu">
+      <button
+        onClick={toggleMenu}
+        className={`flex items-center gap-3 p-2 hover:bg-green-50 rounded-lg transition-all duration-300 
+                   transform hover:-translate-y-1 hover:shadow-lg
+                   cursor-pointer focus:outline-none focus:ring-0 ${
+                     variant === "sidebar" ? "w-full" : ""
+                   }`}
+      >
+        <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center">
+          <span className="text-sm font-medium text-green-600">
+            {getInitials()}
+          </span>
+        </div>
+        <div className={variant === "sidebar" ? "block" : "hidden sm:block"}>
+          <p className="text-sm font-medium text-gray-700 text-left">
+            {getFullName()}
+          </p>
+          <p className="text-xs text-gray-500">{user?.role || "User"}</p>
+        </div>
+      </button>
+
+      <AnimatePresence>
+        {isMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ duration: 0.2 }}
+            className={`${
+              variant === "sidebar" ? "w-full" : "absolute right-0 w-48"
+            } mt-2 bg-white rounded-lg shadow-lg py-1 z-50`}
+          >
+            <Link
+              to="/dashboard/profile"
+              className="w-full flex items-center gap-2 px-4 py-2 text-sm !text-gray-700 hover:!bg-green-50 hover:!text-green-600
+                       transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg
+                       cursor-pointer focus:outline-none focus:ring-0"
+            >
+              <FaUserCircle className="h-4 w-4" />
+              View Profile
+            </Link>
+
+            <Link
+              to="/dashboard/settings"
+              className="w-full flex items-center gap-2 px-4 py-2 text-sm !text-gray-700 hover:!bg-green-50 hover:!text-green-600
+                       transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg
+                       cursor-pointer focus:outline-none focus:ring-0"
+            >
+              <FaUserCog className="h-4 w-4" />
+              Account Settings
+            </Link>
+
+            <hr className="my-1" />
+
+            <Link
+              to="/"
+              onClick={handleLogout}
+              className="w-full flex items-center gap-2 px-4 py-2 text-sm !text-red-600 hover:!bg-red-50
+                       transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg
+                       cursor-pointer focus:outline-none focus:ring-0"
+            >
+              <FaSignOutAlt className="h-4 w-4" />
+              Sign out
+            </Link>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

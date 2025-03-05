@@ -6,7 +6,7 @@ import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import passport from "passport";
 import authRoutes from "./routes/authRoutes.js";
-import "./config/passport.js"; 
+import "./config/passport.js";
 
 // Load environment variables
 dotenv.config();
@@ -22,7 +22,14 @@ mongoose
   .catch((err) => console.error("MongoDB connection error:", err));
 
 // Middleware
-app.use(cors({ credentials: true, origin: process.env.CLIENT_URL }));
+app.use(
+  cors({
+    credentials: true,
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 app.use(cookieParser());
 app.use(express.json());
 
