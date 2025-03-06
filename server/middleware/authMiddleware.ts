@@ -2,29 +2,32 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-// Our custom request type with a user property
-export interface AuthRequest extends Request {
-  user?: { id: string; role: string };
+// Update JWTPayload to match what we're actually storing
+export interface JWTPayload {
+  id: string;
+  isAdmin: boolean;
 }
+
+// Update the request interface
+export type AuthenticatedRequest = Request & {
+  user: JWTPayload;
+};
 
 // Middleware to require a valid JWT token and attach user info
 export const requireAuth = (
   req: Request,
   res: Response,
   next: NextFunction
-): void => {
+) => {
   try {
     const token = req.cookies?.token;
     if (!token) {
       res.status(401).json({ message: "No token provided" });
       return;
     }
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-      id: string;
-      role: string;
-    };
-    // Now req.user (of type Express.User) is correctly set.
-    req.user = { id: decoded.id, role: decoded.role };
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
+    (req as AuthenticatedRequest).user = decoded;
     next();
   } catch (err) {
     res.status(401).json({ message: "Invalid or expired token" });
@@ -37,9 +40,10 @@ export const requireAdmin = (
   res: Response,
   next: NextFunction
 ) => {
-  const authReq = req as AuthRequest;
-  if (!authReq.user || authReq.user.role !== "admin") {
-    return res.status(403).json({ message: "Access denied. Admins only." });
+  const user = (req as AuthenticatedRequest).user;
+  if (!user?.isAdmin) {
+    res.status(403).json({ message: "Access denied. Admins only." });
+    return;
   }
   next();
 };

@@ -20,18 +20,21 @@ export function ProfileMenu({
   const { signOut, user } = useAuth();
   const [isLocalOpen, setIsLocalOpen] = useState(false);
 
-  // Add console.log to see the user data
   console.log("User data in ProfileMenu:", user);
 
+  // Get initials from username
   const getInitials = () => {
     if (!user) return "??";
-    return `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`;
+    const firstInitial = user.firstName?.[0] || "";
+    const lastInitial = user.lastName?.[0] || "";
+    return firstInitial + lastInitial || "??";
   };
 
-  // Get full name
+  // Get display name
   const getFullName = () => {
     if (!user) return "Loading...";
-    return `${user.firstName || ""} ${user.lastName || ""}`.trim();
+    const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+    return fullName || "Loading...";
   };
 
   const handleLogout = async () => {
@@ -97,7 +100,7 @@ export function ProfileMenu({
           <p className="text-sm font-medium text-gray-700 text-left">
             {getFullName()}
           </p>
-          <p className="text-xs text-gray-500">{user?.role || "User"}</p>
+          <p className="text-xs text-gray-500">{user?.role}</p>
         </div>
       </button>
 

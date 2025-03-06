@@ -7,19 +7,16 @@ import {
 } from "react";
 import axios from "axios";
 
-// Configure axios defaults
 axios.defaults.baseURL =
   import.meta.env.VITE_API_URL || "http://localhost:5000";
 axios.defaults.withCredentials = true;
 
-console.log("API URL:", import.meta.env.VITE_API_URL);
-
 interface User {
   id: string;
-  firstName?: string;
-  lastName?: string;
+  firstName: string;
+  lastName: string;
   username?: string;
-  email?: string;
+  email: string;
   role: string;
 }
 
@@ -44,7 +41,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Check if user is logged in on mount
   useEffect(() => {
     console.log("Checking auth state...");
     checkAuth();
@@ -53,7 +49,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checkAuth = async () => {
     try {
       const { data } = await axios.get("/auth/me");
-      setUser(data.user);
+      setUser({
+        id: data.user.id,
+        firstName: data.user.firstName,
+        lastName: data.user.lastName,
+        email: data.user.email,
+        username: data.user.username,
+        role: data.user.isAdmin ? "Administrator" : "User",
+      });
     } catch (error) {
       console.error("Auth check failed:", error);
       setUser(null);
@@ -73,7 +76,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data.user) {
         setUser({
-          ...data.user,
+          id: data.user.id,
+          firstName: data.user.firstName,
+          lastName: data.user.lastName,
+          email: data.user.email,
+          username: data.user.username,
           role: data.user.isAdmin ? "Administrator" : "User",
         });
         console.log("User set in context with full data:", data.user);
@@ -108,7 +115,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (data.user) {
-        setUser(data.user);
+        setUser({
+          id: data.user.id,
+          firstName: data.user.firstName,
+          lastName: data.user.lastName,
+          email: data.user.email,
+          username: data.user.username,
+          role: data.user.isAdmin ? "Administrator" : "User",
+        });
       } else {
         throw new Error("No user data received");
       }
@@ -124,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     try {
       setLoading(true);
-      await axios.post("/auth/logout");
+      await axios.get("/auth/logout");
       setUser(null);
     } catch (error) {
       console.error("Logout failed:", error);
@@ -135,7 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const googleSignIn = () => {
-    window.location.href = "/api/auth/google";
+    window.location.href = "/auth/google";
   };
 
   return (
