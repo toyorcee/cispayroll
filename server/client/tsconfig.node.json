@@ -5,6 +5,8 @@
     "lib": ["ES2023"],
     "module": "ESNext",
     "skipLibCheck": true,
+    "types": ["jspdf-autotable"],
+    "typeRoots": ["./node_modules/@types", "./src/types"],
 
     /* Bundler mode */
     "moduleResolution": "bundler",

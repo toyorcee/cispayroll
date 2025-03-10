@@ -1,3 +1,5 @@
+import { UserRole, Permission } from "./auth";
+
 export interface PayrollSettings {
   processingDay: string;
   currency: string;
@@ -151,21 +153,22 @@ export interface TaxSettings {
   nhfRate: number;
 }
 
-// ... previous types ...
-
 export interface User {
-  id: number;
-  name: string;
+  id: string;
+  employeeId: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  role: string;
-  department: string;
-  status: "Active" | "Inactive";
-  lastActive: string;
+  role: UserRole;
+  permissions: Permission[];
+  department?: string;
+  status: "active" | "inactive" | "suspended";
+  lastLogin?: Date;
 }
 
 export interface Role {
-  name: string;
-  permissions: string[];
+  name: UserRole;
+  permissions: Permission[];
 }
 
 export interface UserStats {

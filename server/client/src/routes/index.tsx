@@ -24,11 +24,198 @@ import Compliance from "../pages/dashboard/settings/Compliance";
 import UserManagement from "../pages/dashboard/settings/UserManagement";
 import Notifications from "../pages/dashboard/settings/Notifications";
 import Integrations from "../pages/dashboard/settings/Integrations";
+import UserProfile from "../pages/dashboard/profile/UserProfile";
+import Payslips from "../pages/dashboard/settings/Payslips";
+import UserDocuments from "../pages/dashboard/settings/UserDocuments";
+import UserLeaveManagement from "../pages/dashboard/employees/UserLeaveManagement";
 import { AuthProvider } from "../context/AuthContext";
+import { UserRole, Permission } from "../types/auth";
+
+export interface RouteConfig {
+  path: string;
+  label: string;
+  icon?: React.ComponentType;
+  roles: UserRole[];
+  permissions?: Permission[];
+  element: React.ReactNode;
+  children?: RouteConfig[];
+}
+
+export const routes: RouteConfig[] = [
+  {
+    path: "",
+    label: "Dashboard",
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+    element: <Dashboard />,
+  },
+  {
+    path: "profile",
+    label: "My Profile",
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+    permissions: [Permission.VIEW_PERSONAL_INFO],
+    element: <UserProfile />,
+  },
+  {
+    path: "my-payslips",
+    label: "Payslips",
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+    element: <Payslips />,
+  },
+  {
+    path: "my-documents",
+    label: "Documents",
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+    element: <UserDocuments />,
+  },
+  {
+    path: "my-leave",
+    label: "Leave Management",
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+    permissions: [Permission.REQUEST_LEAVE, Permission.VIEW_OWN_LEAVE],
+    element: <UserLeaveManagement />,
+  },
+  {
+    path: "employees",
+    label: "Employees",
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    element: <AllEmployees />,
+    children: [
+      {
+        path: "list",
+        label: "All Employees",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.MANAGE_USERS],
+        element: <AllEmployees />,
+      },
+      {
+        path: "onboarding",
+        label: "Onboarding",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.MANAGE_USERS],
+        element: <Onboarding />,
+      },
+      {
+        path: "leave",
+        label: "Leave Management",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        element: <LeaveManagement />,
+      },
+    ],
+  },
+  {
+    path: "payroll",
+    label: "Payroll",
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    element: <ProcessPayroll />,
+    children: [
+      {
+        path: "process",
+        label: "Process Payroll",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.MANAGE_PAYROLL],
+        element: <ProcessPayroll />,
+      },
+      {
+        path: "structure",
+        label: "Salary Structure",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.MANAGE_PAYROLL],
+        element: <SalaryStructure />,
+      },
+      {
+        path: "deductions",
+        label: "Deductions",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.MANAGE_PAYROLL],
+        element: <Deductions />,
+      },
+    ],
+  },
+  {
+    path: "reports",
+    label: "Reports",
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    permissions: [Permission.VIEW_REPORTS],
+    element: <PayrollReports />,
+    children: [
+      {
+        path: "payroll",
+        label: "Payroll Reports",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.VIEW_REPORTS],
+        element: <PayrollReports />,
+      },
+      {
+        path: "employees",
+        label: "Employee Reports",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.VIEW_REPORTS],
+        element: <EmployeeReports />,
+      },
+      {
+        path: "tax",
+        label: "Tax Reports",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.VIEW_REPORTS],
+        element: <TaxReports />,
+      },
+      {
+        path: "audit",
+        label: "Audit Logs",
+        roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.VIEW_REPORTS],
+        element: <AuditLogs />,
+      },
+    ],
+  },
+  {
+    path: "settings",
+    label: "Settings",
+    roles: [UserRole.SUPER_ADMIN],
+    element: <GeneralSettings />,
+    children: [
+      {
+        path: "company",
+        label: "Company Profile",
+        roles: [UserRole.SUPER_ADMIN],
+        element: <CompanyProfile />,
+      },
+      {
+        path: "tax",
+        label: "Tax Configuration",
+        roles: [UserRole.SUPER_ADMIN],
+        element: <TaxConfiguration />,
+      },
+      {
+        path: "compliance",
+        label: "Compliance",
+        roles: [UserRole.SUPER_ADMIN],
+        element: <Compliance />,
+      },
+      {
+        path: "users",
+        label: "User Management",
+        roles: [UserRole.SUPER_ADMIN],
+        element: <UserManagement />,
+      },
+      {
+        path: "notifications",
+        label: "Notifications",
+        roles: [UserRole.SUPER_ADMIN],
+        element: <Notifications />,
+      },
+      {
+        path: "integrations",
+        label: "Integrations",
+        roles: [UserRole.SUPER_ADMIN],
+        element: <Integrations />,
+      },
+    ],
+  },
+];
 
 export const router = createBrowserRouter([
   {
-    // Root element that wraps everything
     element: (
       <AuthProvider>
         <Outlet />
@@ -36,7 +223,6 @@ export const router = createBrowserRouter([
     ),
     children: [
       {
-        // Auth routes (no header/footer)
         children: [
           {
             path: "/auth/signin",
@@ -49,7 +235,6 @@ export const router = createBrowserRouter([
         ],
       },
       {
-        // Main routes (with header/footer)
         element: <AppLayout />,
         children: [
           {
@@ -59,90 +244,45 @@ export const router = createBrowserRouter([
         ],
       },
       {
-        // Dashboard routes (protected, with header/footer)
         path: "/dashboard",
         element: (
-          <ProtectedRoute>
+          <ProtectedRoute
+            roles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]}
+          >
             <NavigationProvider>
               <DashboardLayout />
             </NavigationProvider>
           </ProtectedRoute>
         ),
-        children: [
-          {
-            path: "",
-            element: <Dashboard />,
-          },
-          {
-            path: "employees",
-            element: <AllEmployees />,
-          },
-          {
-            path: "employees/onboarding",
-            element: <Onboarding />,
-          },
-          {
-            path: "employees/leave",
-            element: <LeaveManagement />,
-          },
-          {
-            path: "payroll",
-            element: <ProcessPayroll />,
-          },
-          {
-            path: "payroll/structure",
-            element: <SalaryStructure />,
-          },
-          {
-            path: "payroll/deductions",
-            element: <Deductions />,
-          },
-          {
-            path: "reports/payroll",
-            element: <PayrollReports />,
-          },
-          {
-            path: "reports/employees",
-            element: <EmployeeReports />,
-          },
-          {
-            path: "reports/tax",
-            element: <TaxReports />,
-          },
-          {
-            path: "reports/audit",
-            element: <AuditLogs />,
-          },
-          {
-            path: "settings",
-            element: <GeneralSettings />,
-          },
-          {
-            path: "settings/company",
-            element: <CompanyProfile />,
-          },
-          {
-            path: "settings/tax",
-            element: <TaxConfiguration />,
-          },
-          {
-            path: "settings/compliance",
-            element: <Compliance />,
-          },
-          {
-            path: "settings/users",
-            element: <UserManagement />,
-          },
-          {
-            path: "settings/notifications",
-            element: <Notifications />,
-          },
-          {
-            path: "settings/integrations",
-            element: <Integrations />,
-          },
-        ],
+        children: routes.map((route) => ({
+          path: route.path.replace(/^\/dashboard\/?/, "") || "",
+          element: (
+            <ProtectedRoute roles={route.roles} permissions={route.permissions}>
+              {route.element}
+            </ProtectedRoute>
+          ),
+          children: route.children?.map((child) => ({
+            path: child.path.replace(/^\/dashboard\/?/, ""),
+            element: (
+              <ProtectedRoute
+                roles={child.roles}
+                permissions={child.permissions}
+              >
+                {child.element}
+              </ProtectedRoute>
+            ),
+          })),
+        })),
       },
+    ],
+  },
+  {
+    path: "/",
+    element: <AppLayout />,
+    children: [
+      { index: true, element: <Home /> },
+      { path: "auth/signin", element: <SignIn /> },
+      { path: "auth/signup", element: <SignUp /> },
     ],
   },
 ]);

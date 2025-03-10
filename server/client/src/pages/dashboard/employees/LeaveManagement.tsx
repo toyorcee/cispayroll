@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useAuth } from "../../../context/AuthContext";
+import { UserRole } from "../../../types/auth";
 import {
   FaFilter,
   FaCalendarAlt,
@@ -61,15 +63,53 @@ const leaveTypeLabels: Record<LeaveType, string> = {
   unpaid: "Unpaid Leave",
 };
 
-export default function Leave() {
+export default function LeaveManagement() {
+  const { user } = useAuth();
   const [selectedStatus, setSelectedStatus] = useState<LeaveStatus | "all">(
     "all"
   );
 
-  const filteredRequests =
-    selectedStatus === "all"
-      ? leaveRequests
-      : leaveRequests.filter((request) => request.status === selectedStatus);
+  const getFilteredRequests = () => {
+    let filtered = leaveRequests;
+
+    // Role-based filtering
+    if (user?.role === UserRole.USER) {
+      filtered = leaveRequests.filter(
+        (request) => request.employeeId === user.id
+      );
+    } else if (user?.role === UserRole.ADMIN) {
+      filtered = leaveRequests.filter(
+        (request) => request.employee.department === user.department
+      );
+    }
+    // SUPER_ADMIN sees all requests
+
+    // Status filtering
+    if (selectedStatus !== "all") {
+      filtered = filtered.filter(
+        (request) => request.status === selectedStatus
+      );
+    }
+
+    return filtered;
+  };
+
+  const canManageRequests = () => {
+    return [UserRole.SUPER_ADMIN, UserRole.ADMIN].includes(
+      user?.role as UserRole
+    );
+  };
+
+  const getPageTitle = () => {
+    switch (user?.role) {
+      case UserRole.SUPER_ADMIN:
+        return "All Leave Requests";
+      case UserRole.ADMIN:
+        return "Department Leave Requests";
+      default:
+        return "My Leave Requests";
+    }
+  };
 
   const calculateDuration = (start: Date, end: Date) => {
     const diffTime = Math.abs(end.getTime() - start.getTime());
@@ -77,9 +117,14 @@ export default function Leave() {
     return `${diffDays} days`;
   };
 
+  const filteredRequests = getFilteredRequests();
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-semibold text-gray-900">
+          {getPageTitle()}
+        </h1>
         <Link
           to="/dashboard/leave/request"
           className="inline-flex items-center px-4 py-2 !bg-green-600 !text-white rounded-lg hover:bg-green-700 
@@ -93,91 +138,109 @@ export default function Leave() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <div
-          className="bg-white overflow-hidden shadow rounded-lg transform transition-all duration-300 
-                    hover:scale-105 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
-        >
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <FaCalendarAlt className="h-6 w-6 text-green-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total Leave Days
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">24</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div
-          className="bg-white overflow-hidden shadow rounded-lg transform transition-all duration-300 
-                    hover:scale-105 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
-        >
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <FaCheckCircle className="h-6 w-6 text-green-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Used Days
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">12</dd>
-                </dl>
+        {user?.role === UserRole.USER ? (
+          // User view - personal stats
+          <>
+            <div
+              className="bg-white overflow-hidden shadow rounded-lg transform transition-all duration-300 
+                          hover:scale-105 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
+            >
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <FaCalendarAlt className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">
+                        My Leave Balance
+                      </dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {user?.leave?.annual || 0} days
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        <div
-          className="bg-white overflow-hidden shadow rounded-lg transform transition-all duration-300 
-                    hover:scale-105 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
-        >
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <FaClock className="h-6 w-6 text-green-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Pending Requests
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {leaveRequests.filter((r) => r.status === "pending").length}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div
-          className="bg-white overflow-hidden shadow rounded-lg transform transition-all duration-300 
-                    hover:scale-105 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
-        >
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <FaTimesCircle className="h-6 w-6 text-green-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Remaining Days
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">12</dd>
-                </dl>
+            <div
+              className="bg-white overflow-hidden shadow rounded-lg transform transition-all duration-300 
+                          hover:scale-105 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
+            >
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <FaCheckCircle className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">
+                        Pending Requests
+                      </dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {
+                          filteredRequests.filter((r) => r.status === "pending")
+                            .length
+                        }
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+          </>
+        ) : (
+          // Admin/Super Admin view
+          <>
+            <div
+              className="bg-white overflow-hidden shadow rounded-lg transform transition-all duration-300 
+                          hover:scale-105 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
+            >
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <FaCalendarAlt className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">
+                        Total Leave Requests
+                      </dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {filteredRequests.length}
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              className="bg-white overflow-hidden shadow rounded-lg transform transition-all duration-300 
+                          hover:scale-105 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
+            >
+              <div className="p-5">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <FaClock className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div className="ml-5 w-0 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">
+                        Pending Approvals
+                      </dt>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {
+                          filteredRequests.filter((r) => r.status === "pending")
+                            .length
+                        }
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Filters */}
@@ -277,7 +340,7 @@ export default function Leave() {
                     {request.submittedAt.toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm md:text-base">
-                    {request.status === "pending" && (
+                    {request.status === "pending" && canManageRequests() ? (
                       <>
                         <button
                           className="text-green-600 hover:text-green-700 mr-4 
@@ -296,8 +359,7 @@ export default function Leave() {
                           Reject
                         </button>
                       </>
-                    )}
-                    {request.status !== "pending" && (
+                    ) : (
                       <button
                         className="text-green-600 hover:text-green-700
                                  transition-all duration-200 
