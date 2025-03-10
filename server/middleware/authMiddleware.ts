@@ -1,7 +1,9 @@
 // middleware/authMiddleware.ts
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import UserModel from "../models/User.js";
 import { UserRole, Permission } from "../models/User.js";
+import { PermissionChecker } from "../utils/permissionUtils.js";
 
 // Update JWTPayload to match what we're storing in the token
 export interface JWTPayload {
@@ -15,6 +17,11 @@ export interface JWTPayload {
 // Update the request interface
 export interface AuthenticatedRequest extends Request {
   user: JWTPayload;
+}
+
+// New helper type for department-specific operations
+export interface DepartmentRequest extends AuthenticatedRequest {
+  departmentId?: string;
 }
 
 // Base middleware to require authentication
@@ -38,10 +45,11 @@ export const requireAuth = (
   }
 };
 
-// Middleware to check for specific roles
+// Update requireRole to use permissions
 export const requireRole = (roles: UserRole[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const user = (req as AuthenticatedRequest).user;
+    // Super Admin check remains the same
     if (user.role === UserRole.SUPER_ADMIN) {
       next();
       return;
@@ -49,6 +57,8 @@ export const requireRole = (roles: UserRole[]) => {
     if (!roles.includes(user.role)) {
       res.status(403).json({
         message: "Access denied. Insufficient role privileges.",
+        required: roles,
+        current: user.role,
       });
       return;
     }
@@ -56,20 +66,27 @@ export const requireRole = (roles: UserRole[]) => {
   };
 };
 
-// Middleware to check for specific permissions
-export const requirePermission = (permissions: Permission[]) => {
+// Enhanced permission middleware with better error handling
+export const requirePermission = (requiredPermissions: Permission[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const user = (req as AuthenticatedRequest).user;
+
+    // Super Admin bypass remains
     if (user.role === UserRole.SUPER_ADMIN) {
       next();
       return;
     }
-    const hasAllPermissions = permissions.every((permission) =>
-      user.permissions.includes(permission)
-    );
-    if (!hasAllPermissions) {
+
+    if (!PermissionChecker.hasAllPermissions(user, requiredPermissions)) {
+      const missingPermissions = requiredPermissions.filter(
+        (permission) => !user.permissions.includes(permission)
+      );
+
       res.status(403).json({
         message: "Access denied. Insufficient permissions.",
+        required: requiredPermissions,
+        missing: missingPermissions,
+        current: user.permissions,
       });
       return;
     }
@@ -77,23 +94,31 @@ export const requirePermission = (permissions: Permission[]) => {
   };
 };
 
-// Convenience middleware for admin-only routes
+// Simplify requireAdmin to focus on role check only since we have requirePermission
 export const requireAdmin = (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   const user = (req as AuthenticatedRequest).user;
-  if (![UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(user.role)) {
+
+  if (user.role === UserRole.SUPER_ADMIN) {
+    next();
+    return;
+  }
+
+  if (user.role !== UserRole.ADMIN) {
     res.status(403).json({
-      message: "Access denied. Administrators only.",
+      message: "Access denied. Administrator privileges required.",
+      current: user.role,
     });
     return;
   }
+
   next();
 };
 
-// Convenience middleware for super-admin-only routes
+// requireSuperAdmin remains mostly the same but with enhanced error message
 export const requireSuperAdmin = (
   req: Request,
   res: Response,
@@ -101,9 +126,58 @@ export const requireSuperAdmin = (
 ) => {
   const user = (req as AuthenticatedRequest).user;
   if (user.role !== UserRole.SUPER_ADMIN) {
-    return res.status(403).json({
+    res.status(403).json({
       message: "Access denied. Super Admin privileges required.",
+      current: user.role,
     });
+    return;
   }
   next();
+};
+
+// New middleware for department-specific operations
+export const requireDepartmentAccess = (
+  allowedRoles: UserRole[] = [UserRole.ADMIN]
+) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const user = (req as AuthenticatedRequest).user;
+    const departmentId = req.params.departmentId || req.body.departmentId;
+
+    // Super Admin can access all departments
+    if (user.role === UserRole.SUPER_ADMIN) {
+      (req as DepartmentRequest).departmentId = departmentId;
+      next();
+      return;
+    }
+
+    if (!allowedRoles.includes(user.role)) {
+      res.status(403).json({
+        message: "Access denied. Insufficient role for department access.",
+        required: allowedRoles,
+        current: user.role,
+      });
+      return;
+    }
+
+    // For admins, check if they belong to the department
+    try {
+      const userDoc = await UserModel.findById(user.id);
+      if (!userDoc || userDoc.department !== departmentId) {
+        res.status(403).json({
+          message: "Access denied. You can only access your own department.",
+          requestedDepartment: departmentId,
+          userDepartment: userDoc?.department,
+        });
+        return;
+      }
+
+      (req as DepartmentRequest).departmentId = departmentId;
+      next();
+    } catch (error) {
+      res.status(500).json({
+        message: "Error verifying department access",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  };
 };

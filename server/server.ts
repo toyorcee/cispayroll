@@ -10,6 +10,7 @@ import authRoutes from "./routes/authRoutes.js";
 import superAdminRoutes from "./routes/superAdminRoutes.js";
 import leaveRoutes from "./routes/leaveRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import regularUserRoutes from "./routes/regularUserRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -46,6 +47,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/super-admin", superAdminRoutes);
 app.use("/api/leave", leaveRoutes);
+app.use("/api/users", regularUserRoutes);
 
 // Health Check Route
 app.get("/api/health", (_req: Request, res: Response) => {

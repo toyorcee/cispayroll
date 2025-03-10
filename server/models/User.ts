@@ -8,21 +8,49 @@ export enum UserRole {
   USER = "USER",
 }
 
-// Define permission types
+// Define permission types with clear categorization
 export enum Permission {
-  MANAGE_USERS = "MANAGE_USERS",
-  MANAGE_ADMINS = "MANAGE_ADMINS",
-  MANAGE_PAYROLL = "MANAGE_PAYROLL",
+  // ===== User Management Permissions =====
+  // Super Admin Only
+  CREATE_ADMIN = "CREATE_ADMIN",
+  EDIT_ADMIN = "EDIT_ADMIN",
+  DELETE_ADMIN = "DELETE_ADMIN",
+  VIEW_ALL_ADMINS = "VIEW_ALL_ADMINS", // New: For Super Admin to view admin list
+
+  // Admin & Super Admin
+  CREATE_USER = "CREATE_USER",
+  EDIT_USER = "EDIT_USER",
+  DELETE_USER = "DELETE_USER",
+  VIEW_ALL_USERS = "VIEW_ALL_USERS",
+
+  // ===== Department Management =====
+  CREATE_DEPARTMENT = "CREATE_DEPARTMENT", // New: Super Admin only
+  EDIT_DEPARTMENT = "EDIT_DEPARTMENT", // New: Super Admin only
+  DELETE_DEPARTMENT = "DELETE_DEPARTMENT", // New: Super Admin only
+  VIEW_ALL_DEPARTMENTS = "VIEW_ALL_DEPARTMENTS", // New: Both Admin and Super Admin
+  MANAGE_DEPARTMENT_USERS = "MANAGE_DEPARTMENT_USERS", // New: Admin can manage users in their department
+
+  // ===== Payroll Permissions =====
+  CREATE_PAYROLL = "CREATE_PAYROLL", // New: Super Admin & Admin
+  EDIT_PAYROLL = "EDIT_PAYROLL", // New: Super Admin & Admin
+  DELETE_PAYROLL = "DELETE_PAYROLL", // New: Super Admin only
+  VIEW_ALL_PAYROLL = "VIEW_ALL_PAYROLL", // New: Super Admin can view all payroll
+  VIEW_DEPARTMENT_PAYROLL = "VIEW_DEPARTMENT_PAYROLL", // New: Admin can view department payroll
+  APPROVE_PAYROLL = "APPROVE_PAYROLL", // New: Super Admin only
+  GENERATE_PAYSLIP = "GENERATE_PAYSLIP", // New: Admin & Super Admin
   VIEW_REPORTS = "VIEW_REPORTS",
-  MANAGE_DEPARTMENTS = "MANAGE_DEPARTMENTS",
+
+  // ===== Leave Management =====
   APPROVE_LEAVE = "APPROVE_LEAVE",
+  VIEW_TEAM_LEAVE = "VIEW_TEAM_LEAVE",
+  VIEW_ALL_LEAVE = "VIEW_ALL_LEAVE", // New: Super Admin can view all leave requests
+
+  // ===== Basic User Permissions =====
   VIEW_PERSONAL_INFO = "VIEW_PERSONAL_INFO",
-  // Add new leave-related permissions
   REQUEST_LEAVE = "REQUEST_LEAVE",
   VIEW_OWN_LEAVE = "VIEW_OWN_LEAVE",
   CANCEL_OWN_LEAVE = "CANCEL_OWN_LEAVE",
-  VIEW_TEAM_LEAVE = "VIEW_TEAM_LEAVE",
-  // Add more permissions as needed
+  VIEW_OWN_PAYSLIP = "VIEW_OWN_PAYSLIP", // New: All users can view their payslip
 }
 
 // Base interface for user properties
@@ -241,7 +269,7 @@ UserSchema.methods.hasRole = function (
   return this.role === role;
 };
 
-// Update the pre-save middleware
+// Update the pre-save middleware with enhanced permissions
 UserSchema.pre("save", function (this: UserDocument, next) {
   if (
     this.isModified("role") &&
@@ -249,34 +277,113 @@ UserSchema.pre("save", function (this: UserDocument, next) {
   ) {
     switch (this.role) {
       case UserRole.SUPER_ADMIN:
-        this.permissions = Object.values(Permission);
-        break;
-      case UserRole.ADMIN:
         this.permissions = [
-          Permission.MANAGE_USERS,
-          Permission.MANAGE_PAYROLL,
+          // User Management
+          Permission.CREATE_ADMIN,
+          Permission.EDIT_ADMIN,
+          Permission.DELETE_ADMIN,
+          Permission.VIEW_ALL_ADMINS,
+          Permission.CREATE_USER,
+          Permission.EDIT_USER,
+          Permission.DELETE_USER,
+          Permission.VIEW_ALL_USERS,
+
+          // Department Management
+          Permission.CREATE_DEPARTMENT,
+          Permission.EDIT_DEPARTMENT,
+          Permission.DELETE_DEPARTMENT,
+          Permission.VIEW_ALL_DEPARTMENTS,
+          Permission.MANAGE_DEPARTMENT_USERS,
+
+          // Payroll Management
+          Permission.CREATE_PAYROLL,
+          Permission.EDIT_PAYROLL,
+          Permission.DELETE_PAYROLL,
+          Permission.VIEW_ALL_PAYROLL,
+          Permission.APPROVE_PAYROLL,
+          Permission.GENERATE_PAYSLIP,
           Permission.VIEW_REPORTS,
-          Permission.MANAGE_DEPARTMENTS,
+
+          // Leave Management
           Permission.APPROVE_LEAVE,
-          Permission.VIEW_PERSONAL_INFO,
           Permission.VIEW_TEAM_LEAVE,
+          Permission.VIEW_ALL_LEAVE,
+
+          // Basic Permissions
+          Permission.VIEW_PERSONAL_INFO,
           Permission.REQUEST_LEAVE,
           Permission.VIEW_OWN_LEAVE,
           Permission.CANCEL_OWN_LEAVE,
+          Permission.VIEW_OWN_PAYSLIP,
         ];
         break;
+
+      case UserRole.ADMIN:
+        this.permissions = [
+          // User Management (User-level only)
+          Permission.CREATE_USER,
+          Permission.EDIT_USER,
+          Permission.DELETE_USER,
+          Permission.VIEW_ALL_USERS,
+
+          // Department Management
+          Permission.VIEW_ALL_DEPARTMENTS,
+          Permission.MANAGE_DEPARTMENT_USERS,
+
+          // Payroll Management
+          Permission.CREATE_PAYROLL,
+          Permission.EDIT_PAYROLL,
+          Permission.VIEW_DEPARTMENT_PAYROLL,
+          Permission.GENERATE_PAYSLIP,
+          Permission.VIEW_REPORTS,
+
+          // Leave Management
+          Permission.APPROVE_LEAVE,
+          Permission.VIEW_TEAM_LEAVE,
+
+          // Basic Permissions
+          Permission.VIEW_PERSONAL_INFO,
+          Permission.REQUEST_LEAVE,
+          Permission.VIEW_OWN_LEAVE,
+          Permission.CANCEL_OWN_LEAVE,
+          Permission.VIEW_OWN_PAYSLIP,
+        ];
+        break;
+
       case UserRole.USER:
         this.permissions = [
           Permission.VIEW_PERSONAL_INFO,
           Permission.REQUEST_LEAVE,
           Permission.VIEW_OWN_LEAVE,
           Permission.CANCEL_OWN_LEAVE,
+          Permission.VIEW_OWN_PAYSLIP,
         ];
         break;
     }
   }
   next();
 });
+
+// Add helper methods to match ROLE_PERMISSIONS structure
+UserSchema.methods.canCreateAdmin = function (this: UserDocument): boolean {
+  return this.hasPermission(Permission.CREATE_ADMIN);
+};
+
+UserSchema.methods.canCreateUser = function (this: UserDocument): boolean {
+  return this.hasPermission(Permission.CREATE_USER);
+};
+
+UserSchema.methods.canEditAdmin = function (this: UserDocument): boolean {
+  return this.hasPermission(Permission.EDIT_ADMIN);
+};
+
+UserSchema.methods.canEditUser = function (this: UserDocument): boolean {
+  return this.hasPermission(Permission.EDIT_USER);
+};
+
+UserSchema.methods.canViewAll = function (this: UserDocument): boolean {
+  return this.hasPermission(Permission.VIEW_ALL_USERS);
+};
 
 UserSchema.virtual("fullName").get(function (this: UserDocument) {
   return `${this.firstName} ${this.lastName}`;

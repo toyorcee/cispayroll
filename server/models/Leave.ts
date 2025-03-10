@@ -16,28 +16,32 @@ export enum LeaveType {
   OTHER = "OTHER",
 }
 
-export interface ILeave {
-  user: Types.ObjectId;
+export interface ILeave extends Document {
+  employee: Types.ObjectId;
+  leaveType: LeaveType;
   startDate: Date;
   endDate: Date;
-  type: LeaveType;
   reason: string;
   status: LeaveStatus;
   approvedBy?: Types.ObjectId;
-  approvalDate?: Date;
-  approvalNotes?: string;
-  attachments?: string[];
+  approvedAt?: Date;
+  rejectionReason?: string;
+  createdBy: Types.ObjectId;
+  updatedBy: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface LeaveDocument extends Document, ILeave {}
-
-const LeaveSchema = new Schema<LeaveDocument>(
+const LeaveSchema = new Schema<ILeave>(
   {
-    user: {
+    employee: {
       type: Schema.Types.ObjectId,
       ref: "User",
+      required: true,
+    },
+    leaveType: {
+      type: String,
+      enum: Object.values(LeaveType),
       required: true,
     },
     startDate: {
@@ -46,11 +50,6 @@ const LeaveSchema = new Schema<LeaveDocument>(
     },
     endDate: {
       type: Date,
-      required: true,
-    },
-    type: {
-      type: String,
-      enum: Object.values(LeaveType),
       required: true,
     },
     reason: {
@@ -66,13 +65,30 @@ const LeaveSchema = new Schema<LeaveDocument>(
       type: Schema.Types.ObjectId,
       ref: "User",
     },
-    approvalDate: Date,
-    approvalNotes: String,
-    attachments: [String],
+    approvedAt: Date,
+    rejectionReason: String,
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    updatedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
   },
   {
     timestamps: true,
   }
 );
 
-export default mongoose.model<LeaveDocument>("Leave", LeaveSchema);
+// Add validation for dates
+LeaveSchema.pre("save", function (next) {
+  if (this.startDate > this.endDate) {
+    next(new Error("End date cannot be before start date"));
+  }
+  next();
+});
+
+export default mongoose.model<ILeave>("Leave", LeaveSchema);

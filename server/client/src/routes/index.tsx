@@ -195,7 +195,8 @@ export const routes: RouteConfig[] = [
       {
         path: "users",
         label: "User Management",
-        roles: [UserRole.SUPER_ADMIN],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.MANAGE_USERS],
         element: <UserManagement />,
       },
       {

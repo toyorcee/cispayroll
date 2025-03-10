@@ -1,10 +1,11 @@
-import bcryptjs from "bcryptjs";
+import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
+import { UserDocument } from "../models/User.js";
 import { UserRole, Permission } from "../models/User.js";
 
 // Define the User model type
-const User = mongoose.model("User");
+const UserModel = mongoose.model("User");
 
 // Define interface for user document
 interface IUserDocument extends mongoose.Document {
@@ -53,18 +54,18 @@ export interface CreateUserData extends SignupData {
 
 class AuthService {
   static async hashPassword(password: string): Promise<string> {
-    const salt = await bcryptjs.genSalt(10);
-    return bcryptjs.hash(password, salt);
+    const salt = await bcrypt.genSalt(10);
+    return bcrypt.hash(password, salt);
   }
 
   static async comparePasswords(
     plainPassword: string,
     hashedPassword: string
   ): Promise<boolean> {
-    return bcryptjs.compare(plainPassword, hashedPassword);
+    return bcrypt.compare(plainPassword, hashedPassword);
   }
 
-  static generateToken(user: IUserDocument): string {
+  static generateToken(user: UserDocument | IUserDocument): string {
     return jwt.sign(
       {
         id: user._id.toString(),
@@ -76,7 +77,7 @@ class AuthService {
     );
   }
 
-  static formatUserResponse(user: IUserDocument) {
+  static formatUserResponse(user: UserDocument | IUserDocument) {
     return {
       id: user._id.toString(),
       firstName: user.firstName,
@@ -102,16 +103,33 @@ class AuthService {
         return Object.values(Permission);
       case UserRole.ADMIN:
         return [
-          Permission.MANAGE_USERS,
-          Permission.MANAGE_PAYROLL,
+          // User Management
+          Permission.CREATE_USER,
+          Permission.EDIT_USER,
+          Permission.DELETE_USER,
+          Permission.VIEW_ALL_USERS,
+
+          // Department Management
+          Permission.VIEW_ALL_DEPARTMENTS,
+          Permission.MANAGE_DEPARTMENT_USERS,
+
+          // Payroll Management
+          Permission.CREATE_PAYROLL,
+          Permission.EDIT_PAYROLL,
+          Permission.VIEW_DEPARTMENT_PAYROLL,
+          Permission.GENERATE_PAYSLIP,
           Permission.VIEW_REPORTS,
-          Permission.MANAGE_DEPARTMENTS,
+
+          // Leave Management
           Permission.APPROVE_LEAVE,
-          Permission.VIEW_PERSONAL_INFO,
           Permission.VIEW_TEAM_LEAVE,
+
+          // Basic Permissions
+          Permission.VIEW_PERSONAL_INFO,
           Permission.REQUEST_LEAVE,
           Permission.VIEW_OWN_LEAVE,
           Permission.CANCEL_OWN_LEAVE,
+          Permission.VIEW_OWN_PAYSLIP,
         ];
       case UserRole.USER:
         return [
@@ -119,6 +137,7 @@ class AuthService {
           Permission.REQUEST_LEAVE,
           Permission.VIEW_OWN_LEAVE,
           Permission.CANCEL_OWN_LEAVE,
+          Permission.VIEW_OWN_PAYSLIP,
         ];
     }
   }
@@ -131,9 +150,9 @@ class AuthService {
       throw new Error("Invalid email format");
     }
 
-    const user = await User.findOne({ email: credentials.email })
+    const user = (await UserModel.findOne({ email: credentials.email })
       .select("+password")
-      .exec();
+      .exec()) as UserDocument;
 
     if (!user) {
       throw new Error("Invalid credentials");
@@ -163,15 +182,15 @@ class AuthService {
   }
 
   static async createUser(
-    userData: Partial<IUserDocument>
+    userData: Partial<UserDocument | IUserDocument>
   ): Promise<AuthResponse> {
     try {
       if (userData.password) {
-        const salt = await bcryptjs.genSalt(10);
-        userData.password = await bcryptjs.hash(userData.password, salt);
+        const salt = await bcrypt.genSalt(10);
+        userData.password = await bcrypt.hash(userData.password, salt);
       }
 
-      const user = (await User.create(userData)) as IUserDocument;
+      const user = (await UserModel.create(userData)) as UserDocument;
       const token = this.generateToken(user);
 
       return {

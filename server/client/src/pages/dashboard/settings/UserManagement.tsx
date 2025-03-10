@@ -27,7 +27,23 @@ export default function UserManagement() {
     phone: "",
     workLocation: "",
     gradeLevel: "",
+    status: "active" as "active" | "inactive" | "suspended",
   });
+
+  // Add debug logging
+  // useEffect(() => {
+  //   console.log("Current User:", currentUser);
+  //   console.log(
+  //     "Has MANAGE_USERS permission:",
+  //     currentUser?.permissions?.includes("MANAGE_USERS")
+  //   );
+  //   console.log("Role:", currentUser?.role);
+  // }, [currentUser]);
+
+  // Debug the users data
+  useEffect(() => {
+    console.log("Users array:", users);
+  }, [users]);
 
   // Fetch users
   useEffect(() => {
@@ -36,9 +52,12 @@ export default function UserManagement() {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get("/admin/users");
+      console.log("Fetching users...");
+      const response = await axios.get("/api/admin/users");
+      console.log("Users API response:", response.data);
       setUsers(response.data.users);
     } catch (error: any) {
+      console.error("Error fetching users:", error);
       toast.error(error.response?.data?.message || "Failed to fetch users");
     } finally {
       setLoading(false);
@@ -48,12 +67,11 @@ export default function UserManagement() {
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await axios.post("/admin/users/create", newUser);
-      toast.success("User created successfully", {
-        style: { backgroundColor: "#10B981", color: "white" },
-      });
+      await axios.post("/api/admin/users/create", newUser);
+      toast.success("User created successfully");
       setShowAddUser(false);
       setNewUser({
+        ...newUser,
         firstName: "",
         lastName: "",
         email: "",
@@ -66,6 +84,7 @@ export default function UserManagement() {
         phone: "",
         workLocation: "",
         gradeLevel: "",
+        status: "active",
       });
       fetchUsers();
     } catch (error: any) {
@@ -75,7 +94,7 @@ export default function UserManagement() {
 
   const handleEditUser = async (userId: string) => {
     try {
-      const response = await axios.put(`/admin/users/${userId}`, {
+      const response = await axios.put(`/api/admin/users/${userId}`, {
         // updated user data
       });
       toast.success("User updated successfully", {
@@ -90,7 +109,7 @@ export default function UserManagement() {
   const handleDeleteUser = async (userId: string) => {
     if (window.confirm("Are you sure you want to delete this user?")) {
       try {
-        await axios.delete(`/admin/users/${userId}`);
+        await axios.delete(`/api/admin/users/${userId}`);
         toast.success("User deleted successfully", {
           style: { backgroundColor: "#10B981", color: "white" },
         });
@@ -101,10 +120,10 @@ export default function UserManagement() {
     }
   };
 
-  // Only show add user button for SUPER_ADMIN and ADMIN
-  const canManageUsers =
-    currentUser?.role === UserRole.SUPER_ADMIN ||
-    currentUser?.role === UserRole.ADMIN;
+  // Update the permission check
+  const canManageUsers = currentUser?.permissions?.includes(
+    Permission.MANAGE_USERS
+  );
 
   // Function to get default permissions based on role
   const getDefaultPermissions = (role: UserRole): Permission[] => {
@@ -139,6 +158,17 @@ export default function UserManagement() {
     });
   };
 
+  // Add departments array
+  const departments = [
+    "Human Resources",
+    "Finance",
+    "Information Technology",
+    "Operations",
+    "Marketing",
+    "Sales",
+    "Research & Development",
+  ];
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -148,124 +178,155 @@ export default function UserManagement() {
   }
 
   const AddUserForm = () => (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto z-50">
-      <div className="relative top-20 mx-auto p-5 w-full max-w-md">
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div className="relative top-20 mx-auto p-5 w-full max-w-2xl">
         <div className="bg-white rounded-lg shadow-xl">
           <div className="flex justify-between items-center p-4 border-b">
-            <h3 className="text-lg font-medium">Add New User</h3>
-            <button onClick={() => setShowAddUser(false)}>
-              <FaTimes className="h-5 w-5 text-gray-500" />
+            <h3 className="text-xl font-medium">Add New User</h3>
+            <button
+              onClick={() => setShowAddUser(false)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <FaTimes className="h-5 w-5" />
             </button>
           </div>
-          <form onSubmit={handleAddUser} className="p-6 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  First Name
-                </label>
-                <input
-                  type="text"
-                  value={newUser.firstName}
-                  onChange={(e) =>
-                    setNewUser({ ...newUser, firstName: e.target.value })
-                  }
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                  required
-                />
+
+          <form onSubmit={handleAddUser} className="p-6">
+            <div className="grid grid-cols-2 gap-6">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-900">Basic Information</h4>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newUser.firstName}
+                    onChange={(e) =>
+                      setNewUser({ ...newUser, firstName: e.target.value })
+                    }
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newUser.lastName}
+                    onChange={(e) =>
+                      setNewUser({ ...newUser, lastName: e.target.value })
+                    }
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={newUser.email}
+                    onChange={(e) =>
+                      setNewUser({ ...newUser, email: e.target.value })
+                    }
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    value={newUser.password}
+                    onChange={(e) =>
+                      setNewUser({ ...newUser, password: e.target.value })
+                    }
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                    required
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Last Name
-                </label>
-                <input
-                  type="text"
-                  value={newUser.lastName}
-                  onChange={(e) =>
-                    setNewUser({ ...newUser, lastName: e.target.value })
-                  }
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                  required
-                />
+
+              {/* Employment Details */}
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-900">
+                  Employment Details
+                </h4>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Employee ID
+                  </label>
+                  <input
+                    type="text"
+                    value={newUser.employeeId}
+                    onChange={(e) =>
+                      setNewUser({ ...newUser, employeeId: e.target.value })
+                    }
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Department
+                  </label>
+                  <select
+                    value={newUser.department}
+                    onChange={(e) =>
+                      setNewUser({ ...newUser, department: e.target.value })
+                    }
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                    required
+                  >
+                    <option value="">Select Department</option>
+                    {departments.map((dept) => (
+                      <option key={dept} value={dept}>
+                        {dept}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Role
+                  </label>
+                  <select
+                    value={newUser.role}
+                    onChange={handleRoleChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                    required
+                  >
+                    {currentUser?.role === UserRole.SUPER_ADMIN && (
+                      <option value={UserRole.ADMIN}>Department Admin</option>
+                    )}
+                    <option value={UserRole.USER}>Regular User</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Position
+                  </label>
+                  <input
+                    type="text"
+                    value={newUser.position}
+                    onChange={(e) =>
+                      setNewUser({ ...newUser, position: e.target.value })
+                    }
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                    required
+                  />
+                </div>
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
-              <input
-                type="email"
-                value={newUser.email}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, email: e.target.value })
-                }
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <input
-                type="password"
-                value={newUser.password}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, password: e.target.value })
-                }
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Employee ID
-              </label>
-              <input
-                type="text"
-                value={newUser.employeeId}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, employeeId: e.target.value })
-                }
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Role
-              </label>
-              <select
-                value={newUser.role}
-                onChange={handleRoleChange}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                required
-              >
-                {currentUser?.role === UserRole.SUPER_ADMIN && (
-                  <option value={UserRole.ADMIN}>Admin</option>
-                )}
-                <option value={UserRole.USER}>User</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Department
-              </label>
-              <input
-                type="text"
-                value={newUser.department}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, department: e.target.value })
-                }
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-              />
-            </div>
-
-            <div className="flex justify-end space-x-3 pt-4">
+            <div className="mt-6 flex justify-end space-x-3">
               <button
                 type="button"
                 onClick={() => setShowAddUser(false)}

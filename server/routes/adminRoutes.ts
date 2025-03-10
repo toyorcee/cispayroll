@@ -1,99 +1,95 @@
-import { Router, Response, NextFunction, RequestHandler } from "express";
+import { Router, RequestHandler } from "express";
 import {
   requireAuth,
   requireAdmin,
+  requirePermission,
   AuthenticatedRequest,
-  JWTPayload,
 } from "../middleware/authMiddleware.js";
-import { AuthService } from "../services/authService.js";
-import { UserRole } from "../models/User.js";
-import UserModel from "../models/User.js";
-import { UserController } from "../controllers/UserController.js";
+import { AdminController } from "../controllers/AdminController.js";
+import { Permission } from "../models/User.js";
 
 const router = Router();
 
-// Development-only route to reset SUPER_ADMIN
-router.post("/dev/reset-super-admin", (async (req, res: Response) => {
-  if (process.env.NODE_ENV !== "development") {
-    res
-      .status(403)
-      .json({ message: "This route is only available in development" });
-    return;
-  }
+// Apply base middleware
+router.use(requireAuth as RequestHandler);
+router.use(requireAdmin as RequestHandler);
 
-  try {
-    await UserModel.deleteMany({ role: UserRole.SUPER_ADMIN });
+// Department-specific routes (admins can manage their own department)
+router.get(
+  "/department/users",
+  requirePermission([Permission.VIEW_ALL_USERS]),
+  AdminController.getDepartmentUsers as RequestHandler<
+    {},
+    any,
+    any,
+    any,
+    { user: AuthenticatedRequest["user"] }
+  >
+);
 
-    const userData = {
-      ...req.body,
-      role: UserRole.SUPER_ADMIN,
-      isEmailVerified: true,
-    };
+router.get(
+  "/department/payroll",
+  requirePermission([Permission.VIEW_DEPARTMENT_PAYROLL]),
+  AdminController.getDepartmentPayroll as RequestHandler<
+    {},
+    any,
+    any,
+    any,
+    { user: AuthenticatedRequest["user"] }
+  >
+);
 
-    const { user } = await AuthService.createUser(userData);
-    res.status(201).json({
-      message: "SUPER_ADMIN reset successfully",
-      user,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Server error";
-    res.status(400).json({ message });
-  }
-}) as RequestHandler<any, any, any, any, { user: JWTPayload }>);
+// User management within department
+router.post(
+  "/department/users",
+  requirePermission([
+    Permission.CREATE_USER,
+    Permission.MANAGE_DEPARTMENT_USERS,
+  ]),
+  AdminController.createDepartmentUser as RequestHandler<
+    {},
+    any,
+    any,
+    any,
+    { user: AuthenticatedRequest["user"] }
+  >
+);
 
-// Apply middleware to all routes
-router.use(requireAuth);
-router.use(requireAdmin);
+router.put(
+  "/department/users/:id",
+  requirePermission([Permission.EDIT_USER, Permission.MANAGE_DEPARTMENT_USERS]),
+  AdminController.updateDepartmentUser as RequestHandler<
+    {},
+    any,
+    any,
+    any,
+    { user: AuthenticatedRequest["user"] }
+  >
+);
 
-// Admin routes for managing regular users
-router.get("/users", UserController.getAllUsers);
-router.post("/users/create", UserController.createUser);
-router.put("/users/:id", UserController.updateUser);
-router.delete("/users/:id", UserController.deleteUser);
+// Payroll management within department
+router.post(
+  "/department/payroll",
+  requirePermission([Permission.CREATE_PAYROLL]),
+  AdminController.createDepartmentPayroll as RequestHandler<
+    {},
+    any,
+    any,
+    any,
+    { user: AuthenticatedRequest["user"] }
+  >
+);
 
-// Initial SUPER_ADMIN setup
-router.post("/setup/super-admin", (async (
-  req,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const superAdminExists = await UserModel.exists({
-      role: UserRole.SUPER_ADMIN,
-    });
-
-    if (superAdminExists) {
-      const existingAdmin = await UserModel.findOne({
-        role: UserRole.SUPER_ADMIN,
-      }).select("email");
-
-      res.status(400).json({
-        message: "SUPER_ADMIN already exists",
-        details:
-          "Please use the existing super admin account or contact system administrator.",
-        email:
-          process.env.NODE_ENV === "development"
-            ? existingAdmin?.email
-            : undefined,
-      });
-      return;
-    }
-
-    const userData = {
-      ...req.body,
-      role: UserRole.SUPER_ADMIN,
-      isEmailVerified: true,
-    };
-
-    const { user } = await AuthService.createUser(userData);
-    res.status(201).json({
-      message: "SUPER_ADMIN created successfully",
-      user,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Server error";
-    res.status(400).json({ message });
-  }
-}) as RequestHandler<any, any, any, any, { user: JWTPayload }>);
+router.put(
+  "/department/payroll/:id",
+  requirePermission([Permission.EDIT_PAYROLL]),
+  AdminController.updateDepartmentPayroll as RequestHandler<
+    {},
+    any,
+    any,
+    any,
+    { user: AuthenticatedRequest["user"] }
+  >
+);
 
 export default router;

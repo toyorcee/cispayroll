@@ -1,4 +1,4 @@
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, Response, NextFunction, RequestHandler } from "express";
 import {
   requireAuth,
   requirePermission,
@@ -16,9 +16,9 @@ router.post(
   "/request",
   requireAuth,
   requirePermission([Permission.REQUEST_LEAVE]),
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  (async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      const userId = (req as AuthenticatedRequest).user.id;
+      const userId = req.user.id;
       const user = await User.findById(userId);
       if (!user) {
         res.status(404).json({ message: "User not found" });
@@ -31,7 +31,7 @@ router.post(
       const message = error instanceof Error ? error.message : "Server error";
       res.status(400).json({ message });
     }
-  }
+  }) as RequestHandler
 );
 
 // Get user's own leaves
@@ -39,9 +39,9 @@ router.get(
   "/my-leaves",
   requireAuth,
   requirePermission([Permission.VIEW_OWN_LEAVE]),
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  (async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      const userId = (req as AuthenticatedRequest).user.id;
+      const userId = req.user.id;
       const leaves = await LeaveService.getUserLeaves(
         new Types.ObjectId(userId)
       );
@@ -49,7 +49,7 @@ router.get(
     } catch (error) {
       res.status(500).json({ message: "Error fetching leaves" });
     }
-  }
+  }) as RequestHandler
 );
 
 // Approve/Reject leave (Admin only)
@@ -57,11 +57,11 @@ router.patch(
   "/:leaveId/status",
   requireAuth,
   requirePermission([Permission.APPROVE_LEAVE]),
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  (async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const { leaveId } = req.params;
       const { status, notes } = req.body;
-      const userId = (req as AuthenticatedRequest).user.id;
+      const userId = req.user.id;
 
       const approver = await User.findById(userId);
       if (!approver) {
@@ -92,7 +92,7 @@ router.patch(
       const message = error instanceof Error ? error.message : "Server error";
       res.status(400).json({ message });
     }
-  }
+  }) as RequestHandler
 );
 
 export default router;

@@ -1,8 +1,4 @@
-import Leave, {
-  LeaveDocument,
-  LeaveStatus,
-  LeaveType,
-} from "../models/Leave.js";
+import Leave, { ILeave, LeaveStatus, LeaveType } from "../models/Leave.js";
 import { UserDocument } from "../models/User.js";
 import { Types } from "mongoose";
 
@@ -18,7 +14,7 @@ export class LeaveService {
   static async createLeave(
     user: UserDocument,
     leaveData: CreateLeaveRequest
-  ): Promise<LeaveDocument> {
+  ): Promise<ILeave> {
     const leave = await Leave.create({
       user: user._id,
       ...leaveData,
@@ -27,7 +23,7 @@ export class LeaveService {
     return leave;
   }
 
-  static async getUserLeaves(userId: Types.ObjectId): Promise<LeaveDocument[]> {
+  static async getUserLeaves(userId: Types.ObjectId): Promise<ILeave[]> {
     return Leave.find({ user: userId }).sort({ createdAt: -1 });
   }
 
@@ -35,7 +31,7 @@ export class LeaveService {
     leaveId: Types.ObjectId,
     approver: UserDocument,
     notes?: string
-  ): Promise<LeaveDocument> {
+  ): Promise<ILeave> {
     const leave = await Leave.findByIdAndUpdate(
       leaveId,
       {
@@ -54,7 +50,7 @@ export class LeaveService {
     leaveId: Types.ObjectId,
     approver: UserDocument,
     notes?: string
-  ): Promise<LeaveDocument> {
+  ): Promise<ILeave> {
     const leave = await Leave.findByIdAndUpdate(
       leaveId,
       {
@@ -72,7 +68,7 @@ export class LeaveService {
   static async cancelLeave(
     leaveId: Types.ObjectId,
     userId: Types.ObjectId
-  ): Promise<LeaveDocument> {
+  ): Promise<ILeave> {
     const leave = await Leave.findOne({ _id: leaveId, user: userId });
     if (!leave) throw new Error("Leave request not found");
     if (leave.status !== LeaveStatus.PENDING) {
