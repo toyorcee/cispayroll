@@ -42,13 +42,11 @@ const DepartmentSchema = new Schema<DepartmentDocument, DepartmentModel>(
     name: {
       type: String,
       required: [true, "Department name is required"],
-      unique: true,
       trim: true,
     },
     code: {
       type: String,
       required: [true, "Department code is required"],
-      unique: true,
       trim: true,
       uppercase: true,
     },
@@ -124,8 +122,8 @@ DepartmentSchema.virtual("employeeCount", {
 });
 
 // Add indexes for frequently queried fields
-DepartmentSchema.index({ name: 1 });
-DepartmentSchema.index({ code: 1 });
+DepartmentSchema.index({ name: 1 }, { unique: true });
+DepartmentSchema.index({ code: 1 }, { unique: true });
 DepartmentSchema.index({ status: 1 });
 DepartmentSchema.index({ headOfDepartment: 1 });
 

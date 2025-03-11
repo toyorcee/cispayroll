@@ -91,4 +91,9 @@ LeaveSchema.pre("save", function (next) {
   next();
 });
 
+// Add these indexes at the bottom before export
+LeaveSchema.index({ employee: 1, startDate: 1 });
+LeaveSchema.index({ status: 1 });
+LeaveSchema.index({ department: 1 }); // If you track department
+
 export default mongoose.model<ILeave>("Leave", LeaveSchema);

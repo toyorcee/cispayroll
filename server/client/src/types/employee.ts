@@ -101,3 +101,50 @@ export interface OnboardingEmployee {
     taxInfoSubmitted?: boolean;
   };
 }
+
+export type OffboardingStatus =
+  | "pending"
+  | "in_progress"
+  | "clearance_pending"
+  | "completed"
+  | "cancelled";
+
+export type OffboardingTaskName =
+  | "exit_interview"
+  | "equipment_return"
+  | "access_revocation"
+  | "final_settlement"
+  | "knowledge_transfer"
+  | "documentation_handover";
+
+export interface OffboardingTask {
+  name: OffboardingTaskName;
+  completed: boolean;
+  dueDate?: Date;
+  assignedTo?: string;
+  notes?: string;
+  completedAt?: Date;
+  verifiedBy?: string;
+}
+
+export interface OffboardingEmployee {
+  id: string;
+  employeeId: string;
+  firstName: string;
+  lastName: string;
+  position: string;
+  department: string;
+  lastWorkingDate: Date;
+  initiatedDate: Date;
+  status: OffboardingStatus;
+  progress: number;
+  tasks: OffboardingTask[];
+  supervisor?: string;
+  reason: string;
+  clearance: {
+    itClearance?: boolean;
+    financeClearance?: boolean;
+    hrClearance?: boolean;
+    departmentClearance?: boolean;
+  };
+}

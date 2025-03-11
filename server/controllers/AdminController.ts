@@ -6,6 +6,7 @@ import { Permission, UserRole } from "../models/User.js";
 import { PermissionChecker } from "../utils/permissionUtils.js";
 import { Types } from "mongoose";
 import { handleError, ApiError } from "../utils/errorHandler.js";
+import { AuthService } from "../services/authService.js"; 
 
 export class AdminController {
   // Get all users in admin's department
@@ -58,10 +59,12 @@ export class AdminController {
         ...req.body,
         department: admin.department,
         role: UserRole.USER,
+        isEmailVerified: true,
         createdBy: req.user.id,
       };
 
-      const user = await UserModel.create(userData);
+      const { user } = await AuthService.createUser(userData);
+
       res.status(201).json({
         success: true,
         message: "User created successfully",

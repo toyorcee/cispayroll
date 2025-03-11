@@ -15,7 +15,7 @@ export enum Permission {
   CREATE_ADMIN = "CREATE_ADMIN",
   EDIT_ADMIN = "EDIT_ADMIN",
   DELETE_ADMIN = "DELETE_ADMIN",
-  VIEW_ALL_ADMINS = "VIEW_ALL_ADMINS", // New: For Super Admin to view admin list
+  VIEW_ALL_ADMINS = "VIEW_ALL_ADMINS",
 
   // Admin & Super Admin
   CREATE_USER = "CREATE_USER",
@@ -51,6 +51,19 @@ export enum Permission {
   VIEW_OWN_LEAVE = "VIEW_OWN_LEAVE",
   CANCEL_OWN_LEAVE = "CANCEL_OWN_LEAVE",
   VIEW_OWN_PAYSLIP = "VIEW_OWN_PAYSLIP", // New: All users can view their payslip
+
+  // Employee Lifecycle Management
+  MANAGE_ONBOARDING = "MANAGE_ONBOARDING",
+  VIEW_ONBOARDING = "VIEW_ONBOARDING",
+  MANAGE_OFFBOARDING = "MANAGE_OFFBOARDING",
+  VIEW_OFFBOARDING = "VIEW_OFFBOARDING",
+  APPROVE_OFFBOARDING = "APPROVE_OFFBOARDING",
+
+  // System Management
+  VIEW_PAYROLL_STATS = "VIEW_PAYROLL_STATS",
+  MANAGE_SYSTEM = "MANAGE_SYSTEM",
+  VIEW_SYSTEM_HEALTH = "VIEW_SYSTEM_HEALTH",
+  VIEW_AUDIT_LOGS = "VIEW_AUDIT_LOGS",
 }
 
 // Base interface for user properties
@@ -139,7 +152,6 @@ const UserSchema = new Schema<UserDocument, UserModel>(
     employeeId: {
       type: String,
       required: [true, "Employee ID is required"],
-      unique: true,
       trim: true,
     },
     firstName: {
@@ -155,7 +167,6 @@ const UserSchema = new Schema<UserDocument, UserModel>(
     email: {
       type: String,
       required: [true, "Email is required"],
-      unique: true,
       trim: true,
       lowercase: true,
     },
@@ -167,6 +178,7 @@ const UserSchema = new Schema<UserDocument, UserModel>(
     password: {
       type: String,
       select: false,
+      required: [true, "Password is required"],
     },
     role: {
       type: String,
@@ -315,6 +327,19 @@ UserSchema.pre("save", function (this: UserDocument, next) {
           Permission.VIEW_OWN_LEAVE,
           Permission.CANCEL_OWN_LEAVE,
           Permission.VIEW_OWN_PAYSLIP,
+
+          // Employee Lifecycle Management
+          Permission.MANAGE_ONBOARDING,
+          Permission.VIEW_ONBOARDING,
+          Permission.MANAGE_OFFBOARDING,
+          Permission.VIEW_OFFBOARDING,
+          Permission.APPROVE_OFFBOARDING,
+
+          // System Management
+          Permission.VIEW_PAYROLL_STATS,
+          Permission.MANAGE_SYSTEM,
+          Permission.VIEW_SYSTEM_HEALTH,
+          Permission.VIEW_AUDIT_LOGS,
         ];
         break;
 
@@ -347,6 +372,12 @@ UserSchema.pre("save", function (this: UserDocument, next) {
           Permission.VIEW_OWN_LEAVE,
           Permission.CANCEL_OWN_LEAVE,
           Permission.VIEW_OWN_PAYSLIP,
+
+          // Employee Lifecycle Management
+          Permission.VIEW_ONBOARDING,
+          Permission.MANAGE_ONBOARDING,
+          Permission.VIEW_OFFBOARDING,
+          Permission.MANAGE_OFFBOARDING,
         ];
         break;
 
@@ -398,6 +429,16 @@ UserSchema.set("toJSON", {
   },
 });
 
+// At the bottom, AFTER all schema definitions and BEFORE model export
+// Remove any existing indexes first
+UserSchema.clearIndexes();
+
+// Then add our indexes
+UserSchema.index({ email: 1 }, { unique: true });
+UserSchema.index({ employeeId: 1 }, { unique: true });
+UserSchema.index({ "bankDetails.accountNumber": 1 }, { unique: true });
 UserSchema.index({ role: 1 });
+UserSchema.index({ department: 1 });
+UserSchema.index({ status: 1 });
 
 export default mongoose.model<UserDocument, UserModel>("User", UserSchema);

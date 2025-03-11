@@ -199,30 +199,31 @@ export class SuperAdminController {
     }
   }
 
-  static async createUser(
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) {
+  static async createUser(req: AuthenticatedRequest, res: Response) {
     try {
-      if (req.body.department) {
-        const department = await DepartmentModel.findById(req.body.department);
-        if (!department) {
-          throw new ApiError(400, "Invalid department ID");
-        }
+      if (!req.body.department) {
+        throw new ApiError(400, "Department is required");
       }
 
       const userData = {
         ...req.body,
         role: UserRole.USER,
-        isEmailVerified: true,
+        isEmailVerified: true, // Since super admin creates it, it's verified
       };
 
-      const { user } = await AuthService.createUser(userData);
+      const user = await UserModel.create(userData);
+
       res.status(201).json({
         success: true,
         message: "User created successfully",
-        user,
+        user: {
+          id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          role: user.role,
+          department: user.department,
+        },
       });
     } catch (error) {
       const { statusCode, message } = handleError(error);

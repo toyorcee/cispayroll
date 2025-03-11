@@ -7,6 +7,7 @@ import {
 } from "react";
 import axios from "axios";
 import { User, UserRole, Permission } from "../types/auth";
+import { toast } from "react-toastify";
 
 axios.defaults.baseURL =
   import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -27,6 +28,7 @@ interface AuthContextType {
   hasPermission: (permission: Permission) => boolean;
   hasAnyPermission: (permissions: Permission[]) => boolean;
   hasAllPermissions: (permissions: Permission[]) => boolean;
+  hasRole: (role: UserRole) => boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
@@ -37,6 +39,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const hasRole = (role: UserRole): boolean => {
+    if (!user) return false;
+    if (user.role === UserRole.SUPER_ADMIN) return true;
+    if (user.role === UserRole.ADMIN && role === UserRole.USER) return true;
+    return user.role === role;
+  };
+
   useEffect(() => {
     checkAuth();
   }, []);
@@ -46,6 +55,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = await axios.get("/api/auth/me");
       if (data.user) {
         setUser(parseUserData(data.user));
+      } else {
+        setUser(null);
+        if (!window.location.pathname.includes("/auth/")) {
+          toast.error("Please login to continue");
+        }
       }
     } catch (error) {
       console.error("Auth check failed:", error);
@@ -101,9 +115,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       await axios.get("/api/auth/logout");
       setUser(null);
+      toast.success("Logged out successfully");
     } catch (error) {
       console.error("Logout failed:", error);
       setUser(null);
+      toast.error("Logout failed");
     } finally {
       setLoading(false);
     }
@@ -144,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         hasPermission,
         hasAnyPermission,
         hasAllPermissions,
+        hasRole,
       }}
     >
       {children}

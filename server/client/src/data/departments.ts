@@ -1,0 +1,40 @@
+import { Department } from "../types/department";
+
+export const departments: Department[] = [
+  {
+    id: "DEPT001",
+    name: "Engineering",
+    code: "ENG",
+    description: "Software Development and Infrastructure",
+    adminId: "USR001",
+    adminName: "John Doe",
+    employeeCount: 15,
+    status: "active",
+    createdAt: new Date("2024-01-01"),
+    updatedAt: new Date("2024-01-01"),
+  },
+  {
+    id: "DEPT002",
+    name: "Human Resources",
+    code: "HR",
+    description: "Employee Management and Recruitment",
+    adminId: "USR002",
+    adminName: "Jane Smith",
+    employeeCount: 5,
+    status: "active",
+    createdAt: new Date("2024-01-01"),
+    updatedAt: new Date("2024-01-01"),
+  },
+  {
+    id: "DEPT003",
+    name: "Finance",
+    code: "FIN",
+    description: "Financial Management and Accounting",
+    adminId: "USR003",
+    adminName: "Mike Johnson",
+    employeeCount: 8,
+    status: "active",
+    createdAt: new Date("2024-01-01"),
+    updatedAt: new Date("2024-01-01"),
+  },
+];
