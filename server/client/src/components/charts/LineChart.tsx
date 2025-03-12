@@ -20,7 +20,6 @@ const LineChart = ({ data }: LineChartProps) => {
 
   useEffect(() => {
     if (chartRef.current) {
-      // Destroy existing chart if it exists
       if (chartInstance.current) {
         chartInstance.current.destroy();
       }
@@ -29,21 +28,70 @@ const LineChart = ({ data }: LineChartProps) => {
       if (ctx) {
         chartInstance.current = new Chart(ctx, {
           type: "line",
-          data: data,
+          data: {
+            ...data,
+            datasets: data.datasets.map((dataset) => ({
+              ...dataset,
+              borderWidth: 3,
+              pointRadius: 4,
+              pointHoverRadius: 8,
+              pointBackgroundColor: "white",
+              pointHoverBackgroundColor: dataset.borderColor,
+              pointBorderWidth: 2,
+              pointHoverBorderWidth: 3,
+              tension: 0.4,
+              fill: true,
+            })),
+          },
           options: {
             responsive: true,
             animation: {
               duration: 2000,
               easing: "easeInOutQuart",
+              delay: (context) => {
+                const delay = context.dataIndex * 100;
+                return delay;
+              },
+            },
+            transitions: {
+              active: {
+                animation: {
+                  duration: 400,
+                },
+              },
+            },
+            interaction: {
+              intersect: false,
+              mode: "index",
             },
             plugins: {
               legend: {
                 position: "top",
+                labels: {
+                  font: {
+                    size: 12,
+                    weight: "bold",
+                  },
+                  usePointStyle: true,
+                  pointStyle: "circle",
+                },
               },
               tooltip: {
                 backgroundColor: "rgba(0, 0, 0, 0.8)",
                 padding: 12,
                 cornerRadius: 8,
+                titleFont: {
+                  size: 14,
+                  weight: "bold",
+                },
+                bodyFont: {
+                  size: 13,
+                },
+                callbacks: {
+                  label: (context) => {
+                    return `${context.dataset.label}: ${context.formattedValue}`;
+                  },
+                },
               },
             },
             scales: {
@@ -51,11 +99,30 @@ const LineChart = ({ data }: LineChartProps) => {
                 beginAtZero: true,
                 grid: {
                   color: "rgba(0, 0, 0, 0.1)",
+                  drawTicks: false,
+                },
+                border: {
+                  display: false,
+                },
+                ticks: {
+                  font: {
+                    size: 12,
+                    weight: "bold",
+                  },
                 },
               },
               x: {
                 grid: {
                   display: false,
+                },
+                border: {
+                  display: false,
+                },
+                ticks: {
+                  font: {
+                    size: 12,
+                    weight: "bold",
+                  },
                 },
               },
             },
@@ -73,9 +140,14 @@ const LineChart = ({ data }: LineChartProps) => {
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.5 }}
+      initial={{ opacity: 0, x: -100 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{
+        duration: 0.8,
+        type: "spring",
+        bounce: 0.4,
+        delay: 0.2,
+      }}
       className="w-full h-[300px] relative"
     >
       <canvas ref={chartRef} />

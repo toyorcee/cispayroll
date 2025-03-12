@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import Chart from "chart.js/auto";
+import { ChartType, ScriptableContext } from "chart.js";
+import { useInView } from "framer-motion";
 
 interface BarChartProps {
   data: {
@@ -17,10 +19,12 @@ interface BarChartProps {
 
 const BarChart = ({ data }: BarChartProps) => {
   const chartRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef(null);
+  const isInView = useInView(containerRef, { amount: 0.5 });
   const chartInstance = useRef<Chart | null>(null);
 
   useEffect(() => {
-    if (chartRef.current) {
+    if (chartRef.current && isInView) {
       if (chartInstance.current) {
         chartInstance.current.destroy();
       }
@@ -29,16 +33,46 @@ const BarChart = ({ data }: BarChartProps) => {
       if (ctx) {
         chartInstance.current = new Chart(ctx, {
           type: "bar",
-          data: data,
+          data: {
+            ...data,
+            datasets: data.datasets.map((dataset) => ({
+              ...dataset,
+              borderWidth: 2,
+              borderRadius: 8,
+              hoverBorderWidth: 3,
+              hoverBorderColor: dataset.borderColor.map((color) =>
+                color.replace("rgb", "rgba").replace(")", ", 1)")
+              ),
+              hoverBackgroundColor: dataset.backgroundColor.map((color) =>
+                color.replace("0.6", "0.8")
+              ),
+            })),
+          },
           options: {
             responsive: true,
             animation: {
               duration: 2000,
-              easing: "easeInOutQuart",
+              easing: "easeOutElastic",
+              delay: (context: ScriptableContext<"bar">) => {
+                return context.dataIndex * 300;
+              },
+            },
+            transitions: {
+              active: {
+                animation: {
+                  duration: 400,
+                },
+              },
             },
             plugins: {
               legend: {
                 position: "top",
+                labels: {
+                  font: {
+                    size: 12,
+                    weight: "bold",
+                  },
+                },
               },
               tooltip: {
                 backgroundColor: "rgba(0, 0, 0, 0.8)",
@@ -51,8 +85,11 @@ const BarChart = ({ data }: BarChartProps) => {
                 bodyFont: {
                   size: 13,
                 },
-                displayColors: true,
-                usePointStyle: true,
+                callbacks: {
+                  label: (context) => {
+                    return `${context.dataset.label}: ${context.formattedValue} employees`;
+                  },
+                },
               },
             },
             scales: {
@@ -60,10 +97,15 @@ const BarChart = ({ data }: BarChartProps) => {
                 beginAtZero: true,
                 grid: {
                   color: "rgba(0, 0, 0, 0.1)",
+                  drawTicks: false,
+                },
+                border: {
+                  display: false,
                 },
                 ticks: {
                   font: {
                     size: 12,
+                    weight: "bold",
                   },
                 },
               },
@@ -71,9 +113,13 @@ const BarChart = ({ data }: BarChartProps) => {
                 grid: {
                   display: false,
                 },
+                border: {
+                  display: false,
+                },
                 ticks: {
                   font: {
                     size: 12,
+                    weight: "bold",
                   },
                 },
               },
@@ -88,13 +134,19 @@ const BarChart = ({ data }: BarChartProps) => {
         chartInstance.current.destroy();
       }
     };
-  }, [data]);
+  }, [data, isInView]);
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.5 }}
+      ref={containerRef}
+      initial={{ opacity: 0, x: 100 }}
+      animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: 100 }}
+      transition={{
+        duration: 0.8,
+        type: "spring",
+        bounce: 0.4,
+        delay: 0.2,
+      }}
       className="w-full h-[300px] relative"
     >
       <canvas ref={chartRef} />

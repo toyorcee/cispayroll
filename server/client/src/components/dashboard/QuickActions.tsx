@@ -2,19 +2,33 @@ import { motion } from "framer-motion";
 import { UserRole, Permission } from "../../types/auth";
 import { FaPlus, FaUserPlus, FaFileAlt, FaCalendarPlus } from "react-icons/fa";
 import { Link } from "react-router-dom";
+import { IconType } from "react-icons";
+
+interface Action {
+  label: string;
+  icon: IconType;
+  href?: string;
+  color: string;
+  onClick?: () => void;
+}
 
 interface QuickActionsProps {
   role?: UserRole;
   permissions?: Permission[];
+  onAddAdmin: () => void;
 }
 
-const QuickActions = ({ role, permissions = [] }: QuickActionsProps) => {
-  const actions = {
+const QuickActions = ({
+  role,
+  permissions = [],
+  onAddAdmin,
+}: QuickActionsProps) => {
+  const actions: Record<UserRole, Action[]> = {
     [UserRole.SUPER_ADMIN]: [
       {
         label: "Add Admin",
         icon: FaUserPlus,
-        href: "/settings/users/new",
+        onClick: onAddAdmin,
         color: "blue",
       },
       {
@@ -65,16 +79,33 @@ const QuickActions = ({ role, permissions = [] }: QuickActionsProps) => {
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: index * 0.1 }}
         >
-          <Link
-            to={action.href}
-            className={`flex items-center p-4 bg-white rounded-lg shadow-md 
+          {action.onClick ? (
+            <button
+              onClick={action.onClick}
+              className={`flex items-center w-full p-4 bg-white rounded-lg shadow-md 
                        border-l-4 border-${action.color}-500 hover:shadow-lg transition-all duration-300`}
-          >
-            <action.icon className={`h-6 w-6 text-${action.color}-500 mr-3`} />
-            <span className="text-sm font-medium text-gray-700">
-              {action.label}
-            </span>
-          </Link>
+            >
+              <action.icon
+                className={`h-6 w-6 text-${action.color}-500 mr-3`}
+              />
+              <span className="text-sm font-medium text-gray-700">
+                {action.label}
+              </span>
+            </button>
+          ) : action.href ? (
+            <Link
+              to={action.href}
+              className={`flex items-center p-4 bg-white rounded-lg shadow-md 
+                       border-l-4 border-${action.color}-500 hover:shadow-lg transition-all duration-300`}
+            >
+              <action.icon
+                className={`h-6 w-6 text-${action.color}-500 mr-3`}
+              />
+              <span className="text-sm font-medium text-gray-700">
+                {action.label}
+              </span>
+            </Link>
+          ) : null}
         </motion.div>
       ))}
     </div>

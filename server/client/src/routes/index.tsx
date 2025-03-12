@@ -33,6 +33,8 @@ import Offboarding from "../pages/dashboard/employees/Offboarding";
 import { GlobalErrorBoundary } from "../components/error/GlobalErrorBoundary";
 import { SkeletonProvider } from "../components/skeletons/SkeletonProvider";
 import { useSkeleton } from "../components/skeletons/SkeletonProvider";
+import { AuthSkeleton } from "../components/skeletons/AuthSkeleton";
+import Dashboard from "../pages/dashboard/Dashboard";
 
 export interface RouteConfig {
   path: string;
@@ -255,17 +257,16 @@ const userRoutes: RouteConfig[] = [
 // Move lazy loading declarations to the top, before any usage
 const SignIn = lazy(() => import("../pages/auth/SignIn"));
 const SignUp = lazy(() => import("../pages/auth/SignUp"));
-const Dashboard = lazy(() => import("../pages/dashboard/Dashboard"));
 
-// Update the LazyRoute component to use our new skeleton types
+// Update the LazyRoute component
 function LazyRoute({
   component: Component,
   element,
-  skeletonType = "page", // Default to 'page' instead of 'dashboard'
+  skeletonType = "content",
 }: {
   component?: React.LazyExoticComponent<() => React.ReactElement>;
   element?: React.ReactNode;
-  skeletonType?: "page" | "dashboard" | "auth"; // Updated to use our new types
+  skeletonType: "content" | "auth";
 }) {
   const { getSkeleton } = useSkeleton();
 
@@ -278,50 +279,93 @@ function LazyRoute({
   );
 }
 
-// Update the routes configuration
+// First, let's separate employee routes
+const employeeRoutes: RouteConfig = {
+  path: "employees",
+  label: "Employees",
+  // Both SUPER_ADMIN and ADMIN should have access
+  roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+  // Base permissions for viewing the employee section
+  permissions: [Permission.VIEW_ALL_USERS],
+  element: <AllEmployees />,
+  children: [
+    {
+      path: "list",
+      label: "All Employees",
+      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+      permissions: [Permission.VIEW_ALL_USERS],
+      element: <AllEmployees />,
+    },
+    {
+      path: "onboarding",
+      label: "Onboarding",
+      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+      permissions: [Permission.MANAGE_ONBOARDING, Permission.VIEW_ONBOARDING],
+      element: <Onboarding />,
+    },
+    {
+      path: "offboarding",
+      label: "Offboarding",
+      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+      permissions: [
+        Permission.MANAGE_OFFBOARDING,
+        Permission.VIEW_OFFBOARDING,
+        Permission.APPROVE_OFFBOARDING,
+      ],
+      element: <Offboarding />,
+    },
+    {
+      path: "leave",
+      label: "Leave Management",
+      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+      permissions: [
+        Permission.APPROVE_LEAVE,
+        Permission.VIEW_TEAM_LEAVE,
+        Permission.VIEW_ALL_LEAVE, // Added this for super admin
+      ],
+      element: <LeaveManagement />,
+    },
+  ],
+};
+
+// Update your routes configuration
 export const routes: RouteConfig[] = [
-  // Common routes accessible to all roles
   {
     path: "",
     label: "Dashboard",
     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
     element: <Dashboard />,
   },
-  // Role-specific routes
+  employeeRoutes, // Add employee routes directly
   ...superAdminRoutes,
-  ...adminRoutes,
+  ...adminRoutes.filter((route) => route.path !== "employees"), // Remove employees from admin routes
   ...userRoutes,
 ];
 
-// Update the router configuration
+// Update the router configuration to properly wrap each route with ProtectedRoute
 export const router = createBrowserRouter([
   {
     element: (
       <AuthProvider>
         <SkeletonProvider>
-          <Outlet />
+          <NavigationProvider>
+            <Outlet />
+          </NavigationProvider>
         </SkeletonProvider>
       </AuthProvider>
     ),
+    errorElement: <GlobalErrorBoundary />,
     children: [
       {
+        path: "/auth",
         children: [
           {
-            path: "/auth/signin",
+            path: "signin",
             element: <LazyRoute component={SignIn} skeletonType="auth" />,
           },
           {
-            path: "/auth/signup",
+            path: "signup",
             element: <LazyRoute component={SignUp} skeletonType="auth" />,
-          },
-        ],
-      },
-      {
-        element: <AppLayout />,
-        children: [
-          {
-            path: "/",
-            element: <Home />,
           },
         ],
       },
@@ -331,51 +375,36 @@ export const router = createBrowserRouter([
           <ProtectedRoute
             roles={[UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]}
           >
-            <NavigationProvider>
-              <DashboardLayout />
-            </NavigationProvider>
+            <DashboardLayout />
           </ProtectedRoute>
         ),
         children: routes.map((route) => ({
           path: route.path.replace(/^\/dashboard\/?/, "") || "",
           element: (
-            <LazyRoute
-              element={route.element}
-              skeletonType={
-                // Use specific skeleton types based on route
-                route.path.includes("profile")
-                  ? "page"
-                  : route.path.includes("settings")
-                  ? "page"
-                  : "dashboard"
-              }
-            />
+            <ProtectedRoute roles={route.roles} permissions={route.permissions}>
+              <LazyRoute element={route.element} skeletonType="content" />
+            </ProtectedRoute>
           ),
-          children: route.children?.map((child) => ({
-            path: child.path.replace(/^\/dashboard\/?/, ""),
+          children: route.children?.map((childRoute) => ({
+            path: childRoute.path,
             element: (
-              <LazyRoute
-                element={child.element}
-                skeletonType="page" // All child routes use page skeleton
-              />
+              <ProtectedRoute
+                roles={childRoute.roles}
+                permissions={childRoute.permissions}
+              >
+                <LazyRoute
+                  element={childRoute.element}
+                  skeletonType="content"
+                />
+              </ProtectedRoute>
             ),
           })),
         })),
       },
-    ],
-  },
-  {
-    path: "/",
-    element: <AppLayout />,
-    children: [
-      { index: true, element: <Home /> },
       {
-        path: "auth/signin",
-        element: <LazyRoute component={SignIn} skeletonType="auth" />,
-      },
-      {
-        path: "auth/signup",
-        element: <LazyRoute component={SignUp} skeletonType="auth" />,
+        path: "/",
+        element: <AppLayout />,
+        children: [{ index: true, element: <Home /> }],
       },
     ],
   },

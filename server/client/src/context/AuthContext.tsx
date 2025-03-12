@@ -40,6 +40,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const hasRole = (role: UserRole): boolean => {
+    console.log("=== DEBUG: hasRole ===");
+    console.log("Checking role:", role);
+    console.log("User role:", user?.role);
+    console.log("Is SUPER_ADMIN?", user?.role === UserRole.SUPER_ADMIN);
+
     if (!user) return false;
     if (user.role === UserRole.SUPER_ADMIN) return true;
     if (user.role === UserRole.ADMIN && role === UserRole.USER) return true;
@@ -119,7 +124,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Logout failed:", error);
       setUser(null);
-      toast.error("Logout failed");
     } finally {
       setLoading(false);
     }
@@ -130,6 +134,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const hasPermission = (permission: Permission): boolean => {
+    console.log("=== DEBUG: hasPermission ===");
+    console.log("Checking permission:", permission);
+    console.log("User permissions:", user?.permissions);
+
     if (!user) return false;
     return user.permissions.includes(permission);
   };

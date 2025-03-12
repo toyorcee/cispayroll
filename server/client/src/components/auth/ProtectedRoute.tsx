@@ -3,6 +3,7 @@ import { useAuth } from "../../context/AuthContext";
 import { UserRole, Permission } from "../../types/auth";
 import { toast } from "react-toastify";
 import { useSkeleton } from "../../components/skeletons/SkeletonProvider";
+import { useState, useEffect } from "react";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -20,12 +21,17 @@ export function ProtectedRoute({
   const { user, loading } = useAuth();
   const location = useLocation();
   const { getSkeleton } = useSkeleton();
+  const [initialLoad, setInitialLoad] = useState(true);
+
+  useEffect(() => {
+    if (!loading) {
+      setInitialLoad(false);
+    }
+  }, [loading]);
 
   if (loading) {
-    // Use appropriate skeleton based on the route
-    return getSkeleton(
-      location.pathname.includes("dashboard") ? "dashboard" : "auth"
-    );
+    // Always show content skeleton for dashboard routes
+    return getSkeleton("content");
   }
 
   if (!user) {

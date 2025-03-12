@@ -1,8 +1,7 @@
-import { useEffect, useState, Suspense, lazy } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState, useRef } from "react";
+import { motion, useInView } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
 import { UserRole } from "../../types/auth";
-import { DashboardSkeleton } from "../../components/skeletons/DashboardSkeleton";
 import { getRoleSpecificWelcomeMessage } from "../../utils/dashboardUtils";
 import { GlobalErrorBoundary } from "../../components/error/GlobalErrorBoundary";
 import {
@@ -10,42 +9,15 @@ import {
   getRoleActivities,
   payrollData,
   departmentData,
+  departmentPieData,
 } from "../../data/dashboardData";
-
-// Correct way to implement prioritized lazy loading
-const StatCardLazy = lazy(() => import("../../components/dashboard/StatCard"));
-const QuickActionsLazy = lazy(
-  () => import("../../components/dashboard/QuickActions")
-);
-
-// For medium priority components, wrap the import in Promise.resolve
-const ActivityItemLazy = lazy(
-  () =>
-    new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(import("../../components/dashboard/ActivityItem") as any);
-      }, 100);
-    })
-);
-
-// For lower priority components, wrap the import in Promise.resolve
-const LineChartLazy = lazy(
-  () =>
-    new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(import("../../components/charts/LineChart") as any);
-      }, 300);
-    })
-);
-
-const BarChartLazy = lazy(
-  () =>
-    new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(import("../../components/charts/BarChart") as any);
-      }, 300);
-    })
-);
+import StatCard from "../../components/dashboard/StatCard";
+import QuickActions from "../../components/dashboard/QuickActions";
+import ActivityItem from "../../components/dashboard/ActivityItem";
+import LineChart from "../../components/charts/LineChart";
+import BarChart from "../../components/charts/BarChart";
+import PieChart from "../../components/charts/PieChart";
+import CreateAdminModal from "../../components/modals/CreateAdminModal";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -56,6 +28,16 @@ export default function Dashboard() {
     payroll: payrollData,
     department: departmentData,
   });
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+
+  // Add refs for each chart section
+  const payrollRef = useRef(null);
+  const distributionRef = useRef(null);
+  const pieChartRef = useRef(null);
+
+  const isPayrollInView = useInView(payrollRef, { amount: 0.5 });
+  const isDistributionInView = useInView(distributionRef, { amount: 0.5 });
+  const isPieChartInView = useInView(pieChartRef, { amount: 0.5 });
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -98,128 +80,148 @@ export default function Dashboard() {
 
   return (
     <GlobalErrorBoundary>
-      <Suspense fallback={<DashboardSkeleton />}>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="space-y-6 w-full overflow-x-hidden"
+      >
+        {/* Welcome Section */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className="space-y-6"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white p-6 rounded-lg shadow-lg border-l-4 border-blue-500"
         >
-          {/* Welcome Section */}
-          <motion.div
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.3 }}
-            className="bg-white p-6 rounded-lg shadow-lg border-l-4 border-blue-500"
-          >
-            <h1 className="text-2xl font-semibold text-gray-900">
-              Welcome back, {user?.firstName}!
-            </h1>
-            <p className="mt-1 text-sm text-gray-500">
-              {getRoleSpecificWelcomeMessage(user?.role)}
-            </p>
-          </motion.div>
+          <h1 className="text-2xl font-semibold text-gray-900">
+            Welcome back, {user?.firstName}!
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {getRoleSpecificWelcomeMessage(user?.role)}
+          </p>
+        </motion.div>
 
-          {/* Quick Actions - High Priority */}
-          <Suspense
-            fallback={
-              <div className="h-24 bg-gray-100 animate-pulse rounded-lg" />
-            }
-          >
-            <QuickActionsLazy
-              role={user?.role}
-              permissions={user?.permissions}
-            />
-          </Suspense>
+        {/* Quick Actions */}
+        <QuickActions
+          role={user?.role}
+          permissions={user?.permissions}
+          onAddAdmin={() => setIsAdminModalOpen(true)}
+        />
 
-          {/* Stats Grid - High Priority */}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.map((stat, index) => (
-              <Suspense
-                key={stat.name}
-                fallback={
-                  <div className="h-32 bg-gray-100 animate-pulse rounded-lg" />
-                }
-              >
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  <StatCardLazy {...stat} />
-                </motion.div>
-              </Suspense>
-            ))}
-          </div>
+        {/* Add the modal */}
+        <CreateAdminModal
+          isOpen={isAdminModalOpen}
+          onClose={() => setIsAdminModalOpen(false)}
+          departments={departmentData.labels}
+        />
 
-          {/* Charts Section - Lower Priority */}
-          {(user?.role === UserRole.SUPER_ADMIN ||
-            user?.role === UserRole.ADMIN) && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Suspense
-                fallback={
-                  <div className="h-64 bg-gray-100 animate-pulse rounded-lg" />
-                }
-              >
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="bg-white p-6 rounded-lg shadow-lg"
-                >
-                  <h2 className="text-lg font-semibold mb-4">Payroll Trends</h2>
-                  <LineChartLazy data={chartData.payroll} />
-                </motion.div>
-              </Suspense>
-
-              <Suspense
-                fallback={
-                  <div className="h-64 bg-gray-100 animate-pulse rounded-lg" />
-                }
-              >
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="bg-white p-6 rounded-lg shadow-lg"
-                >
-                  <h2 className="text-lg font-semibold mb-4">
-                    Department Statistics
-                  </h2>
-                  <BarChartLazy data={chartData.department} />
-                </motion.div>
-              </Suspense>
-            </div>
-          )}
-
-          {/* Recent Activity - Medium Priority */}
-          <Suspense
-            fallback={
-              <div className="h-48 bg-gray-100 animate-pulse rounded-lg" />
-            }
-          >
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {stats.map((stat, index) => (
             <motion.div
+              key={stat.name}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-white rounded-lg shadow-lg overflow-hidden"
+              transition={{ delay: index * 0.1 }}
             >
-              <div className="p-6">
-                <h2 className="text-lg font-semibold">Recent Activity</h2>
-                <div className="mt-4 space-y-4">
-                  {activities.map((activity, index) => (
-                    <ActivityItemLazy
-                      key={activity.id}
-                      activity={activity}
-                      index={index}
-                    />
-                  ))}
-                </div>
-              </div>
+              <StatCard {...stat} />
             </motion.div>
-          </Suspense>
+          ))}
+        </div>
+
+        {/* Charts Section */}
+        {(user?.role === UserRole.SUPER_ADMIN ||
+          user?.role === UserRole.ADMIN) && (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <motion.div
+                ref={payrollRef}
+                initial={{ opacity: 0, x: -50 }}
+                animate={
+                  isPayrollInView
+                    ? { opacity: 1, x: 0 }
+                    : { opacity: 0, x: -50 }
+                }
+                transition={{
+                  duration: 0.8,
+                  type: "spring",
+                  bounce: 0.4,
+                  delay: 0.1,
+                }}
+                className="bg-white p-6 rounded-lg shadow-lg"
+              >
+                <h2 className="text-lg font-semibold mb-4">
+                  Monthly Payroll Trends
+                </h2>
+                <LineChart data={chartData.payroll} />
+              </motion.div>
+
+              <motion.div
+                ref={distributionRef}
+                initial={{ opacity: 0, x: 50 }}
+                animate={
+                  isDistributionInView
+                    ? { opacity: 1, x: 0 }
+                    : { opacity: 0, x: 50 }
+                }
+                transition={{
+                  duration: 0.8,
+                  type: "spring",
+                  bounce: 0.4,
+                  delay: 0.2,
+                }}
+                className="bg-white p-6 rounded-lg shadow-lg"
+              >
+                <h2 className="text-lg font-semibold mb-4">
+                  Employee Distribution
+                </h2>
+                <BarChart data={chartData.department} />
+              </motion.div>
+            </div>
+
+            <motion.div
+              ref={pieChartRef}
+              initial={{ opacity: 0, y: 50 }}
+              animate={
+                isPieChartInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }
+              }
+              transition={{
+                duration: 0.8,
+                type: "spring",
+                bounce: 0.4,
+                delay: 0.3,
+              }}
+              className="bg-white p-6 rounded-lg shadow-lg mx-auto w-full max-w-4xl"
+            >
+              <h2 className="text-lg font-semibold mb-6 text-center">
+                Department Distribution Overview
+              </h2>
+              <PieChart data={departmentPieData} />
+            </motion.div>
+          </>
+        )}
+
+        {/* Recent Activity */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="bg-white rounded-lg shadow-lg overflow-hidden"
+        >
+          <div className="p-6">
+            <h2 className="text-lg font-semibold">Recent Activity</h2>
+            <div className="mt-4 space-y-4">
+              {activities.map((activity, index) => (
+                <ActivityItem
+                  key={activity.id}
+                  activity={activity}
+                  index={index}
+                />
+              ))}
+            </div>
+          </div>
         </motion.div>
-      </Suspense>
+      </motion.div>
     </GlobalErrorBoundary>
   );
 }

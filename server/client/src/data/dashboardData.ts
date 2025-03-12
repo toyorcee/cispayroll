@@ -344,31 +344,28 @@ export const getRoleActivities = (role?: UserRole): ActivityItem[] => {
   }
 };
 
-export const payrollData = {
-  labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-  datasets: [
-    {
-      label: "Total Payroll (Millions)",
-      data: [150, 155, 152, 148, 152, 155],
-      borderColor: "rgb(59, 130, 246)",
-      backgroundColor: "rgba(59, 130, 246, 0.1)",
-      tension: 0.4,
-    },
+export const departmentPieData = {
+  labels: [
+    "Engineering",
+    "Finance",
+    "HR",
+    "Marketing",
+    "Sales",
+    "Operations",
+    "Legal",
   ],
-};
-
-export const departmentData = {
-  labels: ["Engineering", "Finance", "HR", "Marketing", "Sales"],
   datasets: [
     {
-      label: "Employee Count",
-      data: [42, 28, 15, 22, 35],
+      label: "Department Distribution",
+      data: [42, 28, 15, 22, 35, 18, 12],
       backgroundColor: [
-        "rgba(59, 130, 246, 0.6)",
-        "rgba(16, 185, 129, 0.6)",
-        "rgba(245, 158, 11, 0.6)",
-        "rgba(239, 68, 68, 0.6)",
-        "rgba(139, 92, 246, 0.6)",
+        "rgba(59, 130, 246, 0.8)", // Blue
+        "rgba(16, 185, 129, 0.8)", // Green
+        "rgba(245, 158, 11, 0.8)", // Yellow
+        "rgba(239, 68, 68, 0.8)", // Red
+        "rgba(139, 92, 246, 0.8)", // Purple
+        "rgba(14, 165, 233, 0.8)", // Sky
+        "rgba(236, 72, 153, 0.8)", // Pink
       ],
       borderColor: [
         "rgb(59, 130, 246)",
@@ -376,6 +373,65 @@ export const departmentData = {
         "rgb(245, 158, 11)",
         "rgb(239, 68, 68)",
         "rgb(139, 92, 246)",
+        "rgb(14, 165, 233)",
+        "rgb(236, 72, 153)",
+      ],
+      borderWidth: 1,
+    },
+  ],
+};
+
+export const payrollData = {
+  labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+  datasets: [
+    {
+      label: "Total Payroll (Millions ₦)",
+      data: [150.5, 155.2, 152.8, 148.9, 152.4, 155.7],
+      borderColor: "rgb(59, 130, 246)",
+      backgroundColor: "rgba(59, 130, 246, 0.1)",
+      tension: 0.4,
+    },
+    {
+      label: "Average Per Employee (Thousands ₦)",
+      data: [450, 460, 455, 445, 452, 458],
+      borderColor: "rgb(16, 185, 129)",
+      backgroundColor: "rgba(16, 185, 129, 0.1)",
+      tension: 0.4,
+    },
+  ],
+};
+
+export const departmentData = {
+  labels: [
+    "Engineering",
+    "Finance",
+    "HR",
+    "Marketing",
+    "Sales",
+    "Operations",
+    "Legal",
+  ],
+  datasets: [
+    {
+      label: "Employee Count",
+      data: [42, 28, 15, 22, 35, 18, 12],
+      backgroundColor: [
+        "rgba(59, 130, 246, 0.6)",
+        "rgba(16, 185, 129, 0.6)",
+        "rgba(245, 158, 11, 0.6)",
+        "rgba(239, 68, 68, 0.6)",
+        "rgba(139, 92, 246, 0.6)",
+        "rgba(14, 165, 233, 0.6)",
+        "rgba(236, 72, 153, 0.6)",
+      ],
+      borderColor: [
+        "rgb(59, 130, 246)",
+        "rgb(16, 185, 129)",
+        "rgb(245, 158, 11)",
+        "rgb(239, 68, 68)",
+        "rgb(139, 92, 246)",
+        "rgb(14, 165, 233)",
+        "rgb(236, 72, 153)",
       ],
       borderWidth: 1,
     },

@@ -1,9 +1,9 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useRouteError } from "react-router-dom";
 import { motion } from "framer-motion";
 
 interface Props {
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 interface State {
@@ -30,8 +30,21 @@ export class GlobalErrorBoundary extends React.Component<Props, State> {
       return <ErrorFallback error={this.state.error} />;
     }
 
+    if (!this.props.children) {
+      return <RouteErrorFallback />;
+    }
+
     return this.props.children;
   }
+}
+
+function RouteErrorFallback() {
+  const error = useRouteError();
+  return (
+    <ErrorFallback
+      error={error instanceof Error ? error : new Error("Route error occurred")}
+    />
+  );
 }
 
 function ErrorFallback({ error }: { error: Error | null }) {
