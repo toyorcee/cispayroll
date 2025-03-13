@@ -6,31 +6,25 @@ import { useSkeleton } from "../../components/skeletons/SkeletonProvider";
 import { useState, useEffect } from "react";
 
 interface ProtectedRouteProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  element?: React.ReactNode;
   roles?: UserRole[];
   permissions?: Permission[];
   requireAllPermissions?: boolean;
 }
 
-export function ProtectedRoute({
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
+  element,
   roles,
   permissions,
-  requireAllPermissions = true,
-}: ProtectedRouteProps) {
+  requireAllPermissions = false,
+}) => {
   const { user, loading } = useAuth();
   const location = useLocation();
   const { getSkeleton } = useSkeleton();
-  const [initialLoad, setInitialLoad] = useState(true);
-
-  useEffect(() => {
-    if (!loading) {
-      setInitialLoad(false);
-    }
-  }, [loading]);
 
   if (loading) {
-    // Always show content skeleton for dashboard routes
     return getSkeleton("content");
   }
 
@@ -45,7 +39,7 @@ export function ProtectedRoute({
   }
 
   // Enhanced permission checking
-  if (permissions) {
+  if (permissions && permissions.length > 0) {
     const hasRequiredPermissions = requireAllPermissions
       ? permissions.every((permission) =>
           user.permissions?.includes(permission)
@@ -58,11 +52,11 @@ export function ProtectedRoute({
       const missingPermissions = permissions.filter(
         (permission) => !user.permissions?.includes(permission)
       );
-      toast.error(
-        `Access denied: Missing required permissions: ${missingPermissions.join(
-          ", "
-        )}`
-      );
+      console.log("User permissions:", user.permissions);
+      console.log("Required permissions:", permissions);
+      console.log("Missing permissions:", missingPermissions);
+
+      toast.error(`Access denied: Insufficient permissions for this action`);
       return <Navigate to="/dashboard" replace />;
     }
   }
@@ -165,4 +159,4 @@ export function ProtectedRoute({
   }
 
   return <>{children}</>;
-}
+};

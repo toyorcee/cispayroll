@@ -22,6 +22,7 @@ import {
   NavigationSubItem,
   IconType,
 } from "../../types/navigation";
+import { FaUsers, FaUserPlus, FaUserMinus } from "react-icons/fa";
 
 // Map icons to menu items
 const iconMap: Record<string, IconType> = {
@@ -86,35 +87,22 @@ export function Sidebar() {
     if (!subItems) return [];
 
     return subItems.filter((subItem: NavigationSubItem) => {
-      console.log(`2. Processing subitem: ${subItem.name}`);
-      console.log("- Required roles:", subItem.roles);
-      console.log("- Required permissions:", subItem.permissions);
-
-      // For Employees subitems, always show if SUPER_ADMIN
-      if (hasRole(UserRole.SUPER_ADMIN)) {
-        console.log(`- SUPER_ADMIN bypass for ${subItem.name}`);
+      // For SUPER_ADMIN, show all employee-related items
+      if (
+        hasRole(UserRole.SUPER_ADMIN) &&
+        subItem.href.startsWith("/employees")
+      ) {
         return true;
       }
 
       const hasValidRole =
-        !subItem.roles ||
-        subItem.roles.some((role) => {
-          const result = hasRole(role);
-          console.log(`- Role check for ${role}:`, result);
-          return result;
-        });
+        !subItem.roles || subItem.roles.some((role) => hasRole(role));
 
       const hasValidPermission =
         !subItem.permissions ||
-        subItem.permissions.some((permission) => {
-          const result = hasPermission(permission);
-          console.log(`- Permission check for ${permission}:`, result);
-          return result;
-        });
+        subItem.permissions.some((permission) => hasPermission(permission));
 
-      const show = hasValidRole && hasValidPermission;
-      console.log(`- Show ${subItem.name}:`, show);
-      return show;
+      return hasValidRole && hasValidPermission;
     });
   };
 
@@ -129,6 +117,54 @@ export function Sidebar() {
     isSidebarOpen,
     location: location.pathname,
     itemCount: filteredNavigation.length,
+  });
+
+  // Add debug logging
+  useEffect(() => {
+    if (user) {
+      console.log("Current user role:", user.role);
+      console.log("Current user permissions:", user.permissions);
+    }
+  }, [user]);
+
+  // Add these to your navigation items
+  const employeeItems = [
+    {
+      name: "All Employees",
+      path: "/dashboard/employees/list",
+      icon: FaUsers,
+      permissions: [Permission.VIEW_ALL_USERS],
+    },
+    {
+      name: "Onboarding",
+      path: "/dashboard/employees/onboarding",
+      icon: FaUserPlus,
+      permissions: [Permission.MANAGE_ONBOARDING, Permission.VIEW_ONBOARDING],
+      requireAllPermissions: false,
+      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    },
+    {
+      name: "Offboarding",
+      path: "/dashboard/employees/offboarding",
+      icon: FaUserMinus,
+      permissions: [Permission.MANAGE_OFFBOARDING, Permission.VIEW_OFFBOARDING],
+      requireAllPermissions: false,
+      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    },
+    // ... other items
+  ];
+
+  const filteredEmployeeItems = employeeItems.filter((item) => {
+    if (item.roles && !item.roles.includes(user?.role as UserRole)) {
+      return false;
+    }
+    if (item.permissions) {
+      if (item.requireAllPermissions) {
+        return item.permissions.every((p) => user?.permissions?.includes(p));
+      }
+      return item.permissions.some((p) => user?.permissions?.includes(p));
+    }
+    return true;
   });
 
   return (

@@ -42,6 +42,7 @@ export interface RouteConfig {
   icon?: React.ComponentType;
   roles: UserRole[];
   permissions?: Permission[];
+  requireAllPermissions?: boolean;
   element: React.ReactNode;
   children?: RouteConfig[];
 }
@@ -126,32 +127,33 @@ const adminRoutes: RouteConfig[] = [
       Permission.VIEW_OFFBOARDING,
       Permission.MANAGE_OFFBOARDING,
     ],
-    element: <AllEmployees />,
+    element: <Outlet />,
     children: [
       {
         path: "list",
         label: "All Employees",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.VIEW_ALL_USERS],
         element: <AllEmployees />,
+        permissions: [Permission.VIEW_ALL_USERS],
       },
       {
         path: "onboarding",
         label: "Onboarding",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.MANAGE_ONBOARDING, Permission.VIEW_ONBOARDING],
         element: <Onboarding />,
+        permissions: [Permission.MANAGE_ONBOARDING, Permission.VIEW_ONBOARDING],
+        requireAllPermissions: false,
       },
       {
         path: "offboarding",
         label: "Offboarding",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        element: <Offboarding />,
         permissions: [
           Permission.MANAGE_OFFBOARDING,
           Permission.VIEW_OFFBOARDING,
-          Permission.APPROVE_OFFBOARDING,
         ],
-        element: <Offboarding />,
+        requireAllPermissions: false,
       },
       {
         path: "leave",
@@ -242,14 +244,19 @@ const userRoutes: RouteConfig[] = [
     element: <UserDocuments />,
   },
   {
-    path: "my-leave",
+    path: "employees/leave",
     label: "Leave Management",
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    permissions: [Permission.APPROVE_LEAVE, Permission.VIEW_TEAM_LEAVE],
+    requireAllPermissions: false,
+    element: <LeaveManagement />,
+  },
+  {
+    path: "my-leave",
+    label: "My Leave",
     roles: [UserRole.USER],
-    permissions: [
-      Permission.REQUEST_LEAVE,
-      Permission.VIEW_OWN_LEAVE,
-      Permission.CANCEL_OWN_LEAVE,
-    ],
+    permissions: [Permission.REQUEST_LEAVE, Permission.VIEW_OWN_LEAVE],
+    requireAllPermissions: false,
     element: <UserLeaveManagement />,
   },
 ];
@@ -257,6 +264,9 @@ const userRoutes: RouteConfig[] = [
 // Move lazy loading declarations to the top, before any usage
 const SignIn = lazy(() => import("../pages/auth/SignIn"));
 const SignUp = lazy(() => import("../pages/auth/SignUp"));
+const CompleteRegistration = lazy(
+  () => import("../pages/auth/CompleteRegistration")
+);
 
 // Update the LazyRoute component
 function LazyRoute({
@@ -264,7 +274,7 @@ function LazyRoute({
   element,
   skeletonType = "content",
 }: {
-  component?: React.LazyExoticComponent<() => React.ReactElement>;
+  component?: React.LazyExoticComponent<React.ComponentType<any>>;
   element?: React.ReactNode;
   skeletonType: "content" | "auth";
 }) {
@@ -279,51 +289,37 @@ function LazyRoute({
   );
 }
 
-// First, let's separate employee routes
+// Update the employee routes configuration
 const employeeRoutes: RouteConfig = {
   path: "employees",
   label: "Employees",
-  // Both SUPER_ADMIN and ADMIN should have access
   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-  // Base permissions for viewing the employee section
   permissions: [Permission.VIEW_ALL_USERS],
-  element: <AllEmployees />,
+  requireAllPermissions: false,
+  element: <Outlet />,
   children: [
     {
       path: "list",
       label: "All Employees",
       roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-      permissions: [Permission.VIEW_ALL_USERS],
       element: <AllEmployees />,
+      permissions: [Permission.VIEW_ALL_USERS],
     },
     {
       path: "onboarding",
       label: "Onboarding",
       roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-      permissions: [Permission.MANAGE_ONBOARDING, Permission.VIEW_ONBOARDING],
       element: <Onboarding />,
+      permissions: [Permission.MANAGE_ONBOARDING, Permission.VIEW_ONBOARDING],
+      requireAllPermissions: false,
     },
     {
       path: "offboarding",
       label: "Offboarding",
       roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-      permissions: [
-        Permission.MANAGE_OFFBOARDING,
-        Permission.VIEW_OFFBOARDING,
-        Permission.APPROVE_OFFBOARDING,
-      ],
       element: <Offboarding />,
-    },
-    {
-      path: "leave",
-      label: "Leave Management",
-      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-      permissions: [
-        Permission.APPROVE_LEAVE,
-        Permission.VIEW_TEAM_LEAVE,
-        Permission.VIEW_ALL_LEAVE, // Added this for super admin
-      ],
-      element: <LeaveManagement />,
+      permissions: [Permission.MANAGE_OFFBOARDING, Permission.VIEW_OFFBOARDING],
+      requireAllPermissions: false,
     },
   ],
 };
@@ -336,10 +332,26 @@ export const routes: RouteConfig[] = [
     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
     element: <Dashboard />,
   },
-  employeeRoutes, // Add employee routes directly
+  employeeRoutes,
   ...superAdminRoutes,
-  ...adminRoutes.filter((route) => route.path !== "employees"), // Remove employees from admin routes
+  ...adminRoutes.filter((route) => route.path !== "employees"),
   ...userRoutes,
+  {
+    path: "employees/onboarding",
+    label: "Onboarding",
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    element: <ProtectedRoute element={<Onboarding />} />,
+    permissions: [Permission.MANAGE_ONBOARDING, Permission.VIEW_ONBOARDING],
+    requireAllPermissions: false,
+  },
+  {
+    path: "employees/offboarding",
+    label: "Offboarding",
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    element: <ProtectedRoute element={<Offboarding />} />,
+    permissions: [Permission.MANAGE_OFFBOARDING, Permission.VIEW_OFFBOARDING],
+    requireAllPermissions: false,
+  },
 ];
 
 // Update the router configuration to properly wrap each route with ProtectedRoute
@@ -367,6 +379,12 @@ export const router = createBrowserRouter([
             path: "signup",
             element: <LazyRoute component={SignUp} skeletonType="auth" />,
           },
+          {
+            path: "complete-registration/:token",
+            element: (
+              <LazyRoute component={CompleteRegistration} skeletonType="auth" />
+            ),
+          },
         ],
       },
       {
@@ -379,7 +397,7 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
         children: routes.map((route) => ({
-          path: route.path.replace(/^\/dashboard\/?/, "") || "",
+          path: route.path,
           element: (
             <ProtectedRoute roles={route.roles} permissions={route.permissions}>
               <LazyRoute element={route.element} skeletonType="content" />

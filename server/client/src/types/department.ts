@@ -3,9 +3,9 @@ export interface Department {
   name: string;
   code: string;
   description: string;
-  adminId?: string;
-  adminName?: string;
-  employeeCount?: number;
+  adminId: string;
+  adminName: string;
+  employeeCount: number;
   status: "active" | "inactive";
   createdAt: Date;
   updatedAt: Date;

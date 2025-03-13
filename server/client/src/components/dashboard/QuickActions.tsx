@@ -79,33 +79,20 @@ const QuickActions = ({
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: index * 0.1 }}
         >
-          {action.onClick ? (
-            <button
-              onClick={action.onClick}
-              className={`flex items-center w-full p-4 bg-white rounded-lg shadow-md 
-                       border-l-4 border-${action.color}-500 hover:shadow-lg transition-all duration-300`}
-            >
-              <action.icon
-                className={`h-6 w-6 text-${action.color}-500 mr-3`}
-              />
-              <span className="text-sm font-medium text-gray-700">
-                {action.label}
-              </span>
-            </button>
-          ) : action.href ? (
-            <Link
-              to={action.href}
-              className={`flex items-center p-4 bg-white rounded-lg shadow-md 
-                       border-l-4 border-${action.color}-500 hover:shadow-lg transition-all duration-300`}
-            >
-              <action.icon
-                className={`h-6 w-6 text-${action.color}-500 mr-3`}
-              />
-              <span className="text-sm font-medium text-gray-700">
-                {action.label}
-              </span>
-            </Link>
-          ) : null}
+          <button
+            onClick={action.onClick}
+            className={`flex items-center w-full p-4 bg-white rounded-lg shadow-md 
+                       border-l-4 border-${action.color}-500 hover:bg-gray-50 
+                       hover:shadow-lg transition-all duration-300 group`}
+          >
+            <action.icon
+              className={`h-6 w-6 text-${action.color}-500 mr-3 
+                        group-hover:text-${action.color}-600`}
+            />
+            <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
+              {action.label}
+            </span>
+          </button>
         </motion.div>
       ))}
     </div>

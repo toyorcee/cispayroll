@@ -1,4 +1,5 @@
 import { Status, BankDetails, Allowance, Deduction } from "./common";
+import { UserRole, Permission } from "./auth";
 
 export type LeaveType = "annual" | "sick" | "maternity" | "unpaid";
 export type LeaveStatus = "pending" | "approved" | "rejected";
@@ -27,6 +28,7 @@ export interface Employee {
   department: string;
   position: string;
   gradeLevel: string;
+  workLocation: string;
   bankDetails: BankDetails;
   dateJoined: Date;
   status: Status;
@@ -49,16 +51,26 @@ export interface Employee {
   leave: {
     annual: number;
     sick: number;
-    maternity?: number;
     unpaid: number;
+    maternity?: number;
   };
-  overtime?: {
+  overtime: {
     rate: number;
     hoursWorked: number;
   };
+  emergencyContact?: {
+    name: string;
+    relationship: string;
+    phone: string;
+  };
+  profileImage?: string;
+  reportingTo?: string;
+  isEmailVerified?: boolean;
+  lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
-  lastPayrollDate?: Date;
+  userRole: UserRole;
+  permissions: Permission[];
 }
 
 export type OnboardingStatus =
@@ -146,5 +158,33 @@ export interface OffboardingEmployee {
     financeClearance?: boolean;
     hrClearance?: boolean;
     departmentClearance?: boolean;
+  };
+}
+
+export interface EmployeeFilters {
+  page: number;
+  limit: number;
+  search?: string;
+  department?: string;
+  status?: Status;
+}
+
+export interface EmployeeDetails extends Employee {
+  profileImage?: string;
+  workLocation: string;
+  emergencyContact: {
+    name: string;
+    relationship: string;
+    phone: string;
+  };
+  socialLinks?: {
+    linkedin?: string;
+    twitter?: string;
+  };
+  skills?: string[];
+  documents?: {
+    resume?: string;
+    contract?: string;
+    certificates?: string[];
   };
 }
