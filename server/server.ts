@@ -4,6 +4,9 @@ import mongoose from "mongoose";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 
 // Route Imports
 import authRoutes from "./routes/authRoutes.js";
@@ -11,6 +14,8 @@ import superAdminRoutes from "./routes/superAdminRoutes.js";
 import leaveRoutes from "./routes/leaveRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import regularUserRoutes from "./routes/regularUserRoutes.js";
+import employeeRoutes from "./routes/employeeRoutes.js";
+import invitationRoutes from "./routes/invitationRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -18,6 +23,9 @@ dotenv.config();
 // Initialize Express
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Database Connection with retry logic
 const connectDB = async (): Promise<void> => {
@@ -48,6 +56,8 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/super-admin", superAdminRoutes);
 app.use("/api/leave", leaveRoutes);
 app.use("/api/users", regularUserRoutes);
+app.use("/api/employees", employeeRoutes);
+app.use("/api/invitation", invitationRoutes);
 
 // Health Check Route
 app.get("/api/health", (_req: Request, res: Response) => {
@@ -67,6 +77,16 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ message: "Route not found" });
 });
+
+// Serve uploaded files
+app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
+
+// Your test route for development
+if (process.env.NODE_ENV === "development") {
+  import("./routes/testRoutes.js").then((testRoutes) => {
+    app.use("/api/test", testRoutes.default);
+  });
+}
 
 // Start Server
 const startServer = async (): Promise<void> => {

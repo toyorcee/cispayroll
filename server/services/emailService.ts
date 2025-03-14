@@ -28,13 +28,13 @@ export class EmailService {
 
     const emailContent = {
       to: email,
-      subject: "Complete Your Payroll System Registration",
+      subject: "Welcome to Our Company - Complete Your Account Setup",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #1a73e8; text-align: center;">Welcome to Our Payroll System</h1>
+          <h1 style="color: #1a73e8; text-align: center;">Welcome to Our Team!</h1>
           
           <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <p style="color: #202124; font-size: 16px;">You have been invited to join our payroll system. To complete your registration, please click the button below:</p>
+            <p style="color: #202124; font-size: 16px;">Your employee account has been created in our payroll system. To access your account, please set up your password by clicking the button below:</p>
             
             <div style="text-align: center; margin: 30px 0;">
               <a href="${invitationLink}" 
@@ -44,18 +44,27 @@ export class EmailService {
                         text-decoration: none; 
                         border-radius: 4px;
                         display: inline-block;">
-                Complete Registration
+                Set Up Password
               </a>
             </div>
             
-            <p style="color: #5f6368; font-size: 14px;">This link will expire in 7 days.</p>
+            <p style="color: #5f6368; font-size: 14px;">For security reasons, this link will expire in 7 days.</p>
             
             <p style="color: #5f6368; font-size: 14px;">If you can't click the button, copy and paste this link into your browser:</p>
             <p style="color: #202124; font-size: 14px; word-break: break-all;">${invitationLink}</p>
           </div>
           
+          <p style="color: #5f6368; font-size: 14px; text-align: center;">
+            After setting up your password, you'll be able to:
+            <ul style="list-style-type: none; padding: 0;">
+              <li>✓ Access your payroll information</li>
+              <li>✓ View and manage your leave requests</li>
+              <li>✓ Update your profile details</li>
+            </ul>
+          </p>
+
           <p style="color: #5f6368; font-size: 12px; text-align: center;">
-            If you didn't expect this invitation, please ignore this email.
+            If you didn't expect this invitation, please contact HR immediately.
           </p>
         </div>
       `,

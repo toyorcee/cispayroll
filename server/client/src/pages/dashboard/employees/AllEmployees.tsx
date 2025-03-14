@@ -13,6 +13,8 @@ import {
   FaTrash,
   FaExchangeAlt,
   FaSearch,
+  FaTimes,
+  FaSpinner,
 } from "react-icons/fa";
 import { Employee } from "../../../types/employee";
 import { Status } from "../../../types/common";
@@ -34,6 +36,7 @@ import { DepartmentModal } from "../../../components/departments/DepartmentModal
 import { Department } from "../../../types/department";
 import { EmployeeFilters } from "../../../types/employee";
 import { DepartmentBasic } from "../../../services/employeeService";
+import { Dialog } from "@headlessui/react";
 
 export default function AllEmployees() {
   const { user } = useAuth();
@@ -56,6 +59,18 @@ export default function AllEmployees() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDepartmentModal, setShowDepartmentModal] = useState(false);
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    position: "",
+    gradeLevel: "",
+    workLocation: "",
+    dateJoined: new Date().toISOString().split("T")[0],
+    department: "",
+  });
+  const [isCreating, setIsCreating] = useState(false);
 
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
   const isAdmin = user?.role === UserRole.ADMIN;
@@ -189,17 +204,50 @@ export default function AllEmployees() {
     }
   };
 
-  const handleCreateEmployee = async (data: Partial<Employee>) => {
+  const handleCreateEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCreating(true);
     try {
-      await employeeService.createEmployee(data);
-      const response = await employeeService.getEmployees(filters);
-      setEmployees(response.data);
-      setTotalEmployees(response.total);
+      const employeeData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        position: formData.position,
+        gradeLevel: formData.gradeLevel,
+        workLocation: formData.workLocation,
+        dateJoined: new Date(formData.dateJoined),
+        department: isSuperAdmin ? formData.department : user?.department,
+      };
+
+      console.log("Sending employee data:", employeeData);
+
+      const response = await employeeService.createEmployee(employeeData);
+      console.log("Server response:", response);
+
+      const employeesResponse = await employeeService.getEmployees(filters);
+      setEmployees(employeesResponse.data);
+      setTotalEmployees(employeesResponse.total);
       setShowCreateModal(false);
-      toast.success("Employee created successfully");
-    } catch (error) {
-      toast.error("Failed to create employee");
-      throw error;
+
+      setFormData({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phone: "",
+        position: "",
+        gradeLevel: "",
+        workLocation: "",
+        dateJoined: new Date().toISOString().split("T")[0],
+        department: "",
+      });
+
+      toast.success("Employee invitation sent successfully");
+    } catch (error: any) {
+      console.error("Error creating employee:", error);
+      toast.error(error.response?.data?.message || "Failed to create employee");
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -507,21 +555,229 @@ export default function AllEmployees() {
         onTransfer={handleTransfer}
       />
 
-      {/* Add Create/Edit Modals */}
-      <EmployeeFormModal
-        isOpen={showCreateModal}
+      {/* Create Employee Modal */}
+      <Dialog
+        open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        departments={departments}
-        onSubmit={handleCreateEmployee}
-      />
+        className="relative z-50"
+      >
+        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
 
-      <EmployeeFormModal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        employee={selectedEmployee}
-        departments={departments}
-        onSubmit={handleUpdateEmployee}
-      />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="mx-auto max-w-2xl w-full rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex justify-between items-center mb-6">
+              <Dialog.Title className="text-xl font-semibold text-gray-900">
+                Create New Employee
+              </Dialog.Title>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateEmployee} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    value={formData.firstName}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        firstName: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    value={formData.lastName}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        lastName: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    value={formData.email}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        email: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    value={formData.phone}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        phone: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Position
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    value={formData.position}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        position: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Grade Level
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    value={formData.gradeLevel}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        gradeLevel: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Work Location
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    value={formData.workLocation}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        workLocation: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Date Joined
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    value={formData.dateJoined}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        dateJoined: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                {isSuperAdmin && (
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Department
+                    </label>
+                    <select
+                      required
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                      value={formData.department}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          department: e.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">Select Department</option>
+                      {departments.map((dept) => (
+                        <option key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  disabled={isCreating}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreating}
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed"
+                >
+                  {isCreating ? (
+                    <>
+                      <FaSpinner className="animate-spin mr-2" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create Employee"
+                  )}
+                </button>
+              </div>
+            </form>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
 
       <DepartmentModal
         isOpen={showDepartmentModal}

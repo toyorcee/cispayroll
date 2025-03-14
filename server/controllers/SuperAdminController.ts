@@ -72,6 +72,8 @@ export class SuperAdminController {
         ...req.body,
         role: UserRole.ADMIN,
         isEmailVerified: true,
+        createdBy: req.user.id,
+        status: "pending",
       };
 
       const { user: admin } = await AuthService.createUser(userData);

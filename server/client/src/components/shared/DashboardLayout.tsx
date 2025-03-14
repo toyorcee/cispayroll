@@ -8,7 +8,7 @@ import { Sidebar } from "./Sidebar";
 import { ProfileMenu } from "./ProfileMenu";
 
 export default function DashboardLayout() {
-  const { isSidebarOpen, setIsSidebarOpen, activeMenuText } = useNavigation();
+  const { isSidebarOpen, setIsSidebarOpen } = useNavigation();
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
@@ -51,11 +51,8 @@ export default function DashboardLayout() {
             </div>
           </div>
 
-          {/* Center section with active menu text and search */}
-          <div className="hidden md:flex flex-1 items-center justify-center gap-8 px-8">
-            <span className="text-lg font-medium text-gray-700 min-w-[120px]">
-              {activeMenuText}
-            </span>
+          {/* Center section with search only - removed active menu text */}
+          <div className="hidden md:flex flex-1 items-center justify-center px-8">
             <div className="relative max-w-md w-full">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <FaSearch className="h-5 w-5 text-gray-400" />

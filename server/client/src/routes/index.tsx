@@ -294,8 +294,6 @@ const employeeRoutes: RouteConfig = {
   path: "employees",
   label: "Employees",
   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-  permissions: [Permission.VIEW_ALL_USERS],
-  requireAllPermissions: false,
   element: <Outlet />,
   children: [
     {
@@ -303,14 +301,21 @@ const employeeRoutes: RouteConfig = {
       label: "All Employees",
       roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
       element: <AllEmployees />,
-      permissions: [Permission.VIEW_ALL_USERS],
+      permissions: [
+        Permission.VIEW_ALL_USERS,
+        Permission.MANAGE_DEPARTMENT_USERS,
+      ],
+      requireAllPermissions: false,
     },
     {
       path: "onboarding",
       label: "Onboarding",
       roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
       element: <Onboarding />,
-      permissions: [Permission.MANAGE_ONBOARDING, Permission.VIEW_ONBOARDING],
+      permissions: [
+        Permission.VIEW_ALL_USERS,
+        Permission.MANAGE_DEPARTMENT_USERS,
+      ],
       requireAllPermissions: false,
     },
     {
@@ -318,13 +323,24 @@ const employeeRoutes: RouteConfig = {
       label: "Offboarding",
       roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
       element: <Offboarding />,
-      permissions: [Permission.MANAGE_OFFBOARDING, Permission.VIEW_OFFBOARDING],
+      permissions: [
+        Permission.VIEW_ALL_USERS,
+        Permission.MANAGE_DEPARTMENT_USERS,
+      ],
+      requireAllPermissions: false,
+    },
+    {
+      path: "leave",
+      label: "Leave Management",
+      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+      element: <LeaveManagement />,
+      permissions: [Permission.APPROVE_LEAVE, Permission.VIEW_TEAM_LEAVE],
       requireAllPermissions: false,
     },
   ],
 };
 
-// Update your routes configuration
+// Update the routes array
 export const routes: RouteConfig[] = [
   {
     path: "",
@@ -336,22 +352,6 @@ export const routes: RouteConfig[] = [
   ...superAdminRoutes,
   ...adminRoutes.filter((route) => route.path !== "employees"),
   ...userRoutes,
-  {
-    path: "employees/onboarding",
-    label: "Onboarding",
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    element: <ProtectedRoute element={<Onboarding />} />,
-    permissions: [Permission.MANAGE_ONBOARDING, Permission.VIEW_ONBOARDING],
-    requireAllPermissions: false,
-  },
-  {
-    path: "employees/offboarding",
-    label: "Offboarding",
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    element: <ProtectedRoute element={<Offboarding />} />,
-    permissions: [Permission.MANAGE_OFFBOARDING, Permission.VIEW_OFFBOARDING],
-    requireAllPermissions: false,
-  },
 ];
 
 // Update the router configuration to properly wrap each route with ProtectedRoute

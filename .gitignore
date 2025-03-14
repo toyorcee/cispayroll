@@ -27,3 +27,7 @@ Thumbs.db
 server/client/node_modules/
 server/client/dist/
 server/client/.env
+
+# Uploads
+server/uploads/*
+!server/uploads/.gitkeep

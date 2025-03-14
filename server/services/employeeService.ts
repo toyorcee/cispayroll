@@ -57,16 +57,17 @@ export class EmployeeService {
         ...data,
         employeeId,
         role: UserRole.USER,
-        status: "pending",
+        status: "pending", 
         isEmailVerified: false,
         invitationToken,
         invitationExpires,
         createdBy: creator._id,
-        permissions: [], // Will be set by pre-save middleware
+        permissions: [],
         department:
           creator.role === UserRole.ADMIN
             ? creator.department
             : data.department,
+        // Don't include password, bankDetails, or emergencyContact here
       };
 
       const employee = await UserModel.create(employeeData);

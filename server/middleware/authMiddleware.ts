@@ -9,6 +9,7 @@ import { PermissionChecker } from "../utils/permissionUtils.js";
 export interface JWTPayload {
   id: string;
   role: UserRole;
+  department?: string;
   permissions: Permission[];
   iat: number;
   exp: number;

@@ -88,9 +88,17 @@ export const employeeService = {
   },
 
   // Create new employee
-  createEmployee: async (employeeData: Partial<Employee>) => {
-    const response = await axios.post(`${BASE_URL}/employees`, employeeData);
-    return response.data;
+  createEmployee: async (employeeData: Partial<Employee>): Promise<any> => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/employees/create`,
+        employeeData
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error creating employee:", error);
+      throw error;
+    }
   },
 
   // Update employee

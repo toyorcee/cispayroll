@@ -82,7 +82,7 @@ export interface IUser {
   gradeLevel: string;
   workLocation: string;
   dateJoined: Date;
-  status: "active" | "inactive" | "suspended";
+  status: "active" | "inactive" | "suspended" | "pending";
   emergencyContact: {
     name: string;
     relationship: string;
@@ -99,6 +99,9 @@ export interface IUser {
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
+  invitationToken?: string;
+  invitationExpires?: Date;
+  createdBy?: Types.ObjectId;
 }
 
 // Interface for user methods
@@ -123,7 +126,7 @@ export interface UserDocument extends mongoose.Document {
   gradeLevel: string;
   workLocation: string;
   dateJoined: Date;
-  status: "active" | "inactive" | "suspended";
+  status: "active" | "inactive" | "suspended" | "pending";
   emergencyContact: {
     name: string;
     relationship: string;
@@ -140,6 +143,9 @@ export interface UserDocument extends mongoose.Document {
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
+  invitationToken?: string;
+  invitationExpires?: Date;
+  createdBy?: Types.ObjectId;
   hasPermission(permission: Permission): boolean;
   hasRole(role: UserRole): boolean;
 }
@@ -151,7 +157,10 @@ const UserSchema = new Schema<UserDocument, UserModel>(
   {
     employeeId: {
       type: String,
-      required: [true, "Employee ID is required"],
+      required: function () {
+        // Only required for employees, not for super admin
+        return this.role !== UserRole.SUPER_ADMIN;
+      },
       trim: true,
     },
     firstName: {
@@ -172,13 +181,16 @@ const UserSchema = new Schema<UserDocument, UserModel>(
     },
     phone: {
       type: String,
-      required: [true, "Phone number is required"],
+      required: function () {
+        return this.role !== UserRole.SUPER_ADMIN;
+      },
       trim: true,
     },
     password: {
       type: String,
-      select: false,
-      required: [true, "Password is required"],
+      required: function () {
+        return this.status !== "pending";
+      },
     },
     role: {
       type: String,
@@ -198,56 +210,77 @@ const UserSchema = new Schema<UserDocument, UserModel>(
     },
     position: {
       type: String,
-      required: [true, "Position is required"],
+      required: function () {
+        return this.role !== UserRole.SUPER_ADMIN;
+      },
       trim: true,
     },
     gradeLevel: {
       type: String,
-      required: [true, "Grade level is required"],
+      required: function () {
+        return this.role !== UserRole.SUPER_ADMIN;
+      },
       trim: true,
     },
     workLocation: {
       type: String,
-      required: [true, "Work location is required"],
+      required: function () {
+        return this.role !== UserRole.SUPER_ADMIN;
+      },
       trim: true,
     },
     dateJoined: {
       type: Date,
-      required: [true, "Date joined is required"],
+      required: function () {
+        return this.role !== UserRole.SUPER_ADMIN;
+      },
     },
     status: {
       type: String,
-      enum: ["active", "inactive", "suspended"],
-      default: "active",
+      enum: ["active", "inactive", "suspended", "pending"],
+      default: "pending",
     },
     emergencyContact: {
       name: {
         type: String,
-        required: [true, "Emergency contact name is required"],
+        required: function () {
+          return this.status === "active" && this.role === UserRole.USER;
+        },
       },
       relationship: {
         type: String,
-        required: [true, "Emergency contact relationship is required"],
+        required: function () {
+          return this.status === "active" && this.role === UserRole.USER;
+        },
       },
       phone: {
         type: String,
-        required: [true, "Emergency contact phone is required"],
+        required: function () {
+          return this.status === "active" && this.role === UserRole.USER;
+        },
       },
     },
     bankDetails: {
       bankName: {
         type: String,
-        required: [true, "Bank name is required"],
+        required: function () {
+          return this.status === "active" && this.role === UserRole.USER;
+        },
       },
       accountNumber: {
         type: String,
-        required: [true, "Account number is required"],
+        required: function () {
+          return this.status === "active" && this.role === UserRole.USER;
+        },
       },
       accountName: {
         type: String,
-        required: [true, "Account name is required"],
+        required: function () {
+          return this.status === "active" && this.role === UserRole.USER;
+        },
       },
     },
+
     profileImage: String,
     reportingTo: {
       type: Schema.Types.ObjectId,
@@ -258,6 +291,18 @@ const UserSchema = new Schema<UserDocument, UserModel>(
       default: false,
     },
     lastLogin: Date,
+    invitationToken: {
+      type: String,
+      index: true,
+    },
+    invitationExpires: {
+      type: Date,
+    },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: false,
+    },
   },
   {
     timestamps: true,

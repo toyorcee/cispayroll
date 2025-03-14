@@ -91,12 +91,12 @@ export default function Dashboard() {
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.3 }}
-          className="bg-white p-6 rounded-lg shadow-lg border-l-4 border-blue-500"
+          className="mb-6"
         >
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h4 className="text-2xl font-semibold text-gray-800">
             Welcome back, {user?.firstName}!
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          </h4>
+          <p className="mt-1 text-sm text-gray-600">
             {getRoleSpecificWelcomeMessage(user?.role)}
           </p>
         </motion.div>
