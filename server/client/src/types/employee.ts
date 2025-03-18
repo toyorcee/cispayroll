@@ -1,8 +1,20 @@
 import { Status, BankDetails, Allowance, Deduction } from "./common";
 import { UserRole, Permission } from "./auth";
+import * as Types from "mongoose";
 
-export type LeaveType = "annual" | "sick" | "maternity" | "unpaid";
-export type LeaveStatus = "pending" | "approved" | "rejected";
+export enum LeaveStatus {
+  pending = "pending",
+  approved = "approved",
+  rejected = "rejected",
+  cancelled = "cancelled",
+}
+
+export enum LeaveType {
+  annual = "annual",
+  sick = "sick",
+  maternity = "maternity",
+  unpaid = "unpaid",
+}
 
 export interface LeaveRequest {
   id: string;
@@ -18,9 +30,14 @@ export interface LeaveRequest {
   reason: string;
 }
 
+export interface Task {
+  name: string;
+  completed: boolean;
+}
+
 export interface Employee {
   id: string;
-  employeeId: string;
+  _id: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -29,9 +46,23 @@ export interface Employee {
   position: string;
   gradeLevel: string;
   workLocation: string;
+  status: string;
+  employeeId: string;
+  offboarding?: OffboardingDetails;
+  permissions: string[];
+  progress: number;
+  dateJoined: string;
+  startDate?: string;
+  supervisor: string;
+  tasks: Task[];
+  onboardingStatus:
+    | "not_started"
+    | "contract_stage"
+    | "documentation_stage"
+    | "it_setup_stage"
+    | "training_stage"
+    | "completed";
   bankDetails: BankDetails;
-  dateJoined: Date;
-  status: Status;
   salary: {
     basic: number;
     allowances: Allowance[];
@@ -70,7 +101,15 @@ export interface Employee {
   createdAt: Date;
   updatedAt: Date;
   userRole: UserRole;
-  permissions: Permission[];
+  lastWorkingDate: Date;
+  initiatedDate: Date;
+  reason: string;
+  clearance: {
+    itClearance?: boolean;
+    financeClearance?: boolean;
+    hrClearance?: boolean;
+    departmentClearance?: boolean;
+  };
 }
 
 export type OnboardingStatus =
@@ -96,30 +135,22 @@ export interface OnboardingTask {
 
 export interface OnboardingEmployee {
   id: string;
-  employeeId: string;
   firstName: string;
   lastName: string;
+  email: string;
+  phone: string;
   position: string;
   department: string;
-  startDate: Date;
-  status: OnboardingStatus;
+  gradeLevel: string;
+  workLocation: string;
   progress: number;
-  tasks: OnboardingTask[];
-  supervisor?: string;
-  documents?: {
-    contractSigned?: boolean;
-    idSubmitted?: boolean;
-    bankDetailsProvided?: boolean;
-    taxInfoSubmitted?: boolean;
-  };
+  startDate: string;
+  supervisor: string;
+  status: string;
+  tasks: Task[];
 }
 
-export type OffboardingStatus =
-  | "pending"
-  | "in_progress"
-  | "clearance_pending"
-  | "completed"
-  | "cancelled";
+export type OffboardingStatus = "pending_exit" | "in_progress" | "completed";
 
 export type OffboardingTaskName =
   | "exit_interview"
@@ -187,4 +218,45 @@ export interface EmployeeDetails extends Employee {
     contract?: string;
     certificates?: string[];
   };
+}
+
+export interface CreateEmployeeData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  position: string;
+  department: string;
+  gradeLevel: string;
+  workLocation: string;
+  dateJoined: string | Date;
+}
+
+export interface OffboardingChecklist {
+  exitInterview: boolean;
+  assetsReturned: boolean;
+  knowledgeTransfer: boolean;
+  accessRevoked: boolean;
+  finalSettlement: boolean;
+}
+
+export interface OffboardingDocument {
+  type: "exit_interview" | "asset_return" | "final_settlement" | "clearance";
+  url: string;
+  generatedAt: Date;
+}
+
+export interface OffboardingDetails {
+  status: OffboardingStatus;
+  lastWorkingDay: Date;
+  initiatedAt: Date;
+  initiatedBy: string;
+  checklist: OffboardingChecklist;
+  documents?: OffboardingDocument[];
+}
+
+export interface DepartmentBasic {
+  _id: string;
+  name: string;
+  code: string;
 }

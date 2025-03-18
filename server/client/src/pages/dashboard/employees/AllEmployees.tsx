@@ -16,7 +16,7 @@ import {
   FaTimes,
   FaSpinner,
 } from "react-icons/fa";
-import { Employee } from "../../../types/employee";
+import { Employee, EmployeeFilters } from "../../../types/employee";
 import { Status } from "../../../types/common";
 import { useAuth } from "../../../context/AuthContext";
 import { UserRole, Permission } from "../../../types/auth";
@@ -34,7 +34,6 @@ import { EmployeeTableSkeleton } from "../../../components/employees/EmployeeTab
 import { EmployeeFormModal } from "../../../components/employees/EmployeeFormModal";
 import { DepartmentModal } from "../../../components/departments/DepartmentModal";
 import { Department } from "../../../types/department";
-import { EmployeeFilters } from "../../../types/employee";
 import { DepartmentBasic } from "../../../services/employeeService";
 import { Dialog } from "@headlessui/react";
 
@@ -208,6 +207,12 @@ export default function AllEmployees() {
     e.preventDefault();
     setIsCreating(true);
     try {
+      // Ensure department is not undefined before making the API call
+      if (!formData.department && isSuperAdmin) {
+        toast.error("Please select a department");
+        return;
+      }
+
       const employeeData = {
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -217,7 +222,8 @@ export default function AllEmployees() {
         gradeLevel: formData.gradeLevel,
         workLocation: formData.workLocation,
         dateJoined: new Date(formData.dateJoined),
-        department: isSuperAdmin ? formData.department : user?.department,
+        // Use non-null assertion since we've checked above
+        department: isSuperAdmin ? formData.department : user?.department ?? "",
       };
 
       console.log("Sending employee data:", employeeData);
@@ -230,6 +236,7 @@ export default function AllEmployees() {
       setTotalEmployees(employeesResponse.total);
       setShowCreateModal(false);
 
+      // Reset form
       setFormData({
         firstName: "",
         lastName: "",
@@ -762,7 +769,7 @@ export default function AllEmployees() {
                 <button
                   type="submit"
                   disabled={isCreating}
-                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed"
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-white !bg-green-600 rounded-md hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed"
                 >
                   {isCreating ? (
                     <>
@@ -785,6 +792,7 @@ export default function AllEmployees() {
         onSave={handleDepartmentSave}
         onDelete={handleDepartmentDelete}
         departments={departments}
+        isLoading={loading}
       />
     </motion.div>
   );

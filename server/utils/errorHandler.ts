@@ -1,3 +1,5 @@
+import { Request, Response, NextFunction } from "express";
+
 export class ApiError extends Error {
   constructor(public statusCode: number, message: string) {
     super(message);
@@ -6,11 +8,17 @@ export class ApiError extends Error {
 }
 
 export const handleError = (error: any) => {
-  // Mongoose duplicate key error
+  console.error("Error details:", error);
+
+  // Handle MongoDB duplicate key error
   if (error.code === 11000) {
+    const field = Object.keys(error.keyPattern)[0];
+    const value = error.keyValue[field];
     return {
       statusCode: 400,
-      message: "Duplicate field value entered",
+      message: `${
+        field.charAt(0).toUpperCase() + field.slice(1)
+      } '${value}' already exists`,
     };
   }
 
@@ -35,7 +43,30 @@ export const handleError = (error: any) => {
   // Default server error
   console.error("Server Error:", error);
   return {
-    statusCode: 500,
-    message: "Internal server error",
+    statusCode: error.statusCode || 500,
+    message: error.message || "Internal server error",
+  };
+};
+
+export const traceError = (error: any, context: string) => {
+  console.error(`🔍 Error in ${context}:`, {
+    message: error.message,
+    stack: error.stack,
+    code: error.code,
+    name: error.name,
+  });
+  return error;
+};
+
+export const asyncHandler = (fn: Function) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch((error) => {
+      console.error("🚨 AsyncHandler caught error:", {
+        path: req.path,
+        error: error.message,
+        stack: error.stack,
+      });
+      next(error);
+    });
   };
 };

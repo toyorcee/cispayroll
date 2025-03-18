@@ -39,6 +39,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    // Just fetch user data directly since we're using cookies
+    fetchUserData();
+  }, []);
+
   const hasRole = (role: UserRole): boolean => {
     console.log("=== DEBUG: hasRole ===");
     console.log("Checking role:", role);
@@ -51,17 +56,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return user.role === role;
   };
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
+  const fetchUserData = async () => {
     try {
       const { data } = await axios.get("/api/auth/me");
       if (data.user) {
         setUser(parseUserData(data.user));
       } else {
         setUser(null);
+        // Only show login message if not on auth pages
         if (!window.location.pathname.includes("/auth/")) {
           toast.error("Please login to continue");
         }

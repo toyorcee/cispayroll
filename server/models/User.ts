@@ -64,6 +64,59 @@ export enum Permission {
   MANAGE_SYSTEM = "MANAGE_SYSTEM",
   VIEW_SYSTEM_HEALTH = "VIEW_SYSTEM_HEALTH",
   VIEW_AUDIT_LOGS = "VIEW_AUDIT_LOGS",
+
+  // Salary Structure Management
+  MANAGE_SALARY_STRUCTURE = "MANAGE_SALARY_STRUCTURE",
+  VIEW_SALARY_STRUCTURE = "VIEW_SALARY_STRUCTURE",
+  EDIT_SALARY_STRUCTURE = "EDIT_SALARY_STRUCTURE",
+
+  // Deductions Management
+  MANAGE_DEDUCTIONS = "MANAGE_DEDUCTIONS",
+  VIEW_DEDUCTIONS = "VIEW_DEDUCTIONS",
+  EDIT_DEDUCTIONS = "EDIT_DEDUCTIONS",
+
+  // Allowances Management
+  MANAGE_ALLOWANCES = "MANAGE_ALLOWANCES",
+  VIEW_ALLOWANCES = "VIEW_ALLOWANCES",
+  EDIT_ALLOWANCES = "EDIT_ALLOWANCES",
+
+  // Bonuses & Overtime Management
+  MANAGE_BONUSES = "MANAGE_BONUSES",
+  VIEW_BONUSES = "VIEW_BONUSES",
+  EDIT_BONUSES = "EDIT_BONUSES",
+  MANAGE_OVERTIME = "MANAGE_OVERTIME",
+
+  // Reports & Analytics
+  VIEW_PAYROLL_REPORTS = "VIEW_PAYROLL_REPORTS",
+  VIEW_EMPLOYEE_REPORTS = "VIEW_EMPLOYEE_REPORTS",
+  VIEW_TAX_REPORTS = "VIEW_TAX_REPORTS",
+
+  // Additional System Settings
+  MANAGE_TAX_CONFIG = "MANAGE_TAX_CONFIG",
+  MANAGE_COMPLIANCE = "MANAGE_COMPLIANCE",
+  MANAGE_NOTIFICATIONS = "MANAGE_NOTIFICATIONS",
+  MANAGE_INTEGRATIONS = "MANAGE_INTEGRATIONS",
+  MANAGE_DOCUMENTS = "MANAGE_DOCUMENTS",
+  EDIT_PERSONAL_INFO = "EDIT_PERSONAL_INFO",
+}
+
+// Add these interfaces at the top with your other interfaces
+interface OffboardingChecklist {
+  exitInterview: boolean;
+  assetsReturned: boolean;
+  knowledgeTransfer: boolean;
+  accessRevoked: boolean;
+  finalSettlement: boolean;
+}
+
+interface Offboarding {
+  status: "pending_exit" | "in_progress" | "completed";
+  checklist: OffboardingChecklist;
+  initiatedAt: Date;
+  initiatedBy: Types.ObjectId;
+  completedAt?: Date;
+  completedBy?: Types.ObjectId;
+  progress: number;
 }
 
 // Base interface for user properties
@@ -82,7 +135,13 @@ export interface IUser {
   gradeLevel: string;
   workLocation: string;
   dateJoined: Date;
-  status: "active" | "inactive" | "suspended" | "pending";
+  status:
+    | "active"
+    | "inactive"
+    | "suspended"
+    | "pending"
+    | "offboarding"
+    | "archived";
   emergencyContact: {
     name: string;
     relationship: string;
@@ -102,6 +161,7 @@ export interface IUser {
   invitationToken?: string;
   invitationExpires?: Date;
   createdBy?: Types.ObjectId;
+  offboarding?: Offboarding;
 }
 
 // Interface for user methods
@@ -126,7 +186,13 @@ export interface UserDocument extends mongoose.Document {
   gradeLevel: string;
   workLocation: string;
   dateJoined: Date;
-  status: "active" | "inactive" | "suspended" | "pending";
+  status:
+    | "active"
+    | "inactive"
+    | "suspended"
+    | "pending"
+    | "offboarding"
+    | "archived";
   emergencyContact: {
     name: string;
     relationship: string;
@@ -146,6 +212,7 @@ export interface UserDocument extends mongoose.Document {
   invitationToken?: string;
   invitationExpires?: Date;
   createdBy?: Types.ObjectId;
+  offboarding?: Offboarding;
   hasPermission(permission: Permission): boolean;
   hasRole(role: UserRole): boolean;
 }
@@ -237,7 +304,14 @@ const UserSchema = new Schema<UserDocument, UserModel>(
     },
     status: {
       type: String,
-      enum: ["active", "inactive", "suspended", "pending"],
+      enum: [
+        "active",
+        "inactive",
+        "suspended",
+        "pending",
+        "offboarding",
+        "archived",
+      ],
       default: "pending",
     },
     emergencyContact: {
@@ -280,7 +354,6 @@ const UserSchema = new Schema<UserDocument, UserModel>(
         },
       },
     },
-
     profileImage: String,
     reportingTo: {
       type: Schema.Types.ObjectId,
@@ -302,6 +375,25 @@ const UserSchema = new Schema<UserDocument, UserModel>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: false,
+    },
+    offboarding: {
+      status: {
+        type: String,
+        enum: ["pending_exit", "in_progress", "completed"],
+        default: "pending_exit",
+      },
+      checklist: {
+        exitInterview: { type: Boolean, default: false },
+        assetsReturned: { type: Boolean, default: false },
+        knowledgeTransfer: { type: Boolean, default: false },
+        accessRevoked: { type: Boolean, default: false },
+        finalSettlement: { type: Boolean, default: false },
+      },
+      initiatedAt: Date,
+      initiatedBy: { type: Schema.Types.ObjectId, ref: "User" },
+      completedAt: Date,
+      completedBy: { type: Schema.Types.ObjectId, ref: "User" },
+      progress: { type: Number, default: 0 },
     },
   },
   {
@@ -385,6 +477,40 @@ UserSchema.pre("save", function (this: UserDocument, next) {
           Permission.MANAGE_SYSTEM,
           Permission.VIEW_SYSTEM_HEALTH,
           Permission.VIEW_AUDIT_LOGS,
+
+          // Salary Structure Management
+          Permission.MANAGE_SALARY_STRUCTURE,
+          Permission.VIEW_SALARY_STRUCTURE,
+          Permission.EDIT_SALARY_STRUCTURE,
+
+          // Deductions Management
+          Permission.MANAGE_DEDUCTIONS,
+          Permission.VIEW_DEDUCTIONS,
+          Permission.EDIT_DEDUCTIONS,
+
+          // Allowances Management
+          Permission.MANAGE_ALLOWANCES,
+          Permission.VIEW_ALLOWANCES,
+          Permission.EDIT_ALLOWANCES,
+
+          // Bonuses & Overtime Management
+          Permission.MANAGE_BONUSES,
+          Permission.VIEW_BONUSES,
+          Permission.EDIT_BONUSES,
+          Permission.MANAGE_OVERTIME,
+
+          // Reports & Analytics
+          Permission.VIEW_PAYROLL_REPORTS,
+          Permission.VIEW_EMPLOYEE_REPORTS,
+          Permission.VIEW_TAX_REPORTS,
+
+          // Additional System Settings
+          Permission.MANAGE_TAX_CONFIG,
+          Permission.MANAGE_COMPLIANCE,
+          Permission.MANAGE_NOTIFICATIONS,
+          Permission.MANAGE_INTEGRATIONS,
+          Permission.MANAGE_DOCUMENTS,
+          Permission.EDIT_PERSONAL_INFO,
         ];
         break;
 
@@ -423,6 +549,10 @@ UserSchema.pre("save", function (this: UserDocument, next) {
           Permission.MANAGE_ONBOARDING,
           Permission.VIEW_OFFBOARDING,
           Permission.MANAGE_OFFBOARDING,
+
+          // Salary Structure Management
+          Permission.VIEW_SALARY_STRUCTURE,
+          Permission.EDIT_SALARY_STRUCTURE,
         ];
         break;
 

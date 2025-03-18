@@ -31,43 +31,47 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
 
   const getAvailableMenus = () => {
-    console.log("=== DEBUG: getAvailableMenus ===");
-    console.log("Current user:", user);
-    console.log("User role:", user?.role);
-    console.log("User permissions:", user?.permissions);
-
     if (!user || !user.permissions) {
-      console.log("No user or permissions found");
       return ["Dashboard"];
     }
 
-    // For Super Admin, show all main menus
+    // For Super Admin, show ALL main menus (not submenus)
     if (user.role === UserRole.SUPER_ADMIN) {
-      console.log("User is SUPER_ADMIN, returning all menus");
       return ["Dashboard", "Employees", "Payroll", "Reports", "Settings"];
     }
 
-    // For other roles, check permissions
-    if (user.permissions.includes(Permission.VIEW_ALL_USERS)) {
-      return ["Employees"];
+    // For other roles, check specific permissions
+    const availableMenus = ["Dashboard"];
+
+    // Employee menu and its submenus
+    if (
+      user.permissions.some((p) =>
+        [
+          Permission.VIEW_ALL_USERS,
+          Permission.MANAGE_DEPARTMENT_USERS,
+          Permission.VIEW_ONBOARDING,
+          Permission.MANAGE_ONBOARDING,
+          Permission.VIEW_OFFBOARDING,
+          Permission.MANAGE_OFFBOARDING,
+        ].includes(p)
+      )
+    ) {
+      availableMenus.push("Employees");
     }
 
-    if (
-      user.permissions.includes(Permission.CREATE_PAYROLL) ||
-      user.permissions.includes(Permission.VIEW_DEPARTMENT_PAYROLL)
-    ) {
-      return ["Payroll"];
+    if (user.permissions.some((p) => p.includes("PAYROLL"))) {
+      availableMenus.push("Payroll");
     }
 
     if (user.permissions.includes(Permission.VIEW_REPORTS)) {
-      return ["Reports"];
+      availableMenus.push("Reports");
     }
 
     if (user.permissions.includes(Permission.MANAGE_SYSTEM)) {
-      return ["Settings"];
+      availableMenus.push("Settings");
     }
 
-    return ["Dashboard"];
+    return availableMenus;
   };
 
   const setMainMenuOnly = (text: string) => {
@@ -112,61 +116,93 @@ export const menuItems: NavigationItem[] = [
     href: "/dashboard/employees/list",
     icon: UsersIcon,
     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    permissions: [Permission.VIEW_ALL_USERS],
+    permissions: [
+      Permission.VIEW_ALL_USERS,
+      Permission.MANAGE_DEPARTMENT_USERS,
+    ],
+    requireAllPermissions: false,
     subItems: [
       {
         name: "All Employees",
         href: "/dashboard/employees/list",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.VIEW_ALL_USERS],
+        permissions: [
+          Permission.VIEW_ALL_USERS,
+          Permission.MANAGE_DEPARTMENT_USERS,
+        ],
+        requireAllPermissions: false,
       },
       {
         name: "Onboarding",
         href: "/dashboard/employees/onboarding",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.MANAGE_ONBOARDING, Permission.VIEW_ONBOARDING],
+        permissions: [
+          Permission.VIEW_ALL_USERS,
+          Permission.MANAGE_DEPARTMENT_USERS,
+        ],
+        requireAllPermissions: false,
       },
       {
         name: "Offboarding",
         href: "/dashboard/employees/offboarding",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
         permissions: [
-          Permission.MANAGE_OFFBOARDING,
-          Permission.VIEW_OFFBOARDING,
+          Permission.VIEW_ALL_USERS,
+          Permission.MANAGE_DEPARTMENT_USERS,
         ],
+        requireAllPermissions: false,
       },
       {
         name: "Leave Management",
         href: "/dashboard/employees/leave",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
         permissions: [Permission.APPROVE_LEAVE, Permission.VIEW_TEAM_LEAVE],
+        requireAllPermissions: false,
       },
     ],
   },
   {
     name: "Payroll",
-    href: "/dashboard/payroll",
+    href: "/dashboard/payroll/process",
     icon: CurrencyDollarIcon,
     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    permissions: [Permission.CREATE_PAYROLL, Permission.EDIT_PAYROLL],
+    permissions: [
+      Permission.CREATE_PAYROLL,
+      Permission.EDIT_PAYROLL,
+      Permission.VIEW_ALL_PAYROLL,
+      Permission.VIEW_DEPARTMENT_PAYROLL,
+      Permission.GENERATE_PAYSLIP,
+    ],
+    requireAllPermissions: false,
     subItems: [
       {
         name: "Process Payroll",
         href: "/dashboard/payroll/process",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
         permissions: [Permission.CREATE_PAYROLL, Permission.GENERATE_PAYSLIP],
+        requireAllPermissions: false,
       },
       {
         name: "Salary Structure",
         href: "/dashboard/payroll/structure",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.CREATE_PAYROLL, Permission.EDIT_PAYROLL],
+        permissions: [
+          Permission.MANAGE_SALARY_STRUCTURE,
+          Permission.VIEW_SALARY_STRUCTURE,
+          Permission.EDIT_SALARY_STRUCTURE,
+        ],
+        requireAllPermissions: false,
       },
       {
         name: "Deductions",
         href: "/dashboard/payroll/deductions",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.CREATE_PAYROLL, Permission.EDIT_PAYROLL],
+        permissions: [
+          Permission.MANAGE_DEDUCTIONS,
+          Permission.VIEW_DEDUCTIONS,
+          Permission.EDIT_DEDUCTIONS,
+        ],
+        requireAllPermissions: false,
       },
     ],
   },
@@ -175,52 +211,73 @@ export const menuItems: NavigationItem[] = [
     href: "/dashboard/reports",
     icon: DocumentTextIcon,
     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    permissions: [Permission.VIEW_REPORTS],
+    permissions: [
+      Permission.VIEW_REPORTS,
+      Permission.VIEW_AUDIT_LOGS,
+      Permission.VIEW_PAYROLL_REPORTS,
+      Permission.VIEW_EMPLOYEE_REPORTS,
+      Permission.VIEW_TAX_REPORTS,
+    ],
+    requireAllPermissions: false,
     subItems: [
       {
         name: "Payroll Reports",
         href: "/dashboard/reports/payroll",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [
-          Permission.VIEW_DEPARTMENT_PAYROLL,
-          Permission.VIEW_REPORTS,
-        ],
+        permissions: [Permission.VIEW_PAYROLL_REPORTS],
+        requireAllPermissions: false,
       },
       {
         name: "Employee Reports",
         href: "/dashboard/reports/employees",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.VIEW_ALL_USERS, Permission.VIEW_REPORTS],
+        permissions: [Permission.VIEW_EMPLOYEE_REPORTS],
+        requireAllPermissions: false,
       },
       {
         name: "Tax Reports",
         href: "/dashboard/reports/tax",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.VIEW_REPORTS],
+        permissions: [Permission.VIEW_TAX_REPORTS],
+        requireAllPermissions: false,
       },
       {
         name: "Audit Logs",
         href: "/dashboard/reports/audit",
         roles: [UserRole.SUPER_ADMIN],
-        permissions: [Permission.VIEW_REPORTS],
+        permissions: [Permission.VIEW_AUDIT_LOGS],
+        requireAllPermissions: false,
       },
     ],
   },
   {
     name: "Settings",
-    href: "/dashboard/settings",
+    href: "/dashboard/settings/general",
     icon: CogIcon,
     roles: [UserRole.SUPER_ADMIN],
+    permissions: [
+      Permission.MANAGE_SYSTEM,
+      Permission.MANAGE_COMPANY_PROFILE,
+      Permission.MANAGE_TAX_CONFIG,
+      Permission.MANAGE_COMPLIANCE,
+      Permission.MANAGE_NOTIFICATIONS,
+      Permission.MANAGE_INTEGRATIONS,
+    ],
+    requireAllPermissions: false,
     subItems: [
       {
         name: "General Settings",
         href: "/dashboard/settings/general",
         roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_SYSTEM],
+        requireAllPermissions: false,
       },
       {
         name: "Company Profile",
         href: "/dashboard/settings/company",
         roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_COMPANY_PROFILE],
+        requireAllPermissions: false,
       },
       {
         name: "Department Management",
@@ -231,32 +288,46 @@ export const menuItems: NavigationItem[] = [
           Permission.EDIT_DEPARTMENT,
           Permission.VIEW_ALL_DEPARTMENTS,
         ],
+        requireAllPermissions: false,
       },
       {
         name: "Tax Configuration",
         href: "/dashboard/settings/tax",
         roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_TAX_CONFIG],
+        requireAllPermissions: false,
       },
       {
         name: "Compliance",
         href: "/dashboard/settings/compliance",
         roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_COMPLIANCE],
+        requireAllPermissions: false,
       },
       {
         name: "User Management",
         href: "/dashboard/settings/users",
         roles: [UserRole.SUPER_ADMIN],
-        permissions: [Permission.CREATE_USER, Permission.EDIT_USER],
+        permissions: [
+          Permission.CREATE_USER,
+          Permission.EDIT_USER,
+          Permission.VIEW_ALL_USERS,
+        ],
+        requireAllPermissions: false,
       },
       {
         name: "Notifications",
         href: "/dashboard/settings/notifications",
         roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_NOTIFICATIONS],
+        requireAllPermissions: false,
       },
       {
         name: "Integrations",
         href: "/dashboard/settings/integrations",
         roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_INTEGRATIONS],
+        requireAllPermissions: false,
       },
     ],
   },

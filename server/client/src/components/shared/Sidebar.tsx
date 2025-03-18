@@ -24,7 +24,7 @@ import {
 } from "../../types/navigation";
 import { FaUsers, FaUserPlus, FaUserMinus } from "react-icons/fa";
 
-// Map icons to menu items
+// Updated icon mapping to include all sections
 const iconMap: Record<string, IconType> = {
   Dashboard: ChartBarIcon,
   Employees: UsersIcon,
@@ -60,49 +60,46 @@ export function Sidebar() {
   }, [location.pathname, setActiveMenuText]);
 
   const filteredNavigation = menuItems.filter((item: NavigationItem) => {
-    if (item.name === "Employees") {
-      console.log("2. Processing Employees menu:");
-      console.log("- User role:", user?.role);
-      console.log("- Required roles:", item.roles);
-      console.log("- Required permissions:", item.permissions);
-
-      const roleCheck = hasRole(UserRole.SUPER_ADMIN);
-      console.log("- Is SUPER_ADMIN?", roleCheck);
-
-      if (roleCheck) {
-        console.log("- SUPER_ADMIN bypass activated");
-        return true;
-      }
+    // Super Admin sees everything
+    if (hasRole(UserRole.SUPER_ADMIN)) {
+      return true;
     }
+
+    // Check roles
+    if (item.roles && !item.roles.some((role) => hasRole(role))) {
+      return false;
+    }
+
+    // Check permissions
+    if (item.permissions) {
+      return item.permissions.some((permission) => hasPermission(permission));
+    }
+
     return true;
   });
-
-  // Add this before rendering
-  const employeesInFiltered = filteredNavigation.find(
-    (item) => item.name === "Employees"
-  );
-  console.log("3. Employees in filtered results:", !!employeesInFiltered);
 
   const getFilteredChildren = (subItems: NavigationSubItem[] | undefined) => {
     if (!subItems) return [];
 
     return subItems.filter((subItem: NavigationSubItem) => {
-      // For SUPER_ADMIN, show all employee-related items
-      if (
-        hasRole(UserRole.SUPER_ADMIN) &&
-        subItem.href.startsWith("/employees")
-      ) {
+      // Super Admin sees all subitems
+      if (hasRole(UserRole.SUPER_ADMIN)) {
         return true;
       }
 
-      const hasValidRole =
-        !subItem.roles || subItem.roles.some((role) => hasRole(role));
+      // Check roles
+      if (subItem.roles && !subItem.roles.some((role) => hasRole(role))) {
+        return false;
+      }
 
-      const hasValidPermission =
-        !subItem.permissions ||
-        subItem.permissions.some((permission) => hasPermission(permission));
+      // Check permissions
+      if (subItem.permissions) {
+        return subItem.permissions.some((permission) =>
+          hasPermission(permission)
+        );
+      }
 
-      return hasValidRole && hasValidPermission;
+      return true;
     });
   };
 
@@ -113,21 +110,7 @@ export function Sidebar() {
     }
   };
 
-  console.log("5. Sidebar props:", {
-    isSidebarOpen,
-    location: location.pathname,
-    itemCount: filteredNavigation.length,
-  });
-
-  // Add debug logging
-  useEffect(() => {
-    if (user) {
-      console.log("Current user role:", user.role);
-      console.log("Current user permissions:", user.permissions);
-    }
-  }, [user]);
-
-  // Add these to your navigation items
+  // Updated employee items with proper permission checks
   const employeeItems = [
     {
       name: "All Employees",
@@ -139,31 +122,41 @@ export function Sidebar() {
       name: "Onboarding",
       path: "/dashboard/employees/onboarding",
       icon: FaUserPlus,
-      permissions: [Permission.MANAGE_ONBOARDING, Permission.VIEW_ONBOARDING],
-      requireAllPermissions: false,
+      permissions: [Permission.MANAGE_ONBOARDING],
       roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
     },
     {
       name: "Offboarding",
       path: "/dashboard/employees/offboarding",
       icon: FaUserMinus,
-      permissions: [Permission.MANAGE_OFFBOARDING, Permission.VIEW_OFFBOARDING],
-      requireAllPermissions: false,
+      permissions: [Permission.MANAGE_OFFBOARDING],
       roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
     },
-    // ... other items
+    {
+      name: "Leave Management",
+      path: "/dashboard/employees/leave",
+      icon: DocumentTextIcon,
+      permissions: [Permission.APPROVE_LEAVE, Permission.VIEW_TEAM_LEAVE],
+      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    },
   ];
 
   const filteredEmployeeItems = employeeItems.filter((item) => {
-    if (item.roles && !item.roles.includes(user?.role as UserRole)) {
+    // Super Admin sees everything
+    if (hasRole(UserRole.SUPER_ADMIN)) {
+      return true;
+    }
+
+    // Check roles
+    if (item.roles && !item.roles.some((role) => hasRole(role))) {
       return false;
     }
+
+    // Check permissions
     if (item.permissions) {
-      if (item.requireAllPermissions) {
-        return item.permissions.every((p) => user?.permissions?.includes(p));
-      }
-      return item.permissions.some((p) => user?.permissions?.includes(p));
+      return item.permissions.some((permission) => hasPermission(permission));
     }
+
     return true;
   });
 
@@ -184,6 +177,14 @@ export function Sidebar() {
       <nav className="h-full flex flex-col">
         <div className="flex-1 px-4 py-6 lg:py-4 overflow-y-auto">
           {filteredNavigation.map((item: NavigationItem) => {
+            // Only render items that the user has permission to see
+            const filteredSubItems = getFilteredChildren(item.subItems);
+
+            // Don't render items with no accessible subitems
+            if (item.subItems && filteredSubItems.length === 0) {
+              return null;
+            }
+
             return (
               <div key={item.name} className="mb-2">
                 <Link

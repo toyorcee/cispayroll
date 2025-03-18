@@ -7,6 +7,7 @@ import { PermissionChecker } from "../utils/permissionUtils.js";
 
 // Update JWTPayload to match what we're storing in the token
 export interface JWTPayload {
+  _id: string;
   id: string;
   role: UserRole;
   department?: string;
@@ -15,9 +16,16 @@ export interface JWTPayload {
   exp: number;
 }
 
-// Update the request interface
+// Update the request interface to extend Express.Request
 export interface AuthenticatedRequest extends Request {
   user: JWTPayload;
+}
+
+// Add a type guard function
+export function isAuthenticatedRequest(
+  req: Request
+): req is AuthenticatedRequest {
+  return "user" in req;
 }
 
 // New helper type for department-specific operations
@@ -25,7 +33,7 @@ export interface DepartmentRequest extends AuthenticatedRequest {
   departmentId?: string;
 }
 
-// Base middleware to require authentication
+// Update the requireAuth middleware
 export const requireAuth = (
   req: Request,
   res: Response,
@@ -39,7 +47,20 @@ export const requireAuth = (
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
-    (req as AuthenticatedRequest).user = decoded;
+
+    // Set both id and _id to be the same value
+    (req as AuthenticatedRequest).user = {
+      ...decoded,
+      id: decoded.id,
+      _id: decoded.id, // Use the same ID for both
+    };
+
+    console.log("🔐 Auth middleware user:", {
+      id: decoded.id,
+      _id: decoded.id, // Log both to verify
+      role: decoded.role,
+    });
+
     next();
   } catch (err) {
     res.status(401).json({ message: "Invalid or expired token" });

@@ -35,6 +35,8 @@ import { SkeletonProvider } from "../components/skeletons/SkeletonProvider";
 import { useSkeleton } from "../components/skeletons/SkeletonProvider";
 import { AuthSkeleton } from "../components/skeletons/AuthSkeleton";
 import Dashboard from "../pages/dashboard/Dashboard";
+import AllowanceManagement from "../pages/dashboard/payroll/AllowanceManagement";
+import BonusManagement from "../pages/dashboard/payroll/BonusManagement";
 
 export interface RouteConfig {
   path: string;
@@ -56,59 +58,122 @@ const superAdminRoutes: RouteConfig[] = [
     permissions: [
       Permission.CREATE_DEPARTMENT,
       Permission.EDIT_DEPARTMENT,
+      Permission.DELETE_DEPARTMENT,
       Permission.VIEW_ALL_DEPARTMENTS,
     ],
+    requireAllPermissions: false,
     element: <DepartmentManagement />,
   },
   {
     path: "reports/audit",
     label: "Audit Logs",
     roles: [UserRole.SUPER_ADMIN],
-    permissions: [Permission.VIEW_REPORTS],
+    permissions: [Permission.VIEW_AUDIT_LOGS],
+    requireAllPermissions: false,
     element: <AuditLogs />,
   },
   {
     path: "settings",
     label: "Settings",
     roles: [UserRole.SUPER_ADMIN],
+    permissions: [
+      Permission.MANAGE_SYSTEM,
+      Permission.MANAGE_COMPANY_PROFILE,
+      Permission.MANAGE_TAX_CONFIG,
+      Permission.MANAGE_COMPLIANCE,
+      Permission.MANAGE_NOTIFICATIONS,
+      Permission.MANAGE_INTEGRATIONS,
+    ],
+    requireAllPermissions: false,
     element: <GeneralSettings />,
     children: [
       {
         path: "company",
         label: "Company Profile",
         roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_COMPANY_PROFILE],
+        requireAllPermissions: false,
         element: <CompanyProfile />,
       },
       {
         path: "tax",
         label: "Tax Configuration",
         roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_TAX_CONFIG],
+        requireAllPermissions: false,
         element: <TaxConfiguration />,
       },
       {
         path: "compliance",
         label: "Compliance",
         roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_COMPLIANCE],
+        requireAllPermissions: false,
         element: <Compliance />,
       },
       {
         path: "users",
         label: "User Management",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        roles: [UserRole.SUPER_ADMIN],
         permissions: [Permission.CREATE_USER, Permission.EDIT_USER],
+        requireAllPermissions: false,
         element: <UserManagement />,
       },
       {
         path: "notifications",
         label: "Notifications",
         roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_NOTIFICATIONS],
+        requireAllPermissions: false,
         element: <Notifications />,
       },
       {
         path: "integrations",
         label: "Integrations",
         roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_INTEGRATIONS],
+        requireAllPermissions: false,
         element: <Integrations />,
+      },
+    ],
+  },
+  {
+    path: "reports",
+    label: "Reports",
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    permissions: [
+      Permission.VIEW_REPORTS,
+      Permission.VIEW_AUDIT_LOGS,
+      Permission.VIEW_PAYROLL_REPORTS,
+      Permission.VIEW_EMPLOYEE_REPORTS,
+      Permission.VIEW_TAX_REPORTS,
+    ],
+    requireAllPermissions: false,
+    element: <Outlet />,
+    children: [
+      {
+        path: "payroll",
+        label: "Payroll Reports",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.VIEW_PAYROLL_REPORTS],
+        requireAllPermissions: false,
+        element: <PayrollReports />,
+      },
+      {
+        path: "employees",
+        label: "Employee Reports",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.VIEW_EMPLOYEE_REPORTS],
+        requireAllPermissions: false,
+        element: <EmployeeReports />,
+      },
+      {
+        path: "tax",
+        label: "Tax Reports",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.VIEW_TAX_REPORTS],
+        requireAllPermissions: false,
+        element: <TaxReports />,
       },
     ],
   },
@@ -121,11 +186,8 @@ const adminRoutes: RouteConfig[] = [
     label: "Employees",
     roles: [UserRole.ADMIN],
     permissions: [
+      Permission.VIEW_ALL_USERS,
       Permission.MANAGE_DEPARTMENT_USERS,
-      Permission.VIEW_ONBOARDING,
-      Permission.MANAGE_ONBOARDING,
-      Permission.VIEW_OFFBOARDING,
-      Permission.MANAGE_OFFBOARDING,
     ],
     element: <Outlet />,
     children: [
@@ -133,27 +195,22 @@ const adminRoutes: RouteConfig[] = [
         path: "list",
         label: "All Employees",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        element: <AllEmployees />,
         permissions: [Permission.VIEW_ALL_USERS],
+        element: <AllEmployees />,
       },
       {
         path: "onboarding",
         label: "Onboarding",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.MANAGE_ONBOARDING],
         element: <Onboarding />,
-        permissions: [Permission.MANAGE_ONBOARDING, Permission.VIEW_ONBOARDING],
-        requireAllPermissions: false,
       },
       {
         path: "offboarding",
         label: "Offboarding",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.MANAGE_OFFBOARDING],
         element: <Offboarding />,
-        permissions: [
-          Permission.MANAGE_OFFBOARDING,
-          Permission.VIEW_OFFBOARDING,
-        ],
-        requireAllPermissions: false,
       },
       {
         path: "leave",
@@ -167,57 +224,75 @@ const adminRoutes: RouteConfig[] = [
   {
     path: "payroll",
     label: "Payroll",
-    roles: [UserRole.ADMIN],
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
     permissions: [
-      Permission.CREATE_PAYROLL,
-      Permission.EDIT_PAYROLL,
+      Permission.VIEW_ALL_PAYROLL,
       Permission.VIEW_DEPARTMENT_PAYROLL,
+      Permission.MANAGE_SALARY_STRUCTURE,
     ],
-    element: <ProcessPayroll />,
+    requireAllPermissions: false,
+    element: <Outlet />,
     children: [
       {
         path: "process",
         label: "Process Payroll",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.CREATE_PAYROLL, Permission.GENERATE_PAYSLIP],
+        permissions: [
+          Permission.CREATE_PAYROLL,
+          Permission.EDIT_PAYROLL,
+          Permission.APPROVE_PAYROLL,
+          Permission.GENERATE_PAYSLIP,
+        ],
+        requireAllPermissions: false,
         element: <ProcessPayroll />,
       },
       {
         path: "structure",
         label: "Salary Structure",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.CREATE_PAYROLL, Permission.EDIT_PAYROLL],
+        permissions: [
+          Permission.MANAGE_SALARY_STRUCTURE,
+          Permission.VIEW_SALARY_STRUCTURE,
+          Permission.EDIT_SALARY_STRUCTURE,
+        ],
+        requireAllPermissions: false,
         element: <SalaryStructure />,
       },
       {
         path: "deductions",
-        label: "Deductions",
+        label: "Statutory Deductions",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.CREATE_PAYROLL, Permission.EDIT_PAYROLL],
+        permissions: [
+          Permission.MANAGE_DEDUCTIONS,
+          Permission.VIEW_DEDUCTIONS,
+          Permission.EDIT_DEDUCTIONS,
+        ],
+        requireAllPermissions: false,
         element: <Deductions />,
       },
+      {
+        path: "allowances",
+        label: "Allowances",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [
+          Permission.MANAGE_SALARY_STRUCTURE,
+          Permission.EDIT_SALARY_STRUCTURE,
+        ],
+        requireAllPermissions: false,
+        element: <AllowanceManagement />,
+      },
+      {
+        path: "bonuses",
+        label: "Bonuses & Overtime",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [
+          Permission.MANAGE_SALARY_STRUCTURE,
+          Permission.EDIT_SALARY_STRUCTURE,
+        ],
+        requireAllPermissions: false,
+        element: <BonusManagement />,
+      },
     ],
-  },
-  {
-    path: "reports/payroll",
-    label: "Payroll Reports",
-    roles: [UserRole.ADMIN],
-    permissions: [Permission.VIEW_DEPARTMENT_PAYROLL, Permission.VIEW_REPORTS],
-    element: <PayrollReports />,
-  },
-  {
-    path: "reports/employees",
-    label: "Employee Reports",
-    roles: [UserRole.ADMIN],
-    permissions: [Permission.VIEW_ALL_USERS, Permission.VIEW_REPORTS],
-    element: <EmployeeReports />,
-  },
-  {
-    path: "reports/tax",
-    label: "Tax Reports",
-    roles: [UserRole.ADMIN],
-    permissions: [Permission.VIEW_REPORTS],
-    element: <TaxReports />,
   },
 ];
 
@@ -226,37 +301,29 @@ const userRoutes: RouteConfig[] = [
   {
     path: "profile",
     label: "My Profile",
-    roles: [UserRole.USER],
+    roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPER_ADMIN],
     permissions: [Permission.VIEW_PERSONAL_INFO],
     element: <UserProfile />,
   },
   {
     path: "my-payslips",
     label: "My Payslips",
-    roles: [UserRole.USER],
+    roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPER_ADMIN],
     permissions: [Permission.VIEW_OWN_PAYSLIP],
     element: <Payslips />,
   },
   {
     path: "my-documents",
     label: "Documents",
-    roles: [UserRole.USER],
+    roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPER_ADMIN],
+    permissions: [Permission.MANAGE_DOCUMENTS],
     element: <UserDocuments />,
-  },
-  {
-    path: "employees/leave",
-    label: "Leave Management",
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    permissions: [Permission.APPROVE_LEAVE, Permission.VIEW_TEAM_LEAVE],
-    requireAllPermissions: false,
-    element: <LeaveManagement />,
   },
   {
     path: "my-leave",
     label: "My Leave",
-    roles: [UserRole.USER],
-    permissions: [Permission.REQUEST_LEAVE, Permission.VIEW_OWN_LEAVE],
-    requireAllPermissions: false,
+    roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPER_ADMIN],
+    permissions: [Permission.VIEW_OWN_LEAVE],
     element: <UserLeaveManagement />,
   },
 ];
@@ -340,6 +407,98 @@ const employeeRoutes: RouteConfig = {
   ],
 };
 
+// Payroll routes with specific permissions
+const payrollRoutes: RouteConfig = {
+  path: "payroll",
+  label: "Payroll",
+  roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+  permissions: [
+    Permission.VIEW_ALL_PAYROLL,
+    Permission.VIEW_DEPARTMENT_PAYROLL,
+    Permission.MANAGE_SALARY_STRUCTURE,
+    Permission.DELETE_PAYROLL,
+  ],
+  requireAllPermissions: false,
+  element: <Outlet />,
+  children: [
+    {
+      path: "process",
+      label: "Process Payroll",
+      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+      permissions: [
+        Permission.CREATE_PAYROLL,
+        Permission.EDIT_PAYROLL,
+        Permission.DELETE_PAYROLL,
+        Permission.APPROVE_PAYROLL,
+        Permission.GENERATE_PAYSLIP,
+      ],
+      requireAllPermissions: false,
+      element: <ProcessPayroll />,
+    },
+    {
+      path: "structure",
+      label: "Salary Structure",
+      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+      permissions: [
+        Permission.MANAGE_SALARY_STRUCTURE,
+        Permission.VIEW_SALARY_STRUCTURE,
+        Permission.EDIT_SALARY_STRUCTURE,
+      ],
+      requireAllPermissions: false,
+      element: <SalaryStructure />,
+    },
+    {
+      path: "deductions",
+      label: "Statutory Deductions",
+      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+      permissions: [
+        Permission.MANAGE_DEDUCTIONS,
+        Permission.VIEW_DEDUCTIONS,
+        Permission.EDIT_DEDUCTIONS,
+      ],
+      requireAllPermissions: false,
+      element: <Deductions />,
+    },
+    {
+      path: "allowances",
+      label: "Allowances",
+      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+      permissions: [
+        Permission.MANAGE_ALLOWANCES,
+        Permission.VIEW_ALLOWANCES,
+        Permission.EDIT_ALLOWANCES,
+      ],
+      requireAllPermissions: false,
+      element: <AllowanceManagement />,
+    },
+    {
+      path: "bonuses",
+      label: "Bonuses & Overtime",
+      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+      permissions: [
+        Permission.MANAGE_BONUSES,
+        Permission.VIEW_BONUSES,
+        Permission.EDIT_BONUSES,
+        Permission.MANAGE_OVERTIME,
+      ],
+      requireAllPermissions: false,
+      element: <BonusManagement />,
+    },
+  ],
+};
+
+// User-specific payroll routes
+const userPayrollRoutes: RouteConfig[] = [
+  {
+    path: "my-payslips",
+    label: "My Payslips",
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+    permissions: [Permission.VIEW_OWN_PAYSLIP],
+    requireAllPermissions: false,
+    element: <Payslips />,
+  },
+];
+
 // Update the routes array
 export const routes: RouteConfig[] = [
   {
@@ -349,8 +508,10 @@ export const routes: RouteConfig[] = [
     element: <Dashboard />,
   },
   employeeRoutes,
+  payrollRoutes,
   ...superAdminRoutes,
   ...adminRoutes.filter((route) => route.path !== "employees"),
+  ...userPayrollRoutes,
   ...userRoutes,
 ];
 
@@ -399,7 +560,11 @@ export const router = createBrowserRouter([
         children: routes.map((route) => ({
           path: route.path,
           element: (
-            <ProtectedRoute roles={route.roles} permissions={route.permissions}>
+            <ProtectedRoute
+              roles={route.roles}
+              permissions={route.permissions}
+              requireAllPermissions={route.requireAllPermissions}
+            >
               <LazyRoute element={route.element} skeletonType="content" />
             </ProtectedRoute>
           ),
@@ -409,6 +574,7 @@ export const router = createBrowserRouter([
               <ProtectedRoute
                 roles={childRoute.roles}
                 permissions={childRoute.permissions}
+                requireAllPermissions={childRoute.requireAllPermissions}
               >
                 <LazyRoute
                   element={childRoute.element}

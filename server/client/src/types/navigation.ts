@@ -10,6 +10,7 @@ export interface NavigationSubItem {
   href: string;
   roles?: UserRole[];
   permissions?: Permission[];
+  requireAllPermissions?: boolean;
 }
 
 export interface NavigationItem {
@@ -18,5 +19,6 @@ export interface NavigationItem {
   icon?: IconType;
   roles?: UserRole[];
   permissions?: Permission[];
+  requireAllPermissions?: boolean;
   subItems?: NavigationSubItem[];
 }

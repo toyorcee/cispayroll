@@ -12,12 +12,10 @@ import {
   departmentPieData,
 } from "../../data/dashboardData";
 import StatCard from "../../components/dashboard/StatCard";
-import QuickActions from "../../components/dashboard/QuickActions";
 import ActivityItem from "../../components/dashboard/ActivityItem";
 import LineChart from "../../components/charts/LineChart";
 import BarChart from "../../components/charts/BarChart";
 import PieChart from "../../components/charts/PieChart";
-import CreateAdminModal from "../../components/modals/CreateAdminModal";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -28,7 +26,6 @@ export default function Dashboard() {
     payroll: payrollData,
     department: departmentData,
   });
-  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
   // Add refs for each chart section
   const payrollRef = useRef(null);
@@ -100,20 +97,6 @@ export default function Dashboard() {
             {getRoleSpecificWelcomeMessage(user?.role)}
           </p>
         </motion.div>
-
-        {/* Quick Actions */}
-        <QuickActions
-          role={user?.role}
-          permissions={user?.permissions}
-          onAddAdmin={() => setIsAdminModalOpen(true)}
-        />
-
-        {/* Add the modal */}
-        <CreateAdminModal
-          isOpen={isAdminModalOpen}
-          onClose={() => setIsAdminModalOpen(false)}
-          departments={departmentData.labels}
-        />
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">

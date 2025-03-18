@@ -11,6 +11,7 @@ export interface CreateLeaveRequest {
 }
 
 export class LeaveService {
+  // Core leave operations
   static async createLeave(
     user: UserDocument,
     leaveData: CreateLeaveRequest

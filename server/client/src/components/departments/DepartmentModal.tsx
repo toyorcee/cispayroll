@@ -17,6 +17,7 @@ interface DepartmentModalProps {
   onSave: (department: Partial<Department>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   departments: Department[];
+  isLoading: boolean;
 }
 
 export const DepartmentModal = ({
@@ -25,6 +26,7 @@ export const DepartmentModal = ({
   onSave,
   onDelete,
   departments,
+  isLoading,
 }: DepartmentModalProps) => {
   const [loading, setLoading] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(
@@ -132,7 +134,7 @@ export const DepartmentModal = ({
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 
+                className="px-4 py-2 !bg-green-600 text-white rounded-lg hover:bg-green-700 
                          transition-colors flex items-center space-x-2"
               >
                 {loading ? (

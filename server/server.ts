@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import { traceError } from "./utils/errorHandler.js";
 
 // Route Imports
 import authRoutes from "./routes/authRoutes.js";
@@ -20,56 +21,149 @@ import invitationRoutes from "./routes/invitationRoutes.js";
 // Load environment variables
 dotenv.config();
 
-// Initialize Express
+// Enhanced error tracking
+const logServerError = (error: any, context: string) => {
+  console.error(`🔴 ${context}:`, {
+    message: error.message,
+    stack: error.stack,
+    time: new Date().toISOString(),
+  });
+};
+
+// Request logger middleware
+const requestLogger = (req: Request, _res: Response, next: NextFunction) => {
+  console.log(`📥 ${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+};
+
+// Response logger middleware
+const responseLogger = (req: Request, res: Response, next: NextFunction) => {
+  const oldJson = res.json;
+  res.json = function (data) {
+    console.log(
+      `📤 ${new Date().toISOString()} - ${req.method} ${req.url} - Status: ${
+        res.statusCode
+      }`
+    );
+    return oldJson.call(this, data);
+  };
+  next();
+};
+
+// Database connection with enhanced logging
+const connectDB = async (): Promise<void> => {
+  try {
+    const conn = await mongoose.connect(process.env.MONGO_URI!);
+    console.log(`🟢 MongoDB Connected: ${conn.connection.host}`);
+
+    // Monitor database events
+    mongoose.connection.on("error", (error) => {
+      logServerError(error, "MongoDB Error");
+    });
+
+    mongoose.connection.on("disconnected", () => {
+      console.log("🔴 MongoDB Disconnected");
+    });
+  } catch (error) {
+    logServerError(error, "MongoDB Connection Error");
+    console.error("❌ Error details:", error);
+    setTimeout(connectDB, 5000);
+  }
+};
+
+// Initialize Express with enhanced error handling
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Database Connection with retry logic
-const connectDB = async (): Promise<void> => {
-  try {
-    await mongoose.connect(process.env.MONGO_URI!);
-    console.log("✅ MongoDB connected successfully");
-  } catch (err) {
-    console.error("❌ MongoDB connection error:", err);
-    setTimeout(connectDB, 5000);
-  }
-};
+// Global error handlers with more detail
+process.on("unhandledRejection", (reason, promise) => {
+  logServerError({ reason, promise }, "Unhandled Promise Rejection");
+  console.error("🔴 Promise details:", promise);
+});
 
-// Middleware
+process.on("uncaughtException", (error) => {
+  logServerError(error, "Uncaught Exception");
+  console.error("🔴 Error details:", error);
+});
+
+// Middleware with logging
+app.use(requestLogger);
+app.use(responseLogger);
 app.use(
   cors({
     credentials: true,
     origin: process.env.CLIENT_URL || "http://localhost:5173",
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"], 
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 app.use(cookieParser());
 app.use(express.json());
 
-// API Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/super-admin", superAdminRoutes);
-app.use("/api/leave", leaveRoutes);
-app.use("/api/users", regularUserRoutes);
-app.use("/api/employees", employeeRoutes);
-app.use("/api/invitation", invitationRoutes);
+// Route error wrapper
+const routeErrorWrapper = (handler: Function) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await handler(req, res, next);
+    } catch (error) {
+      logServerError(error, `Route Error: ${req.method} ${req.url}`);
+      next(error);
+    }
+  };
+};
 
-// Health Check Route
+// Wrap your route handlers
+app.use("/api/auth", routeErrorWrapper(authRoutes));
+app.use("/api/admin", routeErrorWrapper(adminRoutes));
+app.use("/api/super-admin", routeErrorWrapper(superAdminRoutes));
+app.use("/api/leave", routeErrorWrapper(leaveRoutes));
+app.use("/api/users", routeErrorWrapper(regularUserRoutes));
+app.use("/api/employees", routeErrorWrapper(employeeRoutes));
+app.use("/api/invitation", routeErrorWrapper(invitationRoutes));
+
+// Enhanced health check
 app.get("/api/health", (_req: Request, res: Response) => {
-  res.json({ status: "healthy", timestamp: new Date().toISOString() });
+  const health = {
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    mongodb:
+      mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+  };
+  res.json(health);
 });
 
-// Global Error Handler
+// Enhanced error handler
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error("❌ Error:", err);
+  const error = traceError(
+    err,
+    `Global Error Handler: ${req.method} ${req.url}`
+  );
+  console.error("❌ Full error details:", {
+    error,
+    path: req.path,
+    method: req.method,
+    body: req.body,
+    query: req.query,
+    params: req.params,
+    headers: req.headers,
+  });
+
   res.status(500).json({
+    success: false,
     message: "Internal server error",
-    error: process.env.NODE_ENV === "development" ? err.message : undefined,
+    error:
+      process.env.NODE_ENV === "development"
+        ? {
+            message: error.message,
+            stack: error.stack,
+          }
+        : undefined,
   });
 });
 
@@ -88,31 +182,25 @@ if (process.env.NODE_ENV === "development") {
   });
 }
 
-// Start Server
+// Start server with enhanced logging
 const startServer = async (): Promise<void> => {
   try {
     await connectDB();
     app.listen(PORT, () => {
-      console.log(`✅ Server running on port ${PORT}`);
-      console.log(
-        `📱 Client URL: ${process.env.CLIENT_URL || "http://localhost:5173"}`
-      );
+      console.log(`
+🚀 Server is running!
+📡 Port: ${PORT}
+🌍 Environment: ${process.env.NODE_ENV}
+🔗 Client URL: ${process.env.CLIENT_URL || "http://localhost:5173"}
+      `);
     });
   } catch (error) {
-    console.error("❌ Server startup error:", error);
+    logServerError(error, "Server Startup Error");
     process.exit(1);
   }
 };
 
 startServer();
 
-// Handle uncaught exceptions
-process.on("uncaughtException", (error) => {
-  console.error("❌ Uncaught Exception:", error);
-  process.exit(1);
-});
-
-process.on("unhandledRejection", (error) => {
-  console.error("❌ Unhandled Rejection:", error);
-  process.exit(1);
-});
+// Update your package.json to include this debug script:
+// "debug": "NODE_ENV=development DEBUG=* nodemon --inspect server.ts"

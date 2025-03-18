@@ -3,7 +3,6 @@ import { useAuth } from "../../context/AuthContext";
 import { UserRole, Permission } from "../../types/auth";
 import { toast } from "react-toastify";
 import { useSkeleton } from "../../components/skeletons/SkeletonProvider";
-import { useState, useEffect } from "react";
 
 interface ProtectedRouteProps {
   children?: React.ReactNode;
@@ -32,13 +31,159 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/auth/signin" state={{ from: location }} replace />;
   }
 
-  // Check if user has required role
+  // Role-based access check
   if (roles && !roles.includes(user.role)) {
-    toast.error(`Access denied: Insufficient role privileges`);
+    toast.error("Access denied: Insufficient role privileges");
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Enhanced permission checking
+  // Path-specific permission checks
+  const path = location.pathname.toLowerCase();
+
+  // Payroll Routes with specific submenu checks
+  if (path.startsWith("/dashboard/payroll")) {
+    // Debug log
+    console.log("Current user permissions:", user.permissions);
+
+    // Specific check for salary structure
+    if (path.includes("/structure")) {
+      const salaryStructurePermissions = [
+        Permission.MANAGE_SALARY_STRUCTURE,
+        Permission.VIEW_SALARY_STRUCTURE,
+        Permission.EDIT_SALARY_STRUCTURE,
+      ];
+      console.log("Required permissions:", salaryStructurePermissions);
+      console.log(
+        "Has permissions:",
+        salaryStructurePermissions.some((perm) =>
+          user.permissions?.includes(perm)
+        )
+      );
+
+      if (
+        !salaryStructurePermissions.some((perm) =>
+          user.permissions?.includes(perm)
+        )
+      ) {
+        toast.error("Access denied: No salary structure permissions");
+        return <Navigate to="/dashboard" replace />;
+      }
+      return <>{children || element}</>;
+    }
+
+    // Specific check for process payroll
+    if (path.includes("/process")) {
+      const processPayrollPermissions = [
+        Permission.CREATE_PAYROLL,
+        Permission.EDIT_PAYROLL,
+        Permission.DELETE_PAYROLL,
+        Permission.APPROVE_PAYROLL,
+        Permission.GENERATE_PAYSLIP,
+      ];
+      if (
+        !processPayrollPermissions.some((perm) =>
+          user.permissions?.includes(perm)
+        )
+      ) {
+        toast.error("Access denied: No payroll processing permissions");
+        return <Navigate to="/dashboard" replace />;
+      }
+      // If has permissions, continue to render
+      return <>{children || element}</>;
+    }
+
+    // General payroll access check for other payroll routes
+    const generalPayrollPermissions = [
+      Permission.VIEW_ALL_PAYROLL,
+      Permission.VIEW_DEPARTMENT_PAYROLL,
+    ];
+    if (
+      !generalPayrollPermissions.some((perm) =>
+        user.permissions?.includes(perm)
+      )
+    ) {
+      toast.error("Access denied: No payroll access permissions");
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
+
+  // Reports Routes
+  if (path.startsWith("/dashboard/reports")) {
+    const reportPermissions = [
+      Permission.VIEW_REPORTS,
+      Permission.VIEW_PAYROLL_REPORTS,
+      Permission.VIEW_EMPLOYEE_REPORTS,
+      Permission.VIEW_TAX_REPORTS,
+    ];
+
+    if (!reportPermissions.some((perm) => user.permissions?.includes(perm))) {
+      toast.error("Access denied: No report viewing permissions");
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
+
+  // Settings Routes
+  if (path.startsWith("/dashboard/settings")) {
+    const settingsPermissions = [
+      Permission.MANAGE_SYSTEM,
+      Permission.MANAGE_COMPANY_PROFILE,
+      Permission.MANAGE_TAX_CONFIG,
+      Permission.MANAGE_COMPLIANCE,
+      Permission.MANAGE_NOTIFICATIONS,
+      Permission.MANAGE_INTEGRATIONS,
+      Permission.CREATE_DEPARTMENT,
+      Permission.EDIT_DEPARTMENT,
+      Permission.VIEW_ALL_DEPARTMENTS,
+    ];
+
+    if (!settingsPermissions.some((perm) => user.permissions?.includes(perm))) {
+      toast.error("Access denied: No settings management permissions");
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
+
+  // Employee Routes
+  if (path.startsWith("/dashboard/employees")) {
+    const employeePermissions = [
+      Permission.CREATE_USER,
+      Permission.EDIT_USER,
+      Permission.DELETE_USER,
+      Permission.VIEW_ALL_USERS,
+      Permission.MANAGE_DEPARTMENT_USERS,
+      Permission.MANAGE_ONBOARDING,
+      Permission.VIEW_ONBOARDING,
+      Permission.MANAGE_OFFBOARDING,
+      Permission.VIEW_OFFBOARDING,
+      Permission.APPROVE_OFFBOARDING,
+      Permission.APPROVE_LEAVE,
+      Permission.VIEW_TEAM_LEAVE,
+      Permission.VIEW_ALL_LEAVE,
+    ];
+
+    if (!employeePermissions.some((perm) => user.permissions?.includes(perm))) {
+      toast.error("Access denied: No employee management permissions");
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
+
+  // User Routes (profile, documents, etc.)
+  if (
+    path.startsWith("/dashboard/profile") ||
+    path.startsWith("/dashboard/my-payslips")
+  ) {
+    const userPermissions = [
+      Permission.VIEW_PERSONAL_INFO,
+      Permission.EDIT_PERSONAL_INFO,
+      Permission.VIEW_OWN_PAYSLIP,
+    ];
+
+    if (!userPermissions.some((perm) => user.permissions?.includes(perm))) {
+      toast.error("Access denied: Insufficient permissions for this section");
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
+
+  // General permission-based access check
   if (permissions && permissions.length > 0) {
     const hasRequiredPermissions = requireAllPermissions
       ? permissions.every((permission) =>
@@ -49,114 +194,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         );
 
     if (!hasRequiredPermissions) {
-      const missingPermissions = permissions.filter(
-        (permission) => !user.permissions?.includes(permission)
-      );
-      console.log("User permissions:", user.permissions);
-      console.log("Required permissions:", permissions);
-      console.log("Missing permissions:", missingPermissions);
-
-      toast.error(`Access denied: Insufficient permissions for this action`);
+      toast.error("Access denied: Insufficient permissions");
       return <Navigate to="/dashboard" replace />;
     }
   }
 
-  // Route-specific permission checks
-  const path = location.pathname.toLowerCase();
-
-  // Department Management Routes
-  if (path.includes("departments")) {
-    if (
-      !user.permissions?.includes(Permission.VIEW_ALL_DEPARTMENTS) &&
-      !user.permissions?.includes(Permission.MANAGE_DEPARTMENT_USERS)
-    ) {
-      toast.error("Access denied: No department management permissions");
-      return <Navigate to="/dashboard" replace />;
-    }
-
-    if (
-      (path.includes("new") || path.includes("edit")) &&
-      !user.permissions?.includes(Permission.CREATE_DEPARTMENT) &&
-      !user.permissions?.includes(Permission.EDIT_DEPARTMENT)
-    ) {
-      toast.error(
-        "Access denied: Department modification restricted to Super Admin"
-      );
-      return <Navigate to="/dashboard" replace />;
-    }
-  }
-
-  // Onboarding Routes
-  if (path.includes("onboarding")) {
-    if (
-      !user.permissions?.includes(Permission.VIEW_ONBOARDING) &&
-      !user.permissions?.includes(Permission.MANAGE_ONBOARDING)
-    ) {
-      toast.error("Access denied: No onboarding permissions");
-      return <Navigate to="/dashboard" replace />;
-    }
-  }
-
-  // Offboarding Routes
-  if (path.includes("offboarding")) {
-    if (
-      !user.permissions?.includes(Permission.VIEW_OFFBOARDING) &&
-      !user.permissions?.includes(Permission.MANAGE_OFFBOARDING) &&
-      !user.permissions?.includes(Permission.APPROVE_OFFBOARDING)
-    ) {
-      toast.error("Access denied: No offboarding permissions");
-      return <Navigate to="/dashboard" replace />;
-    }
-  }
-
-  // Payroll Routes
-  if (path.includes("payroll")) {
-    if (
-      !user.permissions?.includes(Permission.VIEW_DEPARTMENT_PAYROLL) &&
-      !user.permissions?.includes(Permission.VIEW_ALL_PAYROLL)
-    ) {
-      toast.error("Access denied: No payroll viewing permissions");
-      return <Navigate to="/dashboard" replace />;
-    }
-
-    if (
-      path.includes("process") &&
-      !user.permissions?.includes(Permission.CREATE_PAYROLL)
-    ) {
-      toast.error("Access denied: No payroll processing permissions");
-      return <Navigate to="/dashboard" replace />;
-    }
-  }
-
-  // Leave Management Routes
-  if (path.includes("leave")) {
-    if (
-      !user.permissions?.includes(Permission.VIEW_TEAM_LEAVE) &&
-      !user.permissions?.includes(Permission.VIEW_ALL_LEAVE)
-    ) {
-      toast.error("Access denied: No leave management permissions");
-      return <Navigate to="/dashboard" replace />;
-    }
-  }
-
-  // Reports Routes
-  if (path.includes("reports")) {
-    if (!user.permissions?.includes(Permission.VIEW_REPORTS)) {
-      toast.error("Access denied: No report viewing permissions");
-      return <Navigate to="/dashboard" replace />;
-    }
-  }
-
-  // System Management Routes
-  if (path.includes("settings")) {
-    if (
-      !user.permissions?.includes(Permission.MANAGE_SYSTEM) &&
-      !user.permissions?.includes(Permission.VIEW_SYSTEM_HEALTH)
-    ) {
-      toast.error("Access denied: No system management permissions");
-      return <Navigate to="/dashboard" replace />;
-    }
-  }
-
-  return <>{children}</>;
+  return <>{children || element}</>;
 };

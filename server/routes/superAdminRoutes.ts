@@ -3,10 +3,12 @@ import {
   requireAuth,
   requireSuperAdmin,
   requirePermission,
+  AuthenticatedRequest,
 } from "../middleware/authMiddleware.js";
 import { SuperAdminController } from "../controllers/SuperAdminController.js";
 import { Permission } from "../models/User.js";
 import { validateDepartment } from "../middleware/departmentMiddleware.js";
+import { Response, NextFunction } from "express";
 
 const router = Router();
 
@@ -104,10 +106,17 @@ router.delete(
 );
 
 // ===== Payroll Management Routes =====
+// Basic Payroll Operations
 router.get(
   "/payroll",
   requirePermission([Permission.VIEW_ALL_PAYROLL]),
   SuperAdminController.getAllPayroll as unknown as RequestHandler
+);
+
+router.get(
+  "/payroll/:id",
+  requirePermission([Permission.VIEW_ALL_PAYROLL]),
+  SuperAdminController.getPayrollById as unknown as RequestHandler
 );
 
 router.post(
@@ -116,16 +125,147 @@ router.post(
   SuperAdminController.createPayroll as unknown as RequestHandler
 );
 
-router.post(
-  "/payroll/:id/approve",
-  requirePermission([Permission.APPROVE_PAYROLL]),
-  SuperAdminController.approvePayroll as unknown as RequestHandler
+router.patch(
+  "/payroll/:id",
+  requirePermission([Permission.EDIT_PAYROLL]),
+  SuperAdminController.updatePayroll as unknown as RequestHandler
 );
 
 router.delete(
   "/payroll/:id",
   requirePermission([Permission.DELETE_PAYROLL]),
   SuperAdminController.deletePayroll as unknown as RequestHandler
+);
+
+// Payroll Approval and Generation
+router.post(
+  "/payroll/:id/approve",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  SuperAdminController.approvePayroll as unknown as RequestHandler
+);
+
+router.post(
+  "/payroll/:id/generate-slip",
+  requirePermission([Permission.GENERATE_PAYSLIP]),
+  SuperAdminController.generatePayslip as unknown as RequestHandler
+);
+
+// Payroll Views and Statistics
+router.get(
+  "/payroll/employee/:employeeId",
+  requirePermission([Permission.VIEW_ALL_PAYROLL]),
+  SuperAdminController.getEmployeePayrollHistory as unknown as RequestHandler
+);
+
+router.get(
+  "/payroll/department/:departmentId",
+  requirePermission([Permission.VIEW_ALL_PAYROLL]),
+  SuperAdminController.getDepartmentPayroll as unknown as RequestHandler
+);
+
+router.get(
+  "/payroll/stats",
+  requirePermission([Permission.VIEW_PAYROLL_STATS]),
+  SuperAdminController.getPayrollStats as unknown as RequestHandler
+);
+
+// Employee Management Routes
+router.get(
+  "/onboarding-employees",
+  requirePermission([Permission.VIEW_ONBOARDING]),
+  SuperAdminController.getOnboardingEmployees as unknown as RequestHandler
+);
+
+router.get(
+  "/offboarding-employees",
+  requirePermission([Permission.VIEW_OFFBOARDING]),
+  SuperAdminController.getOffboardingEmployees as unknown as RequestHandler
+);
+
+router.post(
+  "/employees/:employeeId/offboard",
+  requirePermission([Permission.MANAGE_OFFBOARDING]),
+  SuperAdminController.initiateOffboarding as unknown as RequestHandler
+);
+
+router.post(
+  "/employees/:employeeId/revert-onboarding",
+  requirePermission([Permission.MANAGE_ONBOARDING]),
+  SuperAdminController.revertToOnboarding as unknown as RequestHandler
+);
+
+router.patch(
+  "/employees/:employeeId/offboarding",
+  requirePermission([Permission.MANAGE_OFFBOARDING]),
+  SuperAdminController.updateOffboardingStatus as unknown as RequestHandler
+);
+
+router.post(
+  "/employees/:employeeId/archive",
+  requirePermission([Permission.MANAGE_OFFBOARDING]),
+  SuperAdminController.archiveEmployee as unknown as RequestHandler
+);
+
+// ===== Leave Management Routes =====
+router.get(
+  "/leave/all",
+  requirePermission([Permission.VIEW_ALL_LEAVE]),
+  SuperAdminController.getAllLeaves as unknown as RequestHandler
+);
+
+router.patch(
+  "/leave/:id/approve",
+  requirePermission([Permission.APPROVE_LEAVE]),
+  SuperAdminController.approveLeave as unknown as RequestHandler
+);
+
+router.patch(
+  "/leave/:id/reject",
+  requirePermission([Permission.APPROVE_LEAVE]),
+  SuperAdminController.rejectLeave as unknown as RequestHandler
+);
+
+// Salary Structure Routes
+router.post(
+  "/salary-grades",
+  requirePermission([Permission.MANAGE_SALARY_STRUCTURE]),
+  SuperAdminController.createSalaryGrade as unknown as RequestHandler
+);
+
+router.get(
+  "/salary-grades",
+  requirePermission([Permission.VIEW_SALARY_STRUCTURE]),
+  SuperAdminController.getAllSalaryGrades as unknown as RequestHandler
+);
+
+router.patch(
+  "/salary-grades/:id",
+  requirePermission([Permission.MANAGE_SALARY_STRUCTURE]),
+  SuperAdminController.updateSalaryGrade as unknown as RequestHandler
+);
+
+router.post(
+  "/salary-grades/:id/components",
+  requirePermission([Permission.MANAGE_SALARY_STRUCTURE]),
+  SuperAdminController.addSalaryComponent as unknown as RequestHandler
+);
+
+router.patch(
+  "/salary-grades/:id/components/:componentId",
+  requirePermission([Permission.MANAGE_SALARY_STRUCTURE]),
+  SuperAdminController.updateSalaryComponent as unknown as RequestHandler
+);
+
+router.get(
+  "/salary-grades/:id",
+  requirePermission([Permission.VIEW_SALARY_STRUCTURE]),
+  SuperAdminController.getSalaryGrade as unknown as RequestHandler
+);
+
+router.delete(
+  "/salary-grades/:id",
+  requirePermission([Permission.MANAGE_SALARY_STRUCTURE]),
+  SuperAdminController.deleteSalaryGrade as unknown as RequestHandler
 );
 
 export default router;
