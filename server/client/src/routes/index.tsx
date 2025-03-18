@@ -588,13 +588,13 @@ export const router = createBrowserRouter([
       },
       {
         path: "/",
-        element: <SignIn />,
-        // children: [{ index: true, element: <SignIn /> }],
+        element: <AppLayout />,
+        children: [{ index: true, element: <Home /> }],
       },
       {
         path: "/home",
         element: <Landing />,
-      
+        // children: [{ index: true, element: <Landing /> }],
       },
     ],
   },
