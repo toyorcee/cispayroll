@@ -533,10 +533,10 @@ export const router = createBrowserRouter([
       {
         path: "/auth",
         children: [
-          // {
-          //   path: "signin",
-          //   element: <LazyRoute component={SignIn} skeletonType="auth" />,
-          // },
+          {
+            path: "signin",
+            element: <LazyRoute component={SignIn} skeletonType="auth" />,
+          },
           {
             path: "signup",
             element: <LazyRoute component={SignUp} skeletonType="auth" />,
