@@ -54,7 +54,7 @@ export default function SignIn() {
           boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
         },
       });
-      navigate("/dashboard");
+      navigate("/home");
     } catch (err) {
       console.error("Login error:", err);
       toast.error(
