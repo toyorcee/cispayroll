@@ -37,6 +37,7 @@ import { AuthSkeleton } from "../components/skeletons/AuthSkeleton";
 import Dashboard from "../pages/dashboard/Dashboard";
 import AllowanceManagement from "../pages/dashboard/payroll/AllowanceManagement";
 import BonusManagement from "../pages/dashboard/payroll/BonusManagement";
+import Landing from "../pages/Landing";
 
 export interface RouteConfig {
   path: string;
@@ -532,10 +533,10 @@ export const router = createBrowserRouter([
       {
         path: "/auth",
         children: [
-          {
-            path: "signin",
-            element: <LazyRoute component={SignIn} skeletonType="auth" />,
-          },
+          // {
+          //   path: "signin",
+          //   element: <LazyRoute component={SignIn} skeletonType="auth" />,
+          // },
           {
             path: "signup",
             element: <LazyRoute component={SignUp} skeletonType="auth" />,
@@ -587,8 +588,13 @@ export const router = createBrowserRouter([
       },
       {
         path: "/",
-        element: <AppLayout />,
-        children: [{ index: true, element: <Home /> }],
+        element: <SignIn />,
+        // children: [{ index: true, element: <SignIn /> }],
+      },
+      {
+        path: "/home",
+        element: <Landing />,
+      
       },
     ],
   },
