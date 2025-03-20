@@ -12,8 +12,15 @@ export interface ISalaryComponentBase {
 }
 
 // Interface for salary component as stored in MongoDB
-export interface ISalaryComponent extends ISalaryComponentBase {
+export interface ISalaryComponent {
   _id: Types.ObjectId;
+  name: string;
+  type: "allowance" | "deduction";
+  calculationMethod: "fixed" | "percentage";
+  value: number;
+  isActive: boolean;
+  createdBy: Types.ObjectId;
+  updatedBy: Types.ObjectId;
 }
 
 // Interface for input when creating/updating components
@@ -41,10 +48,18 @@ export interface ISalaryGrade extends Document {
 const SalaryComponentSchema = new Schema<ISalaryComponent>(
   {
     name: { type: String, required: true },
-    type: { type: String, enum: ["fixed", "percentage"], required: true },
+    type: {
+      type: String,
+      required: true,
+      enum: ["allowance", "deduction"],
+    },
+    calculationMethod: {
+      type: String,
+      required: true,
+      enum: ["fixed", "percentage"],
+    },
     value: { type: Number, required: true },
     isActive: { type: Boolean, default: true },
-    description: { type: String },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     updatedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
   },

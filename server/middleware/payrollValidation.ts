@@ -91,24 +91,36 @@ export const validatePayrollUpdate = (
     }
 
     components.forEach((component, index) => {
-      if (!component.name || !component.type || !component.amount) {
+      if (
+        !component.name ||
+        !component.type ||
+        !component.value ||
+        !component.calculationMethod
+      ) {
         throw new ApiError(
           400,
           `Component at index ${index} is missing required fields`
         );
       }
 
-      if (!["fixed", "percentage"].includes(component.type)) {
+      if (!["allowance", "deduction"].includes(component.type)) {
         throw new ApiError(
           400,
-          `Invalid component type at index ${index}. Must be 'fixed' or 'percentage'`
+          `Invalid component type at index ${index}. Must be 'allowance' or 'deduction'`
         );
       }
 
-      if (component.amount < 0) {
+      if (!["fixed", "percentage"].includes(component.calculationMethod)) {
         throw new ApiError(
           400,
-          `Component amount cannot be negative at index ${index}`
+          `Invalid calculation method at index ${index}. Must be 'fixed' or 'percentage'`
+        );
+      }
+
+      if (component.value < 0) {
+        throw new ApiError(
+          400,
+          `Component value cannot be negative at index ${index}`
         );
       }
     });

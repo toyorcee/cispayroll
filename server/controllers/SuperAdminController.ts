@@ -5,7 +5,6 @@ import { AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import UserModel from "../models/User.js";
 import DepartmentModel, { DepartmentStatus } from "../models/Department.js";
 import PayrollModel from "../models/Payroll.js";
-import { PermissionChecker } from "../utils/permissionUtils.js";
 import { handleError, ApiError } from "../utils/errorHandler.js";
 import Leave from "../models/Leave.js";
 import { LeaveStatus } from "../models/Leave.js";
@@ -14,6 +13,8 @@ import SalaryGrade, { ISalaryComponent } from "../models/SalaryStructure.js";
 import { Types } from "mongoose";
 import mongoose from "mongoose";
 import { PayPeriod, PayrollStatus } from "../types/payroll.js";
+import { DeductionService } from "../services/DeductionService.js";
+import Deduction from "../models/Deduction.js";
 
 interface PayrollAllowances {
   housing: number;
@@ -1332,6 +1333,197 @@ export class SuperAdminController {
         message: "Salary grade deleted successfully",
       });
     } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async setupStatutoryDeductions(
+    req: AuthenticatedRequest,
+    res: Response
+  ) {
+    try {
+      console.log("🔄 Setting up statutory deductions");
+
+      // Convert string ID to ObjectId using our helper
+      await DeductionService.createStatutoryDeductions(asObjectId(req.user.id));
+
+      console.log("✅ Statutory deductions set up successfully");
+
+      res.status(201).json({
+        success: true,
+        message: "Statutory deductions set up successfully",
+      });
+    } catch (error) {
+      console.error("❌ Error setting up statutory deductions:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async getAllDeductions(req: AuthenticatedRequest, res: Response) {
+    try {
+      console.log("🔍 Fetching all deductions");
+
+      const deductions = await DeductionService.getActiveDeductions();
+
+      console.log("✅ Found deductions:", {
+        statutoryCount: deductions.statutory.length,
+        voluntaryCount: deductions.voluntary.length,
+      });
+
+      res.status(200).json({
+        success: true,
+        data: deductions,
+      });
+    } catch (error) {
+      console.error("❌ Error fetching deductions:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async createVoluntaryDeduction(
+    req: AuthenticatedRequest,
+    res: Response
+  ) {
+    try {
+      console.log("📝 Creating voluntary deduction:", req.body);
+
+      const deduction = await DeductionService.createVoluntaryDeduction(
+        asObjectId(req.user.id),
+        {
+          name: req.body.name,
+          description: req.body.description,
+          calculationMethod: req.body.calculationMethod,
+          value: req.body.value,
+          effectiveDate: req.body.effectiveDate || new Date(),
+        }
+      );
+
+      console.log("✅ Voluntary deduction created:", deduction);
+
+      res.status(201).json({
+        success: true,
+        message: "Voluntary deduction created successfully",
+        data: deduction,
+      });
+    } catch (error) {
+      console.error("❌ Error creating voluntary deduction:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async updateDeduction(req: AuthenticatedRequest, res: Response) {
+    try {
+      console.log("📝 Updating deduction:", {
+        id: req.params.id,
+        updates: req.body,
+      });
+
+      const deduction = await Deduction.findById(req.params.id);
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found");
+      }
+
+      // Don't allow changing the type of deduction
+      if (req.body.type) {
+        throw new ApiError(400, "Cannot change deduction type");
+      }
+
+      // For PAYE, only allow updating tax brackets
+      if (deduction.name === "PAYE Tax" && req.body.value !== undefined) {
+        throw new ApiError(
+          400,
+          "Cannot modify PAYE value directly. Update tax brackets instead."
+        );
+      }
+
+      const updatedDeduction = await Deduction.findByIdAndUpdate(
+        req.params.id,
+        {
+          ...req.body,
+          updatedBy: asObjectId(req.user.id),
+        },
+        { new: true }
+      );
+
+      console.log("✅ Deduction updated successfully");
+
+      res.status(200).json({
+        success: true,
+        message: "Deduction updated successfully",
+        data: updatedDeduction,
+      });
+    } catch (error) {
+      console.error("❌ Error updating deduction:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async toggleDeductionStatus(req: AuthenticatedRequest, res: Response) {
+    try {
+      console.log("🔄 Toggling deduction status for:", req.params.id);
+
+      const deduction = await Deduction.findById(req.params.id);
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found");
+      }
+
+      // Don't allow disabling statutory deductions
+      if (deduction.type === "statutory") {
+        throw new ApiError(400, "Cannot disable statutory deductions");
+      }
+
+      // Toggle the isActive status
+      deduction.isActive = !deduction.isActive;
+      deduction.updatedBy = asObjectId(req.user.id);
+      await deduction.save();
+
+      console.log(
+        `✅ Deduction ${
+          deduction.isActive ? "activated" : "deactivated"
+        } successfully`
+      );
+
+      res.status(200).json({
+        success: true,
+        message: `Deduction ${
+          deduction.isActive ? "activated" : "deactivated"
+        } successfully`,
+        data: deduction,
+      });
+    } catch (error) {
+      console.error("❌ Error toggling deduction status:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async deleteDeduction(req: AuthenticatedRequest, res: Response) {
+    try {
+      const deduction = await Deduction.findById(req.params.id);
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found");
+      }
+
+      // Don't allow deleting statutory deductions
+      if (deduction.type === "statutory") {
+        throw new ApiError(400, "Cannot delete statutory deductions");
+      }
+
+      await Deduction.findByIdAndDelete(req.params.id);
+
+      console.log("✅ Deduction deleted successfully");
+
+      res.status(200).json({
+        success: true,
+        message: "Deduction deleted successfully",
+      });
+    } catch (error) {
+      console.error("❌ Error deleting deduction:", error);
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
     }

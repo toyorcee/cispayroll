@@ -1,39 +1,107 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Schema, Document, Types } from "mongoose";
 
+// Enum for deduction types
 export enum DeductionType {
-  PERCENTAGE = "percentage",
-  FIXED = "fixed",
-  TAX = "tax",
-  PENSION = "pension",
+  STATUTORY = "statutory",
+  VOLUNTARY = "voluntary",
 }
 
+// Enum for calculation methods
+export enum CalculationMethod {
+  FIXED = "fixed",
+  PERCENTAGE = "percentage",
+  PROGRESSIVE = "progressive", // For PAYE tax brackets
+}
+
+// Interface for tax bracket (used for PAYE)
+export interface TaxBracket {
+  min: number;
+  max: number | null; // null for the highest bracket
+  rate: number; // Percentage
+}
+
+// Main deduction interface
 export interface IDeduction extends Document {
   name: string;
   type: DeductionType;
-  value: number;
   description?: string;
-  active: boolean;
-  mandatory: boolean;
-  createdBy: mongoose.Types.ObjectId;
+  calculationMethod: CalculationMethod;
+  value: number; // Percentage or fixed amount
+  taxBrackets?: TaxBracket[]; // Only for PAYE
+  isActive: boolean;
+  effectiveDate: Date;
+  createdBy: Types.ObjectId;
+  updatedBy: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const DeductionSchema = new Schema(
+// Schema for tax brackets
+const TaxBracketSchema = new Schema<TaxBracket>(
   {
-    name: { type: String, required: true },
+    min: { type: Number, required: true },
+    max: { type: Number, default: null },
+    rate: { type: Number, required: true },
+  },
+  { _id: false }
+);
+
+// Main deduction schema
+const DeductionSchema = new Schema<IDeduction>(
+  {
+    name: {
+      type: String,
+      required: true,
+      unique: true,
+    },
     type: {
       type: String,
       enum: Object.values(DeductionType),
       required: true,
     },
-    value: { type: Number, required: true },
-    description: { type: String },
-    active: { type: Boolean, default: true },
-    mandatory: { type: Boolean, default: false },
-    createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    description: {
+      type: String,
+    },
+    calculationMethod: {
+      type: String,
+      enum: Object.values(CalculationMethod),
+      required: true,
+    },
+    value: {
+      type: Number,
+      required: true,
+    },
+    taxBrackets: {
+      type: [TaxBracketSchema],
+      default: undefined,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    effectiveDate: {
+      type: Date,
+      default: Date.now,
+    },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    updatedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
+
+// Create indexes
+DeductionSchema.index({ name: 1 }, { unique: true });
+DeductionSchema.index({ type: 1 });
+DeductionSchema.index({ isActive: 1 });
 
 export default mongoose.model<IDeduction>("Deduction", DeductionSchema);

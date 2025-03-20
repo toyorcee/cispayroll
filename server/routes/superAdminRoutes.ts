@@ -9,7 +9,10 @@ import { SuperAdminController } from "../controllers/SuperAdminController.js";
 import { Permission } from "../models/User.js";
 import { validateDepartment } from "../middleware/departmentMiddleware.js";
 import { Response, NextFunction } from "express";
-import { validatePayrollCreate } from "../middleware/payrollValidation.js";
+import {
+  validatePayrollCreate,
+  validatePayrollUpdate,
+} from "../middleware/payrollValidation.js";
 
 const router = Router();
 
@@ -108,12 +111,19 @@ router.delete(
 
 // ===== Payroll Management Routes =====
 // Basic Payroll Operations
-router.post(
-  "/payroll",
-  requirePermission([Permission.CREATE_PAYROLL]),
-  validatePayrollCreate,
-  SuperAdminController.createPayroll as unknown as RequestHandler
-);
+// router.post(
+//   "/payroll",
+//   requirePermission([Permission.CREATE_PAYROLL]),
+//   validatePayrollCreate,
+//   SuperAdminController.createPayroll
+// );
+
+// router.patch(
+//   "/payroll/:id",
+//   requirePermission([Permission.EDIT_PAYROLL]),
+//   validatePayrollUpdate,
+//   SuperAdminController.updatePayroll
+// );
 
 // router.get(
 //   "/payroll",
@@ -125,12 +135,6 @@ router.post(
 //   "/payroll/:id",
 //   requirePermission([Permission.VIEW_ALL_PAYROLL]),
 //   SuperAdminController.getPayrollById as unknown as RequestHandler
-// );
-
-// router.patch(
-//   "/payroll/:id",
-//   requirePermission([Permission.EDIT_PAYROLL]),
-//   SuperAdminController.updatePayroll as unknown as RequestHandler
 // );
 
 // router.delete(
@@ -268,6 +272,43 @@ router.delete(
   "/salary-grades/:id",
   requirePermission([Permission.MANAGE_SALARY_STRUCTURE]),
   SuperAdminController.deleteSalaryGrade as unknown as RequestHandler
+);
+
+//Deduction Routes
+router.post(
+  "/deductions/statutory/setup",
+  requirePermission([Permission.MANAGE_DEDUCTIONS]),
+  SuperAdminController.setupStatutoryDeductions as unknown as RequestHandler
+);
+
+router.get(
+  "/deductions",
+  requirePermission([Permission.VIEW_DEDUCTIONS]),
+  SuperAdminController.getAllDeductions as unknown as RequestHandler
+);
+
+router.post(
+  "/deductions/voluntary",
+  requirePermission([Permission.MANAGE_DEDUCTIONS]),
+  SuperAdminController.createVoluntaryDeduction as unknown as RequestHandler
+);
+
+router.patch(
+  "/deductions/:id",
+  requirePermission([Permission.EDIT_DEDUCTIONS]),
+  SuperAdminController.updateDeduction as unknown as RequestHandler
+);
+
+router.patch(
+  "/deductions/:id/toggle",
+  requirePermission([Permission.MANAGE_DEDUCTIONS]),
+  SuperAdminController.toggleDeductionStatus as unknown as RequestHandler
+);
+
+router.delete(
+  "/deductions/:id",
+  requirePermission([Permission.MANAGE_DEDUCTIONS]),
+  SuperAdminController.deleteDeduction as unknown as RequestHandler
 );
 
 export default router;
