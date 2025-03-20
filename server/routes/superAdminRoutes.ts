@@ -111,12 +111,12 @@ router.delete(
 
 // ===== Payroll Management Routes =====
 // Basic Payroll Operations
-// router.post(
-//   "/payroll",
-//   requirePermission([Permission.CREATE_PAYROLL]),
-//   validatePayrollCreate,
-//   SuperAdminController.createPayroll
-// );
+router.post(
+  "/payroll",
+  requirePermission([Permission.CREATE_PAYROLL]),
+  validatePayrollCreate,
+  SuperAdminController.createPayroll as unknown as RequestHandler
+);
 
 // router.patch(
 //   "/payroll/:id",
@@ -137,11 +137,11 @@ router.delete(
 //   SuperAdminController.getPayrollById as unknown as RequestHandler
 // );
 
-// router.delete(
-//   "/payroll/:id",
-//   requirePermission([Permission.DELETE_PAYROLL]),
-//   SuperAdminController.deletePayroll as unknown as RequestHandler
-// );
+router.delete(
+  "/payroll/:id",
+  requirePermission([Permission.DELETE_PAYROLL]),
+  SuperAdminController.deletePayroll as unknown as RequestHandler
+);
 
 // Payroll Approval and Generation
 // router.post(

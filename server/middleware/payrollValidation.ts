@@ -12,10 +12,10 @@ export const validatePayrollCreate = (
   try {
     console.log("🔍 Validating payroll data:", req.body);
 
-    const { employee, month, year, basicSalary, salaryGrade } = req.body;
+    const { employee, month, year, salaryGrade } = req.body;
 
     // Check required fields
-    if (!employee || !month || !year || !basicSalary || !salaryGrade) {
+    if (!employee || !month || !year || !salaryGrade) {
       throw new ApiError(400, "Missing required fields");
     }
 
@@ -36,11 +36,6 @@ export const validatePayrollCreate = (
     const currentYear = new Date().getFullYear();
     if (year < currentYear - 1 || year > currentYear + 1) {
       throw new ApiError(400, "Invalid year");
-    }
-
-    // Validate amounts
-    if (typeof basicSalary !== "number" || basicSalary <= 0) {
-      throw new ApiError(400, "Basic salary must be a positive number");
     }
 
     console.log("✅ Validation passed");

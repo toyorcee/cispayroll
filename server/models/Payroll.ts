@@ -9,35 +9,70 @@ export enum PayrollStatus {
 export interface IPayroll extends Document {
   employee: Types.ObjectId;
   department: Types.ObjectId;
+  salaryGrade: Types.ObjectId;
   month: number;
   year: number;
   basicSalary: number;
-  allowances: {
-    housing: number;
-    transport: number;
-    meal: number;
-    other: number;
+  components: Array<{
+    name: string;
+    type: string;
+    value: number;
+    amount: number;
+  }>;
+  earnings: {
+    overtime: {
+      hours: number;
+      rate: number;
+      amount: number;
+    };
+    bonus: Array<{
+      description: string;
+      amount: number;
+    }>;
+    totalEarnings: number;
   };
   deductions: {
-    tax: number;
-    pension: number;
-    loan: number;
-    other: number;
+    tax: {
+      taxableAmount: number;
+      taxRate: number;
+      amount: number;
+    };
+    pension: {
+      pensionableAmount: number;
+      rate: number;
+      amount: number;
+    };
+    loans: Array<{
+      description: string;
+      amount: number;
+    }>;
+    others: Array<{
+      description: string;
+      amount: number;
+    }>;
+    totalDeductions: number;
   };
-  grossSalary: number;
-  netSalary: number;
+  totals: {
+    grossEarnings: number;
+    totalDeductions: number;
+    netPay: number;
+  };
   status: PayrollStatus;
-  approvedBy?: Types.ObjectId;
-  approvedAt?: Date;
-  createdBy: Types.ObjectId;
-  updatedBy: Types.ObjectId;
-  comments?: string;
-  paymentDate?: Date;
-  bankDetails: {
+  approvalFlow: {
+    submittedBy: Types.ObjectId;
+    submittedAt: Date;
+    approvedBy?: Types.ObjectId;
+    approvedAt?: Date;
+  };
+  payment: {
     bankName: string;
     accountNumber: string;
     accountName: string;
   };
+  processedBy: Types.ObjectId;
+  createdBy: Types.ObjectId;
+  updatedBy: Types.ObjectId;
+  comments?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -54,6 +89,11 @@ const PayrollSchema = new Schema<IPayroll>(
       ref: "Department",
       required: true,
     },
+    salaryGrade: {
+      type: Schema.Types.ObjectId,
+      ref: "SalaryGrade",
+      required: true,
+    },
     month: {
       type: Number,
       required: true,
@@ -68,36 +108,80 @@ const PayrollSchema = new Schema<IPayroll>(
       type: Number,
       required: true,
     },
-    allowances: {
-      housing: { type: Number, default: 0 },
-      transport: { type: Number, default: 0 },
-      meal: { type: Number, default: 0 },
-      other: { type: Number, default: 0 },
+    components: [
+      {
+        name: { type: String, required: true },
+        type: { type: String, required: true },
+        value: { type: Number, required: true },
+        amount: { type: Number, required: true },
+      },
+    ],
+    earnings: {
+      overtime: {
+        hours: { type: Number, default: 0 },
+        rate: { type: Number, default: 0 },
+        amount: { type: Number, default: 0 },
+      },
+      bonus: [
+        {
+          description: String,
+          amount: Number,
+        },
+      ],
+      totalEarnings: { type: Number, required: true },
     },
     deductions: {
-      tax: { type: Number, default: 0 },
-      pension: { type: Number, default: 0 },
-      loan: { type: Number, default: 0 },
-      other: { type: Number, default: 0 },
+      tax: {
+        taxableAmount: { type: Number, default: 0 },
+        taxRate: { type: Number, default: 0 },
+        amount: { type: Number, default: 0 },
+      },
+      pension: {
+        pensionableAmount: { type: Number, default: 0 },
+        rate: { type: Number, default: 0 },
+        amount: { type: Number, default: 0 },
+      },
+      loans: [
+        {
+          description: String,
+          amount: Number,
+        },
+      ],
+      others: [
+        {
+          description: String,
+          amount: Number,
+        },
+      ],
+      totalDeductions: { type: Number, required: true },
     },
-    grossSalary: {
-      type: Number,
-      required: true,
-    },
-    netSalary: {
-      type: Number,
-      required: true,
+    totals: {
+      grossEarnings: { type: Number, required: true },
+      totalDeductions: { type: Number, required: true },
+      netPay: { type: Number, required: true },
     },
     status: {
       type: String,
       enum: Object.values(PayrollStatus),
       default: PayrollStatus.PENDING,
+      required: true,
     },
-    approvedBy: {
+    approvalFlow: {
+      submittedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+      submittedAt: { type: Date, required: true },
+      approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
+      approvedAt: Date,
+    },
+    payment: {
+      bankName: { type: String, required: true },
+      accountNumber: { type: String, required: true },
+      accountName: { type: String, required: true },
+    },
+    processedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
+      required: true,
     },
-    approvedAt: Date,
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
@@ -109,12 +193,6 @@ const PayrollSchema = new Schema<IPayroll>(
       required: true,
     },
     comments: String,
-    paymentDate: Date,
-    bankDetails: {
-      bankName: { type: String, required: true },
-      accountNumber: { type: String, required: true },
-      accountName: { type: String, required: true },
-    },
   },
   {
     timestamps: true,
@@ -126,23 +204,6 @@ PayrollSchema.index({ employee: 1, month: 1, year: 1 }, { unique: true });
 PayrollSchema.index({ department: 1 });
 PayrollSchema.index({ status: 1 });
 PayrollSchema.index({ createdAt: 1 });
-
-// Calculate gross and net salary before save
-PayrollSchema.pre("save", function (next) {
-  const allowanceTotal = Object.values(this.allowances).reduce(
-    (a, b) => a + b,
-    0
-  );
-  const deductionTotal = Object.values(this.deductions).reduce(
-    (a, b) => a + b,
-    0
-  );
-
-  this.grossSalary = this.basicSalary + allowanceTotal;
-  this.netSalary = this.grossSalary - deductionTotal;
-
-  next();
-});
 
 const PayrollModel = mongoose.model<IPayroll>("Payroll", PayrollSchema);
 export default PayrollModel;

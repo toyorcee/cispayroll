@@ -17,26 +17,31 @@ export class PayrollService {
   ): Promise<IEmployee> {
     console.log("🔍 Validating employee:", employeeId);
 
-    const employee = await UserModel.findById(employeeId)
-      .populate("department", "name code _id")
-      .lean();
+    const employee = await UserModel.findById(employeeId).lean();
 
     if (!employee) {
       throw new ApiError(400, "Employee not found");
     }
 
-    if (!employee.department || typeof employee.department === "string") {
-      throw new ApiError(400, "Employee department information is missing");
+    if (!employee.department) {
+      throw new ApiError(400, "Employee must be assigned to a department");
     }
 
-    console.log("✅ Employee found:", {
-      id: employee._id,
-      name: `${employee.firstName} ${employee.lastName}`,
-      department: employee.department,
-    });
+    // Create department object if it's a string
+    const departmentInfo =
+      typeof employee.department === "string"
+        ? {
+            _id: new Types.ObjectId(),
+            name: employee.department,
+            code: employee.department,
+          }
+        : employee.department;
 
-    // First cast to unknown, then to our populated type
-    return employee as unknown as IEmployee;
+    return {
+      ...employee,
+      department: departmentInfo,
+      gradeLevel: employee.gradeLevel?.toString() || "",
+    } as IEmployee;
   }
 
   static async checkExistingPayroll(
@@ -83,32 +88,28 @@ export class PayrollService {
       throw new ApiError(404, "Salary grade not found");
     }
 
-    // Calculate total earnings from components
-    const earnings = salaryGrade.components.reduce((total, component) => {
-      if (component.isActive && component.type === 'allowance') {
-        if (component.calculationMethod === 'percentage') {
-          return total + (salaryGrade.basicSalary * component.value) / 100;
+    // Calculate total allowances from components
+    const totalAllowances = salaryGrade.components.reduce(
+      (total, component) => {
+        if (component.isActive && component.type === "allowance") {
+          const amount =
+            component.calculationMethod === "percentage"
+              ? (salaryGrade.basicSalary * component.value) / 100
+              : component.value;
+          return total + amount;
         }
-        return total + component.value;
-      }
-      return total;
-    }, salaryGrade.basicSalary); // Start with basic salary
+        return total;
+      },
+      0
+    );
 
-    // Calculate deductions from salary components
-    const componentDeductions = salaryGrade.components.reduce((total, component) => {
-      if (component.isActive && component.type === 'deduction') {
-        if (component.calculationMethod === 'percentage') {
-          return total + (salaryGrade.basicSalary * component.value) / 100;
-        }
-        return total + component.value;
-      }
-      return total;
-    }, 0);
+    // Gross salary is basic salary plus all allowances
+    const grossSalary = salaryGrade.basicSalary + totalAllowances;
 
     return {
       basicSalary: salaryGrade.basicSalary,
-      totalEarnings: earnings,
-      componentDeductions,
+      totalAllowances,
+      grossSalary,
       components: salaryGrade.components,
     };
   }
@@ -170,16 +171,16 @@ export class PayrollService {
     // Calculate deductions
     const deductionDetails = await this.calculateDeductions(
       salaryDetails.basicSalary,
-      salaryDetails.totalEarnings
+      salaryDetails.grossSalary
     );
 
     // Calculate net salary
-    const netSalary = salaryDetails.totalEarnings - deductionDetails.total;
+    const netSalary = salaryDetails.grossSalary - deductionDetails.total;
 
     return {
       basicSalary: salaryDetails.basicSalary,
       components: salaryDetails.components,
-      grossSalary: salaryDetails.totalEarnings,
+      grossSalary: salaryDetails.grossSalary,
       deductions: deductionDetails,
       netSalary: netSalary,
     };

@@ -242,17 +242,13 @@ export interface IDepartment {
 // Standalone interface without extending UserDocument
 export interface IEmployee {
   _id: Types.ObjectId;
+  employeeId: string;
   firstName: string;
   lastName: string;
   email: string;
-  employeeId: string;
+  department: IDepartment | string; // Allow both department object and string
+  gradeLevel: string; // Keep it simple as string since it's just a designation
   role: string;
-  department: {
-    _id: Types.ObjectId;
-    name: string;
-    code: string;
-  };
-  gradeLevel: Types.ObjectId;
   bankDetails?: IBankDetails;
   salary?: number;
   allowances?: PayrollAllowances;

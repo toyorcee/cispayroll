@@ -4,7 +4,7 @@ import { UserRole, Permission } from "../models/User.js";
 import { AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import UserModel from "../models/User.js";
 import DepartmentModel, { DepartmentStatus } from "../models/Department.js";
-import PayrollModel from "../models/Payroll.js";
+import PayrollModel, { PayrollStatus } from "../models/Payroll.js";
 import { handleError, ApiError } from "../utils/errorHandler.js";
 import Leave from "../models/Leave.js";
 import { LeaveStatus } from "../models/Leave.js";
@@ -12,7 +12,7 @@ import { PayrollService } from "../services/PayrollService.js";
 import SalaryGrade, { ISalaryComponent } from "../models/SalaryStructure.js";
 import { Types } from "mongoose";
 import mongoose from "mongoose";
-import { PayPeriod, PayrollStatus } from "../types/payroll.js";
+import { PayPeriod } from "../types/payroll.js";
 import { DeductionService } from "../services/DeductionService.js";
 import Deduction from "../models/Deduction.js";
 
@@ -612,7 +612,7 @@ export class SuperAdminController {
   static async createPayroll(req: AuthenticatedRequest, res: Response) {
     try {
       console.log("📝 Creating payroll record with data:", req.body);
-      const { employee, month, year, basicSalary, salaryGrade } = req.body;
+      const { employee, month, year, salaryGrade } = req.body;
 
       // Use PayrollService for validation and data preparation
       const employeeData = await PayrollService.validateAndGetEmployee(
@@ -624,36 +624,76 @@ export class SuperAdminController {
         year
       );
 
-      // Create the payroll record
+      // Calculate all payroll components first
+      const calculations = await PayrollService.calculatePayroll(
+        asObjectId(employee),
+        asObjectId(salaryGrade),
+        month,
+        year
+      );
+
+      // Create the payroll record with correct structure
+      const components = calculations.components.map((comp) => {
+        const amount =
+          comp.calculationMethod === "percentage"
+            ? Number(((comp.value * calculations.basicSalary) / 100).toFixed(2))
+            : Number(comp.value.toFixed(2));
+
+        return {
+          name: comp.name,
+          type: comp.type,
+          value: Number(comp.value),
+          amount: amount, // This will make Housing Allowance 50,000 (20% of 250,000)
+        };
+      });
+
+      const totalAllowances = components.reduce(
+        (sum, comp) => sum + Number(comp.amount),
+        0
+      );
+      const grossEarnings = Number(
+        (calculations.basicSalary + totalAllowances).toFixed(2)
+      );
+      const totalDeductions = Number(calculations.deductions.total.toFixed(2));
+      const netPay = Number((grossEarnings - totalDeductions).toFixed(2));
+
+      // Create the payroll record with correct structure
       const payroll = await PayrollModel.create({
         employee: asObjectId(employee),
-        department: employeeData.department._id,
+        department: employeeData.department,
         salaryGrade: asObjectId(salaryGrade),
-        payPeriod: {
-          type: PayPeriod.MONTHLY,
-          startDate,
-          endDate,
-          month,
-          year,
-        },
-        basicSalary,
-        components: [], // Initialize empty
+        month,
+        year,
+        basicSalary: calculations.basicSalary,
+        components,
         earnings: {
           overtime: { hours: 0, rate: 0, amount: 0 },
           bonus: [],
-          totalEarnings: basicSalary,
+          totalEarnings: grossEarnings,
         },
         deductions: {
-          tax: { taxableAmount: 0, taxRate: 0, amount: 0 },
-          pension: { pensionableAmount: 0, rate: 0, amount: 0 },
+          tax: {
+            taxableAmount: Number(
+              calculations.deductions.statutory.paye.toFixed(2)
+            ),
+            taxRate: 20, // Set PAYE tax rate (20%)
+            amount: Number(calculations.deductions.statutory.paye.toFixed(2)),
+          },
+          pension: {
+            pensionableAmount: Number(calculations.basicSalary.toFixed(2)),
+            rate: 8, // Set pension rate (8%)
+            amount: Number(
+              calculations.deductions.statutory.pension.toFixed(2)
+            ),
+          },
           loans: [],
           others: [],
-          totalDeductions: 0,
+          totalDeductions: totalDeductions,
         },
         totals: {
-          grossEarnings: basicSalary,
-          totalDeductions: 0,
-          netPay: basicSalary,
+          grossEarnings,
+          totalDeductions,
+          netPay,
         },
         status: PayrollStatus.PENDING,
         approvalFlow: {
@@ -661,20 +701,35 @@ export class SuperAdminController {
           submittedAt: new Date(),
         },
         payment: {
-          bankName: employeeData.bankDetails?.bankName || "",
-          accountNumber: employeeData.bankDetails?.accountNumber || "",
-          accountName: employeeData.bankDetails?.accountName || "",
+          bankName:
+            employeeData.bankDetails?.bankName ||
+            (employeeData.status === "active"
+              ? "Bank Details Required"
+              : "Pending Employee Onboarding"),
+          accountNumber:
+            employeeData.bankDetails?.accountNumber ||
+            (employeeData.status === "active"
+              ? "Bank Details Required"
+              : "Pending Employee Onboarding"),
+          accountName:
+            employeeData.bankDetails?.accountName ||
+            (employeeData.status === "active"
+              ? "Bank Details Required"
+              : "Pending Employee Onboarding"),
         },
         processedBy: asObjectId(req.user!.id),
         createdBy: asObjectId(req.user!.id),
         updatedBy: asObjectId(req.user!.id),
       });
 
-      // Populate necessary fields for response
-      const populatedPayroll = await PayrollModel.findById(payroll._id)
-        .populate("employee", "firstName lastName employeeId")
-        .populate("department", "name code")
-        .populate("salaryGrade", "level description");
+      // Populate and return the created payroll
+      const populatedPayroll = await PayrollModel.findById(
+        payroll._id
+      ).populate([
+        { path: "employee", select: "firstName lastName employeeId" },
+        { path: "department", select: "name code" },
+        { path: "salaryGrade", select: "level description" },
+      ]);
 
       res.status(201).json({
         success: true,
@@ -688,6 +743,32 @@ export class SuperAdminController {
         success: false,
         message,
         error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  static async deletePayroll(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      console.log("🗑️ Attempting to delete payroll:", id);
+
+      const payroll = await PayrollModel.findById(id);
+      if (!payroll) {
+        throw new ApiError(404, "Payroll record not found");
+      }
+
+      await PayrollModel.findByIdAndDelete(id);
+
+      res.status(200).json({
+        success: true,
+        message: "Payroll record deleted successfully",
+      });
+    } catch (error) {
+      console.error("❌ Error deleting payroll:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message: message || "Failed to delete payroll record",
       });
     }
   }
