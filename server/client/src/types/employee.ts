@@ -264,5 +264,9 @@ export interface DepartmentBasic {
 export interface EmployeeResponse {
   success: boolean;
   data: Employee[];
-  total: number;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+  };
 }

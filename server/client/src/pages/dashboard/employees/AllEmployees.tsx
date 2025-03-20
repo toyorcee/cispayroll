@@ -247,7 +247,7 @@ export default function AllEmployees() {
       const employeesResponse = await employeeService.getEmployees(filters);
       setEmployees(employeesResponse.data);
       // Fix: Use total directly instead of pagination.total
-      setTotalEmployees(employeesResponse.total);
+      setTotalEmployees(employeesResponse.pagination.total);
       setShowCreateModal(false);
 
       // Reset form
