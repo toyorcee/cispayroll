@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { FaPlus, FaTrash } from "react-icons/fa";
 import { salaryStructureService } from "../../../services/salaryStructureService";
-import { employeeService } from "../../../services/employeeService";
+import { departmentService } from "../../../services/departmentService";
 import TableSkeleton from "../../../components/skeletons/TableSkeleton";
 import { ISalaryGrade } from "../../../types/salary";
 import { DepartmentBasic } from "../../../types/employee";
@@ -46,9 +46,9 @@ export default function SalaryStructure() {
   const fetchDepartments = useCallback(async () => {
     try {
       console.log("🔍 Fetching departments...");
-      const deps = await employeeService.getDepartments();
-      console.log("📥 Received departments:", deps);
-      setDepartments(deps);
+      const departments = await departmentService.getAllDepartments();
+      console.log("📥 Received departments:", departments);
+      setDepartments(departments);
     } catch (error) {
       console.error("Error fetching departments:", error);
       toast.error("Failed to fetch departments");

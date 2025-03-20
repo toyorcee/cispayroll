@@ -31,11 +31,14 @@ import { toast } from "react-toastify";
 import { StatusFilter } from "../../../components/employees/StatusFilter";
 import { Pagination } from "../../../components/shared/Pagination";
 import { EmployeeTableSkeleton } from "../../../components/employees/EmployeeTableSkeleton";
-import { EmployeeFormModal } from "../../../components/employees/EmployeeFormModal";
 import { DepartmentModal } from "../../../components/departments/DepartmentModal";
-import { Department } from "../../../types/department";
-import { DepartmentBasic } from "../../../services/employeeService";
+import {
+  Department,
+  DepartmentBasic,
+  DepartmentFormData,
+} from "../../../types/department";
 import { Dialog } from "@headlessui/react";
+import { departmentService } from "../../../services/departmentService";
 
 export default function AllEmployees() {
   const { user } = useAuth();
@@ -54,7 +57,7 @@ export default function AllEmployees() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
-  const [departments, setDepartments] = useState<DepartmentBasic[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDepartmentModal, setShowDepartmentModal] = useState(false);
@@ -78,10 +81,16 @@ export default function AllEmployees() {
     const fetchEmployees = async () => {
       try {
         const response = await employeeService.getEmployees(filters);
+        console.log("API Response:", response);
+
+        // Set employees from response.data
         setEmployees(response.data);
-        setTotalEmployees(response.total);
+        // Set total from response.pagination
+        setTotalEmployees(response.pagination.total);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
+        console.error("Error fetching employees:", err);
+        setTotalEmployees(0);
       } finally {
         setLoading(false);
       }
@@ -93,7 +102,7 @@ export default function AllEmployees() {
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const departments = await employeeService.getDepartments();
+        const departments = await departmentService.getAllDepartments();
         setDepartments(departments);
       } catch (error) {
         toast.error("Failed to fetch departments");
@@ -137,16 +146,20 @@ export default function AllEmployees() {
     return basic + allowances - deductions;
   };
 
-  const getStatusColor = (status: Status) => {
+  const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "active":
-        return "bg-green-100 text-green-800";
-      case "inactive":
-        return "bg-red-100 text-red-800";
+        return "!bg-green-600 !text-white";
+      case "pending":
+        return "!bg-blue-600 !text-white";
+      case "offboarding":
+        return "!bg-orange-600 !text-white";
       case "suspended":
-        return "bg-yellow-100 text-yellow-800";
+        return "!bg-yellow-600 !text-white";
       case "terminated":
-        return "bg-gray-100 text-gray-800";
+        return "!bg-red-600 !text-white";
+      case "inactive":
+        return "!bg-gray-600 !text-white";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -233,6 +246,7 @@ export default function AllEmployees() {
 
       const employeesResponse = await employeeService.getEmployees(filters);
       setEmployees(employeesResponse.data);
+      // Fix: Use total directly instead of pagination.total
       setTotalEmployees(employeesResponse.total);
       setShowCreateModal(false);
 
@@ -272,35 +286,52 @@ export default function AllEmployees() {
     }
   };
 
-  const handleDepartmentSave = async (department: Partial<Department>) => {
+  const handleDepartmentSave = async (formData: DepartmentFormData) => {
     try {
-      if (department.id) {
-        await employeeService.updateDepartment(department.id, {
-          name: department.name || "",
-          description: department.description,
-        });
+      if (formData.id) {
+        // Update existing department
+        await employeeService.updateDepartment(formData.id, formData);
+        toast.success("Department updated successfully");
       } else {
-        await employeeService.createDepartment({
-          name: department.name || "",
-          description: department.description,
-        });
+        // Create new department
+        await employeeService.createDepartment(formData);
+        toast.success("Department created successfully");
       }
-      // Refresh departments
+
+      // Refresh departments list with proper type conversion
       const response = await employeeService.getDepartments();
-      setDepartments(response as DepartmentBasic[]);
-    } catch (error) {
-      throw error;
+      const formattedDepartments = response.map((dept) => ({
+        ...dept,
+        id: dept._id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+      setDepartments(formattedDepartments);
+    } catch (error: any) {
+      console.error("Failed to save department:", error);
+      toast.error(error.response?.data?.message || "Failed to save department");
     }
   };
 
   const handleDepartmentDelete = async (id: string) => {
     try {
       await employeeService.deleteDepartment(id);
-      // Refresh departments
+      toast.success("Department deleted successfully");
+
+      // Refresh departments list
       const response = await employeeService.getDepartments();
-      setDepartments(response as DepartmentBasic[]);
-    } catch (error) {
-      throw error;
+      const formattedDepartments = response.map((dept) => ({
+        ...dept,
+        id: dept._id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+      setDepartments(formattedDepartments);
+    } catch (error: any) {
+      console.error("Failed to delete department:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to delete department"
+      );
     }
   };
 
@@ -362,38 +393,14 @@ export default function AllEmployees() {
       transition={{ duration: 0.5 }}
       className="p-4"
     >
-      {/* Controls row with better spacing */}
-      <div className="flex flex-wrap items-center gap-4 mb-4">
-        {/* Status Filter */}
-        <StatusFilter
-          currentStatus={filters.status}
-          onStatusChange={handleStatusChange}
-        />
-
-        {/* Department Filter - This is the one being used */}
-        {isSuperAdmin && (
-          <select
-            value={filters.department || ""}
-            onChange={(e) =>
-              handleDepartmentChange(e.target.value || undefined)
-            }
-            className="w-48 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-          >
-            <option value="">All Departments</option>
-            {departments.map((dept) => (
-              <option key={dept.id} value={dept.name}>
-                {dept.name} ({dept.employeeCount ?? 0})
-              </option>
-            ))}
-          </select>
-        )}
-
-        {/* Search bar */}
+      {/* Move controls row to top and add margin-bottom */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+        {/* Left side - Search */}
         <div className="flex-1 max-w-md">
           <EmployeeSearch onSearch={handleSearch} />
         </div>
 
-        {/* Action Buttons */}
+        {/* Right side - Action Buttons */}
         <div className="flex items-center gap-2">
           {canCreate && (
             <button
@@ -410,13 +417,45 @@ export default function AllEmployees() {
             <button
               onClick={() => setShowDepartmentModal(true)}
               className="px-4 py-2 !bg-blue-600 !text-white rounded-lg hover:!bg-blue-700 
-                       transition-colors flex items-center space-x-2"
+                       transition-colors flex items-center space-x-2 whitespace-nowrap"
             >
               <FaBuilding className="w-4 h-4" />
               <span>Manage Departments</span>
             </button>
           )}
         </div>
+      </div>
+
+      {/* Filters row - updated with better spacing and full width */}
+      <div className="flex flex-wrap items-center gap-4 mb-6 w-full">
+        {/* Status Filter - make it grow to fill available space */}
+        <div className="flex-1 min-w-[200px]">
+          <StatusFilter
+            currentStatus={filters.status}
+            onStatusChange={handleStatusChange}
+          />
+        </div>
+
+        {/* Department Filter - fixed width but with proper spacing */}
+        {isSuperAdmin && (
+          <div className="w-64">
+            <select
+              value={filters.department || ""}
+              onChange={(e) =>
+                handleDepartmentChange(e.target.value || undefined)
+              }
+              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">All Departments</option>
+              <option value="No Department">No Department</option>
+              {departments.map((dept) => (
+                <option key={dept.id} value={dept.name}>
+                  {dept.name} ({dept.employeeCount || 0})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Table with margin-top and no overflow */}
@@ -437,6 +476,9 @@ export default function AllEmployees() {
                 )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">
                   Position
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/8">
+                  Role
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/8">
                   Status
@@ -468,7 +510,7 @@ export default function AllEmployees() {
                   {isSuperAdmin && (
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 break-words">
-                        {employee.department}
+                        {employee.department || "No Department"}
                       </div>
                     </td>
                   )}
@@ -477,18 +519,19 @@ export default function AllEmployees() {
                       {employee.position}
                     </div>
                   </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-medium">
+                      {(employee as any).role === "SUPER_ADMIN"
+                        ? "Super Admin"
+                        : (employee as any).role === "ADMIN"
+                        ? "Admin"
+                        : "Employee"}
+                    </div>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`px-3 py-1 inline-flex text-sm leading-5 font-semibold rounded-full
-                        ${
-                          employee.status === "active"
-                            ? "!bg-green-600 !text-white"
-                            : employee.status === "inactive"
-                            ? "bg-gray-100 text-gray-800"
-                            : employee.status === "suspended"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
+                        ${getStatusColor(employee.status)}`}
                     >
                       {employee.status.charAt(0).toUpperCase() +
                         employee.status.slice(1)}
@@ -507,15 +550,40 @@ export default function AllEmployees() {
       {/* Add pagination */}
       {!loading && employees.length > 0 && (
         <div className="mt-6">
-          <div className="text-center text-sm text-gray-600 mb-4">
-            Showing page{" "}
-            <span className="font-semibold text-green-600">{filters.page}</span>{" "}
-            of {Math.ceil(totalEmployees / filters.limit)}
+          <div className="flex flex-col items-center gap-2 text-sm text-gray-600 mb-4">
+            <div>
+              Showing{" "}
+              <span className="font-semibold text-green-600">
+                {(filters.page - 1) * filters.limit + 1}
+              </span>{" "}
+              -{" "}
+              <span className="font-semibold text-green-600">
+                {Math.min(filters.page * filters.limit, totalEmployees)}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-green-600">
+                {totalEmployees}
+              </span>{" "}
+              employees
+            </div>
+            <div>
+              Page{" "}
+              <span className="font-semibold text-green-600">
+                {filters.page}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-green-600">
+                {Math.ceil(totalEmployees / filters.limit)}
+              </span>
+            </div>
           </div>
           <Pagination
             currentPage={filters.page}
             totalPages={Math.ceil(totalEmployees / filters.limit)}
-            onPageChange={(page) => setFilters((prev) => ({ ...prev, page }))}
+            onPageChange={(page) => {
+              setFilters((prev) => ({ ...prev, page }));
+              window.scrollTo(0, 0);
+            }}
           />
         </div>
       )}

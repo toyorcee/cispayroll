@@ -136,12 +136,12 @@ export interface IUser {
   workLocation: string;
   dateJoined: Date;
   status:
-    | "active"
-    | "inactive"
-    | "suspended"
-    | "pending"
-    | "offboarding"
-    | "archived";
+    | "pending" // New hire, onboarding
+    | "active" // Regular employee
+    | "inactive" // Temporary inactive
+    | "suspended" // Disciplinary
+    | "offboarding" // In process of leaving
+    | "terminated"; // Employment ended (replacing archived)
   emergencyContact: {
     name: string;
     relationship: string;
@@ -187,12 +187,12 @@ export interface UserDocument extends mongoose.Document {
   workLocation: string;
   dateJoined: Date;
   status:
+    | "pending"
     | "active"
     | "inactive"
     | "suspended"
-    | "pending"
     | "offboarding"
-    | "archived";
+    | "terminated";
   emergencyContact: {
     name: string;
     relationship: string;
@@ -305,12 +305,12 @@ const UserSchema = new Schema<UserDocument, UserModel>(
     status: {
       type: String,
       enum: [
+        "pending",
         "active",
         "inactive",
         "suspended",
-        "pending",
         "offboarding",
-        "archived",
+        "terminated",
       ],
       default: "pending",
     },
@@ -608,10 +608,9 @@ UserSchema.set("toJSON", {
 // Remove any existing indexes first
 UserSchema.clearIndexes();
 
-// Then add our indexes
+// Then add our indexes - REMOVE the bankDetails index
 UserSchema.index({ email: 1 }, { unique: true });
 UserSchema.index({ employeeId: 1 }, { unique: true });
-UserSchema.index({ "bankDetails.accountNumber": 1 }, { unique: true });
 UserSchema.index({ role: 1 });
 UserSchema.index({ department: 1 });
 UserSchema.index({ status: 1 });

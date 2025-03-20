@@ -6,23 +6,16 @@ import {
   OnboardingEmployee,
   OffboardingDetails,
   DepartmentBasic,
+  EmployeeResponse,
 } from "../types/employee";
-import { employees } from "../data/employees";
+import { Department, DepartmentFormData } from "../types/department";
 import { OnboardingStats } from "../types/chart";
-import { toast } from "react-hot-toast";
+import { toast } from "react-toastify";
 
 const BASE_URL = "http://localhost:5000/api";
 
 // Set default axios config to always include credentials
 axios.defaults.withCredentials = true;
-
-interface EmployeeResponse {
-  data: Employee[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
 
 interface DepartmentWithCount extends DepartmentBasic {
   employeeCount: number;
@@ -31,46 +24,10 @@ interface DepartmentWithCount extends DepartmentBasic {
 export const employeeService = {
   // Get employees with filtering and pagination
   getEmployees: async (filters: EmployeeFilters): Promise<EmployeeResponse> => {
-    const { page = 1, limit = 10, search, department, status } = filters;
-
-    let filteredEmployees = [...employees];
-
-    if (status) {
-      filteredEmployees = filteredEmployees.filter(
-        (emp) => emp.status === status
-      );
-    }
-
-    if (department) {
-      filteredEmployees = filteredEmployees.filter(
-        (emp) => emp.department.toLowerCase() === department.toLowerCase()
-      );
-    }
-
-    if (search) {
-      const searchLower = search.toLowerCase();
-      filteredEmployees = filteredEmployees.filter(
-        (emp) =>
-          emp.firstName.toLowerCase().includes(searchLower) ||
-          emp.lastName.toLowerCase().includes(searchLower) ||
-          emp.email.toLowerCase().includes(searchLower) ||
-          emp.department.toLowerCase().includes(searchLower) ||
-          emp.position.toLowerCase().includes(searchLower)
-      );
-    }
-
-    const total = filteredEmployees.length;
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedEmployees = filteredEmployees.slice(startIndex, endIndex);
-
-    return {
-      data: paginatedEmployees,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+    const response = await axios.get(`${BASE_URL}/super-admin/users`, {
+      params: filters,
+    });
+    return response.data;
   },
 
   // Get employees for specific department
@@ -136,11 +93,18 @@ export const employeeService = {
   getDepartments: async (): Promise<DepartmentBasic[]> => {
     try {
       console.log("🔄 Fetching departments from API...");
-      const response = await axios.get<{ data: DepartmentBasic[] }>(
+      const response = await axios.get<{ data: any[] }>(
         `${BASE_URL}/super-admin/departments`
       );
-      console.log("✅ Departments fetched:", response.data);
-      return response.data.data;
+
+      // Map the response to include both _id and id
+      const departments = response.data.data.map((dept) => ({
+        ...dept,
+        id: dept._id, // Add id field for frontend compatibility
+      }));
+
+      console.log("✅ Departments fetched:", departments);
+      return departments;
     } catch (error: any) {
       console.error("❌ Failed to fetch departments:", error);
       toast.error(
@@ -150,22 +114,56 @@ export const employeeService = {
     }
   },
 
-  createDepartment: async (data: { name: string; description?: string }) => {
-    const response = await axios.post(`${BASE_URL}/departments`, data);
-    return response.data;
+  createDepartment: async (data: DepartmentFormData): Promise<Department> => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/super-admin/departments`,
+        data,
+        { withCredentials: true }
+      );
+      return {
+        ...response.data.data,
+        id: response.data.data._id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    } catch (error) {
+      console.error("Failed to create department:", error);
+      throw error;
+    }
   },
 
   updateDepartment: async (
     id: string,
-    data: { name: string; description?: string }
-  ) => {
-    const response = await axios.put(`${BASE_URL}/departments/${id}`, data);
-    return response.data;
+    data: DepartmentFormData
+  ): Promise<Department> => {
+    try {
+      const response = await axios.put(
+        `${BASE_URL}/super-admin/departments/${id}`,
+        data,
+        { withCredentials: true }
+      );
+      return {
+        ...response.data.data,
+        id: response.data.data._id,
+        createdAt: new Date(response.data.data.createdAt),
+        updatedAt: new Date(response.data.data.updatedAt),
+      };
+    } catch (error) {
+      console.error("Failed to update department:", error);
+      throw error;
+    }
   },
 
-  deleteDepartment: async (id: string) => {
-    const response = await axios.delete(`${BASE_URL}/departments/${id}`);
-    return response.data;
+  deleteDepartment: async (id: string): Promise<void> => {
+    try {
+      await axios.delete(`${BASE_URL}/super-admin/departments/${id}`, {
+        withCredentials: true,
+      });
+    } catch (error) {
+      console.error("Failed to delete department:", error);
+      throw error;
+    }
   },
 
   async getOnboardingEmployees(): Promise<OnboardingEmployee[]> {

@@ -8,7 +8,8 @@
     "start": "node server.ts",
     "dev": "nodemon",
     "debug": "cross-env NODE_ENV=development DEBUG=* nodemon --inspect server.ts",
-    "seed": "cross-env NODE_ENV=development node --loader ts-node/esm src/db/seed.ts"
+    "seed": "cross-env NODE_ENV=development node --loader ts-node/esm src/db/seed.ts",
+    "flush": "cross-env NODE_ENV=development node --loader ts-node/esm src/db/flush.ts"
   },
   "keywords": [],
   "author": "",
@@ -17,6 +18,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/dotenv": "^8.2.3",
     "@types/nodemailer": "^6.4.17",
+    "axios": "^1.8.4",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",

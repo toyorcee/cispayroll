@@ -1,4 +1,10 @@
-export type Status = "active" | "inactive" | "suspended" | "terminated";
+export type Status =
+  | "pending"
+  | "active"
+  | "inactive"
+  | "suspended"
+  | "offboarding"
+  | "terminated";
 
 export interface BankDetails {
   bankName: string;

@@ -4,15 +4,16 @@ import axios from "axios";
 const BASE_URL = "http://localhost:5000/api/super-admin";
 
 export interface Department {
+  _id: string;
   id: string;
   name: string;
   code: string;
-  description: string;
-  location: string;
-  email?: string;
-  phone?: string;
-  headOfDepartment?: string;
-  status: "active" | "inactive";
+  headOfDepartment?: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  employeeCount: number;
 }
 
 export const departmentService = {
@@ -38,32 +39,22 @@ export const departmentService = {
       const response = await axios.get("/api/super-admin/departments", {
         withCredentials: true,
       });
-      console.log("📥 Raw API response:", {
-        fullResponse: response,
-        data: response.data,
-        departments: response.data?.data,
-      });
 
-      // Check if we have valid data before mapping
-      if (!response.data?.data || !Array.isArray(response.data.data)) {
+      // The response now includes departments and totalCounts in data.data
+      if (!response.data?.data?.departments) {
         console.error("Invalid departments data:", response.data);
         return [];
       }
 
-      // Ensure we're returning string IDs
-      const departments = response.data.data
-        .map((dept: any) => {
-          console.log("Processing department:", dept);
-          if (!dept?._id) {
-            console.error("Department missing _id:", dept);
-            return null;
-          }
-          return {
-            _id: dept._id.toString(),
-            name: dept.name || "Unknown",
-          };
-        })
-        .filter(Boolean); // Remove any null values
+      // Map the response to include both _id and id for compatibility
+      const departments = response.data.data.departments.map((dept: any) => ({
+        _id: dept._id,
+        id: dept._id,
+        name: dept.name,
+        code: dept.code,
+        headOfDepartment: dept.headOfDepartment,
+        employeeCount: dept.employeeCounts.total, // Update this to use the new structure
+      }));
 
       console.log("✅ Processed departments:", departments);
       return departments;

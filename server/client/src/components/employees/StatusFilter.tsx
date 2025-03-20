@@ -15,8 +15,29 @@ export const StatusFilter = ({
     "active",
     "inactive",
     "suspended",
+    "pending",
+    "offboarding",
     "terminated",
   ];
+
+  const getStatusStyle = (status: string) => {
+    switch (status) {
+      case "active":
+        return "!bg-green-600 !text-white hover:!bg-green-700";
+      case "pending":
+        return "!bg-blue-600 !text-white hover:!bg-blue-700";
+      case "offboarding":
+        return "!bg-orange-600 !text-white hover:!bg-orange-700";
+      case "suspended":
+        return "!bg-yellow-600 !text-white hover:!bg-yellow-700";
+      case "terminated":
+        return "!bg-red-600 !text-white hover:!bg-red-700";
+      case "inactive":
+        return "!bg-gray-600 !text-white hover:!bg-gray-700";
+      default:
+        return "bg-gray-100 text-gray-700 hover:bg-gray-200";
+    }
+  };
 
   return (
     <motion.div
@@ -32,7 +53,7 @@ export const StatusFilter = ({
           }
           className={`px-4 py-2 rounded-lg transition-all duration-300 ${
             (status === "all" && !currentStatus) || status === currentStatus
-              ? "!bg-green-600 !text-white hover:!bg-green-700"
+              ? getStatusStyle(status)
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
           }`}
         >

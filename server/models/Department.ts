@@ -1,5 +1,4 @@
-
-import mongoose, { Document } from "mongoose";
+import mongoose, { Document, Schema, Types } from "mongoose";
 
 // Define department status
 export enum DepartmentStatus {
@@ -13,12 +12,12 @@ export interface IDepartment {
   code: string;
   description: string;
   location: string;
-  headOfDepartment?: string;
-  email?: string;
-  phone?: string;
-  status: DepartmentStatus;
-  createdBy: string;
-  updatedBy: string;
+  headOfDepartment: Types.ObjectId;
+  status: "active" | "inactive";
+  createdBy: Types.ObjectId | string;
+  updatedBy: Types.ObjectId | string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Document type
@@ -29,20 +28,18 @@ export type DepartmentModel = mongoose.Model<DepartmentDocument>;
 
 const DepartmentSchema = new mongoose.Schema<DepartmentDocument>(
   {
-    name: { type: String, required: true },
+    name: { type: String, required: true, unique: true },
     code: { type: String, required: true, unique: true },
     description: { type: String, required: true },
     location: { type: String, required: true },
-    headOfDepartment: { type: String },
-    email: { type: String },
-    phone: { type: String },
-    status: {
-      type: String,
-      enum: Object.values(DepartmentStatus),
-      default: DepartmentStatus.ACTIVE,
+    headOfDepartment: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
     },
-    createdBy: { type: String, required: true },
-    updatedBy: { type: String, required: true },
+    status: { type: String, enum: ["active", "inactive"], default: "active" },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    updatedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
   },
   { timestamps: true }
 );

@@ -10,7 +10,7 @@ import { salaryStructureService } from "../../services/salaryStructureService";
 import { ISalaryGrade } from "../../types/salary";
 import { useAuth } from "../../context/AuthContext";
 import { Permission } from "../../types/auth";
-import { employeeService } from "../../services/employeeService";
+import { departmentService } from "../../services/departmentService";
 import { DepartmentBasic } from "../../types/employee";
 import { Types } from "mongoose";
 import { SelectChangeEvent } from "@mui/material/Select";
@@ -117,7 +117,7 @@ export default function EditSalaryGrade({
     const loadDepartments = async () => {
       try {
         if (canManageAllDepartments) {
-          const deps = await employeeService.getDepartments();
+          const deps = await departmentService.getAllDepartments();
           console.log("📋 Loaded departments:", {
             deps,
             currentDeptId: selectedDept,

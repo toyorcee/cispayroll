@@ -260,3 +260,9 @@ export interface DepartmentBasic {
   name: string;
   code: string;
 }
+
+export interface EmployeeResponse {
+  success: boolean;
+  data: Employee[];
+  total: number;
+}

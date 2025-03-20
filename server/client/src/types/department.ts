@@ -1,20 +1,22 @@
-export interface Department {
-  id: string;
+export interface DepartmentBasic {
+  _id: string; // MongoDB id
+  id: string; // Add this for frontend compatibility
   name: string;
   code: string;
-  description: string;
-  adminId: string;
-  adminName: string;
-  employeeCount: number;
-  status: "active" | "inactive";
+  employeeCount?: number;
+}
+
+export interface Department extends DepartmentBasic {
+  description?: string;
+  headOfDepartment?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface DepartmentFormData {
+  id?: string; // Optional for create/update operations
   name: string;
   code: string;
   description: string;
-  adminId?: string;
   status: "active" | "inactive";
 }

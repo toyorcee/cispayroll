@@ -1,4 +1,7 @@
-import Department, { DepartmentStatus, IDepartment } from "../models/Department.js";
+import Department, {
+  DepartmentStatus,
+  IDepartment,
+} from "../models/Department.js";
 import { ApiError } from "../utils/errorHandler.js";
 
 export class DepartmentService {

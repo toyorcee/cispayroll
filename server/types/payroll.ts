@@ -1,5 +1,4 @@
 import { Types } from "mongoose";
-import { UserDocument } from "../models/User.js";
 
 // Unified Status Enums
 export enum PayrollStatus {
@@ -32,6 +31,20 @@ export enum BonusType {
   PERFORMANCE = "performance",
   THIRTEENTH_MONTH = "thirteenthMonth",
   OTHER = "other",
+}
+
+export enum PayPeriod {
+  WEEKLY = "weekly",
+  MONTHLY = "monthly",
+  BI_MONTHLY = "bi-monthly",
+  DAILY = "daily",
+  YEARLY = "yearly",
+}
+
+export interface PayPeriodRange {
+  type: PayPeriod;
+  startDate: Date;
+  endDate: Date;
 }
 
 // Unified Interfaces
@@ -72,27 +85,72 @@ export interface IBankDetails {
 
 // Main Payroll Interface
 export interface IPayroll {
-  _id?: Types.ObjectId;
+  _id: Types.ObjectId;
   employee: Types.ObjectId;
   department: Types.ObjectId;
-  periodMonth: number;
-  periodYear: number;
+  salaryGrade: Types.ObjectId;
+
+  payPeriod: {
+    type: PayPeriod;
+    startDate: Date;
+    endDate: Date;
+    month: number;
+    year: number;
+  };
+
   basicSalary: number;
-  allowances: IAllowance[];
-  deductions: IDeduction[];
-  bonuses: IBonus[];
-  overtime?: IOvertime;
-  grossAmount: number;
-  netAmount: number;
+
+  components: Array<IPayrollComponent>;
+
+  earnings: {
+    overtime: {
+      hours: number;
+      rate: number;
+      amount: number;
+    };
+    bonus: Array<{
+      description: string;
+      amount: number;
+    }>;
+    totalEarnings: number;
+  };
+
+  deductions: {
+    tax: {
+      taxableAmount: number;
+      taxRate: number;
+      amount: number;
+    };
+    pension: {
+      pensionableAmount: number;
+      rate: number;
+      amount: number;
+    };
+    loans: Array<{
+      loanId: Types.ObjectId;
+      description: string;
+      amount: number;
+    }>;
+    others: Array<{
+      description: string;
+      amount: number;
+    }>;
+    totalDeductions: number;
+  };
+
+  totals: {
+    grossEarnings: number;
+    totalDeductions: number;
+    netPay: number;
+  };
+
   status: PayrollStatus;
-  paymentDetails: IBankDetails;
-  paymentStatus: "pending" | "paid" | "failed";
-  paymentDate?: Date;
-  paymentReference?: string;
-  processedBy: Types.ObjectId;
+  approvalFlow: IApprovalFlow;
+  payment: IPayrollPayment;
+
+  processedBy?: Types.ObjectId;
   approvedBy?: Types.ObjectId;
   approvedAt?: Date;
-  paidAt?: Date;
   createdBy: Types.ObjectId;
   updatedBy: Types.ObjectId;
   comments?: string;
@@ -189,7 +247,12 @@ export interface IEmployee {
   email: string;
   employeeId: string;
   role: string;
-  department: IDepartment;
+  department: {
+    _id: Types.ObjectId;
+    name: string;
+    code: string;
+  };
+  gradeLevel: Types.ObjectId;
   bankDetails?: IBankDetails;
   salary?: number;
   allowances?: PayrollAllowances;
@@ -200,14 +263,52 @@ export interface IEmployee {
   updatedAt: Date;
 }
 
-export interface PayrollCalculation {
+export interface PayrollCalculationResult {
   basicSalary: number;
-  allowances: PayrollAllowances;
-  totalAllowances: number;
-  grossSalary: number;
-  deductions: PayrollDeductions;
-  totalDeductions: number;
-  netSalary: number;
+  components: {
+    name: string;
+    type: "fixed" | "percentage";
+    amount: number;
+  }[];
+  earnings: {
+    overtime: {
+      hours: number;
+      rate: number;
+      amount: number;
+    };
+    bonus: {
+      description: string;
+      amount: number;
+    }[];
+    totalEarnings: number;
+  };
+  deductions: {
+    tax: {
+      taxableAmount: number;
+      taxRate: number;
+      amount: number;
+    };
+    pension: {
+      pensionableAmount: number;
+      rate: number;
+      amount: number;
+    };
+    loans: {
+      loanId: Types.ObjectId;
+      description: string;
+      amount: number;
+    }[];
+    others: {
+      description: string;
+      amount: number;
+    }[];
+    totalDeductions: number;
+  };
+  totals: {
+    grossEarnings: number;
+    totalDeductions: number;
+    netPay: number;
+  };
 }
 
 export interface BulkPayrollError {
@@ -220,7 +321,54 @@ export interface BulkPayrollResult {
   failed: number;
   payrollResults: Array<{
     employeeData: IEmployee;
-    calculations: PayrollCalculation;
+    calculations: PayrollCalculationResult;
   }>;
   errors: BulkPayrollError[];
+}
+
+export interface PayrollCalculationRequest {
+  employee: Types.ObjectId | string;
+  month: number;
+  year: number;
+  basicSalary: number;
+  components?: {
+    name: string;
+    type: "fixed" | "percentage";
+    amount: number; // Changed from value to amount
+  }[];
+  overtime?: {
+    hours: number;
+    rate: number;
+  };
+  bonus?: {
+    description: string;
+    amount: number;
+  }[];
+  // Add these fields to match what's being used
+  salaryGrade?: string;
+  department?: Types.ObjectId;
+}
+
+// Add new interfaces
+export interface IPayrollComponent {
+  name: string;
+  type: "fixed" | "percentage";
+  value: number;
+  amount: number;
+  componentId: Types.ObjectId;
+}
+
+export interface IPayrollPayment extends IBankDetails {
+  paymentDate?: Date;
+  transactionReference?: string;
+}
+
+export interface IApprovalFlow {
+  submittedBy: Types.ObjectId;
+  submittedAt: Date;
+  approvedBy?: Types.ObjectId;
+  approvedAt?: Date;
+  rejectedBy?: Types.ObjectId;
+  rejectedAt?: Date;
+  comments?: string;
 }

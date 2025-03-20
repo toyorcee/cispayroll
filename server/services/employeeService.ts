@@ -57,7 +57,7 @@ export class EmployeeService {
         ...data,
         employeeId,
         role: UserRole.USER,
-        status: "pending", 
+        status: "pending",
         isEmailVerified: false,
         invitationToken,
         invitationExpires,
@@ -116,5 +116,66 @@ export class EmployeeService {
       department: employee.department?.toString(),
       status: employee.status,
     };
+  }
+
+  static async getEmployees(filters: {
+    page: number;
+    limit: number;
+    search?: string;
+    status?: string;
+    department?: string;
+  }) {
+    try {
+      const { page = 1, limit = 10, search, status, department } = filters;
+      const skip = (page - 1) * limit;
+
+      // Build query
+      const query: any = {};
+
+      // Add search filter
+      if (search) {
+        query.$or = [
+          { firstName: { $regex: search, $options: "i" } },
+          { lastName: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+          { employeeId: { $regex: search, $options: "i" } },
+        ];
+      }
+
+      // Add status filter
+      if (status) {
+        query.status = status;
+      }
+
+      // Add department filter
+      if (department) {
+        if (department === "No Department") {
+          query.department = { $in: [null, undefined] };
+        } else {
+          query.department = department;
+        }
+      }
+
+      // Execute query with pagination
+      const [employees, total] = await Promise.all([
+        UserModel.find(query)
+          .select("-password")
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit),
+        UserModel.countDocuments(query),
+      ]);
+
+      return {
+        data: employees.map((emp) => this.formatEmployeeResponse(emp)),
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (error) {
+      console.error("Error in getEmployees:", error);
+      throw error;
+    }
   }
 }

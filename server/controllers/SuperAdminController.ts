@@ -4,7 +4,7 @@ import { UserRole, Permission } from "../models/User.js";
 import { AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import UserModel from "../models/User.js";
 import DepartmentModel, { DepartmentStatus } from "../models/Department.js";
-import PayrollModel, { PayrollStatus } from "../models/Payroll.js";
+import PayrollModel from "../models/Payroll.js";
 import { PermissionChecker } from "../utils/permissionUtils.js";
 import { handleError, ApiError } from "../utils/errorHandler.js";
 import Leave from "../models/Leave.js";
@@ -13,6 +13,7 @@ import { PayrollService } from "../services/PayrollService.js";
 import SalaryGrade, { ISalaryComponent } from "../models/SalaryStructure.js";
 import { Types } from "mongoose";
 import mongoose from "mongoose";
+import { PayPeriod, PayrollStatus } from "../types/payroll.js";
 
 interface PayrollAllowances {
   housing: number;
@@ -85,18 +86,40 @@ export class SuperAdminController {
     }
   }
 
-  static async createAdmin(
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) {
+  static async createAdmin(req: AuthenticatedRequest, res: Response) {
     try {
+      // Generate admin ID with date format
+      const today = new Date();
+      const day = today.getDate().toString().padStart(2, "0");
+      const month = (today.getMonth() + 1).toString().padStart(2, "0");
+
+      // Get count of admins created today for sequential numbering
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const todayAdminsCount = await UserModel.countDocuments({
+        role: UserRole.ADMIN,
+        createdAt: {
+          $gte: startOfDay,
+          $lte: endOfDay,
+        },
+      });
+
+      const sequentialNumber = (todayAdminsCount + 1)
+        .toString()
+        .padStart(3, "0");
+      const adminId = `ADM${day}${month}${sequentialNumber}`; // Will create ADM2503001 format
+
       const userData = {
         ...req.body,
         role: UserRole.ADMIN,
         isEmailVerified: true,
         createdBy: req.user.id,
         status: "pending",
+        employeeId: adminId,
       };
 
       const { user: admin } = await AuthService.createUser(userData);
@@ -181,23 +204,68 @@ export class SuperAdminController {
   }
 
   // ===== Regular User Management =====
-  static async getAllUsers(
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) {
+  static async getAllUsers(req: AuthenticatedRequest, res: Response) {
     try {
-      const users = await UserModel.find({ role: UserRole.USER })
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const search = req.query.search as string;
+      const status = req.query.status as string;
+      const departmentName = req.query.department as string;
+
+      // Base query - now includes all roles
+      const query: any = {};
+
+      // If user is admin, only show users from their department
+      if (req.user.role === UserRole.ADMIN) {
+        query.department = req.user.department;
+        query.role = { $ne: UserRole.SUPER_ADMIN };
+      }
+
+      // Add other filters if provided
+      if (status) {
+        query.status = status;
+      }
+
+      // Modified department filter to handle null/undefined departments
+      if (departmentName && req.user.role === UserRole.SUPER_ADMIN) {
+        if (departmentName === "No Department") {
+          query.department = { $in: [null, undefined] };
+        } else {
+          query.department = departmentName;
+        }
+      }
+
+      if (search) {
+        query.$or = [
+          { firstName: { $regex: search, $options: "i" } },
+          { lastName: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+        ];
+      }
+
+      const total = await UserModel.countDocuments(query);
+      const totalPages = Math.ceil(total / limit);
+      const skip = (page - 1) * limit;
+
+      const users = await UserModel.find(query)
         .select("-password")
         .populate("department", "name code")
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
 
       res.status(200).json({
         success: true,
-        users,
-        count: users.length,
+        data: users,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages,
+        },
       });
     } catch (error) {
+      console.error("Error fetching users:", error);
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
     }
@@ -335,15 +403,83 @@ export class SuperAdminController {
   static async getAllDepartments(req: AuthenticatedRequest, res: Response) {
     try {
       console.log("🔍 Fetching all departments");
+      // Get all active departments with populated headOfDepartment
       const departments = await DepartmentModel.find({ status: "active" })
-        .select("name code")
-        .sort({ name: 1 });
+        .populate("headOfDepartment", "firstName lastName email")
+        .lean();
 
-      console.log(`📋 Found ${departments.length} departments`);
+      // Get employee count for each department - including ALL employee types
+      const departmentsWithCounts = await Promise.all(
+        departments.map(async (dept) => {
+          // Count all employees in department (including super admins)
+          const totalCount = await UserModel.countDocuments({
+            department: dept.name,
+            $or: [
+              { status: { $ne: "archived" } },
+              { status: { $exists: false } },
+            ],
+          });
+
+          // Get role-specific counts
+          const [adminCount, userCount] = await Promise.all([
+            UserModel.countDocuments({
+              department: dept.name,
+              role: UserRole.ADMIN,
+              $or: [
+                { status: { $ne: "archived" } },
+                { status: { $exists: false } },
+              ],
+            }),
+            UserModel.countDocuments({
+              department: dept.name,
+              role: UserRole.USER,
+              $or: [
+                { status: { $ne: "archived" } },
+                { status: { $exists: false } },
+              ],
+            }),
+          ]);
+
+          return {
+            _id: dept._id,
+            name: dept.name,
+            code: dept.code,
+            headOfDepartment: dept.headOfDepartment,
+            employeeCounts: {
+              total: totalCount,
+              admins: adminCount,
+              regularUsers: userCount,
+            },
+          };
+        })
+      );
+
+      // Get overall employee counts directly here instead of using getEmployeeCounts
+      const [superAdmins, admins, regularUsers] = await Promise.all([
+        UserModel.countDocuments({ role: UserRole.SUPER_ADMIN }),
+        UserModel.countDocuments({ role: UserRole.ADMIN }),
+        UserModel.countDocuments({ role: UserRole.USER }),
+      ]);
+
+      const totalCounts = {
+        superAdmins,
+        admins,
+        regularUsers,
+        total: superAdmins + admins + regularUsers,
+      };
+
+      console.log(
+        `📋 Found ${departments.length} departments with counts:`,
+        departmentsWithCounts
+      );
+      console.log("📊 Total employee counts:", totalCounts);
 
       res.status(200).json({
         success: true,
-        data: departments,
+        data: {
+          departments: departmentsWithCounts,
+          totalCounts,
+        },
       });
     } catch (error) {
       console.error("❌ Error fetching departments:", error);
@@ -472,350 +608,90 @@ export class SuperAdminController {
   }
 
   // ===== Payroll Management =====
-  static async getAllPayroll(req: AuthenticatedRequest, res: Response) {
-    try {
-      console.log("🔍 Fetching all payroll records");
-
-      const payroll = await PayrollModel.find()
-        .populate([
-          { path: "employee", select: "firstName lastName employeeId" },
-          { path: "department", select: "name code" },
-          { path: "approvedBy", select: "firstName lastName" },
-        ])
-        .sort({ createdAt: -1 });
-
-      res.status(200).json({
-        success: true,
-        data: payroll,
-        count: payroll.length,
-      });
-    } catch (error) {
-      console.error("❌ Error fetching payroll records:", error);
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
-    }
-  }
-
-  static async getPayrollById(req: AuthenticatedRequest, res: Response) {
-    try {
-      console.log("🔍 Fetching payroll record:", req.params.id);
-
-      const payroll = await PayrollModel.findById(req.params.id).populate([
-        { path: "employee", select: "firstName lastName employeeId" },
-        { path: "department", select: "name code" },
-        { path: "approvedBy", select: "firstName lastName" },
-      ]);
-
-      if (!payroll) {
-        throw new ApiError(404, "Payroll record not found");
-      }
-
-      res.status(200).json({
-        success: true,
-        data: payroll,
-      });
-    } catch (error) {
-      console.error("❌ Error fetching payroll record:", error);
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
-    }
-  }
-
   static async createPayroll(req: AuthenticatedRequest, res: Response) {
     try {
-      console.log("📝 Creating new payroll record");
+      console.log("📝 Creating payroll record with data:", req.body);
+      const { employee, month, year, basicSalary, salaryGrade } = req.body;
 
-      const {
-        employee,
-        department,
+      // Use PayrollService for validation and data preparation
+      const employeeData = await PayrollService.validateAndGetEmployee(
+        employee
+      );
+      await PayrollService.checkExistingPayroll(employee, month, year);
+      const { startDate, endDate } = PayrollService.calculatePayPeriod(
         month,
-        year,
-        basicSalary,
-        allowances = {
-          housing: 0,
-          transport: 0,
-          meal: 0,
-          other: 0,
-        },
-        deductions = {
-          pension: 0,
-          loan: 0,
-          other: 0,
-        },
-      } = req.body;
+        year
+      );
 
-      // Calculate payroll using service
-      const { employeeData, calculations } =
-        await PayrollService.calculatePayroll({
-          employee,
+      // Create the payroll record
+      const payroll = await PayrollModel.create({
+        employee: asObjectId(employee),
+        department: employeeData.department._id,
+        salaryGrade: asObjectId(salaryGrade),
+        payPeriod: {
+          type: PayPeriod.MONTHLY,
+          startDate,
+          endDate,
           month,
           year,
-          basicSalary,
-          allowances,
-          deductions,
-        });
-
-      // Create payroll record
-      const payroll = await PayrollModel.create({
-        employee,
-        department: employeeData.department,
-        month,
-        year,
-        ...calculations,
-        bankDetails: employeeData.bankDetails,
-        createdBy: req.user.id,
-        updatedBy: req.user.id,
+        },
+        basicSalary,
+        components: [], // Initialize empty
+        earnings: {
+          overtime: { hours: 0, rate: 0, amount: 0 },
+          bonus: [],
+          totalEarnings: basicSalary,
+        },
+        deductions: {
+          tax: { taxableAmount: 0, taxRate: 0, amount: 0 },
+          pension: { pensionableAmount: 0, rate: 0, amount: 0 },
+          loans: [],
+          others: [],
+          totalDeductions: 0,
+        },
+        totals: {
+          grossEarnings: basicSalary,
+          totalDeductions: 0,
+          netPay: basicSalary,
+        },
         status: PayrollStatus.PENDING,
+        approvalFlow: {
+          submittedBy: asObjectId(req.user!.id),
+          submittedAt: new Date(),
+        },
+        payment: {
+          bankName: employeeData.bankDetails?.bankName || "",
+          accountNumber: employeeData.bankDetails?.accountNumber || "",
+          accountName: employeeData.bankDetails?.accountName || "",
+        },
+        processedBy: asObjectId(req.user!.id),
+        createdBy: asObjectId(req.user!.id),
+        updatedBy: asObjectId(req.user!.id),
       });
 
-      await payroll.populate([
-        {
-          path: "employee",
-          select: "firstName lastName employeeId bankDetails",
-        },
-        {
-          path: "department",
-          select: "name code",
-        },
-      ]);
-
-      console.log("✅ Payroll record created successfully");
+      // Populate necessary fields for response
+      const populatedPayroll = await PayrollModel.findById(payroll._id)
+        .populate("employee", "firstName lastName employeeId")
+        .populate("department", "name code")
+        .populate("salaryGrade", "level description");
 
       res.status(201).json({
         success: true,
         message: "Payroll record created successfully",
-        data: payroll,
+        data: populatedPayroll,
       });
     } catch (error) {
-      console.error("❌ Error creating payroll record:", error);
+      console.error("❌ Error in createPayroll:", error);
       const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
+      res.status(statusCode).json({
+        success: false,
+        message,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
     }
   }
 
-  static async updatePayroll(req: AuthenticatedRequest, res: Response) {
-    try {
-      console.log("📝 Updating payroll record:", req.params.id);
-
-      const payroll = await PayrollModel.findById(req.params.id);
-      if (!payroll) {
-        throw new ApiError(404, "Payroll record not found");
-      }
-
-      if (payroll.status === PayrollStatus.APPROVED) {
-        throw new ApiError(400, "Cannot update approved payroll record");
-      }
-
-      const updatedPayroll = await PayrollModel.findByIdAndUpdate(
-        req.params.id,
-        {
-          ...req.body,
-          updatedBy: req.user.id,
-        },
-        { new: true }
-      ).populate([
-        { path: "employee", select: "firstName lastName employeeId" },
-        { path: "department", select: "name code" },
-      ]);
-
-      res.status(200).json({
-        success: true,
-        message: "Payroll record updated successfully",
-        data: updatedPayroll,
-      });
-    } catch (error) {
-      console.error("❌ Error updating payroll record:", error);
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
-    }
-  }
-
-  static async approvePayroll(req: AuthenticatedRequest, res: Response) {
-    try {
-      console.log("✅ Approving payroll record:", req.params.id);
-
-      const payroll = await PayrollModel.findByIdAndUpdate(
-        req.params.id,
-        {
-          status: PayrollStatus.APPROVED,
-          approvedBy: req.user.id,
-          approvedAt: new Date(),
-        },
-        { new: true }
-      ).populate([
-        { path: "employee", select: "firstName lastName employeeId" },
-        { path: "department", select: "name code" },
-        { path: "approvedBy", select: "firstName lastName" },
-      ]);
-
-      if (!payroll) {
-        throw new ApiError(404, "Payroll record not found");
-      }
-
-      res.status(200).json({
-        success: true,
-        message: "Payroll approved successfully",
-        data: payroll,
-      });
-    } catch (error) {
-      console.error("❌ Error approving payroll:", error);
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
-    }
-  }
-
-  static async generatePayslip(req: AuthenticatedRequest, res: Response) {
-    try {
-      console.log("📄 Generating payslip for:", req.params.id);
-
-      const payroll = await PayrollModel.findById(req.params.id).populate([
-        {
-          path: "employee",
-          select: "firstName lastName employeeId bankDetails",
-        },
-        { path: "department", select: "name code" },
-      ]);
-
-      if (!payroll) {
-        throw new ApiError(404, "Payroll record not found");
-      }
-
-      // Payslip generation logic will go here
-      // This will be implemented when we set up the payroll calculation service
-
-      res.status(200).json({
-        success: true,
-        message: "Payslip generated successfully",
-        data: payroll,
-      });
-    } catch (error) {
-      console.error("❌ Error generating payslip:", error);
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
-    }
-  }
-
-  static async getEmployeePayrollHistory(
-    req: AuthenticatedRequest,
-    res: Response
-  ) {
-    try {
-      console.log(
-        "🔍 Fetching payroll history for employee:",
-        req.params.employeeId
-      );
-
-      const payrollHistory = await PayrollModel.find({
-        employee: req.params.employeeId,
-      })
-        .populate([
-          { path: "employee", select: "firstName lastName employeeId" },
-          { path: "department", select: "name code" },
-          { path: "approvedBy", select: "firstName lastName" },
-        ])
-        .sort({ createdAt: -1 });
-
-      res.status(200).json({
-        success: true,
-        data: payrollHistory,
-        count: payrollHistory.length,
-      });
-    } catch (error) {
-      console.error("❌ Error fetching employee payroll history:", error);
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
-    }
-  }
-
-  static async getDepartmentPayroll(req: AuthenticatedRequest, res: Response) {
-    try {
-      console.log(
-        "🔍 Fetching payroll for department:",
-        req.params.departmentId
-      );
-
-      const departmentPayroll = await PayrollModel.find({
-        department: req.params.departmentId,
-      })
-        .populate([
-          { path: "employee", select: "firstName lastName employeeId" },
-          { path: "department", select: "name code" },
-          { path: "approvedBy", select: "firstName lastName" },
-        ])
-        .sort({ createdAt: -1 });
-
-      res.status(200).json({
-        success: true,
-        data: departmentPayroll,
-        count: departmentPayroll.length,
-      });
-    } catch (error) {
-      console.error("❌ Error fetching department payroll:", error);
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
-    }
-  }
-
-  static async getPayrollStats(req: AuthenticatedRequest, res: Response) {
-    try {
-      console.log("📊 Generating payroll statistics");
-
-      // Basic statistics calculation
-      const stats = await PayrollModel.aggregate([
-        {
-          $group: {
-            _id: "$department",
-            totalAmount: { $sum: "$netPay" },
-            count: { $sum: 1 },
-          },
-        },
-      ]);
-
-      res.status(200).json({
-        success: true,
-        data: stats,
-      });
-    } catch (error) {
-      console.error("❌ Error generating payroll statistics:", error);
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
-    }
-  }
-
-  static async deletePayroll(
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) {
-    try {
-      if (
-        !PermissionChecker.hasPermission(req.user, Permission.DELETE_PAYROLL)
-      ) {
-        throw new ApiError(403, "Not authorized to delete payroll records");
-      }
-
-      const payroll = await PayrollModel.findById(req.params.id);
-
-      if (!payroll) {
-        throw new ApiError(404, "Payroll not found");
-      }
-
-      if (payroll.status === PayrollStatus.APPROVED) {
-        throw new ApiError(400, "Cannot delete approved payroll");
-      }
-
-      await payroll.deleteOne();
-
-      res.status(200).json({
-        success: true,
-        message: "Payroll deleted successfully",
-      });
-    } catch (error) {
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
-    }
-  }
-
+  //Onboarding & Offboarding
   static async getOnboardingEmployees(
     req: AuthenticatedRequest,
     res: Response
