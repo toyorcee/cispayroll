@@ -32,13 +32,10 @@ import { StatusFilter } from "../../../components/employees/StatusFilter";
 import { Pagination } from "../../../components/shared/Pagination";
 import { EmployeeTableSkeleton } from "../../../components/employees/EmployeeTableSkeleton";
 import { DepartmentModal } from "../../../components/departments/DepartmentModal";
-import {
-  Department,
-  DepartmentBasic,
-  DepartmentFormData,
-} from "../../../types/department";
+import { Department, DepartmentFormData } from "../../../types/department";
 import { Dialog } from "@headlessui/react";
 import { departmentService } from "../../../services/departmentService";
+import { User } from "../../../types/user";
 
 export default function AllEmployees() {
   const { user } = useAuth();
@@ -73,6 +70,7 @@ export default function AllEmployees() {
     department: "",
   });
   const [isCreating, setIsCreating] = useState(false);
+  const [admins, setAdmins] = useState<User[]>([]);
 
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
   const isAdmin = user?.role === UserRole.ADMIN;
@@ -112,6 +110,40 @@ export default function AllEmployees() {
 
     fetchDepartments();
   }, []);
+
+  useEffect(() => {
+    const fetchAdmins = async () => {
+      try {
+        const response = await employeeService.getEmployees({
+          role: UserRole.ADMIN,
+          status: "active",
+          page: 1,
+          limit: 100,
+        });
+
+        // Map Employee type to User type with proper type casting
+        const adminUsers: User[] = response.data.map((emp: Employee) => ({
+          _id: emp.id,
+          id: emp.id,
+          firstName: emp.firstName,
+          lastName: emp.lastName,
+          email: emp.email,
+          role: UserRole.ADMIN,
+          department: emp.department,
+          status: emp.status,
+          permissions: emp.permissions,
+        }));
+        setAdmins(adminUsers);
+      } catch (error) {
+        console.error("Failed to fetch admins:", error);
+        toast.error("Failed to fetch admin list");
+      }
+    };
+
+    if (isSuperAdmin) {
+      fetchAdmins();
+    }
+  }, [isSuperAdmin]);
 
   const getActionPermissions = () => {
     if (isSuperAdmin) {
@@ -197,6 +229,7 @@ export default function AllEmployees() {
     try {
       await employeeService.deleteEmployee(selectedEmployee.id);
       setEmployees(employees.filter((e) => e.id !== selectedEmployee.id));
+      await refreshDepartments();
       toast.success("Employee deleted successfully");
     } catch (error) {
       toast.error("Failed to delete employee");
@@ -207,9 +240,9 @@ export default function AllEmployees() {
     if (!selectedEmployee) return;
     try {
       await employeeService.transferEmployee(selectedEmployee.id, departmentId);
-      // Refresh employee list
       const response = await employeeService.getEmployees(filters);
       setEmployees(response.data);
+      await refreshDepartments();
       toast.success("Employee transferred successfully");
     } catch (error) {
       toast.error("Failed to transfer employee");
@@ -263,6 +296,7 @@ export default function AllEmployees() {
         department: "",
       });
 
+      await refreshDepartments();
       toast.success("Employee invitation sent successfully");
     } catch (error: any) {
       console.error("Error creating employee:", error);
@@ -289,24 +323,16 @@ export default function AllEmployees() {
   const handleDepartmentSave = async (formData: DepartmentFormData) => {
     try {
       if (formData.id) {
-        // Update existing department
-        await employeeService.updateDepartment(formData.id, formData);
+        await departmentService.updateDepartment(formData.id, formData);
         toast.success("Department updated successfully");
       } else {
-        // Create new department
-        await employeeService.createDepartment(formData);
+        await departmentService.createDepartment(formData);
         toast.success("Department created successfully");
       }
 
-      // Refresh departments list with proper type conversion
-      const response = await employeeService.getDepartments();
-      const formattedDepartments = response.map((dept) => ({
-        ...dept,
-        id: dept._id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }));
-      setDepartments(formattedDepartments);
+      // Refresh departments list
+      const departments = await departmentService.getAllDepartments();
+      setDepartments(departments);
     } catch (error: any) {
       console.error("Failed to save department:", error);
       toast.error(error.response?.data?.message || "Failed to save department");
@@ -315,18 +341,12 @@ export default function AllEmployees() {
 
   const handleDepartmentDelete = async (id: string) => {
     try {
-      await employeeService.deleteDepartment(id);
+      await departmentService.deleteDepartment(id);
       toast.success("Department deleted successfully");
 
       // Refresh departments list
-      const response = await employeeService.getDepartments();
-      const formattedDepartments = response.map((dept) => ({
-        ...dept,
-        id: dept._id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }));
-      setDepartments(formattedDepartments);
+      const departments = await departmentService.getAllDepartments();
+      setDepartments(departments);
     } catch (error: any) {
       console.error("Failed to delete department:", error);
       toast.error(
@@ -386,6 +406,16 @@ export default function AllEmployees() {
     </div>
   );
 
+  // Add this helper function to refresh departments
+  const refreshDepartments = async () => {
+    try {
+      const departments = await departmentService.getAllDepartments();
+      setDepartments(departments);
+    } catch (error) {
+      console.error("Failed to refresh departments:", error);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -431,7 +461,7 @@ export default function AllEmployees() {
         {/* Status Filter - make it grow to fill available space */}
         <div className="flex-1 min-w-[200px]">
           <StatusFilter
-            currentStatus={filters.status}
+            currentStatus={filters.status as Status | undefined}
             onStatusChange={handleStatusChange}
           />
         </div>
@@ -450,7 +480,7 @@ export default function AllEmployees() {
               <option value="No Department">No Department</option>
               {departments.map((dept) => (
                 <option key={dept.id} value={dept.name}>
-                  {dept.name} ({dept.employeeCount || 0})
+                  {dept.name} ({dept.employeeCounts.total})
                 </option>
               ))}
             </select>
@@ -860,6 +890,7 @@ export default function AllEmployees() {
         onSave={handleDepartmentSave}
         onDelete={handleDepartmentDelete}
         departments={departments}
+        admins={admins}
         isLoading={loading}
       />
     </motion.div>

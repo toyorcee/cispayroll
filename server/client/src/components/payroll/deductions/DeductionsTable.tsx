@@ -1,6 +1,17 @@
 import { useState } from "react";
-import { FaEdit, FaEye, FaToggleOn, FaToggleOff } from "react-icons/fa";
-import { Deduction, CalculationMethod } from "../../../types/deduction";
+import {
+  FaEdit,
+  FaEye,
+  FaToggleOn,
+  FaToggleOff,
+  FaInfoCircle,
+  FaTrash,
+} from "react-icons/fa";
+import {
+  Deduction,
+  CalculationMethod,
+  TaxBracket,
+} from "../../../types/deduction";
 import { TableSkeleton } from "./Skeletons";
 
 interface DeductionsTableProps {
@@ -10,40 +21,141 @@ interface DeductionsTableProps {
   };
   isLoading: boolean;
   onEdit: (deduction: Deduction) => void;
-  onView: (deduction: Deduction) => void;
-  onToggleStatus: (id: string) => void;
+  onToggleStatus: (id: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onFilterChange: (filter: "all" | "statutory" | "voluntary") => void;
 }
 
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-  }).format(amount);
+const TaxBracketsModal = ({
+  isOpen,
+  onClose,
+  brackets,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  brackets: TaxBracket[];
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-white bg-opacity-95 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+      <div
+        className="relative mx-auto p-5 border w-full max-w-md shadow-xl rounded-lg bg-white"
+        style={{ maxHeight: "80vh" }}
+      >
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">
+            PAYE Tax Brackets
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-500 focus:outline-none p-2 cursor-pointer"
+          >
+            <span className="text-2xl shadow-lg rounded-lg">×</span>
+          </button>
+        </div>
+        <div
+          className="space-y-2 overflow-y-auto"
+          style={{ maxHeight: "60vh" }}
+        >
+          {brackets.map((bracket, index) => (
+            <div
+              key={index}
+              className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-150"
+            >
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-gray-600">
+                  From ₦{bracket.min.toLocaleString()}
+                  {bracket.max
+                    ? ` to ₦${bracket.max.toLocaleString()}`
+                    : " and above"}
+                </div>
+                <div className="text-base font-semibold text-green-600">
+                  {bracket.rate}%
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const formatValue = (
+  deduction: Deduction,
+  onViewBrackets: (brackets: TaxBracket[]) => void
+) => {
+  if (deduction.calculationMethod === CalculationMethod.PERCENTAGE) {
+    return `${deduction.value}%`;
+  } else if (deduction.calculationMethod === CalculationMethod.FIXED) {
+    return new Intl.NumberFormat("en-NG", {
+      style: "currency",
+      currency: "NGN",
+    }).format(deduction.value);
+  }
+  return deduction.value;
 };
 
 export const DeductionsTable = ({
   deductions,
   isLoading,
   onEdit,
-  onView,
   onToggleStatus,
+  onDelete,
+  onFilterChange,
 }: DeductionsTableProps) => {
   const [filter, setFilter] = useState<"all" | "statutory" | "voluntary">(
     "all"
   );
+  const [selectedBrackets, setSelectedBrackets] = useState<TaxBracket[] | null>(
+    null
+  );
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    show: boolean;
+    id: string | null;
+  }>({
+    show: false,
+    id: null,
+  });
+
+  const handleDelete = async (id: string) => {
+    setDeleteConfirm({ show: true, id });
+  };
+
+  const confirmDelete = async () => {
+    if (deleteConfirm.id) {
+      await onDelete(deleteConfirm.id);
+      setDeleteConfirm({ show: false, id: null });
+    }
+  };
+
+  const handleToggle = async (id: string) => {
+    try {
+      setTogglingId(id);
+      await onToggleStatus(id);
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   if (isLoading) return <TableSkeleton />;
 
   const allDeductions = [...deductions.statutory, ...deductions.voluntary];
-
   const filteredDeductions =
     filter === "all"
       ? allDeductions
       : allDeductions.filter((d) =>
           filter === "statutory"
-            ? d.type === "statutory"
-            : d.type === "voluntary"
+            ? d.type.toLowerCase() === "statutory"
+            : d.type.toLowerCase() === "voluntary"
         );
+
+  const handleFilterChange = (newFilter: "all" | "statutory" | "voluntary") => {
+    setFilter(newFilter);
+    onFilterChange(newFilter);
+  };
 
   return (
     <div className="bg-white shadow-sm rounded-lg overflow-hidden">
@@ -52,7 +164,11 @@ export const DeductionsTable = ({
           <select
             className="form-select rounded-md border-gray-300 text-sm focus:ring-green-500 focus:border-green-500"
             value={filter}
-            onChange={(e) => setFilter(e.target.value as any)}
+            onChange={(e) =>
+              handleFilterChange(
+                e.target.value as "all" | "statutory" | "voluntary"
+              )
+            }
           >
             <option value="all">All Deductions</option>
             <option value="statutory">Statutory</option>
@@ -99,15 +215,38 @@ export const DeductionsTable = ({
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
-                  {deduction.type}
+                  {deduction.type.toLowerCase()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
-                  {deduction.calculationMethod}
+                  {deduction.calculationMethod.toLowerCase()}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {deduction.calculationMethod === CalculationMethod.PERCENTAGE
-                    ? `${deduction.value}%`
-                    : formatCurrency(deduction.value)}
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center justify-start">
+                    {deduction.calculationMethod.toLowerCase() ===
+                    "progressive" ? (
+                      <div className="flex items-center space-x-2">
+                        <span className="font-medium text-gray-900">
+                          Progressive Tax
+                        </span>
+                        <button
+                          onClick={() =>
+                            deduction.taxBrackets &&
+                            setSelectedBrackets(deduction.taxBrackets)
+                          }
+                          className="text-green-600 hover:text-green-700 focus:outline-none"
+                        >
+                          <FaInfoCircle className="w-5 h-5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-gray-900">
+                        {deduction.calculationMethod.toLowerCase() ===
+                        "percentage"
+                          ? `${deduction.value}%`
+                          : deduction.value.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
@@ -122,26 +261,42 @@ export const DeductionsTable = ({
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button
-                    onClick={() => onView(deduction)}
-                    className="text-green-600 hover:text-green-900 mr-4"
-                  >
-                    <FaEye className="inline-block w-4 h-4" />
-                  </button>
-                  <button
                     onClick={() => onEdit(deduction)}
                     className="text-green-600 hover:text-green-900 mr-4"
                   >
                     <FaEdit className="inline-block w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => onToggleStatus(deduction._id)}
-                    className="text-green-600 hover:text-green-900"
+                    onClick={() => handleToggle(deduction._id)}
+                    disabled={togglingId === deduction._id}
+                    className={`${
+                      deduction.isActive ? "text-green-600" : "text-gray-400"
+                    } hover:text-green-900 mr-4 transition-opacity ${
+                      togglingId === deduction._id
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
+                    }`}
+                    title={deduction.isActive ? "Deactivate" : "Activate"}
                   >
                     {deduction.isActive ? (
-                      <FaToggleOn className="inline-block w-4 h-4" />
+                      <FaToggleOn
+                        className={`inline-block w-5 h-5 ${
+                          togglingId === deduction._id ? "animate-pulse" : ""
+                        }`}
+                      />
                     ) : (
-                      <FaToggleOff className="inline-block w-4 h-4" />
+                      <FaToggleOff
+                        className={`inline-block w-5 h-5 ${
+                          togglingId === deduction._id ? "animate-pulse" : ""
+                        }`}
+                      />
                     )}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(deduction._id)}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    <FaTrash className="inline-block w-4 h-4" />
                   </button>
                 </td>
               </tr>
@@ -149,6 +304,49 @@ export const DeductionsTable = ({
           </tbody>
         </table>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm.show && (
+        <div className="fixed inset-0 bg-white bg-opacity-95 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+          <div className="relative mx-auto p-5 border w-full max-w-sm shadow-lg rounded-lg bg-white">
+            <div className="mt-3 text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <FaTrash className="h-6 w-6 text-red-600" />
+              </div>
+              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-2">
+                Delete Deduction
+              </h3>
+              <div className="mt-2 px-7 py-3">
+                <p className="text-sm text-gray-500">
+                  Are you sure you want to delete this deduction? This action
+                  cannot be undone.
+                </p>
+              </div>
+              <div className="flex justify-center gap-4 mt-5">
+                <button
+                  onClick={() => setDeleteConfirm({ show: false, id: null })}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Existing Tax Brackets Modal */}
+      <TaxBracketsModal
+        isOpen={!!selectedBrackets}
+        onClose={() => setSelectedBrackets(null)}
+        brackets={selectedBrackets || []}
+      />
     </div>
   );
 };

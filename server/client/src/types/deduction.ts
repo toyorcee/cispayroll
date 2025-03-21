@@ -1,17 +1,19 @@
 export enum DeductionType {
-  STATUTORY = "STATUTORY",
-  VOLUNTARY = "VOLUNTARY",
+  STATUTORY = "statutory",
+  VOLUNTARY = "voluntary",
 }
 
 export enum CalculationMethod {
-  FIXED = "FIXED",
-  PERCENTAGE = "PERCENTAGE",
+  FIXED = "fixed",
+  PERCENTAGE = "percentage",
+  PROGRESSIVE = "progressive",
 }
 
 export interface TaxBracket {
   min: number;
   max: number | null;
   rate: number;
+  _id?: string;
 }
 
 export interface CreateVoluntaryDeductionInput {
@@ -25,15 +27,23 @@ export interface CreateVoluntaryDeductionInput {
 export interface Deduction {
   _id: string;
   name: string;
-  type: DeductionType;
   description?: string;
+  type: DeductionType;
   calculationMethod: CalculationMethod;
   value: number;
-  taxBrackets?: TaxBracket[];
   isActive: boolean;
   effectiveDate?: Date;
-  createdBy: string;
-  updatedBy: string;
   createdAt: Date;
   updatedAt: Date;
+  taxBrackets?: TaxBracket[];
+  createdBy?: string;
+  updatedBy?: string;
+}
+
+export interface DeductionsResponse {
+  success: boolean;
+  data: {
+    statutory: Deduction[];
+    voluntary: Deduction[];
+  };
 }

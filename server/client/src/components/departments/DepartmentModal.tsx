@@ -2,6 +2,7 @@ import { Dialog } from "@headlessui/react";
 import { FaTimes, FaSpinner, FaEdit, FaTrash } from "react-icons/fa";
 import { useState } from "react";
 import { Department, DepartmentFormData } from "../../types/department";
+import { User } from "../../types/user";
 
 interface DepartmentModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface DepartmentModalProps {
   onSave: (department: DepartmentFormData) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   departments: Department[];
+  admins: User[];
   isLoading: boolean;
 }
 
@@ -18,12 +20,15 @@ export const DepartmentModal = ({
   onSave,
   onDelete,
   departments,
+  admins,
   isLoading,
 }: DepartmentModalProps) => {
   const [formData, setFormData] = useState<DepartmentFormData>({
     name: "",
     code: "",
     description: "",
+    headOfDepartment: "",
+    location: "",
     status: "active",
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -51,7 +56,9 @@ export const DepartmentModal = ({
       name: dept.name,
       code: dept.code,
       description: dept.description || "",
-      status: "active",
+      headOfDepartment: dept.headOfDepartment?._id || "",
+      location: dept.location || "",
+      status: dept.status,
     });
     setEditingId(dept.id);
   };
@@ -71,9 +78,29 @@ export const DepartmentModal = ({
       name: "",
       code: "",
       description: "",
+      headOfDepartment: "",
+      location: "",
       status: "active",
     });
     setEditingId(null);
+  };
+
+  // Filter out admins who are already HODs (except current HOD when editing)
+  const getAvailableAdmins = () => {
+    return admins.filter((admin) => {
+      // If we're editing, allow current HOD to be in the list
+      if (editingId) {
+        const currentDept = departments.find((d) => d.id === editingId);
+        if (currentDept?.headOfDepartment._id === admin._id) {
+          return true;
+        }
+      }
+
+      // Filter out admins who are already HODs
+      return !departments.some(
+        (dept) => dept.headOfDepartment._id === admin._id
+      );
+    });
   };
 
   return (
@@ -132,6 +159,30 @@ export const DepartmentModal = ({
                 </div>
 
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 required">
+                    Head of Department
+                  </label>
+                  <select
+                    required
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                    value={formData.headOfDepartment}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        headOfDepartment: e.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">Select Head of Department</option>
+                    {getAvailableAdmins().map((admin) => (
+                      <option key={admin._id} value={admin._id}>
+                        {admin.firstName} {admin.lastName} ({admin.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
                   <label className="block text-sm font-medium text-gray-700">
                     Description
                   </label>
@@ -143,6 +194,23 @@ export const DepartmentModal = ({
                       setFormData((prev) => ({
                         ...prev,
                         description: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Location
+                  </label>
+                  <input
+                    type="text"
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                    value={formData.location || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        location: e.target.value,
                       }))
                     }
                   />
@@ -196,6 +264,9 @@ export const DepartmentModal = ({
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Code
                       </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Head of Department
+                      </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
@@ -209,6 +280,11 @@ export const DepartmentModal = ({
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {dept.code}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {dept.headOfDepartment
+                            ? `${dept.headOfDepartment.firstName} ${dept.headOfDepartment.lastName}`
+                            : "Not Assigned"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button

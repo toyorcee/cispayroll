@@ -46,10 +46,16 @@ export interface Employee {
   position: string;
   gradeLevel: string;
   workLocation: string;
-  status: string;
+  status:
+    | "active"
+    | "pending"
+    | "inactive"
+    | "suspended"
+    | "offboarding"
+    | "terminated";
   employeeId: string;
   offboarding?: OffboardingDetails;
-  permissions: string[];
+  permissions: Permission[];
   progress: number;
   dateJoined: string;
   startDate?: string;
@@ -100,7 +106,7 @@ export interface Employee {
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
-  userRole: UserRole;
+  role: UserRole;
   lastWorkingDate: Date;
   initiatedDate: Date;
   reason: string;
@@ -196,8 +202,9 @@ export interface EmployeeFilters {
   page: number;
   limit: number;
   search?: string;
-  department?: string;
   status?: Status;
+  department?: string;
+  role?: UserRole;
 }
 
 export interface EmployeeDetails extends Employee {

@@ -14,10 +14,9 @@ import { toast } from "react-toastify";
 import { employeeService } from "../../../services/employeeService";
 import { Dialog } from "@headlessui/react";
 import { DepartmentModal } from "../../../components/departments/DepartmentModal";
-import { DepartmentBasic } from "../../../services/employeeService";
-import { Department } from "../../../types/department";
+import { Department, DepartmentFormData } from "../../../types/department";
 import { useAuth } from "../../../context/AuthContext";
-import { UserRole, User } from "../../../types/auth";
+import { UserRole, User, Permission } from "../../../types/auth";
 import {
   CreateEmployeeData,
   Employee,
@@ -27,10 +26,29 @@ import {
 import { Pagination } from "@mui/material";
 import { Grid } from "@mui/material";
 import CreateAdminModal from "../../../components/modals/CreateAdminModal";
+import { departmentService } from "../../../services/departmentService";
+
+// Update the AdminUser interface to match User type exactly
+interface AdminUser {
+  _id: string;
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: UserRole;
+  status:
+    | "active"
+    | "inactive"
+    | "pending"
+    | "suspended"
+    | "terminated"
+    | "offboarding";
+  permissions: Permission[];
+}
 
 // Modify the custom hook to properly handle the User type
 const useOnboardingData = () => {
-  const [departments, setDepartments] = useState<DepartmentBasic[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [onboardingEmployees, setOnboardingEmployees] = useState<
     OnboardingEmployee[]
   >([]);
@@ -41,27 +59,30 @@ const useOnboardingData = () => {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Fetch departments first
-      const deps = await employeeService.getDepartments();
+      const deps = await departmentService.getAllDepartments();
       setDepartments(deps);
 
-      // Then fetch employees based on user role
-      const emps = await employeeService.getOnboardingEmployees();
+      const response = await employeeService.getOnboardingEmployees();
 
-      // Filter employees if user is not a super admin and has department restriction
       const filteredEmps =
         user?.role !== UserRole.SUPER_ADMIN && user?.department
-          ? emps.filter((emp) => emp.department === user.department)
-          : emps;
+          ? response.filter((emp) => emp.department === user.department)
+          : response;
 
       setOnboardingEmployees(filteredEmps);
+      setError(null);
     } catch (error: any) {
-      console.error("Error fetching data:", error);
+      console.error("❌ Error in fetchData:", error);
       setError(error.message || "Failed to load data");
+      setOnboardingEmployees([]);
     } finally {
       setIsLoading(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   return {
     departments,
@@ -74,6 +95,16 @@ const useOnboardingData = () => {
     user,
   };
 };
+
+// Add these constants at the top of the file
+const ONBOARDING_STAGES = {
+  NOT_STARTED: "not_started",
+  CONTRACT_STAGE: "contract_stage",
+  DOCUMENTATION_STAGE: "documentation_stage",
+  IT_SETUP_STAGE: "it_setup_stage",
+  TRAINING_STAGE: "training_stage",
+  COMPLETED: "completed",
+} as const;
 
 export default function Onboarding() {
   // Move ALL hooks to the top, before any conditional returns
@@ -107,6 +138,35 @@ export default function Onboarding() {
 
   const [page, setPage] = useState(1);
   const [itemsPerPage] = useState(6);
+
+  // Add a state for admins
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+
+  // Update the fetchAdmins function to properly type the permissions
+  useEffect(() => {
+    const fetchAdmins = async () => {
+      try {
+        const response = await employeeService.getAdmins();
+        const transformedAdmins = response.map((admin) => ({
+          _id: admin._id,
+          id: admin._id,
+          firstName: admin.firstName,
+          lastName: admin.lastName,
+          email: admin.email,
+          role: admin.role || UserRole.ADMIN,
+          status: admin.status || "active",
+          permissions: (admin.permissions || []).map(
+            (perm) => perm as Permission
+          ),
+        }));
+        setAdmins(transformedAdmins as AdminUser[]);
+      } catch (error) {
+        console.error("Failed to fetch admins:", error);
+      }
+    };
+
+    fetchAdmins();
+  }, []);
 
   // All useEffect hooks
   useEffect(() => {
@@ -158,10 +218,6 @@ export default function Onboarding() {
         return;
       }
 
-      const selectedDept = departments.find(
-        (d) => d.id === formData.department
-      );
-
       // Ensure department is always a string
       const departmentValue =
         user?.role === UserRole.SUPER_ADMIN
@@ -187,37 +243,9 @@ export default function Onboarding() {
         department: departmentValue,
       };
 
-      const response = await employeeService.createEmployee(employeeData);
+      // Just create the employee - don't add to onboarding list yet
+      await employeeService.createEmployee(employeeData);
 
-      // Ensure all required fields have fallback values
-      const newEmployee: OnboardingEmployee = {
-        id: response.id || Math.random().toString(36).substr(2, 9),
-        firstName: response.firstName || formData.firstName || "",
-        lastName: response.lastName || formData.lastName || "",
-        email: response.email || formData.email || "",
-        phone: response.phone || formData.phone || "",
-        position: response.position || formData.position || "",
-        department: selectedDept?.name || "Unassigned",
-        gradeLevel:
-          response.gradeLevel || formData.gradeLevel || "Not specified",
-        workLocation:
-          response.workLocation || formData.workLocation || "Not specified",
-        progress: 0,
-        startDate: formData.dateJoined || new Date().toISOString(),
-        supervisor: "Not Assigned",
-        status: "not_started",
-        tasks: [
-          { name: "documentation_review", completed: false },
-          { name: "system_access_setup", completed: false },
-          { name: "training_completion", completed: false },
-          { name: "department_orientation", completed: false },
-        ],
-      };
-
-      // Add console.log to debug the new employee object
-      console.log("New employee data:", newEmployee);
-
-      setOnboardingEmployees((prev) => [newEmployee, ...prev]);
       setShowCreateModal(false);
 
       // Reset form
@@ -242,24 +270,19 @@ export default function Onboarding() {
     }
   };
 
-  const handleDepartmentSave = async (department: Partial<Department>) => {
+  const handleDepartmentSave = async (formData: DepartmentFormData) => {
     try {
-      if (department.id) {
-        await employeeService.updateDepartment(department.id, {
-          name: department.name || "",
-          description: department.description,
-        });
+      if (formData.id) {
+        await departmentService.updateDepartment(formData.id, formData);
       } else {
-        await employeeService.createDepartment({
-          name: department.name || "",
-          description: department.description,
-        });
+        await departmentService.createDepartment(formData);
       }
+
       // Refresh departments
-      const response = await employeeService.getDepartments();
+      const response = await departmentService.getAllDepartments();
       setDepartments(response);
       toast.success(
-        department.id ? "Department updated!" : "Department created!"
+        formData.id ? "Department updated!" : "Department created!"
       );
     } catch (error) {
       toast.error("Failed to save department");
@@ -272,7 +295,7 @@ export default function Onboarding() {
       await employeeService.deleteDepartment(id);
       // Refresh departments
       const response = await employeeService.getDepartments();
-      setDepartments(response as DepartmentBasic[]);
+      setDepartments(response as Department[]);
       toast.success("Department deleted successfully!");
     } catch (error) {
       toast.error("Failed to delete department");
@@ -302,8 +325,6 @@ export default function Onboarding() {
 
   const handleInitiateOffboarding = async (employeeId: string) => {
     try {
-      console.log("🔄 Initiating offboarding for employee:", employeeId);
-
       // Simplified payload to match backend expectations
       const response = await employeeService.initiateOffboarding(employeeId);
 
@@ -320,6 +341,77 @@ export default function Onboarding() {
     } catch (error) {
       console.error("❌ Error:", error);
       toast.error("Failed to initiate offboarding");
+    }
+  };
+
+  // Add this new function after the other handler functions
+  const handleUpdateOnboardingStage = async (
+    employeeId: string,
+    currentStage: string
+  ) => {
+    try {
+      let nextStage;
+      switch (currentStage) {
+        case ONBOARDING_STAGES.NOT_STARTED:
+          nextStage = ONBOARDING_STAGES.CONTRACT_STAGE;
+          break;
+        case ONBOARDING_STAGES.CONTRACT_STAGE:
+          nextStage = ONBOARDING_STAGES.DOCUMENTATION_STAGE;
+          break;
+        case ONBOARDING_STAGES.DOCUMENTATION_STAGE:
+          nextStage = ONBOARDING_STAGES.IT_SETUP_STAGE;
+          break;
+        case ONBOARDING_STAGES.IT_SETUP_STAGE:
+          nextStage = ONBOARDING_STAGES.TRAINING_STAGE;
+          break;
+        case ONBOARDING_STAGES.TRAINING_STAGE:
+          nextStage = ONBOARDING_STAGES.COMPLETED;
+          break;
+        default:
+          return;
+      }
+
+      // Call the backend API to update the stage
+      await employeeService.updateOnboardingStage(employeeId, nextStage);
+
+      // Update the local state
+      setOnboardingEmployees((prev) =>
+        prev.map((emp) => {
+          if (emp.id === employeeId) {
+            return {
+              ...emp,
+              status: nextStage,
+              progress: calculateProgress(nextStage),
+            };
+          }
+          return emp;
+        })
+      );
+
+      toast.success("Onboarding stage updated successfully");
+    } catch (error) {
+      console.error("Error updating onboarding stage:", error);
+      toast.error("Failed to update onboarding stage");
+    }
+  };
+
+  // Add this helper function to calculate progress percentage
+  const calculateProgress = (stage: string): number => {
+    switch (stage) {
+      case ONBOARDING_STAGES.NOT_STARTED:
+        return 0;
+      case ONBOARDING_STAGES.CONTRACT_STAGE:
+        return 20;
+      case ONBOARDING_STAGES.DOCUMENTATION_STAGE:
+        return 40;
+      case ONBOARDING_STAGES.IT_SETUP_STAGE:
+        return 60;
+      case ONBOARDING_STAGES.TRAINING_STAGE:
+        return 80;
+      case ONBOARDING_STAGES.COMPLETED:
+        return 100;
+      default:
+        return 0;
     }
   };
 
@@ -362,7 +454,12 @@ export default function Onboarding() {
   const displayedEmployees = getFilteredEmployees().slice(startIndex, endIndex);
 
   return (
-    <div className="space-y-6 overflow-x-hidden">
+    <motion.div
+      initial={{ opacity: 0, x: 100 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="space-y-6 overflow-x-hidden"
+    >
       {/* Simplified top section with just the buttons */}
       <div className="flex items-center space-x-4">
         <button
@@ -418,13 +515,7 @@ export default function Onboarding() {
             {displayedEmployees.map((employee) => (
               <Grid item xs={12} sm={6} lg={4} key={employee.id}>
                 <div className="bg-white rounded-lg shadow p-6 relative">
-                  <button
-                    onClick={() => handleInitiateOffboarding(employee.id)}
-                    className="absolute top-2 right-2 text-red-500 hover:text-red-700 p-1"
-                    title="Initiate offboarding"
-                  >
-                    <FaUserMinus className="text-sm" />
-                  </button>
+                  {/* User Info Section */}
                   <div className="flex items-center space-x-4">
                     <div className="h-12 w-12 bg-indigo-100 rounded-full flex items-center justify-center">
                       <span className="text-indigo-600 text-lg font-semibold">
@@ -449,6 +540,8 @@ export default function Onboarding() {
                       </p>
                     </div>
                   </div>
+
+                  {/* Employee Details */}
                   <div className="mt-4 space-y-2">
                     <p className="text-sm text-gray-600">
                       <span className="font-medium">Department:</span>{" "}
@@ -458,6 +551,8 @@ export default function Onboarding() {
                       <span className="font-medium">Start Date:</span>{" "}
                       {new Date(employee.startDate).toLocaleDateString()}
                     </p>
+
+                    {/* Progress Bar */}
                     <div className="mt-2">
                       <div className="h-2 bg-gray-200 rounded">
                         <div
@@ -468,6 +563,47 @@ export default function Onboarding() {
                       <p className="text-xs text-gray-500 mt-1">
                         Onboarding Progress: {employee.progress || 0}%
                       </p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Current Stage:{" "}
+                        {employee.status.replace(/_/g, " ").toUpperCase()}
+                      </p>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="mt-4 pt-3 border-t border-gray-100 space-y-2">
+                      {/* Only show the Update Stage button if not completed */}
+                      {employee.status !== ONBOARDING_STAGES.COMPLETED && (
+                        <button
+                          onClick={() =>
+                            handleUpdateOnboardingStage(
+                              employee.id,
+                              employee.status
+                            )
+                          }
+                          className="w-full flex items-center justify-center space-x-2 px-4 py-2 
+                                   bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 
+                                   hover:to-indigo-700 text-white rounded-lg transition-all duration-200 
+                                   transform hover:scale-[1.02] mb-2"
+                        >
+                          <span className="font-medium">
+                            Move to Next Stage
+                          </span>
+                        </button>
+                      )}
+
+                      {/* Existing offboarding button */}
+                      <button
+                        onClick={() => handleInitiateOffboarding(employee.id)}
+                        className="w-full flex items-center justify-center space-x-2 px-4 py-2 
+                                 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 
+                                 hover:to-red-700 text-white rounded-lg transition-all duration-200 
+                                 transform hover:scale-[1.02]"
+                      >
+                        <FaUserMinus className="text-lg" />
+                        <span className="font-medium">
+                          Initiate Offboarding
+                        </span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -726,7 +862,8 @@ export default function Onboarding() {
         onDelete={handleDepartmentDelete}
         departments={departments}
         isLoading={isLoading}
+        admins={admins}
       />
-    </div>
+    </motion.div>
   );
 }

@@ -11,6 +11,7 @@ import {
 import { Department, DepartmentFormData } from "../types/department";
 import { OnboardingStats } from "../types/chart";
 import { toast } from "react-toastify";
+import { UserRole } from "../types/auth";
 
 const BASE_URL = "http://localhost:5000/api";
 
@@ -19,6 +20,22 @@ axios.defaults.withCredentials = true;
 
 interface DepartmentWithCount extends DepartmentBasic {
   employeeCount: number;
+}
+
+interface AdminResponse {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: UserRole;
+  status:
+    | "active"
+    | "inactive"
+    | "pending"
+    | "suspended"
+    | "terminated"
+    | "offboarding";
+  permissions: string[];
 }
 
 export const employeeService = {
@@ -166,25 +183,22 @@ export const employeeService = {
     }
   },
 
-  async getOnboardingEmployees(): Promise<OnboardingEmployee[]> {
+  getOnboardingEmployees: async (): Promise<OnboardingEmployee[]> => {
     try {
-      console.log("🔍 Fetching onboarding employees...");
-      const response = await axios.get(
-        `${BASE_URL}/super-admin/onboarding-employees`,
-        { withCredentials: true }
-      );
+      console.log("📤 Fetching onboarding employees");
+      const response = await axios.get<{
+        success: boolean;
+        data: OnboardingEmployee[];
+      }>(`${BASE_URL}/super-admin/onboarding-employees`);
 
-      if (!response.data.success) {
-        throw new Error(
-          response.data.message || "Failed to fetch onboarding employees"
-        );
-      }
+      console.log("📥 Onboarding employees response:", response.data);
 
-      console.log("📥 Received employees:", response.data);
-      return response.data.data;
-    } catch (error) {
+      // Return the data array from the response
+      return response.data.data || [];
+    } catch (error: any) {
       console.error("❌ Error fetching onboarding employees:", error);
-      throw error;
+      toast.error(error.response?.data?.message || "Failed to fetch employees");
+      return []; // Return empty array on error
     }
   },
 
@@ -439,6 +453,25 @@ export const employeeService = {
   getPayrollStats: async () => {
     const response = await axios.get(
       `${BASE_URL}/super-admin/payroll/statistics`
+    );
+    return response.data;
+  },
+
+  getAdmins: async (): Promise<AdminResponse[]> => {
+    try {
+      const response = await axios.get("/api/super-admin/admins", {
+        withCredentials: true,
+      });
+      return response.data.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  updateOnboardingStage: async (employeeId: string, stage: string) => {
+    const response = await axios.put(
+      `${BASE_URL}/employees/${employeeId}/onboarding-stage`,
+      { stage }
     );
     return response.data;
   },

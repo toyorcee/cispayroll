@@ -1,6 +1,10 @@
 import axios from "axios";
 import { toast } from "react-toastify";
-import { Deduction, CalculationMethod } from "../types/deduction";
+import {
+  Deduction,
+  DeductionsResponse,
+  CalculationMethod,
+} from "../types/deduction";
 
 const BASE_URL = "http://localhost:5000/api";
 
@@ -24,15 +28,10 @@ interface UpdateDeductionInput {
   effectiveDate?: Date;
 }
 
-interface DeductionsResponse {
-  statutory: Deduction[];
-  voluntary: Deduction[];
-}
-
 export const deductionService = {
-  getAllDeductions: async (): Promise<DeductionsResponse> => {
+  getAllDeductions: async (): Promise<DeductionsResponse["data"]> => {
     try {
-      const response = await axios.get<{ data: DeductionsResponse }>(
+      const response = await axios.get<DeductionsResponse>(
         `${BASE_URL}/super-admin/deductions`
       );
       return response.data.data;
@@ -41,7 +40,7 @@ export const deductionService = {
       toast.error(
         error.response?.data?.message || "Failed to fetch deductions"
       );
-      throw error;
+      return { statutory: [], voluntary: [] };
     }
   },
 
@@ -58,21 +57,20 @@ export const deductionService = {
     }
   },
 
-  createVoluntaryDeduction: async (
+  createDeduction: async (
     data: CreateVoluntaryDeductionInput
   ): Promise<Deduction> => {
     try {
-      console.log("📤 Creating voluntary deduction:", data);
-      const response = await axios.post<{ data: Deduction }>(
+      const response = await axios.post<{ message: string; data: Deduction }>(
         `${BASE_URL}/super-admin/deductions/voluntary`,
         data
       );
-      toast.success("Voluntary deduction created successfully");
+      toast.success(response.data.message);
       return response.data.data;
     } catch (error: any) {
-      console.error("❌ Failed to create voluntary deduction:", error);
+      console.error("❌ Failed to create deduction:", error);
       toast.error(
-        error.response?.data?.message || "Failed to create voluntary deduction"
+        error.response?.data?.message || "Failed to create deduction"
       );
       throw error;
     }
@@ -83,15 +81,14 @@ export const deductionService = {
     data: UpdateDeductionInput
   ): Promise<Deduction> => {
     try {
-      console.log("📤 Updating deduction:", { id, data });
-      const response = await axios.patch<{ data: Deduction }>(
+      const response = await axios.patch(
         `${BASE_URL}/super-admin/deductions/${id}`,
         data
       );
       toast.success("Deduction updated successfully");
       return response.data.data;
     } catch (error: any) {
-      console.error("❌ Update failed:", error);
+      console.error("Failed to update deduction:", error);
       toast.error(
         error.response?.data?.message || "Failed to update deduction"
       );
@@ -101,15 +98,14 @@ export const deductionService = {
 
   toggleDeductionStatus: async (id: string): Promise<Deduction> => {
     try {
-      const response = await axios.patch<{ data: Deduction }>(
+      const response = await axios.patch(
         `${BASE_URL}/super-admin/deductions/${id}/toggle`
       );
-      toast.success("Deduction status updated successfully");
+      toast.success(response.data.message); 
       return response.data.data;
     } catch (error: any) {
-      toast.error(
-        error.response?.data?.message || "Failed to toggle deduction status"
-      );
+      console.error("Failed to toggle deduction status:", error);
+      toast.error(error.response?.data?.message || "Failed to toggle status");
       throw error;
     }
   },
@@ -117,8 +113,8 @@ export const deductionService = {
   deleteDeduction: async (id: string): Promise<void> => {
     try {
       await axios.delete(`${BASE_URL}/super-admin/deductions/${id}`);
-      toast.success("Deduction deleted successfully");
     } catch (error: any) {
+      console.error("Failed to delete deduction:", error);
       toast.error(
         error.response?.data?.message || "Failed to delete deduction"
       );
