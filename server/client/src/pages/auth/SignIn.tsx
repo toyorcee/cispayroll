@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FaMoneyCheckAlt, FaGoogle } from "react-icons/fa";
+import { FaBuilding } from "react-icons/fa";
 import {
   TbCurrencyDollar,
   TbCurrencyEuro,
@@ -132,8 +132,8 @@ export default function SignIn() {
             to="/"
             className="inline-flex justify-center items-center gap-2"
           >
-            <FaMoneyCheckAlt className="h-8 w-8 text-green-600" />
-            <span className="text-2xl font-bold text-gray-900">PAYROLL</span>
+            <FaBuilding className="h-8 w-8 text-green-600" />
+            <span className="text-2xl font-bold text-gray-900">PeopleMAX</span>
           </Link>
 
           <h2 className="mt-4 text-2xl font-bold tracking-tight text-gray-900">
