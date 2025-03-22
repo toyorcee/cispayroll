@@ -6,11 +6,31 @@ import { employeeService } from "../../../services/employeeService";
 
 interface Allowance {
   id: string;
-  type: string;
-  percentage: number;
-  description: string;
-  status: "active" | "inactive";
+  name: string;
+  type: AllowanceType;
+  value: number;
+  frequency: AllowanceFrequency;
+  description?: string;
+  taxable: boolean;
+  effectiveDate: Date;
+  expiryDate?: Date;
+  department?: string;
+  gradeLevel?: string;
+  active: boolean;
 }
+
+const frequencyOptions = [
+  { value: "monthly", label: "Monthly" },
+  { value: "quarterly", label: "Quarterly" },
+  { value: "annual", label: "Annual" },
+  { value: "one_time", label: "One Time" },
+];
+
+const typeOptions = [
+  { value: "percentage", label: "Percentage" },
+  { value: "fixed", label: "Fixed Amount" },
+  { value: "performance_based", label: "Performance Based" },
+];
 
 export default function AllowanceManagement() {
   const [allowances, setAllowances] = useState<Allowance[]>([]);

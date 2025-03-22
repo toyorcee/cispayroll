@@ -3,7 +3,8 @@ import mongoose, { Schema, Document, Types } from "mongoose";
 // Base interface for salary component data
 export interface ISalaryComponentBase {
   name: string;
-  type: "fixed" | "percentage";
+  type: "allowance" | "deduction";
+  calculationMethod: "fixed" | "percentage";
   value: number;
   isActive: boolean;
   description?: string;

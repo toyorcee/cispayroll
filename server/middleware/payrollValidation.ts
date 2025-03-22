@@ -3,18 +3,16 @@ import { ApiError } from "../utils/errorHandler.js";
 import { Types } from "mongoose";
 import { PayrollStatus } from "../types/payroll.js";
 
-// Keep validation simple for now
+// Update validation to be simpler
 export const validatePayrollCreate = (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    console.log("🔍 Validating payroll data:", req.body);
-
     const { employee, month, year, salaryGrade } = req.body;
 
-    // Check required fields
+    // Only validate essential inputs
     if (!employee || !month || !year || !salaryGrade) {
       throw new ApiError(400, "Missing required fields");
     }
@@ -38,10 +36,8 @@ export const validatePayrollCreate = (
       throw new ApiError(400, "Invalid year");
     }
 
-    console.log("✅ Validation passed");
     next();
   } catch (error) {
-    console.error("❌ Validation error:", error);
     next(error);
   }
 };

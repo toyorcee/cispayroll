@@ -25,3 +25,14 @@ export type {
   IBankDetails,
   IPayroll,
 };
+
+export interface PayrollPeriod {
+  id: string;
+  month: number;
+  year: number;
+  totalEmployees?: number;
+  totalNetSalary?: number;
+  status: "draft" | "processing" | "approved" | "paid";
+  processedDate?: Date;
+  processedBy?: string;
+}

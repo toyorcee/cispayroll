@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import Bonus, { IBonus, BonusType } from "../models/Bonus.js";
 import { ApiError } from "../utils/errorHandler.js";
+import UserModel from "../models/User.js";
 
 export class BonusService {
   static async createBonus(
@@ -145,5 +146,31 @@ export class BonusService {
     } catch (error: any) {
       throw new ApiError(500, `Failed to delete bonus: ${error.message}`);
     }
+  }
+
+  static async createThirteenthMonthBonus(
+    userId: Types.ObjectId,
+    employeeId: Types.ObjectId,
+    year: number,
+    amount: number
+  ): Promise<IBonus> {
+    return await this.createBonus(userId, {
+      employee: employeeId,
+      type: BonusType.THIRTEENTH_MONTH,
+      amount,
+      description: `13th Month Pay for ${year}`,
+      paymentDate: new Date(year, 11, 25), // December 25th
+      taxable: true,
+    });
+  }
+
+  static async getEligibleEmployeesForThirteenthMonth(year: number) {
+    // Get employees who have worked for at least 6 months
+    const sixMonthsAgo = new Date(year, 5, 1); // June 1st
+
+    return await UserModel.find({
+      createdAt: { $lte: sixMonthsAgo },
+      status: "active",
+    });
   }
 }

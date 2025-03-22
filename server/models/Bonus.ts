@@ -26,7 +26,7 @@ export interface IBonus extends Document {
   updatedAt: Date;
 }
 
-const BonusSchema = new Schema(
+const BonusSchema = new Schema<IBonus>(
   {
     employee: { type: Schema.Types.ObjectId, ref: "User", required: true },
     type: {
@@ -36,7 +36,10 @@ const BonusSchema = new Schema(
     },
     amount: { type: Number, required: true },
     description: { type: String },
-    paymentDate: { type: Date, required: true },
+    paymentDate: {
+      type: Date,
+      required: true,
+    },
     approvalStatus: {
       type: String,
       enum: ["pending", "approved", "rejected"],

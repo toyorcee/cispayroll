@@ -477,17 +477,22 @@ export class SuperAdminController {
       console.log("📝 Creating payroll record with data:", req.body);
       const { employee, month, year, salaryGrade } = req.body;
 
-      // Use PayrollService for validation and data preparation
-      const employeeData = await PayrollService.validateAndGetEmployee(
-        employee
-      );
-      await PayrollService.checkExistingPayroll(employee, month, year);
-      const { startDate, endDate } = PayrollService.calculatePayPeriod(
+      // First check if payroll already exists
+      const existingPayroll = await PayrollModel.findOne({
+        employee: asObjectId(employee),
         month,
-        year
-      );
+        year,
+      });
 
-      // Calculate all payroll components first
+      if (existingPayroll) {
+        return res.status(400).json({
+          success: false,
+          message: `Payroll record already exists for employee in ${month}/${year}`,
+          data: existingPayroll,
+        });
+      }
+
+      // Get calculations from PayrollService
       const calculations = await PayrollService.calculatePayroll(
         asObjectId(employee),
         asObjectId(salaryGrade),
@@ -495,97 +500,80 @@ export class SuperAdminController {
         year
       );
 
-      // Create the payroll record with correct structure
-      const components = calculations.components.map((comp) => {
-        const amount =
-          comp.calculationMethod === "percentage"
-            ? Number(((comp.value * calculations.basicSalary) / 100).toFixed(2))
-            : Number(comp.value.toFixed(2));
-
+      // Calculate allowance amounts based on components
+      const processedComponents = calculations.components.map((component) => {
+        let calculatedAmount = 0;
+        if (component.type === "allowance") {
+          if (component.name === "Housing Allowance") {
+            // Calculate percentage-based housing allowance
+            calculatedAmount =
+              (component.value / 100) * calculations.basicSalary;
+          } else {
+            // Fixed allowances (Transport and Medical)
+            calculatedAmount = component.value;
+          }
+        }
         return {
-          name: comp.name,
-          type: comp.type,
-          value: Number(comp.value),
-          amount: amount, // This will make Housing Allowance 50,000 (20% of 250,000)
+          ...component,
+          amount: calculatedAmount,
         };
       });
 
-      const totalAllowances = components.reduce(
-        (sum, comp) => sum + Number(comp.amount),
+      // Calculate total allowances
+      const totalAllowances = processedComponents.reduce(
+        (sum, component) => sum + (component.amount || 0),
         0
       );
-      const grossEarnings = Number(
-        (calculations.basicSalary + totalAllowances).toFixed(2)
-      );
-      const totalDeductions = Number(calculations.deductions.total.toFixed(2));
-      const netPay = Number((grossEarnings - totalDeductions).toFixed(2));
 
-      // Create the payroll record with correct structure
-      const payroll = await PayrollModel.create({
-        employee: asObjectId(employee),
-        department: employeeData.department,
-        salaryGrade: asObjectId(salaryGrade),
-        month,
-        year,
-        basicSalary: calculations.basicSalary,
-        components,
-        earnings: {
-          overtime: { hours: 0, rate: 0, amount: 0 },
-          bonus: [],
-          totalEarnings: grossEarnings,
-        },
-        deductions: {
-          tax: {
-            taxableAmount: Number(
-              calculations.deductions.statutory.paye.toFixed(2)
-            ),
-            taxRate: 20, // Set PAYE tax rate (20%)
-            amount: Number(calculations.deductions.statutory.paye.toFixed(2)),
-          },
-          pension: {
-            pensionableAmount: Number(calculations.basicSalary.toFixed(2)),
-            rate: 8, // Set pension rate (8%)
-            amount: Number(
-              calculations.deductions.statutory.pension.toFixed(2)
-            ),
-          },
-          loans: [],
-          others: [],
-          totalDeductions: totalDeductions,
+      // Calculate gross earnings including allowances
+      const grossEarnings = calculations.basicSalary + totalAllowances;
+
+      // Update calculations with correct allowances and totals
+      const payrollData = {
+        ...calculations,
+        components: processedComponents,
+        allowances: {
+          gradeAllowances: processedComponents
+            .filter((comp) => comp.type === "allowance")
+            .map((comp) => ({
+              name: comp.name,
+              amount: comp.amount,
+            })),
+          additionalAllowances: [],
+          totalAllowances,
         },
         totals: {
+          basicSalary: calculations.basicSalary,
+          totalAllowances,
+          totalBonuses: 0,
           grossEarnings,
-          totalDeductions,
-          netPay,
+          totalDeductions: calculations.deductions.totalDeductions,
+          netPay: grossEarnings - calculations.deductions.totalDeductions,
         },
-        status: PayrollStatus.PENDING,
+        processedBy: asObjectId(req.user!.id),
+        createdBy: asObjectId(req.user!.id),
+        updatedBy: asObjectId(req.user!.id),
         approvalFlow: {
           submittedBy: asObjectId(req.user!.id),
           submittedAt: new Date(),
         },
         payment: {
           bankName:
-            employeeData.bankDetails?.bankName ||
-            (employeeData.status === "active"
-              ? "Bank Details Required"
-              : "Pending Employee Onboarding"),
+            calculations.employee.bankDetails?.bankName ||
+            "Bank Details Required",
           accountNumber:
-            employeeData.bankDetails?.accountNumber ||
-            (employeeData.status === "active"
-              ? "Bank Details Required"
-              : "Pending Employee Onboarding"),
+            calculations.employee.bankDetails?.accountNumber ||
+            "Bank Details Required",
           accountName:
-            employeeData.bankDetails?.accountName ||
-            (employeeData.status === "active"
-              ? "Bank Details Required"
-              : "Pending Employee Onboarding"),
+            calculations.employee.bankDetails?.accountName ||
+            "Bank Details Required",
         },
-        processedBy: asObjectId(req.user!.id),
-        createdBy: asObjectId(req.user!.id),
-        updatedBy: asObjectId(req.user!.id),
-      });
+      };
 
-      // Populate and return the created payroll
+      // Create payroll record using the modified data
+      const payroll = await PayrollModel.create(payrollData);
+
+      // Populate and return
       const populatedPayroll = await PayrollModel.findById(
         payroll._id
       ).populate([
@@ -604,7 +592,7 @@ export class SuperAdminController {
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({
         success: false,
-        message,
+        message: "Failed to create payroll record",
         error: error instanceof Error ? error.message : "Unknown error",
       });
     }

@@ -1,4 +1,5 @@
 import { Types } from "mongoose";
+import { IAllowance } from "../models/Allowance.js";
 
 // Unified Status Enums
 export enum PayrollStatus {
@@ -48,13 +49,6 @@ export interface PayPeriodRange {
 }
 
 // Unified Interfaces
-export interface IAllowance {
-  type: AllowanceType;
-  percentage?: number;
-  amount: number;
-  description?: string;
-}
-
 export interface IDeduction {
   type: DeductionType;
   percentage?: number;
@@ -246,8 +240,8 @@ export interface IEmployee {
   firstName: string;
   lastName: string;
   email: string;
-  department: IDepartment | string; // Allow both department object and string
-  gradeLevel: string; // Keep it simple as string since it's just a designation
+  department: IDepartment | string;
+  gradeLevel: string;
   role: string;
   bankDetails?: IBankDetails;
   salary?: number;
@@ -367,4 +361,52 @@ export interface IApprovalFlow {
   rejectedBy?: Types.ObjectId;
   rejectedAt?: Date;
   comments?: string;
+}
+
+// Add or update these interfaces
+export interface IDepartmentFromDB {
+  _id: Types.ObjectId;
+  name: string;
+  code: string;
+}
+
+export interface ISalaryComponent {
+  name: string;
+  type: "allowance" | "deduction";
+  value: number;
+  calculationMethod: "fixed" | "percentage";
+  amount: number;
+  isActive: boolean;
+}
+
+export interface ISalaryGradeDetails {
+  basicSalary: number;
+  components: ISalaryComponent[];
+  totalAllowances: number;
+  grossSalary: number;
+}
+
+interface IDeductionRule {
+  _id: Types.ObjectId;
+  name: string;
+  type: "statutory" | "voluntary";
+  value: number;
+  calculationMethod: "fixed" | "percentage";
+  isActive: boolean;
+}
+
+export interface IAllowanceFilters {
+  active?: boolean;
+  department?: Types.ObjectId;
+  gradeLevel?: string;
+  employee?: Types.ObjectId;
+}
+
+export interface ICalculatedComponent {
+  name: string;
+  type: "allowance" | "deduction";
+  value: number;
+  calculationMethod: "fixed" | "percentage";
+  amount: number;
+  isActive: boolean;
 }

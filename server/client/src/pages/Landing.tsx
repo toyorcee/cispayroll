@@ -167,7 +167,9 @@ function Landing() {
         <div className="relative w-full flex-1 flex items-center justify-center">
           <button
             onClick={() => navigateSlide(-1)}
-            className="absolute left-2 md:left-8 lg:left-20 z-30 p-2 md:p-3 rounded-full bg-white/80 backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300 hover:bg-gray-50 group"
+            className="absolute left-2 md:left-8 lg:left-20 z-30 p-2 md:p-3 rounded-full 
+                     bg-white/80 backdrop-blur-sm shadow-md hover:shadow-lg 
+                     transition-all duration-300 hover:bg-gray-50 group cursor-pointer"
           >
             <ChevronLeftIcon className="h-5 w-5 md:h-6 md:w-6 text-green-600 group-hover:text-green-700" />
           </button>
@@ -247,7 +249,7 @@ function Landing() {
                                bg-green-600 text-white text-sm md:text-base font-medium 
                                hover:bg-green-700 focus:outline-none focus:ring-2 
                                focus:ring-green-500 focus:ring-offset-2 
-                               transition-colors max-w-[160px] md:max-w-[180px]"
+                               transition-colors max-w-[160px] md:max-w-[180px] cursor-pointer"
                     >
                       Enter
                     </button>
@@ -259,7 +261,9 @@ function Landing() {
 
           <button
             onClick={() => navigateSlide(1)}
-            className="absolute right-2 md:right-8 lg:right-20 z-30 p-2 md:p-3 rounded-full bg-white/80 backdrop-blur-sm shadow-md hover:shadow-lg transition-all duration-300 hover:bg-gray-50 group"
+            className="absolute right-2 md:right-8 lg:right-20 z-30 p-2 md:p-3 rounded-full 
+                     bg-white/80 backdrop-blur-sm shadow-md hover:shadow-lg 
+                     transition-all duration-300 hover:bg-gray-50 group cursor-pointer"
           >
             <ChevronRightIcon className="h-5 w-5 md:h-6 md:w-6 text-green-600 group-hover:text-green-700" />
           </button>

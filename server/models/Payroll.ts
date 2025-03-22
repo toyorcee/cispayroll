@@ -6,6 +6,40 @@ export enum PayrollStatus {
   REJECTED = "REJECTED",
 }
 
+export enum PayrollFrequency {
+  WEEKLY = "weekly",
+  BIWEEKLY = "biweekly",
+  MONTHLY = "monthly",
+  QUARTERLY = "quarterly",
+  ANNUAL = "annual",
+}
+
+interface IPayrollAllowances {
+  gradeAllowances: Array<{
+    name: string;
+    type: string;
+    value: number;
+    amount: number;
+  }>;
+  additionalAllowances: Array<{
+    name: string;
+    type: string;
+    value: number;
+    amount: number;
+    frequency: string;
+  }>;
+  totalAllowances: number;
+}
+
+interface IPayrollBonuses {
+  items: Array<{
+    type: string;
+    description: string;
+    amount: number;
+  }>;
+  totalBonuses: number;
+}
+
 export interface IPayroll extends Document {
   employee: Types.ObjectId;
   department: Types.ObjectId;
@@ -53,6 +87,9 @@ export interface IPayroll extends Document {
     totalDeductions: number;
   };
   totals: {
+    basicSalary: number;
+    totalAllowances: number;
+    totalBonuses: number;
     grossEarnings: number;
     totalDeductions: number;
     netPay: number;
@@ -75,6 +112,11 @@ export interface IPayroll extends Document {
   comments?: string;
   createdAt: Date;
   updatedAt: Date;
+  frequency: PayrollFrequency;
+  periodStart: Date;
+  periodEnd: Date;
+  allowances: IPayrollAllowances;
+  bonuses: IPayrollBonuses;
 }
 
 const PayrollSchema = new Schema<IPayroll>(
@@ -156,6 +198,9 @@ const PayrollSchema = new Schema<IPayroll>(
       totalDeductions: { type: Number, required: true },
     },
     totals: {
+      basicSalary: { type: Number, required: true },
+      totalAllowances: { type: Number, required: true },
+      totalBonuses: { type: Number, required: true },
       grossEarnings: { type: Number, required: true },
       totalDeductions: { type: Number, required: true },
       netPay: { type: Number, required: true },
@@ -193,6 +238,50 @@ const PayrollSchema = new Schema<IPayroll>(
       required: true,
     },
     comments: String,
+    frequency: {
+      type: String,
+      enum: Object.values(PayrollFrequency),
+      default: PayrollFrequency.MONTHLY,
+      required: true,
+    },
+    periodStart: {
+      type: Date,
+      required: true,
+    },
+    periodEnd: {
+      type: Date,
+      required: true,
+    },
+    allowances: {
+      gradeAllowances: [
+        {
+          name: { type: String, required: true },
+          type: { type: String, required: true },
+          value: { type: Number, required: true },
+          amount: { type: Number, required: true },
+        },
+      ],
+      additionalAllowances: [
+        {
+          name: { type: String, required: true },
+          type: { type: String, required: true },
+          value: { type: Number, required: true },
+          amount: { type: Number, required: true },
+          frequency: { type: String, required: true },
+        },
+      ],
+      totalAllowances: { type: Number, required: true },
+    },
+    bonuses: {
+      items: [
+        {
+          type: { type: String, required: true },
+          description: { type: String, required: true },
+          amount: { type: Number, required: true },
+        },
+      ],
+      totalBonuses: { type: Number, required: true },
+    },
   },
   {
     timestamps: true,

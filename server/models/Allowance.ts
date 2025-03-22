@@ -1,8 +1,8 @@
 import mongoose, { Schema, Document, Types } from "mongoose";
 
 export enum AllowanceType {
-  PERCENTAGE = "percentage",
   FIXED = "fixed",
+  PERCENTAGE = "percentage",
   PERFORMANCE_BASED = "performance_based",
 }
 
@@ -14,24 +14,25 @@ export enum AllowanceFrequency {
 }
 
 export interface IAllowance extends Document {
+  _id: Types.ObjectId;
   name: string;
   type: AllowanceType;
   value: number;
   frequency: AllowanceFrequency;
   description?: string;
-  taxable: boolean;
+  taxable?: boolean;
+  active?: boolean;
   effectiveDate: Date;
   expiryDate?: Date;
   department?: Types.ObjectId;
   gradeLevel?: string;
-  active: boolean;
   createdBy: Types.ObjectId;
   updatedBy: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const AllowanceSchema = new Schema(
+const AllowanceSchema = new Schema<IAllowance>(
   {
     name: { type: String, required: true },
     type: {

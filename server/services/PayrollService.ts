@@ -7,6 +7,7 @@ import { DeductionService } from "./DeductionService.js";
 import { IEmployee, IDepartment } from "../types/payroll.js";
 import { AllowanceService } from "./AllowanceService.js";
 import { BonusService } from "./BonusService.js";
+import { PayrollStatus, PayrollFrequency } from "../models/Payroll.js";
 
 // Add interface for populated employee
 interface PopulatedEmployee extends Omit<IEmployee, "department"> {
@@ -17,6 +18,20 @@ interface PopulatedEmployee extends Omit<IEmployee, "department"> {
 interface BonusItem {
   amount: number;
   type: string;
+}
+
+// First, add these interfaces at the top of the file
+interface StatutoryDeductions {
+  paye: number;
+  pension: number;
+  nhf: number;
+  total: number;
+}
+
+interface DeductionCalculation {
+  statutory: StatutoryDeductions;
+  voluntary: number;
+  total: number;
 }
 
 export class PayrollService {
@@ -149,7 +164,10 @@ export class PayrollService {
     };
   }
 
-  static async calculateDeductions(basicSalary: number, grossSalary: number) {
+  static async calculateDeductions(
+    basicSalary: number,
+    grossSalary: number
+  ): Promise<DeductionCalculation> {
     console.log("🧮 Calculating deductions for salary:", {
       basicSalary,
       grossSalary,
@@ -159,10 +177,11 @@ export class PayrollService {
     const deductions = await DeductionService.getActiveDeductions();
 
     // Calculate statutory deductions
-    const statutoryDeductions = DeductionService.calculateStatutoryDeductions(
-      basicSalary,
-      grossSalary
-    );
+    const paye = grossSalary * 0.2; // 20% PAYE
+    const pension = basicSalary * 0.08; // 8% Pension
+    const nhf = basicSalary * 0.025; // 2.5% NHF
+
+    const statutoryTotal = paye + pension + nhf;
 
     // Calculate voluntary deductions
     const voluntaryDeductions = deductions.voluntary.reduce(
@@ -178,12 +197,15 @@ export class PayrollService {
       0
     );
 
-    const totalDeductions = statutoryDeductions.total + voluntaryDeductions;
-
     return {
-      statutory: statutoryDeductions,
+      statutory: {
+        paye,
+        pension,
+        nhf,
+        total: statutoryTotal,
+      },
       voluntary: voluntaryDeductions,
-      total: totalDeductions,
+      total: statutoryTotal + voluntaryDeductions,
     };
   }
 
@@ -200,7 +222,10 @@ export class PayrollService {
       year,
     });
 
-    // Get salary components
+    // Get employee details first
+    const employee = await this.validateAndGetEmployee(employeeId);
+
+    // Get salary components - this already has the correct calculation for allowances
     const salaryDetails = await this.calculateSalaryComponents(salaryGradeId);
 
     // Calculate deductions
@@ -209,8 +234,10 @@ export class PayrollService {
       salaryDetails.grossSalary
     );
 
-    // Get approved bonuses for this period
+    // Get period dates
     const { startDate, endDate } = this.calculatePayPeriod(month, year);
+
+    // Get bonuses - keeping your existing bonus calculation
     let bonusAmount = 0;
     let bonusItems: BonusItem[] = [];
 
@@ -233,21 +260,79 @@ export class PayrollService {
       bonusAmount = bonusItems.reduce((sum, bonus) => sum + bonus.amount, 0);
     } catch (error) {
       console.error("Error fetching bonuses:", error);
-      // Continue without bonuses if there's an error
     }
 
-    // Calculate final salaries including bonuses
+    // Calculate final amounts
     const grossSalary = salaryDetails.grossSalary + bonusAmount;
     const netSalary = grossSalary - deductionDetails.total;
 
+    // Return the complete payroll object matching your model structure
     return {
+      employee,
+      department:
+        typeof employee.department === "string"
+          ? new Types.ObjectId(employee.department)
+          : employee.department._id,
+      salaryGrade: salaryGradeId,
+      month,
+      year,
+      periodStart: startDate,
+      periodEnd: endDate,
       basicSalary: salaryDetails.basicSalary,
       components: salaryDetails.components,
-      grossSalary,
-      deductions: deductionDetails,
-      netSalary,
-      bonuses: bonusItems,
-      totalBonuses: bonusAmount,
+      allowances: {
+        gradeAllowances: salaryDetails.components
+          .filter((c) => c.type === "allowance" && c.isActive)
+          .map((c) => ({
+            name: c.name,
+            type: c.type,
+            value: c.value,
+            amount:
+              c.calculationMethod === "percentage"
+                ? (salaryDetails.basicSalary * c.value) / 100
+                : c.value,
+          })),
+        additionalAllowances: salaryDetails.additionalAllowances,
+        totalAllowances: salaryDetails.totalAllowances,
+      },
+      bonuses: {
+        items: bonusItems.map((bonus) => ({
+          type: bonus.type,
+          description: bonus.type, // Using type as description if none provided
+          amount: bonus.amount,
+        })),
+        totalBonuses: bonusAmount,
+      },
+      earnings: {
+        overtime: { hours: 0, rate: 0, amount: 0 },
+        bonus: bonusItems,
+        totalEarnings: grossSalary,
+      },
+      deductions: {
+        tax: {
+          taxableAmount: grossSalary,
+          taxRate: 20,
+          amount: deductionDetails.statutory.paye,
+        },
+        pension: {
+          pensionableAmount: salaryDetails.basicSalary,
+          rate: 8,
+          amount: deductionDetails.statutory.pension,
+        },
+        loans: [],
+        others: [],
+        totalDeductions: deductionDetails.total,
+      },
+      totals: {
+        basicSalary: salaryDetails.basicSalary,
+        totalAllowances: salaryDetails.totalAllowances,
+        totalBonuses: bonusAmount,
+        grossEarnings: grossSalary,
+        totalDeductions: deductionDetails.total,
+        netPay: netSalary,
+      },
+      status: PayrollStatus.PENDING,
+      frequency: PayrollFrequency.MONTHLY,
     };
   }
 }

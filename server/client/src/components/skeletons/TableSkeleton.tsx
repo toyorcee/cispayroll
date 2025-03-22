@@ -1,5 +1,4 @@
 import {
-  BaseSkeleton,
   SkeletonBox,
   SkeletonText,
   SkeletonCircle,

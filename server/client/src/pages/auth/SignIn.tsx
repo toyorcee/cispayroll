@@ -1,6 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FaBuilding } from "react-icons/fa";
 import {
   TbCurrencyDollar,
   TbCurrencyEuro,
@@ -14,6 +13,34 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { useState } from "react";
 import { toast } from "react-toastify";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
+
+const PeopleMaxIcon = () => (
+  <svg
+    width="32"
+    height="32"
+    viewBox="0 0 512 512"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className="h-8 w-8"
+  >
+    <rect
+      width="512"
+      height="512"
+      rx="100"
+      fill="currentColor"
+      className="text-green-600"
+    />
+    <path
+      d="M156 256C156 238.327 170.327 224 188 224H324C341.673 224 356 238.327 356 256V352C356 369.673 341.673 384 324 384H188C170.327 384 156 369.673 156 352V256Z"
+      fill="white"
+    />
+    <path
+      d="M256 128C282.51 128 304 149.49 304 176C304 202.51 282.51 224 256 224C229.49 224 208 202.51 208 176C208 149.49 229.49 128 256 128Z"
+      fill="white"
+    />
+  </svg>
+);
 
 export default function SignIn() {
   const { signIn, googleSignIn } = useAuth();
@@ -21,6 +48,7 @@ export default function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const currencies = [
     TbCurrencyDollar,
@@ -132,7 +160,7 @@ export default function SignIn() {
             to="/"
             className="inline-flex justify-center items-center gap-2"
           >
-            <FaBuilding className="h-8 w-8 text-green-600" />
+            <PeopleMaxIcon />
             <span className="text-2xl font-bold text-gray-900">PeopleMAX</span>
           </Link>
 
@@ -177,18 +205,29 @@ export default function SignIn() {
                 >
                   Password
                 </label>
-                <div className="mt-1">
+                <div className="mt-1 relative">
                   <input
                     id="password"
                     name="password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-green-500 focus:outline-none focus:ring-green-500"
+                    className="block w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-green-500 focus:outline-none focus:ring-green-500 pr-10"
                     placeholder="Enter your password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 cursor-pointer"
+                  >
+                    {showPassword ? (
+                      <FaEyeSlash className="h-5 w-5" />
+                    ) : (
+                      <FaEye className="h-5 w-5" />
+                    )}
+                  </button>
                 </div>
               </div>
 
@@ -225,7 +264,7 @@ export default function SignIn() {
                   className="w-full flex justify-center py-2 px-4 rounded-lg border border-transparent 
                            !bg-green-600 !text-white font-medium hover:!bg-green-700 
                            focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 
-                           transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                           transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {loading ? "Signing in..." : "Sign in"}
                 </button>

@@ -6,14 +6,25 @@ import { employeeService } from "../../../services/employeeService";
 
 interface Bonus {
   id: string;
-  type: "performance" | "thirteenthMonth" | "other";
+  employee: string;
+  type: BonusType;
   amount: number;
-  description: string;
-  status: "pending" | "approved" | "paid";
-  employeeName: string;
-  department: string;
-  date: string;
+  description?: string;
+  paymentDate: Date;
+  approvalStatus: "pending" | "approved" | "rejected";
+  department?: string;
+  taxable: boolean;
 }
+
+// Add bonus type options
+const bonusTypeOptions = [
+  { value: "performance", label: "Performance Bonus" },
+  { value: "thirteenth_month", label: "13th Month" },
+  { value: "special", label: "Special Bonus" },
+  { value: "achievement", label: "Achievement Bonus" },
+  { value: "retention", label: "Retention Bonus" },
+  { value: "project", label: "Project Bonus" },
+];
 
 export default function BonusManagement() {
   const [bonuses, setBonuses] = useState<Bonus[]>([]);
