@@ -311,4 +311,66 @@ router.delete(
   SuperAdminController.deleteDeduction as unknown as RequestHandler
 );
 
+// Allowance Routes
+router.post(
+  "/allowances",
+  requirePermission([Permission.MANAGE_ALLOWANCES]),
+  SuperAdminController.createAllowance as unknown as RequestHandler
+);
+
+router.get(
+  "/allowances",
+  requirePermission([Permission.VIEW_ALLOWANCES]),
+  SuperAdminController.getAllAllowances as unknown as RequestHandler
+);
+
+router.patch(
+  "/allowances/:id",
+  requirePermission([Permission.EDIT_ALLOWANCES]),
+  SuperAdminController.updateAllowance as unknown as RequestHandler
+);
+
+router.patch(
+  "/allowances/:id/toggle",
+  requirePermission([Permission.MANAGE_ALLOWANCES]),
+  SuperAdminController.toggleAllowanceStatus as unknown as RequestHandler
+);
+
+router.delete(
+  "/allowances/:id",
+  requirePermission([Permission.MANAGE_ALLOWANCES]),
+  SuperAdminController.deleteAllowance as unknown as RequestHandler
+);
+
+// Bonus Routes
+router.post(
+  "/bonuses",
+  requirePermission([Permission.MANAGE_BONUSES]),
+  SuperAdminController.createBonus as unknown as RequestHandler
+);
+
+router.get(
+  "/bonuses",
+  requirePermission([Permission.VIEW_BONUSES]),
+  SuperAdminController.getAllBonuses as unknown as RequestHandler
+);
+
+router.patch(
+  "/bonuses/:id",
+  requirePermission([Permission.EDIT_BONUSES]),
+  SuperAdminController.updateBonus as unknown as RequestHandler
+);
+
+router.patch(
+  "/bonuses/:id/approve",
+  requirePermission([Permission.MANAGE_BONUSES]),
+  SuperAdminController.approveBonus as unknown as RequestHandler
+);
+
+router.delete(
+  "/bonuses/:id",
+  requirePermission([Permission.MANAGE_BONUSES]),
+  SuperAdminController.deleteBonus as unknown as RequestHandler
+);
+
 export default router;

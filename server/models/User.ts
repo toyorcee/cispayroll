@@ -100,6 +100,13 @@ export enum Permission {
   EDIT_PERSONAL_INFO = "EDIT_PERSONAL_INFO",
 }
 
+// Add with other enums at the top (after UserRole and Permission)
+export enum OnboardingStatus {
+  NOT_STARTED = "not_started",
+  IN_PROGRESS = "in_progress",
+  COMPLETED = "completed",
+}
+
 // Add these interfaces at the top with your other interfaces
 interface OffboardingChecklist {
   exitInterview: boolean;
@@ -117,6 +124,21 @@ interface Offboarding {
   completedAt?: Date;
   completedBy?: Types.ObjectId;
   progress: number;
+}
+
+// Add after the OffboardingChecklist interface
+interface OnboardingTask {
+  name: string;
+  completed: boolean;
+  completedAt?: Date;
+}
+
+interface Onboarding {
+  status: OnboardingStatus;
+  tasks: OnboardingTask[];
+  progress: number;
+  startedAt?: Date;
+  completedAt?: Date;
 }
 
 // Base interface for user properties
@@ -162,6 +184,7 @@ export interface IUser {
   invitationExpires?: Date;
   createdBy?: Types.ObjectId;
   offboarding?: Offboarding;
+  onboarding?: Onboarding;
 }
 
 // Interface for user methods
@@ -213,6 +236,7 @@ export interface UserDocument extends mongoose.Document {
   invitationExpires?: Date;
   createdBy?: Types.ObjectId;
   offboarding?: Offboarding;
+  onboarding?: Onboarding;
   hasPermission(permission: Permission): boolean;
   hasRole(role: UserRole): boolean;
 }
@@ -394,6 +418,32 @@ const UserSchema = new Schema<UserDocument, UserModel>(
       completedAt: Date,
       completedBy: { type: Schema.Types.ObjectId, ref: "User" },
       progress: { type: Number, default: 0 },
+    },
+    onboarding: {
+      status: {
+        type: String,
+        enum: Object.values(OnboardingStatus),
+        default: OnboardingStatus.NOT_STARTED,
+      },
+      tasks: [
+        {
+          name: {
+            type: String,
+            required: true,
+          },
+          completed: {
+            type: Boolean,
+            default: false,
+          },
+          completedAt: Date,
+        },
+      ],
+      progress: {
+        type: Number,
+        default: 0,
+      },
+      startedAt: Date,
+      completedAt: Date,
     },
   },
   {

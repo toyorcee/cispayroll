@@ -9,13 +9,13 @@ import { generateInvitationToken } from "../utils/tokenUtils.js";
 import { EmailService } from "./emailService.js";
 
 interface CreateEmployeeData {
-  // Required fields only
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
   position: string;
   department?: Types.ObjectId | string;
+  role?: UserRole;
 }
 
 interface EmployeeCreator {
@@ -47,8 +47,8 @@ export class EmployeeService {
         throw new ApiError(400, "Email already registered");
       }
 
-      // Generate employee ID and invitation token
-      const employeeId = await this.generateEmployeeId();
+      // Generate employee/admin ID based on role
+      const employeeId = await this.generateId(data.role || UserRole.USER);
       const invitationToken = generateInvitationToken();
       const invitationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -56,7 +56,7 @@ export class EmployeeService {
       const employeeData = {
         ...data,
         employeeId,
-        role: UserRole.USER,
+        role: data.role || UserRole.USER,
         status: "pending",
         isEmailVerified: false,
         invitationToken,
@@ -67,7 +67,6 @@ export class EmployeeService {
           creator.role === UserRole.ADMIN
             ? creator.department
             : data.department,
-        // Don't include password, bankDetails, or emergencyContact here
       };
 
       const employee = await UserModel.create(employeeData);
@@ -85,24 +84,28 @@ export class EmployeeService {
     }
   }
 
-  private static async generateEmployeeId(): Promise<string> {
+  private static async generateId(role: UserRole): Promise<string> {
     const date = new Date();
-    const year = date.getFullYear().toString().slice(-2);
+    const day = date.getDate().toString().padStart(2, "0");
     const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const prefix = role === UserRole.ADMIN ? "ADM" : "EMP";
 
-    // Get the latest employee ID for this month
-    const latestEmployee = await UserModel.findOne(
-      { employeeId: new RegExp(`^EMP${year}${month}`) },
-      { employeeId: 1 }
-    ).sort({ employeeId: -1 });
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
 
-    let sequence = "001";
-    if (latestEmployee?.employeeId) {
-      const currentSequence = parseInt(latestEmployee.employeeId.slice(-3));
-      sequence = (currentSequence + 1).toString().padStart(3, "0");
-    }
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
 
-    return `EMP${year}${month}${sequence}`;
+    const todayCount = await UserModel.countDocuments({
+      role: role,
+      createdAt: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
+    });
+
+    const sequence = (todayCount + 1).toString().padStart(3, "0");
+    return `${prefix}${day}${month}${sequence}`;
   }
 
   private static formatEmployeeResponse(employee: UserDocument) {
@@ -115,6 +118,7 @@ export class EmployeeService {
       position: employee.position,
       department: employee.department?.toString(),
       status: employee.status,
+      role: employee.role,
     };
   }
 

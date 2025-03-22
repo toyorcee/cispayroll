@@ -64,7 +64,7 @@ export class EmailService {
           </p>
 
           <p style="color: #5f6368; font-size: 12px; text-align: center;">
-            If you didn't expect this invitation, please contact HR immediately.
+            If you didn't expect this invitation, please ignore or contact HR immediately.
           </p>
         </div>
       `,

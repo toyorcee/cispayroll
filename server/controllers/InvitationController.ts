@@ -3,6 +3,7 @@ import UserModel from "../models/User.js";
 import bcrypt from "bcryptjs";
 import { handleError, ApiError } from "../utils/errorHandler.js";
 import jwt from "jsonwebtoken";
+import { OnboardingStatus } from "../models/User.js";
 
 // Define a custom Request type that extends Express.Request
 interface CompleteRegistrationRequest extends Request {
@@ -101,6 +102,35 @@ export class InvitationController {
       if (profileImage) {
         user.profileImage = profileImage;
       }
+
+      // Initialize onboarding when user becomes active
+      user.onboarding = {
+        status: OnboardingStatus.NOT_STARTED,
+        tasks: [
+          {
+            name: "Welcome Meeting",
+            completed: false,
+          },
+          {
+            name: "Department Introduction",
+            completed: false,
+          },
+          {
+            name: "System Access Setup",
+            completed: false,
+          },
+          {
+            name: "Policy Documentation Review",
+            completed: false,
+          },
+          {
+            name: "Initial Training Session",
+            completed: false,
+          },
+        ],
+        progress: 0,
+        startedAt: new Date(),
+      };
 
       user.invitationToken = undefined;
       user.invitationExpires = undefined;

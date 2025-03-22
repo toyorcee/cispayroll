@@ -17,6 +17,7 @@ import adminRoutes from "./routes/adminRoutes.js";
 import regularUserRoutes from "./routes/regularUserRoutes.js";
 import employeeRoutes from "./routes/employeeRoutes.js";
 import invitationRoutes from "./routes/invitationRoutes.js";
+import onboardingRoutes from "./routes/onboardingRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -96,7 +97,7 @@ app.use(
   cors({
     credentials: true,
     origin: process.env.CLIENT_URL || "http://localhost:5173",
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"], 
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
@@ -123,6 +124,7 @@ app.use("/api/leave", routeErrorWrapper(leaveRoutes));
 app.use("/api/users", routeErrorWrapper(regularUserRoutes));
 app.use("/api/employees", routeErrorWrapper(employeeRoutes));
 app.use("/api/invitation", routeErrorWrapper(invitationRoutes));
+app.use("/api/onboarding", routeErrorWrapper(onboardingRoutes));
 
 // Enhanced health check
 app.get("/api/health", (_req: Request, res: Response) => {

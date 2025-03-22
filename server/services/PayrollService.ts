@@ -5,10 +5,18 @@ import PayrollModel from "../models/Payroll.js";
 import SalaryGrade from "../models/SalaryStructure.js";
 import { DeductionService } from "./DeductionService.js";
 import { IEmployee, IDepartment } from "../types/payroll.js";
+import { AllowanceService } from "./AllowanceService.js";
+import { BonusService } from "./BonusService.js";
 
 // Add interface for populated employee
 interface PopulatedEmployee extends Omit<IEmployee, "department"> {
   department: IDepartment;
+}
+
+// Add this interface at the top with other interfaces
+interface BonusItem {
+  amount: number;
+  type: string;
 }
 
 export class PayrollService {
@@ -88,8 +96,8 @@ export class PayrollService {
       throw new ApiError(404, "Salary grade not found");
     }
 
-    // Calculate total allowances from components
-    const totalAllowances = salaryGrade.components.reduce(
+    // Calculate built-in allowances from components
+    const totalComponentAllowances = salaryGrade.components.reduce(
       (total, component) => {
         if (component.isActive && component.type === "allowance") {
           const amount =
@@ -103,6 +111,32 @@ export class PayrollService {
       0
     );
 
+    // Get additional allowances from AllowanceService
+    const additionalAllowances = await AllowanceService.getAllAllowances({
+      active: true,
+      gradeLevel: salaryGrade.level.toString(),
+    });
+
+    // Calculate additional allowance amounts
+    const additionalAllowanceDetails = additionalAllowances.map(
+      (allowance) => ({
+        name: allowance.name,
+        amount: AllowanceService.calculateAllowanceAmount(
+          salaryGrade.basicSalary,
+          allowance
+        ),
+      })
+    );
+
+    const totalAdditionalAllowances = additionalAllowanceDetails.reduce(
+      (sum, a) => sum + a.amount,
+      0
+    );
+
+    // Total all allowances
+    const totalAllowances =
+      totalComponentAllowances + totalAdditionalAllowances;
+
     // Gross salary is basic salary plus all allowances
     const grossSalary = salaryGrade.basicSalary + totalAllowances;
 
@@ -111,6 +145,7 @@ export class PayrollService {
       totalAllowances,
       grossSalary,
       components: salaryGrade.components,
+      additionalAllowances: additionalAllowanceDetails,
     };
   }
 
@@ -174,15 +209,45 @@ export class PayrollService {
       salaryDetails.grossSalary
     );
 
-    // Calculate net salary
-    const netSalary = salaryDetails.grossSalary - deductionDetails.total;
+    // Get approved bonuses for this period
+    const { startDate, endDate } = this.calculatePayPeriod(month, year);
+    let bonusAmount = 0;
+    let bonusItems: BonusItem[] = [];
+
+    try {
+      const bonuses = await BonusService.getAllBonuses({
+        employee: employeeId,
+        approvalStatus: "approved",
+      });
+
+      bonusItems = bonuses
+        .filter((bonus) => {
+          const bonusDate = new Date(bonus.createdAt);
+          return bonusDate >= startDate && bonusDate <= endDate;
+        })
+        .map((bonus) => ({
+          amount: bonus.amount,
+          type: bonus.type,
+        }));
+
+      bonusAmount = bonusItems.reduce((sum, bonus) => sum + bonus.amount, 0);
+    } catch (error) {
+      console.error("Error fetching bonuses:", error);
+      // Continue without bonuses if there's an error
+    }
+
+    // Calculate final salaries including bonuses
+    const grossSalary = salaryDetails.grossSalary + bonusAmount;
+    const netSalary = grossSalary - deductionDetails.total;
 
     return {
       basicSalary: salaryDetails.basicSalary,
       components: salaryDetails.components,
-      grossSalary: salaryDetails.grossSalary,
+      grossSalary,
       deductions: deductionDetails,
-      netSalary: netSalary,
+      netSalary,
+      bonuses: bonusItems,
+      totalBonuses: bonusAmount,
     };
   }
 }

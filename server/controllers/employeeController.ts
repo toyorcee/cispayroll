@@ -7,6 +7,7 @@ import UserModel from "../models/User.js";
 import PayrollModel from "../models/Payroll.js";
 import LeaveModel, { LeaveStatus } from "../models/Leave.js";
 import { Multer } from "multer";
+import { UserRole } from "../models/User.js";
 
 export interface AuthenticatedRequestWithFile extends AuthenticatedRequest {
   file?: Express.Multer.File;
@@ -20,6 +21,13 @@ export class EmployeeController {
     next: NextFunction
   ) {
     try {
+      const { role = UserRole.USER, ...employeeData } = req.body;
+
+      // Validate role creation permissions
+      if (role === UserRole.ADMIN && req.user.role !== UserRole.SUPER_ADMIN) {
+        throw new ApiError(403, "Only super admins can create admin accounts");
+      }
+
       const creator = {
         _id: new Types.ObjectId(req.user.id),
         role: req.user.role,
@@ -28,12 +36,21 @@ export class EmployeeController {
           : undefined,
       };
 
+      // Pass the role to the service
       const { employee, invitationToken } =
-        await EmployeeService.createEmployee(req.body, creator);
+        await EmployeeService.createEmployee(
+          { ...employeeData, role },
+          creator
+        );
+
+      // Customize message based on role
+      const message = `${
+        role === UserRole.ADMIN ? "Admin" : "Employee"
+      } created successfully. Invitation sent.`;
 
       res.status(201).json({
         success: true,
-        message: "Employee created successfully. Invitation sent.",
+        message,
         employee,
       });
     } catch (error) {

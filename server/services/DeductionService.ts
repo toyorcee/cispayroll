@@ -3,6 +3,7 @@ import Deduction, {
   DeductionType,
   CalculationMethod,
   TaxBracket,
+  IDeduction,
 } from "../models/Deduction.js";
 import { ApiError } from "../utils/errorHandler.js";
 
@@ -110,24 +111,62 @@ export class DeductionService {
   // Create a voluntary deduction
   static async createVoluntaryDeduction(
     userId: Types.ObjectId,
-    deductionData: {
+    data: {
       name: string;
-      description: string;
+      description?: string;
       calculationMethod: CalculationMethod;
       value: number;
       effectiveDate?: Date;
     }
-  ) {
+  ): Promise<IDeduction> {
     try {
-      const voluntaryDeduction = await Deduction.create({
-        ...deductionData,
+      console.log("🔄 Service: Creating voluntary deduction");
+      console.log("👤 User ID:", userId);
+      console.log("📝 Deduction data:", data);
+
+      // Validate the data
+      if (!data.name || !data.calculationMethod || data.value === undefined) {
+        console.log("❌ Service: Validation failed - missing required fields");
+        throw new ApiError(400, "Missing required fields");
+      }
+
+      // Create the deduction
+      const deductionData = {
+        name: data.name,
         type: DeductionType.VOLUNTARY,
+        description: data.description,
+        calculationMethod: data.calculationMethod,
+        value: data.value,
+        effectiveDate: data.effectiveDate || new Date(),
+        isActive: true,
         createdBy: userId,
         updatedBy: userId,
+      };
+
+      console.log("📦 Service: Prepared deduction data:", deductionData);
+
+      const deduction = await Deduction.create(deductionData);
+      console.log("✅ Service: Deduction created:", deduction);
+
+      return deduction;
+    } catch (error: any) {
+      console.error("❌ Service Error details:", {
+        name: error.name,
+        message: error.message,
+        code: error.code,
+        stack: error.stack,
       });
-      return voluntaryDeduction;
-    } catch (error) {
-      throw new ApiError(500, "Failed to create voluntary deduction");
+
+      if (error.code === 11000) {
+        throw new ApiError(400, "A deduction with this name already exists");
+      }
+
+      console.error("Full error object:", error);
+
+      throw new ApiError(
+        500,
+        `Failed to create voluntary deduction: ${error.message}`
+      );
     }
   }
 
@@ -213,6 +252,94 @@ export class DeductionService {
       });
     } catch (error) {
       throw new ApiError(500, "Failed to create common voluntary deductions");
+    }
+  }
+
+  static async toggleDeductionStatus(
+    deductionId: Types.ObjectId,
+    userId: Types.ObjectId
+  ): Promise<{
+    deduction: IDeduction;
+    allDeductions: {
+      statutory: IDeduction[];
+      voluntary: IDeduction[];
+    };
+  }> {
+    try {
+      console.log("🔄 Toggling deduction status for:", deductionId);
+
+      // Toggle the status
+      const deduction = await Deduction.findOneAndUpdate(
+        { _id: deductionId },
+        [
+          {
+            $set: {
+              isActive: { $not: "$isActive" },
+              updatedBy: userId,
+            },
+          },
+        ],
+        { new: true }
+      );
+
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found");
+      }
+
+      // Fetch all deductions after toggle
+      const allDeductions = await Deduction.find();
+
+      const result = {
+        deduction,
+        allDeductions: {
+          statutory: allDeductions.filter(
+            (d) => d.type === DeductionType.STATUTORY
+          ),
+          voluntary: allDeductions.filter(
+            (d) => d.type === DeductionType.VOLUNTARY
+          ),
+        },
+      };
+
+      console.log("✅ Toggle complete with all deductions:", {
+        toggledId: deduction._id,
+        newStatus: deduction.isActive,
+        totalDeductions: allDeductions.length,
+      });
+
+      return result;
+    } catch (error: any) {
+      console.error("❌ Toggle status failed:", error);
+      throw new ApiError(
+        500,
+        `Failed to toggle deduction status: ${error.message}`
+      );
+    }
+  }
+
+  static async getAllDeductions(): Promise<{
+    statutory: IDeduction[];
+    voluntary: IDeduction[];
+  }> {
+    try {
+      console.log("📥 Fetching all deductions (active and inactive)");
+
+      const deductions = await Deduction.find();
+
+      const result = {
+        statutory: deductions.filter((d) => d.type === DeductionType.STATUTORY),
+        voluntary: deductions.filter((d) => d.type === DeductionType.VOLUNTARY),
+      };
+
+      console.log("✅ Deductions fetched:", {
+        statutoryCount: result.statutory.length,
+        voluntaryCount: result.voluntary.length,
+      });
+
+      return result;
+    } catch (error) {
+      console.error("❌ Failed to fetch deductions:", error);
+      throw new ApiError(500, "Failed to fetch deductions");
     }
   }
 }

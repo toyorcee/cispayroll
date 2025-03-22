@@ -15,6 +15,14 @@ import mongoose from "mongoose";
 import { PayPeriod } from "../types/payroll.js";
 import { DeductionService } from "../services/DeductionService.js";
 import Deduction from "../models/Deduction.js";
+import { DepartmentService } from "../services/departmentService.js";
+import { AllowanceService } from "../services/AllowanceService.js";
+import { BonusService } from "../services/BonusService.js";
+import Bonus, { BonusType } from "../models/Bonus.js";
+import Allowance, {
+  AllowanceType,
+  AllowanceFrequency,
+} from "../models/Allowance.js";
 
 interface PayrollAllowances {
   housing: number;
@@ -30,7 +38,8 @@ interface PayrollDeductions {
   other: number;
 }
 
-// Add type assertion helper
+// For the mongooseUtils error, let's move the asObjectId helper directly into the controller
+// Remove the import for mongooseUtils and keep the helper here
 const asObjectId = (id: string): Types.ObjectId => new Types.ObjectId(id);
 
 export class SuperAdminController {
@@ -403,125 +412,27 @@ export class SuperAdminController {
   // ===== Department Management =====
   static async getAllDepartments(req: AuthenticatedRequest, res: Response) {
     try {
-      console.log("🔍 Fetching all departments");
-      // Get all active departments with populated headOfDepartment
-      const departments = await DepartmentModel.find({ status: "active" })
-        .populate("headOfDepartment", "firstName lastName email")
-        .lean();
-
-      // Get employee count for each department - including ALL employee types
-      const departmentsWithCounts = await Promise.all(
-        departments.map(async (dept) => {
-          // Count all employees in department (including super admins)
-          const totalCount = await UserModel.countDocuments({
-            department: dept.name,
-            $or: [
-              { status: { $ne: "archived" } },
-              { status: { $exists: false } },
-            ],
-          });
-
-          // Get role-specific counts
-          const [adminCount, userCount] = await Promise.all([
-            UserModel.countDocuments({
-              department: dept.name,
-              role: UserRole.ADMIN,
-              $or: [
-                { status: { $ne: "archived" } },
-                { status: { $exists: false } },
-              ],
-            }),
-            UserModel.countDocuments({
-              department: dept.name,
-              role: UserRole.USER,
-              $or: [
-                { status: { $ne: "archived" } },
-                { status: { $exists: false } },
-              ],
-            }),
-          ]);
-
-          return {
-            _id: dept._id,
-            name: dept.name,
-            code: dept.code,
-            headOfDepartment: dept.headOfDepartment,
-            employeeCounts: {
-              total: totalCount,
-              admins: adminCount,
-              regularUsers: userCount,
-            },
-          };
-        })
-      );
-
-      // Get overall employee counts directly here instead of using getEmployeeCounts
-      const [superAdmins, admins, regularUsers] = await Promise.all([
-        UserModel.countDocuments({ role: UserRole.SUPER_ADMIN }),
-        UserModel.countDocuments({ role: UserRole.ADMIN }),
-        UserModel.countDocuments({ role: UserRole.USER }),
-      ]);
-
-      const totalCounts = {
-        superAdmins,
-        admins,
-        regularUsers,
-        total: superAdmins + admins + regularUsers,
-      };
-
-      console.log(
-        `📋 Found ${departments.length} departments with counts:`,
-        departmentsWithCounts
-      );
-      console.log("📊 Total employee counts:", totalCounts);
-
+      const departments = await DepartmentService.getAllDepartments();
       res.status(200).json({
         success: true,
-        data: {
-          departments: departmentsWithCounts,
-          totalCounts,
-        },
+        data: { departments },
       });
     } catch (error) {
-      console.error("❌ Error fetching departments:", error);
       const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({
-        success: false,
-        message: message || "Failed to fetch departments",
-      });
+      res.status(statusCode).json({ success: false, message });
     }
   }
 
-  static async createDepartment(
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) {
+  static async createDepartment(req: AuthenticatedRequest, res: Response) {
     try {
-      const headOfDept = await UserModel.findById(req.body.headOfDepartment);
-      if (!headOfDept || headOfDept.role !== UserRole.ADMIN) {
-        throw new ApiError(
-          400,
-          "Invalid head of department. Must be an existing admin."
-        );
-      }
-
-      const department = await DepartmentModel.create({
-        ...req.body,
-        createdBy: req.user.id,
-        updatedBy: req.user.id,
-        status: DepartmentStatus.ACTIVE,
-      });
-
-      await department.populate([
-        { path: "headOfDepartment", select: "firstName lastName email" },
-        { path: "createdBy", select: "firstName lastName" },
-      ]);
-
+      const department = await DepartmentService.createDepartment(
+        req.body,
+        req.user.id
+      );
       res.status(201).json({
         success: true,
         message: "Department created successfully",
-        department,
+        data: department,
       });
     } catch (error) {
       const { statusCode, message } = handleError(error);
@@ -529,43 +440,17 @@ export class SuperAdminController {
     }
   }
 
-  static async updateDepartment(
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) {
+  static async updateDepartment(req: AuthenticatedRequest, res: Response) {
     try {
-      if (req.body.headOfDepartment) {
-        const newHead = await UserModel.findById(req.body.headOfDepartment);
-        if (!newHead || newHead.role !== UserRole.ADMIN) {
-          throw new ApiError(
-            400,
-            "Invalid head of department. Must be an existing admin."
-          );
-        }
-      }
-
-      const department = await DepartmentModel.findByIdAndUpdate(
+      const department = await DepartmentService.updateDepartment(
         req.params.id,
-        {
-          ...req.body,
-          updatedBy: req.user.id,
-        },
-        { new: true, runValidators: true }
-      ).populate([
-        { path: "headOfDepartment", select: "firstName lastName email" },
-        { path: "createdBy", select: "firstName lastName" },
-        { path: "updatedBy", select: "firstName lastName" },
-      ]);
-
-      if (!department) {
-        throw new ApiError(404, "Department not found");
-      }
-
+        req.body,
+        req.user.id
+      );
       res.status(200).json({
         success: true,
         message: "Department updated successfully",
-        department,
+        data: department,
       });
     } catch (error) {
       const { statusCode, message } = handleError(error);
@@ -573,31 +458,9 @@ export class SuperAdminController {
     }
   }
 
-  static async deleteDepartment(
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) {
+  static async deleteDepartment(req: AuthenticatedRequest, res: Response) {
     try {
-      const department = await DepartmentModel.findById(req.params.id);
-
-      if (!department) {
-        throw new ApiError(404, "Department not found");
-      }
-
-      const employeeCount = await UserModel.countDocuments({
-        department: department._id,
-      });
-
-      if (employeeCount > 0) {
-        throw new ApiError(
-          400,
-          "Cannot delete department with existing employees"
-        );
-      }
-
-      await department.deleteOne();
-
+      await DepartmentService.deleteDepartment(req.params.id);
       res.status(200).json({
         success: true,
         message: "Department deleted successfully",
@@ -1469,20 +1332,34 @@ export class SuperAdminController {
     res: Response
   ) {
     try {
-      console.log("📝 Creating voluntary deduction:", req.body);
+      // Validate request body
+      if (
+        !req.body.name ||
+        !req.body.calculationMethod ||
+        req.body.value === undefined
+      ) {
+        console.log("❌ Validation failed: Missing required fields");
+        throw new Error("Missing required fields");
+      }
+
+      const userId = asObjectId(req.user.id);
+      console.log("🔑 Converted user ID:", userId);
+
+      const deductionData = {
+        name: req.body.name,
+        description: req.body.description,
+        calculationMethod: req.body.calculationMethod,
+        value: req.body.value,
+        effectiveDate: req.body.effectiveDate || new Date(),
+      };
+      console.log("📝 Prepared deduction data:", deductionData);
 
       const deduction = await DeductionService.createVoluntaryDeduction(
-        asObjectId(req.user.id),
-        {
-          name: req.body.name,
-          description: req.body.description,
-          calculationMethod: req.body.calculationMethod,
-          value: req.body.value,
-          effectiveDate: req.body.effectiveDate || new Date(),
-        }
+        userId,
+        deductionData
       );
 
-      console.log("✅ Voluntary deduction created:", deduction);
+      console.log("✅ Deduction created successfully:", deduction);
 
       res.status(201).json({
         success: true,
@@ -1490,7 +1367,11 @@ export class SuperAdminController {
         data: deduction,
       });
     } catch (error) {
-      console.error("❌ Error creating voluntary deduction:", error);
+      console.error("❌ Error in controller:", error);
+      console.error(
+        "Stack trace:",
+        error instanceof Error ? error.stack : "No stack trace"
+      );
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
     }
@@ -1546,35 +1427,22 @@ export class SuperAdminController {
 
   static async toggleDeductionStatus(req: AuthenticatedRequest, res: Response) {
     try {
-      console.log("🔄 Toggling deduction status for:", req.params.id);
+      const { id } = req.params;
 
-      const deduction = await Deduction.findById(req.params.id);
-      if (!deduction) {
-        throw new ApiError(404, "Deduction not found");
-      }
-
-      // Don't allow disabling statutory deductions
-      if (deduction.type === "statutory") {
-        throw new ApiError(400, "Cannot disable statutory deductions");
-      }
-
-      // Toggle the isActive status
-      deduction.isActive = !deduction.isActive;
-      deduction.updatedBy = asObjectId(req.user.id);
-      await deduction.save();
-
-      console.log(
-        `✅ Deduction ${
-          deduction.isActive ? "activated" : "deactivated"
-        } successfully`
+      const result = await DeductionService.toggleDeductionStatus(
+        asObjectId(id),
+        asObjectId(req.user.id)
       );
 
-      res.status(200).json({
+      res.json({
         success: true,
         message: `Deduction ${
-          deduction.isActive ? "activated" : "deactivated"
+          result.deduction.isActive ? "activated" : "deactivated"
         } successfully`,
-        data: deduction,
+        data: {
+          deduction: result.deduction,
+          allDeductions: result.allDeductions,
+        },
       });
     } catch (error) {
       console.error("❌ Error toggling deduction status:", error);
@@ -1605,6 +1473,237 @@ export class SuperAdminController {
       });
     } catch (error) {
       console.error("❌ Error deleting deduction:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  // ===== Allowance Management =====
+  static async createAllowance(req: AuthenticatedRequest, res: Response) {
+    try {
+      console.log("📝 Creating allowance with data:", req.body);
+
+      const allowance = await AllowanceService.createAllowance(
+        asObjectId(req.user!.id),
+        {
+          ...req.body,
+          effectiveDate: new Date(req.body.effectiveDate),
+          expiryDate: req.body.expiryDate
+            ? new Date(req.body.expiryDate)
+            : undefined,
+          department: req.body.department
+            ? asObjectId(req.body.department)
+            : undefined,
+        }
+      );
+
+      res.status(201).json({
+        success: true,
+        message: "Allowance created successfully",
+        data: allowance,
+      });
+    } catch (error) {
+      console.error("❌ Error creating allowance:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async getAllAllowances(req: AuthenticatedRequest, res: Response) {
+    try {
+      console.log("🔍 Fetching allowances");
+      const filters = {
+        active: req.query.active === "true",
+        department: req.query.department
+          ? asObjectId(req.query.department as string)
+          : undefined,
+        gradeLevel: req.query.gradeLevel as string,
+      };
+
+      const allowances = await AllowanceService.getAllAllowances(filters);
+
+      res.status(200).json({
+        success: true,
+        data: allowances,
+      });
+    } catch (error) {
+      console.error("❌ Error fetching allowances:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async updateAllowance(req: AuthenticatedRequest, res: Response) {
+    try {
+      console.log("📝 Updating allowance:", req.params.id);
+
+      const allowance = await AllowanceService.updateAllowance(
+        req.params.id,
+        asObjectId(req.user!.id),
+        req.body
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Allowance updated successfully",
+        data: allowance,
+      });
+    } catch (error) {
+      console.error("❌ Error updating allowance:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async toggleAllowanceStatus(req: AuthenticatedRequest, res: Response) {
+    try {
+      console.log("🔄 Toggling allowance status:", req.params.id);
+
+      const allowance = await AllowanceService.toggleAllowanceStatus(
+        req.params.id,
+        asObjectId(req.user!.id)
+      );
+
+      res.status(200).json({
+        success: true,
+        message: `Allowance ${
+          allowance.active ? "activated" : "deactivated"
+        } successfully`,
+        data: allowance,
+      });
+    } catch (error) {
+      console.error("❌ Error toggling allowance status:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async deleteAllowance(req: AuthenticatedRequest, res: Response) {
+    try {
+      console.log("🗑️ Deleting allowance:", req.params.id);
+
+      await AllowanceService.deleteAllowance(req.params.id);
+
+      res.status(200).json({
+        success: true,
+        message: "Allowance deleted successfully",
+      });
+    } catch (error) {
+      console.error("❌ Error deleting allowance:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  // ===== Bonus Management =====
+  static async createBonus(req: AuthenticatedRequest, res: Response) {
+    try {
+      console.log("📝 Creating bonus with data:", req.body);
+
+      const bonus = await BonusService.createBonus(asObjectId(req.user!.id), {
+        ...req.body,
+        employee: asObjectId(req.body.employee),
+        department: req.body.department
+          ? asObjectId(req.body.department)
+          : undefined,
+        paymentDate: new Date(req.body.paymentDate),
+      });
+
+      res.status(201).json({
+        success: true,
+        message: "Bonus created successfully",
+        data: bonus,
+      });
+    } catch (error) {
+      console.error("❌ Error creating bonus:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async getAllBonuses(req: AuthenticatedRequest, res: Response) {
+    try {
+      console.log("🔍 Fetching bonuses");
+      const filters = {
+        employee: req.query.employee
+          ? asObjectId(req.query.employee as string)
+          : undefined,
+        department: req.query.department
+          ? asObjectId(req.query.department as string)
+          : undefined,
+        approvalStatus: req.query.status as string,
+        type: req.query.type as BonusType,
+      };
+
+      const bonuses = await BonusService.getAllBonuses(filters);
+
+      res.status(200).json({
+        success: true,
+        data: bonuses,
+      });
+    } catch (error) {
+      console.error("❌ Error fetching bonuses:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async updateBonus(req: AuthenticatedRequest, res: Response) {
+    try {
+      console.log("📝 Updating bonus:", req.params.id);
+
+      const bonus = await BonusService.updateBonus(
+        req.params.id,
+        asObjectId(req.user!.id),
+        req.body
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Bonus updated successfully",
+        data: bonus,
+      });
+    } catch (error) {
+      console.error("❌ Error updating bonus:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async approveBonus(req: AuthenticatedRequest, res: Response) {
+    try {
+      console.log("✍️ Processing bonus approval for:", req.params.id);
+
+      const bonus = await BonusService.approveBonus(
+        req.params.id,
+        asObjectId(req.user!.id),
+        req.body.approved
+      );
+
+      res.status(200).json({
+        success: true,
+        message: `Bonus ${bonus.approvalStatus} successfully`,
+        data: bonus,
+      });
+    } catch (error) {
+      console.error("❌ Error approving bonus:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async deleteBonus(req: AuthenticatedRequest, res: Response) {
+    try {
+      console.log("🗑️ Deleting bonus:", req.params.id);
+
+      await BonusService.deleteBonus(req.params.id);
+
+      res.status(200).json({
+        success: true,
+        message: "Bonus deleted successfully",
+      });
+    } catch (error) {
+      console.error("❌ Error deleting bonus:", error);
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
     }
