@@ -51,6 +51,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       Permission.CREATE_PAYROLL,
       Permission.EDIT_PAYROLL,
       Permission.VIEW_SALARY_STRUCTURE,
+      Permission.MANAGE_DEDUCTIONS,
+      Permission.VIEW_DEDUCTIONS,
+      Permission.EDIT_DEDUCTIONS,
       Permission.MANAGE_ALLOWANCES,
       Permission.VIEW_ALLOWANCES,
       Permission.MANAGE_BONUSES,
@@ -124,7 +127,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       // For other roles, check specific permissions
       if (
         !user.permissions?.some((p) =>
-          [Permission.VIEW_DEDUCTIONS, Permission.MANAGE_DEDUCTIONS].includes(p)
+          [
+            Permission.MANAGE_DEDUCTIONS,
+            Permission.VIEW_DEDUCTIONS,
+            Permission.EDIT_DEDUCTIONS,
+          ].includes(p)
         )
       ) {
         toast.error("Access denied: Cannot access deductions");

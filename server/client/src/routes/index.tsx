@@ -229,7 +229,10 @@ const adminRoutes: RouteConfig[] = [
     permissions: [
       Permission.VIEW_ALL_PAYROLL,
       Permission.VIEW_DEPARTMENT_PAYROLL,
+      Permission.MANAGE_SALARY_STRUCTURE,
+      Permission.DELETE_PAYROLL,
     ],
+    requireAllPermissions: false,
     element: <Outlet />,
     children: [
       {
@@ -238,6 +241,18 @@ const adminRoutes: RouteConfig[] = [
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
         permissions: [Permission.VIEW_SALARY_STRUCTURE],
         element: <SalaryStructure />,
+      },
+      {
+        path: "deductions",
+        label: "Statutory Deductions",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [
+          Permission.MANAGE_DEDUCTIONS,
+          Permission.VIEW_DEDUCTIONS,
+          Permission.EDIT_DEDUCTIONS,
+        ],
+        requireAllPermissions: false,
+        element: <Deductions />,
       },
       {
         path: "allowances",
@@ -383,7 +398,10 @@ const payrollRoutes: RouteConfig = {
   permissions: [
     Permission.VIEW_ALL_PAYROLL,
     Permission.VIEW_DEPARTMENT_PAYROLL,
+    Permission.MANAGE_SALARY_STRUCTURE,
+    Permission.DELETE_PAYROLL,
   ],
+  requireAllPermissions: false,
   element: <Outlet />,
   children: [
     {
@@ -392,6 +410,18 @@ const payrollRoutes: RouteConfig = {
       roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
       permissions: [Permission.VIEW_SALARY_STRUCTURE],
       element: <SalaryStructure />,
+    },
+    {
+      path: "deductions",
+      label: "Statutory Deductions",
+      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+      permissions: [
+        Permission.MANAGE_DEDUCTIONS,
+        Permission.VIEW_DEDUCTIONS,
+        Permission.EDIT_DEDUCTIONS,
+      ],
+      requireAllPermissions: false,
+      element: <Deductions />,
     },
     {
       path: "allowances",
