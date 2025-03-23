@@ -96,12 +96,17 @@ export const deductionService = {
     }
   },
 
-  toggleDeductionStatus: async (id: string): Promise<Deduction> => {
+  toggleDeductionStatus: async (
+    id: string
+  ): Promise<{
+    deduction: Deduction;
+    allDeductions: { statutory: Deduction[]; voluntary: Deduction[] };
+  }> => {
     try {
       const response = await axios.patch(
         `${BASE_URL}/super-admin/deductions/${id}/toggle`
       );
-      toast.success(response.data.message); 
+      toast.success(response.data.message);
       return response.data.data;
     } catch (error: any) {
       console.error("Failed to toggle deduction status:", error);

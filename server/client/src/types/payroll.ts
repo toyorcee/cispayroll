@@ -1,29 +1,42 @@
-// Import and re-export all types from the backend
+// Import types from backend
 import type {
   PayrollStatus,
   AllowanceType,
   DeductionType,
   BonusType,
-  IAllowance,
   IDeduction,
   IBonus,
   IOvertime,
   IBankDetails,
+  ISalaryComponent,
+  IPayrollAllowance,
+  IBonusFilters,
+  IAllowanceFilters,
+  IPayrollCalculationResult,
+  PayrollCalculationRequest,
+  IPayrollComponent,
 } from "../../../types/payroll";
 
 import type { IPayroll } from "../../../models/Payroll";
 
+// Re-export all types
 export type {
   PayrollStatus,
   AllowanceType,
   DeductionType,
   BonusType,
-  IAllowance,
   IDeduction,
   IBonus,
   IOvertime,
   IBankDetails,
   IPayroll,
+  ISalaryComponent,
+  IPayrollAllowance,
+  IBonusFilters,
+  IAllowanceFilters,
+  IPayrollCalculationResult,
+  PayrollCalculationRequest,
+  IPayrollComponent,
 };
 
 export interface PayrollPeriod {
@@ -32,7 +45,7 @@ export interface PayrollPeriod {
   year: number;
   totalEmployees?: number;
   totalNetSalary?: number;
-  status: "draft" | "processing" | "approved" | "paid";
+  status: PayrollStatus;
   processedDate?: Date;
   processedBy?: string;
 }

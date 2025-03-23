@@ -20,10 +20,10 @@ interface DeductionsTableProps {
     voluntary: Deduction[];
   };
   isLoading: boolean;
+  isUpdating: boolean;
   onEdit: (deduction: Deduction) => void;
   onToggleStatus: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
-  onFilterChange: (filter: "all" | "statutory" | "voluntary") => void;
 }
 
 const TaxBracketsModal = ({
@@ -100,14 +100,17 @@ const formatValue = (
 export const DeductionsTable = ({
   deductions,
   isLoading,
+  isUpdating,
   onEdit,
   onToggleStatus,
   onDelete,
-  onFilterChange,
 }: DeductionsTableProps) => {
-  const [filter, setFilter] = useState<"all" | "statutory" | "voluntary">(
-    "all"
-  );
+  const [typeFilter, setTypeFilter] = useState<
+    "all" | "statutory" | "voluntary"
+  >("all");
+  const [statusFilter, setStatusFilter] = useState<
+    "both" | "active" | "inactive"
+  >("both");
   const [selectedBrackets, setSelectedBrackets] = useState<TaxBracket[] | null>(
     null
   );
@@ -119,6 +122,8 @@ export const DeductionsTable = ({
     show: false,
     id: null,
   });
+
+  console.log("Received deductions:", deductions);
 
   const handleDelete = async (id: string) => {
     setDeleteConfirm({ show: true, id });
@@ -143,36 +148,46 @@ export const DeductionsTable = ({
   if (isLoading) return <TableSkeleton />;
 
   const allDeductions = [...deductions.statutory, ...deductions.voluntary];
-  const filteredDeductions =
-    filter === "all"
-      ? allDeductions
-      : allDeductions.filter((d) =>
-          filter === "statutory"
-            ? d.type.toLowerCase() === "statutory"
-            : d.type.toLowerCase() === "voluntary"
-        );
+  const filteredDeductions = allDeductions.filter((d) => {
+    // Type filter
+    if (typeFilter !== "all" && d.type.toLowerCase() !== typeFilter) {
+      return false;
+    }
+    // Status filter
+    if (statusFilter !== "both") {
+      return statusFilter === "active" ? d.isActive : !d.isActive;
+    }
+    return true;
+  });
 
-  const handleFilterChange = (newFilter: "all" | "statutory" | "voluntary") => {
-    setFilter(newFilter);
-    onFilterChange(newFilter);
-  };
+  console.log("Filtered deductions:", filteredDeductions);
 
   return (
     <div className="bg-white shadow-sm rounded-lg overflow-hidden">
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center gap-4">
           <select
-            className="form-select rounded-md border-gray-300 text-sm focus:ring-green-500 focus:border-green-500"
-            value={filter}
+            className="form-select rounded-md border-gray-300 text-sm focus:ring-green-500 focus:border-green-500 bg-green-50 text-green-900 hover:bg-green-100 transition-colors duration-200"
+            value={typeFilter}
             onChange={(e) =>
-              handleFilterChange(
-                e.target.value as "all" | "statutory" | "voluntary"
-              )
+              setTypeFilter(e.target.value as "all" | "statutory" | "voluntary")
             }
           >
             <option value="all">All Deductions</option>
             <option value="statutory">Statutory</option>
             <option value="voluntary">Voluntary</option>
+          </select>
+
+          <select
+            className="form-select rounded-md border-gray-300 text-sm focus:ring-green-500 focus:border-green-500 bg-green-50 text-green-900 hover:bg-green-100 transition-colors duration-200"
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(e.target.value as "both" | "active" | "inactive")
+            }
+          >
+            <option value="both">All Status</option>
+            <option value="active">Active Only</option>
+            <option value="inactive">Inactive Only</option>
           </select>
         </div>
       </div>
@@ -249,15 +264,47 @@ export const DeductionsTable = ({
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span
-                    className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      deduction.isActive
-                        ? "bg-green-100 text-green-800"
-                        : "bg-gray-100 text-gray-800"
-                    }`}
-                  >
-                    {deduction.isActive ? "Active" : "Inactive"}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <span
+                      className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        deduction.isActive
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {deduction.isActive ? "Active" : "Inactive"}
+                    </span>
+                    <button
+                      onClick={() => handleToggle(deduction._id)}
+                      disabled={isUpdating || togglingId === deduction._id}
+                      className={`${
+                        deduction.isActive ? "text-green-600" : "text-gray-400"
+                      } hover:text-green-900 transition-opacity ${
+                        isUpdating || togglingId === deduction._id
+                          ? "opacity-50 cursor-not-allowed"
+                          : ""
+                      }`}
+                      title={deduction.isActive ? "Deactivate" : "Activate"}
+                    >
+                      {isUpdating || togglingId === deduction._id ? (
+                        <div className="animate-pulse">
+                          {deduction.isActive ? (
+                            <FaToggleOn className="w-5 h-5" />
+                          ) : (
+                            <FaToggleOff className="w-5 h-5" />
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          {deduction.isActive ? (
+                            <FaToggleOn className="w-5 h-5" />
+                          ) : (
+                            <FaToggleOff className="w-5 h-5" />
+                          )}
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button
@@ -265,32 +312,6 @@ export const DeductionsTable = ({
                     className="text-green-600 hover:text-green-900 mr-4"
                   >
                     <FaEdit className="inline-block w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleToggle(deduction._id)}
-                    disabled={togglingId === deduction._id}
-                    className={`${
-                      deduction.isActive ? "text-green-600" : "text-gray-400"
-                    } hover:text-green-900 mr-4 transition-opacity ${
-                      togglingId === deduction._id
-                        ? "opacity-50 cursor-not-allowed"
-                        : ""
-                    }`}
-                    title={deduction.isActive ? "Deactivate" : "Activate"}
-                  >
-                    {deduction.isActive ? (
-                      <FaToggleOn
-                        className={`inline-block w-5 h-5 ${
-                          togglingId === deduction._id ? "animate-pulse" : ""
-                        }`}
-                      />
-                    ) : (
-                      <FaToggleOff
-                        className={`inline-block w-5 h-5 ${
-                          togglingId === deduction._id ? "animate-pulse" : ""
-                        }`}
-                      />
-                    )}
                   </button>
                   <button
                     onClick={() => handleDelete(deduction._id)}

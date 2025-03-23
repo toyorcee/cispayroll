@@ -45,65 +45,91 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     // Debug log
     console.log("Current user permissions:", user.permissions);
 
-    // Specific check for salary structure
-    if (path.includes("/structure")) {
-      const salaryStructurePermissions = [
-        Permission.MANAGE_SALARY_STRUCTURE,
-        Permission.VIEW_SALARY_STRUCTURE,
-        Permission.EDIT_SALARY_STRUCTURE,
-      ];
-      console.log("Required permissions:", salaryStructurePermissions);
-      console.log(
-        "Has permissions:",
-        salaryStructurePermissions.some((perm) =>
-          user.permissions?.includes(perm)
-        )
-      );
-
-      if (
-        !salaryStructurePermissions.some((perm) =>
-          user.permissions?.includes(perm)
-        )
-      ) {
-        toast.error("Access denied: No salary structure permissions");
-        return <Navigate to="/dashboard" replace />;
-      }
-      return <>{children || element}</>;
-    }
-
-    // Specific check for process payroll
-    if (path.includes("/process")) {
-      const processPayrollPermissions = [
-        Permission.CREATE_PAYROLL,
-        Permission.EDIT_PAYROLL,
-        Permission.DELETE_PAYROLL,
-        Permission.APPROVE_PAYROLL,
-        Permission.GENERATE_PAYSLIP,
-      ];
-      if (
-        !processPayrollPermissions.some((perm) =>
-          user.permissions?.includes(perm)
-        )
-      ) {
-        toast.error("Access denied: No payroll processing permissions");
-        return <Navigate to="/dashboard" replace />;
-      }
-      // If has permissions, continue to render
-      return <>{children || element}</>;
-    }
-
-    // General payroll access check for other payroll routes
-    const generalPayrollPermissions = [
+    const payrollPermissions = [
       Permission.VIEW_ALL_PAYROLL,
       Permission.VIEW_DEPARTMENT_PAYROLL,
+      Permission.CREATE_PAYROLL,
+      Permission.EDIT_PAYROLL,
+      Permission.VIEW_SALARY_STRUCTURE,
+      Permission.MANAGE_ALLOWANCES,
+      Permission.VIEW_ALLOWANCES,
+      Permission.MANAGE_BONUSES,
+      Permission.VIEW_BONUSES,
     ];
-    if (
-      !generalPayrollPermissions.some((perm) =>
-        user.permissions?.includes(perm)
-      )
-    ) {
-      toast.error("Access denied: No payroll access permissions");
+
+    if (!payrollPermissions.some((perm) => user.permissions?.includes(perm))) {
+      toast.error("Access denied: No payroll management permissions");
       return <Navigate to="/dashboard" replace />;
+    }
+
+    // Specific checks for each payroll section
+    if (path.includes("/structure")) {
+      if (!user.permissions?.includes(Permission.VIEW_SALARY_STRUCTURE)) {
+        toast.error("Access denied: Cannot view salary structure");
+        return <Navigate to="/dashboard" replace />;
+      }
+    }
+
+    if (path.includes("/allowances")) {
+      if (
+        !user.permissions?.some((p) =>
+          [Permission.VIEW_ALLOWANCES, Permission.MANAGE_ALLOWANCES].includes(p)
+        )
+      ) {
+        toast.error("Access denied: Cannot access allowances");
+        return <Navigate to="/dashboard" replace />;
+      }
+    }
+
+    if (path.includes("/bonuses")) {
+      if (
+        !user.permissions?.some((p) =>
+          [Permission.VIEW_BONUSES, Permission.MANAGE_BONUSES].includes(p)
+        )
+      ) {
+        toast.error("Access denied: Cannot access bonuses");
+        return <Navigate to="/dashboard" replace />;
+      }
+    }
+
+    if (path.includes("/process")) {
+      if (
+        !user.permissions?.some((p) =>
+          [Permission.CREATE_PAYROLL, Permission.EDIT_PAYROLL].includes(p)
+        )
+      ) {
+        toast.error("Access denied: Cannot process payroll");
+        return <Navigate to="/dashboard" replace />;
+      }
+    }
+
+    if (path.includes("/deductions")) {
+      // Debug log
+      console.log("Checking deductions permissions:", {
+        userPermissions: user.permissions,
+        hasViewDeductions: user.permissions?.includes(
+          Permission.VIEW_DEDUCTIONS
+        ),
+        hasManageDeductions: user.permissions?.includes(
+          Permission.MANAGE_DEDUCTIONS
+        ),
+        userRole: user.role,
+      });
+
+      // Super admin should always have access
+      if (user.role === UserRole.SUPER_ADMIN) {
+        return <>{children || element}</>;
+      }
+
+      // For other roles, check specific permissions
+      if (
+        !user.permissions?.some((p) =>
+          [Permission.VIEW_DEDUCTIONS, Permission.MANAGE_DEDUCTIONS].includes(p)
+        )
+      ) {
+        toast.error("Access denied: Cannot access deductions");
+        return <Navigate to="/dashboard" replace />;
+      }
     }
   }
 

@@ -1,12 +1,14 @@
 import { Types } from "mongoose";
-import Allowance, {
-  IAllowance,
-  AllowanceType,
-  AllowanceFrequency,
-} from "../models/Allowance.js";
+import Allowance, { IAllowance, AllowanceType } from "../models/Allowance.js";
+import { PayrollFrequency } from "../types/payroll.js";
 import { ApiError } from "../utils/errorHandler.js";
-import { PayrollFrequency } from "../models/Payroll.js";
-import { IAllowanceFilters } from "../types/payroll.js";
+
+export interface IAllowanceFilters {
+  active?: boolean;
+  department?: Types.ObjectId;
+  gradeLevel?: string;
+  employee?: Types.ObjectId;
+}
 
 export class AllowanceService {
   static async createAllowance(
@@ -15,12 +17,15 @@ export class AllowanceService {
       name: string;
       type: AllowanceType;
       value: number;
-      frequency: AllowanceFrequency;
+      calculationMethod: "fixed" | "percentage";
+      baseAmount?: number;
+      frequency: PayrollFrequency;
       description?: string;
       taxable?: boolean;
       effectiveDate: Date;
       expiryDate?: Date;
       department?: Types.ObjectId;
+      employee?: Types.ObjectId;
       gradeLevel?: string;
     }
   ): Promise<IAllowance> {
@@ -49,6 +54,7 @@ export class AllowanceService {
       const query = { ...filters };
       const allowances = await Allowance.find(query)
         .populate("department", "name code")
+        .populate("employee", "firstName lastName employeeId")
         .populate("createdBy", "firstName lastName")
         .populate("updatedBy", "firstName lastName")
         .sort({ createdAt: -1 });
@@ -143,79 +149,41 @@ export class AllowanceService {
     }
   }
 
-  // Add method to calculate prorated allowance
-  static calculateProratedAllowance(
-    allowance: IAllowance,
-    basicSalary: number,
-    frequency: PayrollFrequency
-  ): number {
-    try {
-      let amount = this.calculateAllowanceAmount(basicSalary, {
-        type: allowance.type,
-        value: allowance.value,
-      });
-
-      // Prorate based on allowance frequency vs payroll frequency
-      switch (allowance.frequency) {
-        case AllowanceFrequency.QUARTERLY:
-          amount = amount / 3; // Convert quarterly to monthly
-          break;
-        case AllowanceFrequency.ANNUAL:
-          amount = amount / 12; // Convert annual to monthly
-          break;
-        case AllowanceFrequency.ONE_TIME:
-          // One-time allowances are paid in full when they occur
-          break;
-        default:
-          // Monthly allowance, no change needed
-          break;
-      }
-
-      // Now prorate based on payroll frequency
-      switch (frequency) {
-        case PayrollFrequency.WEEKLY:
-          return amount / 4;
-        case PayrollFrequency.BIWEEKLY:
-          return amount / 2;
-        case PayrollFrequency.MONTHLY:
-          return amount;
-        case PayrollFrequency.QUARTERLY:
-          return amount * 3;
-        case PayrollFrequency.ANNUAL:
-          return amount * 12;
-        default:
-          return amount;
-      }
-    } catch (error) {
-      console.error("Error calculating prorated allowance:", error);
-      return 0;
-    }
-  }
-
-  // Update existing calculateAllowancesForGrade method
   static async calculateAllowancesForGrade(
     basicSalary: number,
-    gradeLevel: string,
-    frequency: PayrollFrequency = PayrollFrequency.MONTHLY
+    gradeLevel: string
   ) {
-    const allowances = await this.getAllAllowances({
-      active: true,
-      gradeLevel,
-    });
+    try {
+      console.log("💰 Calculating allowances for grade level:", gradeLevel);
 
-    const allowanceDetails = allowances.map((allowance) => ({
-      name: allowance.name,
-      amount: this.calculateProratedAllowance(
-        allowance,
-        basicSalary,
-        frequency
-      ),
-      frequency: allowance.frequency,
-    }));
+      // Get active allowances for this grade level
+      const allowances = await this.getAllAllowances({
+        active: true,
+        gradeLevel,
+      });
 
-    return {
-      allowanceItems: allowanceDetails,
-      totalAllowances: allowanceDetails.reduce((sum, a) => sum + a.amount, 0),
-    };
+      // Calculate each allowance amount
+      const allowanceDetails = allowances.map((allowance) => ({
+        name: allowance.name,
+        amount: this.calculateAllowanceAmount(basicSalary, allowance),
+      }));
+
+      // Calculate total allowances
+      const totalAllowances = allowanceDetails.reduce(
+        (sum, a) => sum + a.amount,
+        0
+      );
+
+      return {
+        allowanceItems: allowanceDetails,
+        totalAllowances,
+      };
+    } catch (error) {
+      console.error("Error calculating allowances:", error);
+      return {
+        allowanceItems: [],
+        totalAllowances: 0,
+      };
+    }
   }
 }

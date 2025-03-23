@@ -1,8 +1,8 @@
 import { Suspense, lazy } from "react";
 import { createBrowserRouter, Outlet } from "react-router-dom";
-import AppLayout from "../components/shared/AppLayout";
+// import AppLayout from "../components/shared/AppLayout";
 import { ProtectedRoute } from "../components/auth/ProtectedRoute";
-import Home from "../pages/Home";
+// import Home from "../pages/Home";
 import DashboardLayout from "../components/shared/DashboardLayout";
 import { NavigationProvider } from "../context/NavigationContext";
 import AllEmployees from "../pages/dashboard/employees/AllEmployees";
@@ -229,69 +229,36 @@ const adminRoutes: RouteConfig[] = [
     permissions: [
       Permission.VIEW_ALL_PAYROLL,
       Permission.VIEW_DEPARTMENT_PAYROLL,
-      Permission.MANAGE_SALARY_STRUCTURE,
     ],
-    requireAllPermissions: false,
     element: <Outlet />,
     children: [
-      {
-        path: "process",
-        label: "Process Payroll",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [
-          Permission.CREATE_PAYROLL,
-          Permission.EDIT_PAYROLL,
-          Permission.APPROVE_PAYROLL,
-          Permission.GENERATE_PAYSLIP,
-        ],
-        requireAllPermissions: false,
-        element: <ProcessPayroll />,
-      },
       {
         path: "structure",
         label: "Salary Structure",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [
-          Permission.MANAGE_SALARY_STRUCTURE,
-          Permission.VIEW_SALARY_STRUCTURE,
-          Permission.EDIT_SALARY_STRUCTURE,
-        ],
-        requireAllPermissions: false,
+        permissions: [Permission.VIEW_SALARY_STRUCTURE],
         element: <SalaryStructure />,
-      },
-      {
-        path: "deductions",
-        label: "Statutory Deductions",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [
-          Permission.MANAGE_DEDUCTIONS,
-          Permission.VIEW_DEDUCTIONS,
-          Permission.EDIT_DEDUCTIONS,
-        ],
-        requireAllPermissions: false,
-        element: <Deductions />,
       },
       {
         path: "allowances",
         label: "Allowances",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [
-          Permission.MANAGE_SALARY_STRUCTURE,
-          Permission.EDIT_SALARY_STRUCTURE,
-        ],
-        requireAllPermissions: false,
+        permissions: [Permission.VIEW_ALLOWANCES, Permission.MANAGE_ALLOWANCES],
         element: <AllowanceManagement />,
       },
       {
         path: "bonuses",
-        label: "Bonuses & Overtime",
+        label: "Bonuses",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [
-          Permission.MANAGE_SALARY_STRUCTURE,
-          Permission.EDIT_SALARY_STRUCTURE,
-        ],
-        requireAllPermissions: false,
+        permissions: [Permission.VIEW_BONUSES, Permission.MANAGE_BONUSES],
         element: <BonusManagement />,
+      },
+      {
+        path: "process",
+        label: "Process Payroll",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.CREATE_PAYROLL, Permission.EDIT_PAYROLL],
+        element: <ProcessPayroll />,
       },
     ],
   },
@@ -416,74 +383,36 @@ const payrollRoutes: RouteConfig = {
   permissions: [
     Permission.VIEW_ALL_PAYROLL,
     Permission.VIEW_DEPARTMENT_PAYROLL,
-    Permission.MANAGE_SALARY_STRUCTURE,
-    Permission.DELETE_PAYROLL,
   ],
-  requireAllPermissions: false,
   element: <Outlet />,
   children: [
-    {
-      path: "process",
-      label: "Process Payroll",
-      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-      permissions: [
-        Permission.CREATE_PAYROLL,
-        Permission.EDIT_PAYROLL,
-        Permission.DELETE_PAYROLL,
-        Permission.APPROVE_PAYROLL,
-        Permission.GENERATE_PAYSLIP,
-      ],
-      requireAllPermissions: false,
-      element: <ProcessPayroll />,
-    },
     {
       path: "structure",
       label: "Salary Structure",
       roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-      permissions: [
-        Permission.MANAGE_SALARY_STRUCTURE,
-        Permission.VIEW_SALARY_STRUCTURE,
-        Permission.EDIT_SALARY_STRUCTURE,
-      ],
-      requireAllPermissions: false,
+      permissions: [Permission.VIEW_SALARY_STRUCTURE],
       element: <SalaryStructure />,
-    },
-    {
-      path: "deductions",
-      label: "Statutory Deductions",
-      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-      permissions: [
-        Permission.MANAGE_DEDUCTIONS,
-        Permission.VIEW_DEDUCTIONS,
-        Permission.EDIT_DEDUCTIONS,
-      ],
-      requireAllPermissions: false,
-      element: <Deductions />,
     },
     {
       path: "allowances",
       label: "Allowances",
       roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-      permissions: [
-        Permission.MANAGE_ALLOWANCES,
-        Permission.VIEW_ALLOWANCES,
-        Permission.EDIT_ALLOWANCES,
-      ],
-      requireAllPermissions: false,
+      permissions: [Permission.VIEW_ALLOWANCES, Permission.MANAGE_ALLOWANCES],
       element: <AllowanceManagement />,
     },
     {
       path: "bonuses",
-      label: "Bonuses & Overtime",
+      label: "Bonuses",
       roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-      permissions: [
-        Permission.MANAGE_BONUSES,
-        Permission.VIEW_BONUSES,
-        Permission.EDIT_BONUSES,
-        Permission.MANAGE_OVERTIME,
-      ],
-      requireAllPermissions: false,
+      permissions: [Permission.VIEW_BONUSES, Permission.MANAGE_BONUSES],
       element: <BonusManagement />,
+    },
+    {
+      path: "process",
+      label: "Process Payroll",
+      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+      permissions: [Permission.CREATE_PAYROLL, Permission.EDIT_PAYROLL],
+      element: <ProcessPayroll />,
     },
   ],
 };

@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Types } from "mongoose";
+import { PayrollFrequency } from "../types/payroll.js";
 
 export enum AllowanceType {
   FIXED = "fixed",
@@ -6,25 +7,21 @@ export enum AllowanceType {
   PERFORMANCE_BASED = "performance_based",
 }
 
-export enum AllowanceFrequency {
-  MONTHLY = "monthly",
-  QUARTERLY = "quarterly",
-  ANNUAL = "annual",
-  ONE_TIME = "one_time",
-}
-
 export interface IAllowance extends Document {
   _id: Types.ObjectId;
   name: string;
   type: AllowanceType;
   value: number;
-  frequency: AllowanceFrequency;
+  calculationMethod: "fixed" | "percentage";
+  baseAmount?: number;
+  frequency: PayrollFrequency;
   description?: string;
   taxable?: boolean;
   active?: boolean;
   effectiveDate: Date;
   expiryDate?: Date;
   department?: Types.ObjectId;
+  employee?: Types.ObjectId;
   gradeLevel?: string;
   createdBy: Types.ObjectId;
   updatedBy: Types.ObjectId;
@@ -41,19 +38,27 @@ const AllowanceSchema = new Schema<IAllowance>(
       required: true,
     },
     value: { type: Number, required: true },
+    calculationMethod: {
+      type: String,
+      enum: ["fixed", "percentage"],
+      required: true,
+      default: "fixed",
+    },
+    baseAmount: { type: Number },
     frequency: {
       type: String,
-      enum: Object.values(AllowanceFrequency),
+      enum: Object.values(PayrollFrequency),
       required: true,
-      default: AllowanceFrequency.MONTHLY,
+      default: PayrollFrequency.MONTHLY,
     },
     description: { type: String },
     taxable: { type: Boolean, default: true },
+    active: { type: Boolean, default: true },
     effectiveDate: { type: Date, required: true },
     expiryDate: { type: Date },
     department: { type: Schema.Types.ObjectId, ref: "Department" },
+    employee: { type: Schema.Types.ObjectId, ref: "User" },
     gradeLevel: { type: String },
-    active: { type: Boolean, default: true },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     updatedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
   },

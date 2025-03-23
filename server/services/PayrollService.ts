@@ -4,23 +4,24 @@ import UserModel from "../models/User.js";
 import PayrollModel from "../models/Payroll.js";
 import SalaryGrade from "../models/SalaryStructure.js";
 import { DeductionService } from "./DeductionService.js";
-import { IEmployee, IDepartment } from "../types/payroll.js";
 import { AllowanceService } from "./AllowanceService.js";
 import { BonusService } from "./BonusService.js";
-import { PayrollStatus, PayrollFrequency } from "../models/Payroll.js";
+import {
+  IEmployee,
+  IDepartment,
+  PayrollStatus,
+  PayrollFrequency,
+  IPayrollCalculationResult,
+  ISalaryGradeDetails,
+  IPayrollBonus,
+  IAdditionalAllowance,
+  BonusItem,
+  IBonusFilters,
+  IAllowanceFilters,
+  ISalaryComponent,
+} from "../types/payroll.js";
+import { IAllowance } from "../models/Allowance.js";
 
-// Add interface for populated employee
-interface PopulatedEmployee extends Omit<IEmployee, "department"> {
-  department: IDepartment;
-}
-
-// Add this interface at the top with other interfaces
-interface BonusItem {
-  amount: number;
-  type: string;
-}
-
-// First, add these interfaces at the top of the file
 interface StatutoryDeductions {
   paye: number;
   pension: number;
@@ -32,6 +33,11 @@ interface DeductionCalculation {
   statutory: StatutoryDeductions;
   voluntary: number;
   total: number;
+}
+
+interface BonusCalculation {
+  items: BonusItem[];
+  totalBonuses: number;
 }
 
 export class PayrollService {
@@ -51,14 +57,14 @@ export class PayrollService {
     }
 
     // Create department object if it's a string
-    const departmentInfo =
+    const departmentInfo: IDepartment =
       typeof employee.department === "string"
         ? {
             _id: new Types.ObjectId(),
             name: employee.department,
             code: employee.department,
           }
-        : employee.department;
+        : (employee.department as IDepartment);
 
     return {
       ...employee,
@@ -98,12 +104,29 @@ export class PayrollService {
     const endDate = new Date(year, month, 0);
 
     return {
+      type: PayrollFrequency.MONTHLY,
       startDate,
       endDate,
+      month,
+      year,
     };
   }
 
-  static async calculateSalaryComponents(salaryGradeId: Types.ObjectId) {
+  private static calculateAllowanceAmount(
+    allowance: IAllowance,
+    basicSalary: number
+  ): number {
+    if (allowance.calculationMethod === "percentage") {
+      const base = allowance.baseAmount || basicSalary;
+      return (base * allowance.value) / 100;
+    }
+    return allowance.value;
+  }
+
+  static async calculateSalaryComponents(
+    salaryGradeId: Types.ObjectId,
+    employeeId: Types.ObjectId
+  ): Promise<ISalaryGradeDetails> {
     console.log("🧮 Calculating salary components for grade:", salaryGradeId);
 
     const salaryGrade = await SalaryGrade.findById(salaryGradeId);
@@ -111,56 +134,46 @@ export class PayrollService {
       throw new ApiError(404, "Salary grade not found");
     }
 
-    // Calculate built-in allowances from components
-    const totalComponentAllowances = salaryGrade.components.reduce(
-      (total, component) => {
-        if (component.isActive && component.type === "allowance") {
-          const amount =
-            component.calculationMethod === "percentage"
-              ? (salaryGrade.basicSalary * component.value) / 100
-              : component.value;
-          return total + amount;
-        }
-        return total;
+    // Define standard allowances with correct types
+    const standardAllowances: ISalaryComponent[] = [
+      {
+        name: "Housing Allowance",
+        type: "allowance",
+        value: 25,
+        calculationMethod: "percentage",
+        amount: (salaryGrade.basicSalary * 25) / 100,
+        isActive: true,
       },
-      0
-    );
+      {
+        name: "Transport Allowance",
+        type: "allowance",
+        value: 60000,
+        calculationMethod: "fixed",
+        amount: 60000,
+        isActive: true,
+      },
+      {
+        name: "Medical Allowance",
+        type: "allowance",
+        value: 40000,
+        calculationMethod: "fixed",
+        amount: 40000,
+        isActive: true,
+      },
+    ];
 
-    // Get additional allowances from AllowanceService
-    const additionalAllowances = await AllowanceService.getAllAllowances({
-      active: true,
-      gradeLevel: salaryGrade.level.toString(),
-    });
-
-    // Calculate additional allowance amounts
-    const additionalAllowanceDetails = additionalAllowances.map(
-      (allowance) => ({
-        name: allowance.name,
-        amount: AllowanceService.calculateAllowanceAmount(
-          salaryGrade.basicSalary,
-          allowance
-        ),
-      })
-    );
-
-    const totalAdditionalAllowances = additionalAllowanceDetails.reduce(
+    // Calculate totals
+    const totalAllowances = standardAllowances.reduce(
       (sum, a) => sum + a.amount,
       0
     );
 
-    // Total all allowances
-    const totalAllowances =
-      totalComponentAllowances + totalAdditionalAllowances;
-
-    // Gross salary is basic salary plus all allowances
-    const grossSalary = salaryGrade.basicSalary + totalAllowances;
-
     return {
       basicSalary: salaryGrade.basicSalary,
+      components: standardAllowances, // This is now correctly typed as ISalaryComponent[]
+      additionalAllowances: [],
       totalAllowances,
-      grossSalary,
-      components: salaryGrade.components,
-      additionalAllowances: additionalAllowanceDetails,
+      grossSalary: salaryGrade.basicSalary + totalAllowances,
     };
   }
 
@@ -176,26 +189,23 @@ export class PayrollService {
     // Get all active deductions
     const deductions = await DeductionService.getActiveDeductions();
 
-    // Calculate statutory deductions
-    const paye = grossSalary * 0.2; // 20% PAYE
-    const pension = basicSalary * 0.08; // 8% Pension
-    const nhf = basicSalary * 0.025; // 2.5% NHF
+    // 1. Calculate Statutory Deductions
+    const paye = this.calculatePAYE(grossSalary); // Progressive tax calculation
+    const pension = basicSalary * 0.08; // 8% of basic salary
+    const nhf = basicSalary * 0.025; // 2.5% of basic salary
 
     const statutoryTotal = paye + pension + nhf;
 
-    // Calculate voluntary deductions
-    const voluntaryDeductions = deductions.voluntary.reduce(
-      (total, deduction) => {
-        if (deduction.isActive) {
-          return (
-            total +
-            DeductionService.calculateVoluntaryDeduction(basicSalary, deduction)
-          );
-        }
-        return total;
-      },
-      0
-    );
+    // 2. Calculate Voluntary Deductions
+    const voluntaryDeductions = deductions.voluntary
+      .filter((d) => d.isActive)
+      .reduce((total, deduction) => {
+        const amount =
+          deduction.calculationMethod === "percentage"
+            ? (basicSalary * deduction.value) / 100
+            : deduction.value;
+        return total + amount;
+      }, 0);
 
     return {
       statutory: {
@@ -209,12 +219,213 @@ export class PayrollService {
     };
   }
 
+  // Add PAYE calculation method
+  private static calculatePAYE(grossSalary: number): number {
+    console.log(
+      `\nCalculating PAYE for salary: ₦${grossSalary.toLocaleString()}`
+    );
+
+    const brackets = [
+      { min: 0, max: 300000, rate: 7 }, // First 300,000
+      { min: 300001, max: 600000, rate: 11 }, // Next 299,999
+      { min: 600001, max: 1100000, rate: 15 }, // Next 499,999
+      { min: 1100001, max: 1600000, rate: 19 }, // Next 499,999
+      { min: 1600001, max: 3200000, rate: 21 }, // Next 1,599,999
+      { min: 3200001, max: Number.MAX_SAFE_INTEGER, rate: 24 },
+    ];
+
+    let totalTax = 0;
+    let remainingSalary = grossSalary;
+
+    for (const bracket of brackets) {
+      if (remainingSalary <= 0) break;
+
+      // Calculate exact amount that falls in this bracket
+      const bracketSize =
+        bracket.min === 0 ? bracket.max : bracket.max - bracket.min + 1;
+
+      const amountInBracket = Math.min(remainingSalary, bracketSize);
+      const tax = (amountInBracket * bracket.rate) / 100;
+
+      console.log(
+        `Bracket ₦${bracket.min.toLocaleString()} - ₦${bracket.max.toLocaleString()}:`
+      );
+      console.log(
+        `  Amount taxed in this bracket: ₦${amountInBracket.toLocaleString()}`
+      );
+      console.log(`  Rate: ${bracket.rate}%`);
+      console.log(`  Tax: ₦${tax.toLocaleString()}\n`);
+
+      totalTax += tax;
+      remainingSalary -= amountInBracket;
+    }
+
+    return totalTax;
+  }
+
+  static async calculateBonuses(
+    employeeId: Types.ObjectId,
+    startDate: Date,
+    endDate: Date
+  ): Promise<BonusCalculation> {
+    try {
+      // Get individual bonuses for the employee
+      const filters: IBonusFilters = {
+        employee: employeeId,
+        approvalStatus: "approved",
+        active: true,
+      };
+
+      let bonuses = await BonusService.getAllBonuses(filters);
+
+      // If no bonuses found, return empty result
+      if (!bonuses || !Array.isArray(bonuses) || bonuses.length === 0) {
+        console.log("No bonuses found for employee:", employeeId);
+        return {
+          items: [],
+          totalBonuses: 0,
+        };
+      }
+
+      // Filter valid bonuses for the current period
+      const periodBonuses = bonuses.filter((bonus) => {
+        // Basic validation
+        if (!bonus || !bonus.paymentDate) {
+          console.log("Invalid bonus record:", bonus);
+          return false;
+        }
+
+        // Check if bonus is valid for the current period
+        const bonusDate = new Date(bonus.paymentDate);
+        const isInPeriod = bonusDate >= startDate && bonusDate <= endDate;
+
+        if (!isInPeriod) {
+          console.log(`Bonus ${bonus._id} not in current period`);
+          return false;
+        }
+
+        return true;
+      });
+
+      if (periodBonuses.length === 0) {
+        console.log("No valid bonuses found for the period");
+        return {
+          items: [],
+          totalBonuses: 0,
+        };
+      }
+
+      // Calculate bonus amounts
+      const items: BonusItem[] = periodBonuses.map((bonus) => {
+        // Ensure we have the required fields
+        if (!bonus.amount || !bonus.type) {
+          console.log("Missing required bonus fields:", bonus);
+          return {
+            type: "unknown",
+            description: "Invalid bonus record",
+            amount: 0,
+          };
+        }
+
+        return {
+          type: bonus.type,
+          description: bonus.description || bonus.type,
+          amount: bonus.amount, // Use the direct amount since it's already per period
+        };
+      });
+
+      // Calculate total bonuses
+      const totalBonuses = items.reduce((sum, item) => sum + item.amount, 0);
+
+      console.log(`Calculated ${items.length} bonuses, total: ${totalBonuses}`);
+
+      return {
+        items,
+        totalBonuses,
+      };
+    } catch (error) {
+      console.error("Error calculating bonuses:", error);
+      // Return safe default values in case of error
+      return {
+        items: [],
+        totalBonuses: 0,
+      };
+    }
+  }
+
+  // Update the frequency adjustment helper
+  private static adjustAmountByFrequency(
+    amount: number,
+    frequency: PayrollFrequency,
+    targetFrequency: PayrollFrequency = PayrollFrequency.MONTHLY
+  ): number {
+    const monthlyAmount = (() => {
+      switch (frequency) {
+        case PayrollFrequency.YEARLY:
+          return amount / 12;
+        case PayrollFrequency.SEMI_MONTHLY:
+          return amount * 2;
+        case PayrollFrequency.BI_WEEKLY:
+          return amount * 2.167; // 26 pay periods / 12 months
+        case PayrollFrequency.WEEKLY:
+          return amount * 4.333; // 52 weeks / 12 months
+        case PayrollFrequency.DAILY:
+          return amount * 21.75; // Average working days per month
+        default:
+          return amount;
+      }
+    })();
+
+    // Convert monthly amount to target frequency
+    switch (targetFrequency) {
+      case PayrollFrequency.YEARLY:
+        return monthlyAmount * 12;
+      case PayrollFrequency.SEMI_MONTHLY:
+        return monthlyAmount / 2;
+      case PayrollFrequency.BI_WEEKLY:
+        return monthlyAmount / 2.167;
+      case PayrollFrequency.WEEKLY:
+        return monthlyAmount / 4.333;
+      case PayrollFrequency.DAILY:
+        return monthlyAmount / 21.75;
+      default:
+        return monthlyAmount;
+    }
+  }
+
+  // Add this method to validate the payroll data before saving
+  private static validatePayrollData(
+    payrollData: IPayrollCalculationResult
+  ): void {
+    // Validate allowances
+    const { gradeAllowances } = payrollData.allowances;
+
+    if (!Array.isArray(gradeAllowances)) {
+      throw new ApiError(400, "Grade allowances must be an array");
+    }
+
+    gradeAllowances.forEach((allowance, index) => {
+      if (!allowance.type) {
+        throw new ApiError(400, `Allowance at index ${index} missing type`);
+      }
+      if (typeof allowance.value !== "number") {
+        throw new ApiError(400, `Allowance at index ${index} missing value`);
+      }
+      if (!allowance.name) {
+        throw new ApiError(400, `Allowance at index ${index} missing name`);
+      }
+      if (typeof allowance.amount !== "number") {
+        throw new ApiError(400, `Allowance at index ${index} missing amount`);
+      }
+    });
+  }
+
   static async calculatePayroll(
     employeeId: Types.ObjectId,
     salaryGradeId: Types.ObjectId,
     month: number,
     year: number
-  ) {
+  ): Promise<IPayrollCalculationResult> {
     console.log("📊 Calculating payroll for:", {
       employeeId,
       salaryGradeId,
@@ -222,52 +433,31 @@ export class PayrollService {
       year,
     });
 
-    // Get employee details first
+    // Get employee details
     const employee = await this.validateAndGetEmployee(employeeId);
 
-    // Get salary components - this already has the correct calculation for allowances
-    const salaryDetails = await this.calculateSalaryComponents(salaryGradeId);
+    // Calculate salary components (includes allowances)
+    const salaryDetails = await this.calculateSalaryComponents(
+      salaryGradeId,
+      employeeId
+    );
 
-    // Calculate deductions
+    // Calculate deductions based on salary and allowances
     const deductionDetails = await this.calculateDeductions(
       salaryDetails.basicSalary,
       salaryDetails.grossSalary
     );
 
-    // Get period dates
+    // Get bonuses for the period
     const { startDate, endDate } = this.calculatePayPeriod(month, year);
+    const bonuses = await this.calculateBonuses(employeeId, startDate, endDate);
 
-    // Get bonuses - keeping your existing bonus calculation
-    let bonusAmount = 0;
-    let bonusItems: BonusItem[] = [];
-
-    try {
-      const bonuses = await BonusService.getAllBonuses({
-        employee: employeeId,
-        approvalStatus: "approved",
-      });
-
-      bonusItems = bonuses
-        .filter((bonus) => {
-          const bonusDate = new Date(bonus.createdAt);
-          return bonusDate >= startDate && bonusDate <= endDate;
-        })
-        .map((bonus) => ({
-          amount: bonus.amount,
-          type: bonus.type,
-        }));
-
-      bonusAmount = bonusItems.reduce((sum, bonus) => sum + bonus.amount, 0);
-    } catch (error) {
-      console.error("Error fetching bonuses:", error);
-    }
-
-    // Calculate final amounts
-    const grossSalary = salaryDetails.grossSalary + bonusAmount;
+    // Final calculations
+    const grossSalary = salaryDetails.grossSalary + bonuses.totalBonuses;
     const netSalary = grossSalary - deductionDetails.total;
 
     // Return the complete payroll object matching your model structure
-    return {
+    const payrollData = {
       employee,
       department:
         typeof employee.department === "string"
@@ -279,7 +469,10 @@ export class PayrollService {
       periodStart: startDate,
       periodEnd: endDate,
       basicSalary: salaryDetails.basicSalary,
-      components: salaryDetails.components,
+      components: salaryDetails.components.map((c) => ({
+        ...c,
+        amount: c.amount,
+      })),
       allowances: {
         gradeAllowances: salaryDetails.components
           .filter((c) => c.type === "allowance" && c.isActive)
@@ -287,31 +480,36 @@ export class PayrollService {
             name: c.name,
             type: c.type,
             value: c.value,
-            amount:
-              c.calculationMethod === "percentage"
-                ? (salaryDetails.basicSalary * c.value) / 100
-                : c.value,
+            amount: c.amount,
           })),
-        additionalAllowances: salaryDetails.additionalAllowances,
+        additionalAllowances: salaryDetails.additionalAllowances.map((a) => ({
+          name: a.name,
+          type: "allowance",
+          value: a.amount,
+          amount: a.amount,
+          frequency: PayrollFrequency.MONTHLY,
+        })),
         totalAllowances: salaryDetails.totalAllowances,
       },
       bonuses: {
-        items: bonusItems.map((bonus) => ({
-          type: bonus.type,
-          description: bonus.type, // Using type as description if none provided
-          amount: bonus.amount,
-        })),
-        totalBonuses: bonusAmount,
+        items: bonuses.items.map(
+          (bonus): IPayrollBonus => ({
+            type: bonus.type,
+            description: bonus.type,
+            amount: bonus.amount,
+          })
+        ),
+        totalBonuses: bonuses.totalBonuses,
       },
       earnings: {
         overtime: { hours: 0, rate: 0, amount: 0 },
-        bonus: bonusItems,
+        bonus: bonuses.items,
         totalEarnings: grossSalary,
       },
       deductions: {
         tax: {
           taxableAmount: grossSalary,
-          taxRate: 20,
+          taxRate: (deductionDetails.statutory.paye / grossSalary) * 100,
           amount: deductionDetails.statutory.paye,
         },
         pension: {
@@ -326,7 +524,7 @@ export class PayrollService {
       totals: {
         basicSalary: salaryDetails.basicSalary,
         totalAllowances: salaryDetails.totalAllowances,
-        totalBonuses: bonusAmount,
+        totalBonuses: bonuses.totalBonuses,
         grossEarnings: grossSalary,
         totalDeductions: deductionDetails.total,
         netPay: netSalary,
@@ -334,5 +532,10 @@ export class PayrollService {
       status: PayrollStatus.PENDING,
       frequency: PayrollFrequency.MONTHLY,
     };
+
+    // Validate before returning
+    this.validatePayrollData(payrollData);
+
+    return payrollData;
   }
 }

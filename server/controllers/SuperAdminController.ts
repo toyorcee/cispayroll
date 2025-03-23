@@ -12,17 +12,18 @@ import { PayrollService } from "../services/PayrollService.js";
 import SalaryGrade, { ISalaryComponent } from "../models/SalaryStructure.js";
 import { Types } from "mongoose";
 import mongoose from "mongoose";
-import { PayPeriod } from "../types/payroll.js";
 import { DeductionService } from "../services/DeductionService.js";
 import Deduction from "../models/Deduction.js";
 import { DepartmentService } from "../services/departmentService.js";
 import { AllowanceService } from "../services/AllowanceService.js";
 import { BonusService } from "../services/BonusService.js";
-import Bonus, { BonusType } from "../models/Bonus.js";
-import Allowance, {
+import Bonus from "../models/Bonus.js";
+import Allowance from "../models/Allowance.js";
+import {
   AllowanceType,
-  AllowanceFrequency,
-} from "../models/Allowance.js";
+  PayrollFrequency,
+  BonusType,
+} from "../types/payroll.js";
 
 interface PayrollAllowances {
   housing: number;
@@ -537,7 +538,10 @@ export class SuperAdminController {
             .filter((comp) => comp.type === "allowance")
             .map((comp) => ({
               name: comp.name,
+              type: "allowance",
+              value: comp.value,
               amount: comp.amount,
+              calculationMethod: comp.calculationMethod,
             })),
           additionalAllowances: [],
           totalAllowances,
@@ -567,6 +571,13 @@ export class SuperAdminController {
           accountName:
             calculations.employee.bankDetails?.accountName ||
             "Bank Details Required",
+        },
+        payPeriod: {
+          type: PayrollFrequency.MONTHLY,
+          startDate: new Date(),
+          endDate: new Date(),
+          month,
+          year,
         },
       };
 
@@ -1276,12 +1287,8 @@ export class SuperAdminController {
   ) {
     try {
       console.log("🔄 Setting up statutory deductions");
-
-      // Convert string ID to ObjectId using our helper
       await DeductionService.createStatutoryDeductions(asObjectId(req.user.id));
-
       console.log("✅ Statutory deductions set up successfully");
-
       res.status(201).json({
         success: true,
         message: "Statutory deductions set up successfully",
@@ -1296,8 +1303,7 @@ export class SuperAdminController {
   static async getAllDeductions(req: AuthenticatedRequest, res: Response) {
     try {
       console.log("🔍 Fetching all deductions");
-
-      const deductions = await DeductionService.getActiveDeductions();
+      const deductions = await DeductionService.getAllDeductions();
 
       console.log("✅ Found deductions:", {
         statutoryCount: deductions.statutory.length,

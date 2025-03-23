@@ -17,22 +17,20 @@ interface DeductionsState {
 }
 
 export default function Deductions() {
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [deductions, setDeductions] = useState<DeductionsState>({
     statutory: [],
     voluntary: [],
   });
   const [showAddForm, setShowAddForm] = useState(false);
-  const [currentFilter, setCurrentFilter] = useState<
-    "all" | "statutory" | "voluntary"
-  >("all");
   const [editingDeduction, setEditingDeduction] = useState<
     Deduction | undefined
   >(undefined);
 
   const fetchDeductions = async () => {
     try {
-      setIsLoading(true);
+      setIsInitialLoading(true);
       console.log("🔄 Fetching deductions...");
       const deductionsData = await deductionService.getAllDeductions();
       console.log("📦 Received deductions:", deductionsData);
@@ -49,7 +47,7 @@ export default function Deductions() {
       console.error("❌ Error fetching deductions:", error);
       toast.error("Failed to fetch deductions");
     } finally {
-      setIsLoading(false);
+      setIsInitialLoading(false);
     }
   };
 
@@ -86,8 +84,10 @@ export default function Deductions() {
   const handleToggleStatus = async (id: string) => {
     try {
       setIsLoading(true);
-      await deductionService.toggleDeductionStatus(id);
-      await fetchDeductions();
+      const { allDeductions } = await deductionService.toggleDeductionStatus(
+        id
+      );
+      setDeductions(allDeductions);
     } catch (error) {
       console.error("Toggle status failed:", error);
     } finally {
@@ -126,37 +126,30 @@ export default function Deductions() {
   return (
     <div className="space-y-6">
       <div className="md:flex md:items-center md:justify-between">
-        {(currentFilter === "voluntary" || currentFilter === "statutory") && (
-          <div className="mt-4 flex md:mt-0">
-            <button
-              onClick={() => {
-                setEditingDeduction(undefined);
-                setShowAddForm(true);
-              }}
-              className="inline-flex items-center px-4 py-2 border border-transparent 
-                       rounded-md shadow-sm text-sm font-medium text-white 
-                       bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 
-                       focus:ring-offset-2 focus:ring-green-500"
-            >
-              <FaPlus className="mr-2 -ml-1 h-4 w-4" />
-              Add {currentFilter === "statutory"
-                ? "Statutory"
-                : "Voluntary"}{" "}
-              Deduction
-            </button>
-          </div>
-        )}
+        <button
+          onClick={() => {
+            setEditingDeduction(undefined);
+            setShowAddForm(true);
+          }}
+          className="inline-flex items-center px-4 py-2 border border-transparent 
+                   rounded-md shadow-sm text-sm font-medium text-white 
+                   bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 
+                   focus:ring-offset-2 focus:ring-green-500"
+        >
+          <FaPlus className="mr-2 -ml-1 h-4 w-4" />
+          Add Deduction
+        </button>
       </div>
 
       <div className="bg-white shadow-sm rounded-lg">
         <div className="p-6">
           <DeductionsTable
             deductions={deductions}
-            isLoading={isLoading}
+            isLoading={isInitialLoading}
+            isUpdating={isLoading}
             onEdit={handleEdit}
             onToggleStatus={handleToggleStatus}
             onDelete={handleDelete}
-            onFilterChange={setCurrentFilter}
           />
         </div>
       </div>
@@ -166,11 +159,7 @@ export default function Deductions() {
           <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-lg bg-white">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">
-                {editingDeduction
-                  ? "Edit Deduction"
-                  : `Add ${
-                      currentFilter === "statutory" ? "Statutory" : "Voluntary"
-                    } Deduction`}
+                {editingDeduction ? "Edit Deduction" : "Add Deduction"}
               </h3>
               <button
                 onClick={() => {

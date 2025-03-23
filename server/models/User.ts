@@ -79,6 +79,11 @@ export enum Permission {
   MANAGE_ALLOWANCES = "MANAGE_ALLOWANCES",
   VIEW_ALLOWANCES = "VIEW_ALLOWANCES",
   EDIT_ALLOWANCES = "EDIT_ALLOWANCES",
+  CREATE_ALLOWANCES = "CREATE_ALLOWANCES",
+  DELETE_ALLOWANCES = "DELETE_ALLOWANCES",
+  APPROVE_ALLOWANCES = "APPROVE_ALLOWANCES",
+  REQUEST_ALLOWANCES = "REQUEST_ALLOWANCES",
+  VIEW_OWN_ALLOWANCES = "VIEW_OWN_ALLOWANCES",
 
   // Bonuses & Overtime Management
   MANAGE_BONUSES = "MANAGE_BONUSES",
@@ -98,6 +103,9 @@ export enum Permission {
   MANAGE_INTEGRATIONS = "MANAGE_INTEGRATIONS",
   MANAGE_DOCUMENTS = "MANAGE_DOCUMENTS",
   EDIT_PERSONAL_INFO = "EDIT_PERSONAL_INFO",
+
+  // New permissions
+  VIEW_OWN_DEDUCTIONS = "VIEW_OWN_DEDUCTIONS",
 }
 
 // Add with other enums at the top (after UserRole and Permission)
@@ -542,6 +550,11 @@ UserSchema.pre("save", function (this: UserDocument, next) {
           Permission.MANAGE_ALLOWANCES,
           Permission.VIEW_ALLOWANCES,
           Permission.EDIT_ALLOWANCES,
+          Permission.CREATE_ALLOWANCES,
+          Permission.DELETE_ALLOWANCES,
+          Permission.APPROVE_ALLOWANCES,
+          Permission.REQUEST_ALLOWANCES,
+          Permission.VIEW_OWN_ALLOWANCES,
 
           // Bonuses & Overtime Management
           Permission.MANAGE_BONUSES,
@@ -603,6 +616,16 @@ UserSchema.pre("save", function (this: UserDocument, next) {
           // Salary Structure Management
           Permission.VIEW_SALARY_STRUCTURE,
           Permission.EDIT_SALARY_STRUCTURE,
+
+          // Allowances Management
+          Permission.VIEW_ALLOWANCES,
+          Permission.APPROVE_ALLOWANCES,
+          Permission.VIEW_OWN_ALLOWANCES,
+          Permission.REQUEST_ALLOWANCES,
+
+          // Deductions Management
+          Permission.VIEW_DEDUCTIONS,
+          Permission.EDIT_DEDUCTIONS,
         ];
         break;
 
@@ -613,6 +636,9 @@ UserSchema.pre("save", function (this: UserDocument, next) {
           Permission.VIEW_OWN_LEAVE,
           Permission.CANCEL_OWN_LEAVE,
           Permission.VIEW_OWN_PAYSLIP,
+          Permission.VIEW_OWN_ALLOWANCES,
+          Permission.REQUEST_ALLOWANCES,
+          Permission.VIEW_OWN_DEDUCTIONS,
         ];
         break;
     }

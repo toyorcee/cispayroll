@@ -1,14 +1,13 @@
 import { Types } from "mongoose";
-import { IAllowance } from "../models/Allowance.js";
 
 // Unified Status Enums
 export enum PayrollStatus {
-  PENDING = "pending",
-  PROCESSING = "processing",
-  APPROVED = "approved",
-  REJECTED = "rejected",
-  PAID = "paid",
-  CANCELLED = "cancelled",
+  PENDING = "PENDING",
+  PROCESSING = "PROCESSING",
+  APPROVED = "APPROVED",
+  REJECTED = "REJECTED",
+  PAID = "PAID",
+  CANCELLED = "CANCELLED",
 }
 
 export enum AllowanceType {
@@ -30,20 +29,24 @@ export enum DeductionType {
 
 export enum BonusType {
   PERFORMANCE = "performance",
-  THIRTEENTH_MONTH = "thirteenthMonth",
-  OTHER = "other",
+  THIRTEENTH_MONTH = "thirteenth_month",
+  SPECIAL = "special",
+  ACHIEVEMENT = "achievement",
+  RETENTION = "retention",
+  PROJECT = "project",
 }
 
-export enum PayPeriod {
-  WEEKLY = "weekly",
-  MONTHLY = "monthly",
-  BI_MONTHLY = "bi-monthly",
+export enum PayrollFrequency {
   DAILY = "daily",
+  WEEKLY = "weekly",
+  BI_WEEKLY = "bi-weekly",
+  SEMI_MONTHLY = "semi-monthly",
+  MONTHLY = "monthly",
   YEARLY = "yearly",
 }
 
 export interface PayPeriodRange {
-  type: PayPeriod;
+  type: PayrollFrequency;
   startDate: Date;
   endDate: Date;
 }
@@ -56,10 +59,25 @@ export interface IDeduction {
   description?: string;
 }
 
-export interface IBonus {
+export interface IBonus extends Document {
+  _id: Types.ObjectId;
+  employee: Types.ObjectId;
   type: BonusType;
   amount: number;
   description?: string;
+  frequency: PayrollFrequency;
+  paymentDate: Date;
+  effectiveDate: Date;
+  expiryDate?: Date;
+  approvalStatus: "pending" | "approved" | "rejected";
+  approvedBy?: Types.ObjectId;
+  approvedAt?: Date;
+  department?: Types.ObjectId;
+  gradeLevel?: string;
+  taxable: boolean;
+  active: boolean;
+  createdBy: Types.ObjectId;
+  updatedBy: Types.ObjectId;
 }
 
 export interface IOvertime {
@@ -85,7 +103,7 @@ export interface IPayroll {
   salaryGrade: Types.ObjectId;
 
   payPeriod: {
-    type: PayPeriod;
+    type: PayrollFrequency;
     startDate: Date;
     endDate: Date;
     month: number;
@@ -382,6 +400,7 @@ export interface ISalaryComponent {
 export interface ISalaryGradeDetails {
   basicSalary: number;
   components: ISalaryComponent[];
+  additionalAllowances: IAdditionalAllowance[];
   totalAllowances: number;
   grossSalary: number;
 }
@@ -409,4 +428,96 @@ export interface ICalculatedComponent {
   calculationMethod: "fixed" | "percentage";
   amount: number;
   isActive: boolean;
+}
+
+// Add BonusItem interface
+export interface BonusItem {
+  type: string;
+  description: string;
+  amount: number;
+}
+
+// Add IPayrollCalculationResult
+export interface IPayrollCalculationResult {
+  employee: IEmployee;
+  department: Types.ObjectId;
+  salaryGrade: Types.ObjectId;
+  month: number;
+  year: number;
+  periodStart: Date;
+  periodEnd: Date;
+  basicSalary: number;
+  components: ISalaryComponent[];
+  allowances: {
+    gradeAllowances: Array<{
+      name: string;
+      type: string;
+      value: number;
+      amount: number;
+    }>;
+    additionalAllowances: IAdditionalAllowance[];
+    totalAllowances: number;
+  };
+  bonuses: {
+    items: IPayrollBonus[];
+    totalBonuses: number;
+  };
+  earnings: {
+    overtime: IOvertime;
+    bonus: BonusItem[];
+    totalEarnings: number;
+  };
+  deductions: {
+    tax: {
+      taxableAmount: number;
+      taxRate: number;
+      amount: number;
+    };
+    pension: {
+      pensionableAmount: number;
+      rate: number;
+      amount: number;
+    };
+    loans: any[];
+    others: any[];
+    totalDeductions: number;
+  };
+  totals: {
+    basicSalary: number;
+    totalAllowances: number;
+    totalBonuses: number;
+    grossEarnings: number;
+    totalDeductions: number;
+    netPay: number;
+  };
+  status: PayrollStatus;
+  frequency: PayrollFrequency;
+}
+
+// Add these interfaces
+export interface IPayrollBonus {
+  type: string;
+  description: string;
+  amount: number;
+}
+
+export interface IAdditionalAllowance {
+  name: string;
+  amount: number;
+}
+
+// Add this interface with the bonus filters
+export interface IBonusFilters {
+  employee?: Types.ObjectId;
+  department?: Types.ObjectId;
+  approvalStatus?: string;
+  type?: BonusType;
+  active?: boolean;
+}
+
+export interface IPayrollAllowance {
+  name: string;
+  type: string;
+  value: number;
+  amount: number;
 }
