@@ -6,17 +6,23 @@ import {
   FaExclamationTriangle,
   FaFileAlt,
 } from "react-icons/fa";
-import { PayrollPeriod } from "../../../types/payroll";
-import { payrollPeriods, payrollSummaries } from "../../../data/payroll";
+import {
+  PayrollStatus,
+  type PayrollPeriod,
+  type PayrollStats,
+} from "../../../types/payroll";
+import { payrollService } from "../../../services/payrollService";
 import { Link } from "react-router-dom";
 import TableSkeleton from "../../../components/skeletons/TableSkeleton";
 import { toast } from "react-toastify";
 
-const statusColors: Record<PayrollPeriod["status"], string> = {
-  draft: "bg-gray-100 text-gray-800",
-  processing: "bg-yellow-100 text-yellow-800",
-  approved: "bg-green-100 text-green-800",
-  paid: "bg-green-100 text-green-800",
+const statusColors: Record<PayrollStatus, string> = {
+  [PayrollStatus.PENDING]: "bg-yellow-100 text-yellow-800",
+  [PayrollStatus.PROCESSING]: "bg-blue-100 text-blue-800",
+  [PayrollStatus.APPROVED]: "bg-green-100 text-green-800",
+  [PayrollStatus.REJECTED]: "bg-red-100 text-red-800",
+  [PayrollStatus.PAID]: "bg-green-100 text-green-800",
+  [PayrollStatus.CANCELLED]: "bg-gray-100 text-gray-800",
 };
 
 const formatCurrency = (amount: number | undefined) => {
@@ -28,14 +34,14 @@ const formatCurrency = (amount: number | undefined) => {
 };
 
 export default function ProcessPayroll() {
-  const [selectedStatus, setSelectedStatus] = useState<
-    PayrollPeriod["status"] | "all"
-  >("all");
+  const [selectedStatus, setSelectedStatus] = useState<PayrollStatus | "all">(
+    "all"
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [payrollPeriods, setPayrollPeriods] = useState<PayrollPeriod[]>([]);
-  const [summary, setSummary] = useState({
-    totalPayroll: 0,
+  const [summary, setSummary] = useState<PayrollStats>({
     totalEmployees: 0,
+    totalNetSalary: 0,
     pendingReviews: 0,
   });
 
@@ -44,9 +50,9 @@ export default function ProcessPayroll() {
       ? payrollPeriods
       : payrollPeriods.filter((period) => period.status === selectedStatus);
 
-  const currentSummary = payrollSummaries[0];
+  const currentSummary = payrollPeriods[0];
   const pendingReviews = payrollPeriods.filter(
-    (p) => p.status === "processing"
+    (p) => p.status === PayrollStatus.PROCESSING
   ).length;
 
   const handleRunPayroll = async () => {
@@ -95,7 +101,7 @@ export default function ProcessPayroll() {
     onProcess: () => void;
     isLoading: boolean;
   }) => (
-    <tr className="hover:bg-gray-50 transition-all duration-200 transform hover:-translate-y-0.5 hover:shadow-md cursor-pointer">
+    <tr className="hover:bg-gray-50 transition-all duration-200">
       <td className="px-6 py-4 whitespace-nowrap">
         <div className="text-sm md:text-base font-medium text-gray-900">
           {new Date(period.year, period.month - 1).toLocaleString("default", {
@@ -113,27 +119,26 @@ export default function ProcessPayroll() {
       <td className="px-6 py-4 whitespace-nowrap">
         <span
           className={`px-2 py-1 inline-flex text-xs md:text-sm leading-5 font-semibold rounded-full ${
-            statusColors[period.status]
+            statusColors[period.status as PayrollStatus]
           }`}
         >
-          {period.status.charAt(0).toUpperCase() + period.status.slice(1)}
+          {period.status}
         </span>
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm md:text-base text-gray-500">
         {period.processedDate
-          ? period.processedDate.toLocaleDateString()
+          ? new Date(period.processedDate).toLocaleDateString()
           : "Pending"}
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-right">
         <button
           className="text-xs md:text-sm px-2 py-1 bg-green-100 text-green-700 rounded-lg 
-                   hover:bg-green-200 transition-all duration-200 transform hover:-translate-y-0.5
-                   hover:shadow-md cursor-pointer focus:outline-none focus:ring-0"
+                   hover:bg-green-200 transition-all duration-200"
           onClick={onProcess}
         >
           {isLoading
             ? "Processing..."
-            : period.status === "paid"
+            : period.status === PayrollStatus.PAID
             ? "View Details"
             : "Process"}
         </button>
@@ -163,11 +168,17 @@ export default function ProcessPayroll() {
     const fetchPayrollData = async () => {
       setIsLoading(true);
       try {
-        // TODO: Implement API calls to fetch:
-        // - Payroll periods
-        // - Summary data
-        // - Active allowances and bonuses
-        await new Promise((resolve) => setTimeout(resolve, 1000)); // Remove this when implementing real API
+        // Fetch payroll periods
+        const periods = await payrollService.getPayrollPeriods();
+        setPayrollPeriods(periods);
+
+        // Fetch payroll stats
+        const stats = await payrollService.getPayrollStats();
+        setSummary({
+          totalNetSalary: stats.totalNetSalary || 0,
+          totalEmployees: stats.totalEmployees || 0,
+          pendingReviews: stats.pendingReviews || 0,
+        });
       } catch (error) {
         toast.error("Failed to fetch payroll data");
       } finally {
@@ -204,7 +215,7 @@ export default function ProcessPayroll() {
         <SummaryCard
           icon={<FaMoneyBill className="h-6 w-6 text-green-600" />}
           title="Total Payroll Amount"
-          value={formatCurrency(summary.totalPayroll)}
+          value={formatCurrency(summary.totalNetSalary)}
         />
 
         <SummaryCard
@@ -225,23 +236,18 @@ export default function ProcessPayroll() {
         <div className="flex items-center">
           <FaFilter className="h-4 w-4 text-green-600 mr-2" />
           <select
-            className="text-sm md:text-base border-gray-300 rounded-lg shadow-sm 
-                     !bg-green-600 !text-white px-3 py-1.5 
-                     hover:!bg-green-700 transition-all duration-200
-                     transform hover:-translate-y-0.5 hover:shadow-md
-                     focus:outline-none focus:ring-0 cursor-pointer"
+            className="text-sm md:text-base border-gray-300 rounded-lg shadow-sm"
             value={selectedStatus}
             onChange={(e) =>
-              setSelectedStatus(
-                e.target.value as PayrollPeriod["status"] | "all"
-              )
+              setSelectedStatus(e.target.value as PayrollStatus | "all")
             }
           >
             <option value="all">All Status</option>
-            <option value="draft">Draft</option>
-            <option value="processing">Processing</option>
-            <option value="approved">Approved</option>
-            <option value="paid">Paid</option>
+            {Object.values(PayrollStatus).map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
           </select>
         </div>
       </div>

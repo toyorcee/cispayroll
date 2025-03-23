@@ -5,40 +5,134 @@ import type {
   PayrollPeriod,
   PayrollCalculationRequest,
   IPayrollCalculationResult,
+  ISalaryGrade,
 } from "../types/payroll";
 
-const BASE_URL = "/api";
-
-interface CreatePayrollData {
-  employee: string;
-  month: number;
-  year: number;
-  salaryGrade: string;
-}
+const BASE_URL = "/api/super-admin";
 
 export const payrollService = {
-  createPayroll: async (
+  // Calculate Payroll
+  calculatePayroll: async (
     data: PayrollCalculationRequest
   ): Promise<IPayrollCalculationResult> => {
     try {
-      const response = await axios.post(
-        `${BASE_URL}/super-admin/payroll`,
-        data
-      );
-      return response.data;
+      console.log("🧮 Calculating payroll with data:", data);
+      const response = await axios.post(`${BASE_URL}/payroll`, data);
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to calculate payroll");
+      }
+
+      console.log("✅ Payroll calculation result:", response.data);
+      return response.data.data;
     } catch (error: any) {
-      console.error("❌ Error creating payroll:", error);
-      toast.error(error.response?.data?.message || "Failed to create payroll");
+      console.error("❌ Error calculating payroll:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to calculate payroll"
+      );
       throw error;
     }
   },
 
-  deletePayroll: async (id: string) => {
+  // Get Salary Grades
+  getSalaryGrades: async (): Promise<ISalaryGrade[]> => {
     try {
-      const response = await axios.delete(
-        `${BASE_URL}/super-admin/payroll/${id}`
+      console.log("🔄 Fetching salary grades...");
+      const response = await axios.get(`${BASE_URL}/salary-grades`);
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to fetch salary grades"
+        );
+      }
+
+      console.log("✅ Salary grades fetched:", response.data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Error fetching salary grades:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch salary grades"
       );
-      return response.data;
+      throw error;
+    }
+  },
+
+  // Get Single Salary Grade
+  getSalaryGrade: async (id: string): Promise<ISalaryGrade> => {
+    try {
+      console.log("🔄 Fetching salary grade:", id);
+      const response = await axios.get(`${BASE_URL}/salary-grades/${id}`);
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to fetch salary grade"
+        );
+      }
+
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Error fetching salary grade:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch salary grade"
+      );
+      throw error;
+    }
+  },
+
+  // Get Payroll Periods
+  getPayrollPeriods: async (): Promise<PayrollPeriod[]> => {
+    try {
+      console.log("🔄 Fetching payroll periods...");
+      const response = await axios.get(`${BASE_URL}/payroll/periods`);
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to fetch payroll periods"
+        );
+      }
+
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Error fetching payroll periods:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch payroll periods"
+      );
+      throw error;
+    }
+  },
+
+  // Process Payroll
+  processPayroll: async (
+    data: PayrollCalculationRequest
+  ): Promise<IPayroll> => {
+    try {
+      console.log("🔄 Processing payroll...", data);
+      const response = await axios.post(`${BASE_URL}/payroll/process`, data);
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to process payroll");
+      }
+
+      console.log("✅ Payroll processed:", response.data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Error processing payroll:", error);
+      toast.error(error.response?.data?.message || "Failed to process payroll");
+      throw error;
+    }
+  },
+
+  // Delete Payroll
+  deletePayroll: async (id: string): Promise<void> => {
+    try {
+      console.log("🗑️ Deleting payroll:", id);
+      const response = await axios.delete(`${BASE_URL}/payroll/${id}`);
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to delete payroll");
+      }
+
+      toast.success("Payroll deleted successfully");
     } catch (error: any) {
       console.error("❌ Error deleting payroll:", error);
       toast.error(error.response?.data?.message || "Failed to delete payroll");
@@ -46,16 +140,23 @@ export const payrollService = {
     }
   },
 
-  getPayrollPeriods: async (): Promise<PayrollPeriod[]> => {
+  // Get Payroll Statistics
+  getPayrollStats: async () => {
     try {
-      const response = await axios.get(
-        `${BASE_URL}/super-admin/payroll/periods`
-      );
+      console.log("📊 Fetching payroll statistics...");
+      const response = await axios.get(`${BASE_URL}/payroll/stats`);
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to fetch payroll statistics"
+        );
+      }
+
       return response.data.data;
     } catch (error: any) {
-      console.error("❌ Error fetching payroll periods:", error);
+      console.error("❌ Error fetching payroll statistics:", error);
       toast.error(
-        error.response?.data?.message || "Failed to fetch payroll periods"
+        error.response?.data?.message || "Failed to fetch payroll statistics"
       );
       throw error;
     }
