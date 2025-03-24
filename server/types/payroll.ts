@@ -521,3 +521,131 @@ export interface IPayrollAllowance {
   value: number;
   amount: number;
 }
+
+// Add these interfaces to your types file
+export interface PopulatedEmployee {
+  _id: Types.ObjectId;
+  firstName: string;
+  lastName: string;
+  employeeId: string;
+  bankDetails?: {
+    bankName: string;
+    accountNumber: string;
+    accountName: string;
+  };
+  department?: Types.ObjectId;
+  salaryGrade?: Types.ObjectId;
+}
+
+export interface PopulatedDepartment {
+  _id: Types.ObjectId;
+  name: string;
+  code: string;
+}
+
+export interface PopulatedSalaryGrade {
+  _id: Types.ObjectId;
+  level: string;
+  description: string;
+}
+
+export interface PopulatedPayrollRecord {
+  _id: Types.ObjectId;
+  employee: {
+    _id: Types.ObjectId;
+    firstName: string;
+    lastName: string;
+    employeeId: string;
+    bankDetails?: {
+      bankName: string;
+      accountNumber: string;
+      accountName: string;
+    };
+  };
+  department: {
+    _id: Types.ObjectId;
+    name: string;
+    code: string;
+  };
+  salaryGrade: {
+    _id: Types.ObjectId;
+    level: string;
+    description: string;
+  };
+  month: number;
+  year: number;
+  basicSalary: number;
+  allowances: {
+    gradeAllowances: Array<{
+      name: string;
+      type: string;
+      value: number;
+      amount: number;
+    }>;
+    additionalAllowances: Array<{
+      name: string;
+      type: string;
+      value: number;
+      amount: number;
+      frequency: string;
+    }>;
+    totalAllowances: number;
+  };
+  earnings: {
+    overtime: {
+      hours: number;
+      rate: number;
+      amount: number;
+    };
+    bonus: Array<{
+      description: string;
+      amount: number;
+    }>;
+    totalEarnings: number;
+  };
+  deductions: {
+    tax: {
+      taxableAmount: number;
+      taxRate: number;
+      amount: number;
+    };
+    pension: {
+      pensionableAmount: number;
+      rate: number;
+      amount: number;
+    };
+    loans: Array<{
+      description: string;
+      amount: number;
+    }>;
+    others: Array<{
+      description: string;
+      amount: number;
+    }>;
+    totalDeductions: number;
+  };
+  bonuses: {
+    items: Array<{
+      type: string;
+      description: string;
+      amount: number;
+    }>;
+    totalBonuses: number;
+  };
+  totals: {
+    basicSalary: number;
+    totalAllowances: number;
+    totalBonuses: number;
+    grossEarnings: number;
+    totalDeductions: number;
+    netPay: number;
+  };
+  payment: {
+    bankName: string;
+    accountNumber: string;
+    accountName: string;
+  };
+  status: PayrollStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}

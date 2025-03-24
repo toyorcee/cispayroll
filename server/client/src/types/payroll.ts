@@ -46,10 +46,11 @@ export interface PayrollPeriod {
   _id: string;
   month: number;
   year: number;
-  totalEmployees: number;
-  totalNetSalary: number;
   status: PayrollStatus;
+  totalNetSalary?: number;
+  totalEmployees?: number;
   processedDate?: string;
+  employee?: string;
 }
 
 // Add PayrollStats interface for the summary data
@@ -126,4 +127,63 @@ export interface PayrollCalculationRequest {
   salaryGrade: string;
   month: number;
   year: number;
+}
+
+export interface PeriodPayrollResponse {
+  period: {
+    month: number;
+    year: number;
+    monthName: string;
+  };
+  employees: Array<{
+    id: string;
+    employee: {
+      id: string;
+      name: string;
+      employeeId: string;
+    };
+    department: string;
+    salaryGrade: {
+      level: string;
+      description: string;
+    };
+    payroll: {
+      basicSalary: number;
+      totalAllowances: number;
+      totalDeductions: number;
+      netPay: number;
+    };
+    status: PayrollStatus;
+    processedAt: string;
+  }>;
+  summary: {
+    totalEmployees: number;
+    totalNetPay: number;
+    totalBasicSalary: number;
+    totalAllowances: number;
+    totalDeductions: number;
+    statusBreakdown: Record<PayrollStatus, number>;
+  };
+}
+
+// Add this interface to your types/payroll.ts
+export interface Payslip {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  month: number;
+  year: number;
+  basicSalary: number;
+  allowances: Array<{
+    type: string;
+    amount: number;
+  }>;
+  deductions: Array<{
+    type: string;
+    amount: number;
+  }>;
+  netPay: number;
+  status: PayrollStatus;
+  paymentDate: Date;
+  createdAt: string;
 }

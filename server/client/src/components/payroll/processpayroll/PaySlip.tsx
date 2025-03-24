@@ -1,4 +1,6 @@
 import React from "react";
+import { FaMoneyCheckAlt } from "react-icons/fa";
+import { PayrollBranding } from "../../shared/PayrollBranding";
 
 interface PayrollData {
   _id: string;
@@ -96,9 +98,9 @@ const formatAmount = (amount: number) => {
 export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
   return (
     <div className="bg-white p-6 rounded-lg shadow-md print:shadow-none">
-      {/* Header */}
-      <div className="text-center border-b pb-4">
-        <h2 className="text-2xl font-bold">PAYSLIP</h2>
+      <div className="border-b pb-4">
+        <PayrollBranding className="mb-4" />
+        <h2 className="text-2xl font-bold text-center">PAYSLIP</h2>
         <div className="text-sm text-gray-600">
           <p>Reference: {data._id}</p>
           <p>
@@ -135,7 +137,7 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
 
       {/* Earnings Breakdown */}
       <div className="my-6">
-        <h3 className="font-semibold mb-3">Earnings</h3>
+        <h3 className="text-lg font-semibold text-green-600 mb-2">Earnings</h3>
         <table className="w-full text-sm">
           <tbody>
             <tr className="border-t">
@@ -178,7 +180,9 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
 
       {/* Deductions Breakdown */}
       <div className="my-6">
-        <h3 className="font-semibold mb-3">Deductions</h3>
+        <h3 className="text-lg font-semibold text-green-600 mb-2">
+          Deductions
+        </h3>
         <table className="w-full text-sm">
           <tbody>
             <tr className="border-t">
@@ -224,7 +228,7 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
         </div>
       </div>
 
-      {/* Footer */}
+      {/* Updated Footer */}
       <div className="mt-8 text-xs text-gray-500 border-t pt-4">
         <p>
           Period: {new Date(data.periodStart).toLocaleDateString()} -{" "}
@@ -232,6 +236,9 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
         </p>
         <p>Generated on: {new Date(data.createdAt).toLocaleString()}</p>
         <p>Status: {data.status}</p>
+        <p className="text-center mt-2">
+          Powered by Century Information Systems | {new Date().getFullYear()}
+        </p>
       </div>
 
       {/* Print Button */}

@@ -3,17 +3,21 @@ import { motion, useInView } from "framer-motion";
 import Chart from "chart.js/auto";
 import { ChartData, ChartDataset, Color } from "chart.js";
 
+interface PieChartDataset {
+  label?: string;
+  data: number[];
+  backgroundColor: string[];
+  borderColor: string[];
+  borderWidth: number;
+}
+
+interface PieChartData {
+  labels: string[];
+  datasets: PieChartDataset[];
+}
+
 interface PieChartProps {
-  data: {
-    labels: string[];
-    datasets: {
-      label: string;
-      data: number[];
-      backgroundColor: string[];
-      borderColor: string[];
-      borderWidth: number;
-    }[];
-  };
+  data: PieChartData;
 }
 
 const PieChart = ({ data }: PieChartProps) => {

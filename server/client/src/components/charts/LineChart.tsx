@@ -1,6 +1,20 @@
 import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import Chart from "chart.js/auto";
+import { TooltipItem, ChartType } from "chart.js";
+
+// Define proper tooltip types
+interface ChartTooltipContext {
+  dataset: {
+    label: string;
+    data: number[];
+  };
+  parsed: {
+    y: number;
+  };
+  formattedValue: string;
+  label: string;
+}
 
 interface LineChartProps {
   data: {
@@ -48,25 +62,10 @@ const LineChart = ({ data }: LineChartProps) => {
             animation: {
               duration: 2000,
               easing: "easeInOutQuart",
-              delay: (context) => {
-                const delay = context.dataIndex * 100;
-                return delay;
-              },
-            },
-            transitions: {
-              active: {
-                animation: {
-                  duration: 400,
-                },
-              },
-            },
-            interaction: {
-              intersect: false,
-              mode: "index",
             },
             plugins: {
               legend: {
-                position: "top",
+                position: "top" as const,
                 labels: {
                   font: {
                     size: 12,
@@ -79,7 +78,6 @@ const LineChart = ({ data }: LineChartProps) => {
               tooltip: {
                 backgroundColor: "rgba(0, 0, 0, 0.8)",
                 padding: 12,
-                cornerRadius: 8,
                 titleFont: {
                   size: 14,
                   weight: "bold",
@@ -88,8 +86,11 @@ const LineChart = ({ data }: LineChartProps) => {
                   size: 13,
                 },
                 callbacks: {
-                  label: (context) => {
-                    return `${context.dataset.label}: ${context.formattedValue}`;
+                  label: function (tooltipItem: TooltipItem<"line">) {
+                    const value = tooltipItem.raw as number;
+                    return `${
+                      tooltipItem.dataset.label
+                    }: ₦${value.toLocaleString()}`;
                   },
                 },
               },

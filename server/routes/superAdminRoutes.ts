@@ -170,6 +170,12 @@ router.get(
   SuperAdminController.getEmployeePayrollHistory as unknown as RequestHandler
 );
 
+router.get(
+  "/payroll/period/:month/:year",
+  requirePermission([Permission.VIEW_ALL_PAYROLL]),
+  SuperAdminController.getPeriodPayroll as unknown as RequestHandler
+);
+
 // router.get(
 //   "/payroll/department/:departmentId",
 //   requirePermission([Permission.VIEW_ALL_PAYROLL]),

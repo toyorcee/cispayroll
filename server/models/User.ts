@@ -193,6 +193,7 @@ export interface IUser {
   createdBy?: Types.ObjectId;
   offboarding?: Offboarding;
   onboarding?: Onboarding;
+  salaryGrade?: Types.ObjectId;
 }
 
 // Interface for user methods
@@ -245,6 +246,7 @@ export interface UserDocument extends mongoose.Document {
   createdBy?: Types.ObjectId;
   offboarding?: Offboarding;
   onboarding?: Onboarding;
+  salaryGrade?: Types.ObjectId;
   hasPermission(permission: Permission): boolean;
   hasRole(role: UserRole): boolean;
 }
@@ -452,6 +454,11 @@ const UserSchema = new Schema<UserDocument, UserModel>(
       },
       startedAt: Date,
       completedAt: Date,
+    },
+    salaryGrade: {
+      type: Schema.Types.ObjectId,
+      ref: "SalaryGrade",
+      required: false,
     },
   },
   {

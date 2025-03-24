@@ -1,9 +1,13 @@
 import React from "react";
-import { Payslip } from "../../../types/payslip";
-import { FaDownload, FaPrint, FaEnvelope } from "react-icons/fa";
+import { Payslip } from "../../../types/payroll";
+import {
+  FaDownload,
+  FaPrint,
+  FaEnvelope,
+} from "react-icons/fa";
 import { useAuth } from "../../../context/AuthContext";
-import { UserRole } from "../../../types/auth";
 import { generatePayslipPDF } from "../../../utils/pdfGenerator";
+import { PayrollBranding } from "../../shared/PayrollBranding";
 
 interface PayslipDetailProps {
   payslip: Payslip;
@@ -32,6 +36,10 @@ export default function PayslipDetail({
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
       <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-2/3 shadow-lg rounded-md bg-white">
+        <div className="border-b pb-4 mb-4">
+          <PayrollBranding />
+        </div>
+
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-gray-900">Payslip Details</h2>
           <div className="flex space-x-2">
@@ -64,13 +72,17 @@ export default function PayslipDetail({
           <div className="border-b pb-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <h3 className="text-lg font-semibold">Pay Period</h3>
+                <h3 className="text-lg font-semibold text-green-600 mb-2">
+                  Pay Period
+                </h3>
                 <p className="text-gray-600">
                   {payslip.month} {payslip.year}
                 </p>
               </div>
               <div className="text-right">
-                <h3 className="text-lg font-semibold">Payment Date</h3>
+                <h3 className="text-lg font-semibold text-green-600 mb-2">
+                  Payment Date
+                </h3>
                 <p className="text-gray-600">
                   {payslip.paymentDate?.toLocaleDateString()}
                 </p>
@@ -80,7 +92,9 @@ export default function PayslipDetail({
 
           {/* Earnings Section */}
           <div className="border-b pb-4">
-            <h3 className="text-lg font-semibold mb-3">Earnings</h3>
+            <h3 className="text-lg font-semibold text-green-600 mb-2">
+              Earnings
+            </h3>
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span>Basic Salary</span>
@@ -97,7 +111,9 @@ export default function PayslipDetail({
 
           {/* Deductions Section */}
           <div className="border-b pb-4">
-            <h3 className="text-lg font-semibold mb-3">Deductions</h3>
+            <h3 className="text-lg font-semibold text-green-600 mb-2">
+              Deductions
+            </h3>
             <div className="space-y-2">
               {payslip.deductions.map((deduction, index) => (
                 <div key={index} className="flex justify-between">
@@ -141,14 +157,20 @@ export default function PayslipDetail({
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex justify-end space-x-3 pt-4">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
-            >
-              Close
-            </button>
+          {/* Actions and Footer */}
+          <div className="border-t mt-6 pt-4">
+            <div className="flex justify-between items-center">
+              <p className="text-xs text-gray-500">
+                Powered by Century Information Systems |{" "}
+                {new Date().getFullYear()}
+              </p>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       </div>

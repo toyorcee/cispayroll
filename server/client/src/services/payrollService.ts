@@ -8,6 +8,7 @@ import type {
   ISalaryGrade,
   PayrollData,
   PayrollStats,
+  PeriodPayrollResponse,
 } from "../types/payroll";
 
 const BASE_URL = "/api/super-admin";
@@ -211,10 +212,8 @@ export const payrollService = {
     }
   },
 
-  // Add new method to fetch employee payroll history
-  getEmployeePayrollHistory: async (
-    employeeId: string
-  ): Promise<PayrollData[]> => {
+  // Get Employee Payroll History
+  getEmployeePayrollHistory: async (employeeId: string) => {
     try {
       const response = await axios.get(
         `${BASE_URL}/payroll/employee/${employeeId}/history`
@@ -225,6 +224,34 @@ export const payrollService = {
       return response.data.data;
     } catch (error) {
       console.error("Error fetching employee payroll history:", error);
+      throw error;
+    }
+  },
+
+  // Get Payroll Period Details
+  getPeriodPayroll: async (
+    month: number,
+    year: number
+  ): Promise<PeriodPayrollResponse> => {
+    try {
+      console.log(`🔄 Fetching payroll data for period: ${month}/${year}`);
+      const response = await axios.get(
+        `${BASE_URL}/payroll/period/${month}/${year}`
+      );
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to fetch period payroll data"
+        );
+      }
+
+      console.log("✅ Period payroll data fetched:", response.data.data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Error fetching period payroll data:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch period payroll data"
+      );
       throw error;
     }
   },

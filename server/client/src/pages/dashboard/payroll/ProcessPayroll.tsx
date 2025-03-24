@@ -13,15 +13,29 @@ import {
   type PayrollStats,
   type PayrollData,
   type PayrollCalculationRequest,
+  type PeriodPayrollResponse,
+  type Payslip,
 } from "../../../types/payroll";
 import { payrollService } from "../../../services/payrollService";
 import { Link } from "react-router-dom";
 import TableSkeleton from "../../../components/skeletons/TableSkeleton";
 import { toast } from "react-toastify";
 import PayslipDetail from "../../../components/payroll/processpayroll/PayslipDetail";
-import { Payslip } from "../../../types/payslip";
 import { BarChart, LineChart, PieChart } from "../../../components/charts";
 import { useInView } from "framer-motion";
+import PayrollHistoryModal from "../../../components/payroll/processpayroll/PayrollHistoryModal";
+import PayrollPeriodModal from "../../../components/payroll/processpayroll/PayrollPeriodModal";
+import { mapToPayslip } from "../../../utils/payrollUtils";
+import {
+  TableContainer,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Paper,
+  Skeleton,
+} from "@mui/material";
 
 const statusColors: Record<PayrollStatus, string> = {
   [PayrollStatus.PENDING]: "bg-yellow-100 text-yellow-800",
@@ -109,6 +123,17 @@ interface EmployeePayrollChartsProps {
   };
 }
 
+// Add proper typing for allowances and deductions
+interface Allowance {
+  name: string;
+  amount: number;
+}
+
+interface Deduction {
+  name: string;
+  amount: number;
+}
+
 const EmployeePayrollCharts: React.FC<EmployeePayrollChartsProps> = ({
   employeeData,
 }) => (
@@ -141,22 +166,20 @@ const EmployeePayrollCharts: React.FC<EmployeePayrollChartsProps> = ({
       <h3 className="text-lg font-semibold mb-4">Current Earnings Breakdown</h3>
       <PieChart
         data={{
-          labels: ["Basic Salary", "Allowances", "Bonuses", "Deductions"],
+          labels: ["Basic Salary", "Allowances", "Deductions"],
           datasets: [
             {
               data: [
                 employeeData.payrollHistory[0].basicSalary,
                 employeeData.payrollHistory[0].allowances.totalAllowances,
-                employeeData.payrollHistory[0].bonuses.totalBonuses,
                 -employeeData.payrollHistory[0].deductions.totalDeductions,
               ],
               backgroundColor: [
                 "rgba(34, 197, 94, 0.8)",
                 "rgba(59, 130, 246, 0.8)",
-                "rgba(234, 179, 8, 0.8)",
                 "rgba(239, 68, 68, 0.8)",
               ],
-              borderColor: ["white", "white", "white", "white"],
+              borderColor: ["white", "white", "white"],
               borderWidth: 2,
             },
           ],
@@ -176,6 +199,11 @@ export default function ProcessPayroll() {
     employeeId: string;
     payrollHistory: PayrollData[];
   } | null>(null);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [selectedEmployeeHistory, setSelectedEmployeeHistory] = useState(null);
+  const [showPeriodModal, setShowPeriodModal] = useState(false);
+  const [selectedPeriodData, setSelectedPeriodData] =
+    useState<PeriodPayrollResponse | null>(null);
 
   // Add queryClient for local updates
   const queryClient = useQueryClient();
@@ -243,70 +271,41 @@ export default function ProcessPayroll() {
 
   const currentSummary = periodsData[0];
 
-  const handleViewPayslip = async (period: PayrollPeriod) => {
+  const handleViewHistory = async (period: PayrollPeriod) => {
     try {
-      const payrollData = await payrollService.getPayrollById(period._id);
-
-      // Fetch employee's payroll history when viewing details
-      const employeeHistory = await payrollService.getEmployeePayrollHistory(
-        payrollData.employee.employeeId
+      const periodData = await payrollService.getPeriodPayroll(
+        period.month,
+        period.year
       );
+      setSelectedPeriodData(periodData);
+      setShowPeriodModal(true);
+    } catch (error) {
+      toast.error("Failed to fetch period payroll data");
+    }
+  };
 
-      setSelectedEmployeeData({
-        employeeId: payrollData.employee.employeeId,
-        payrollHistory: employeeHistory,
-      });
-
-      // Map PayrollStatus to Payslip status
-      const mapStatus = (status: string): "pending" | "processed" | "paid" => {
-        switch (status.toLowerCase()) {
-          case "pending":
-          case "processing":
-            return "pending";
-          case "approved":
-            return "processed";
-          case "paid":
-            return "paid";
-          default:
-            return "pending";
-        }
-      };
-
-      const payslipData: Payslip = {
-        id: payrollData._id,
-        employeeId: payrollData.employee.employeeId,
-        basicSalary: payrollData.basicSalary,
-        allowances: payrollData.allowances.gradeAllowances.map((a) => ({
-          type: a.name,
-          amount: a.amount,
-        })),
-        deductions: [
-          {
-            type: "Tax",
-            amount: payrollData.deductions.tax.amount,
-          },
-          {
-            type: "Pension",
-            amount: payrollData.deductions.pension.amount,
-          },
-          ...payrollData.deductions.others.map((d) => ({
-            type: d.name,
-            amount: d.amount,
-          })),
-        ],
-        netPay: payrollData.totals.netPay,
-        month: payrollData.month,
-        year: payrollData.year,
-        status: mapStatus(payrollData.status),
-        paymentDate: new Date(payrollData.createdAt),
-        createdAt: new Date(payrollData.createdAt),
-      };
-
+  const handleViewPayslip = async (employeeId: string) => {
+    try {
+      const payrollData = await payrollService.getEmployeePayrollHistory(
+        employeeId
+      );
+      const payslipData = mapToPayslip(payrollData);
       setSelectedPayslip(payslipData);
       setShowPayslipModal(true);
     } catch (error) {
-      console.error("Error fetching payroll:", error);
-      toast.error("Failed to fetch payroll details");
+      toast.error("Failed to fetch payslip details");
+    }
+  };
+
+  const handleViewEmployeeHistory = async (employeeId: string) => {
+    try {
+      const history = await payrollService.getEmployeePayrollHistory(
+        employeeId
+      );
+      setSelectedEmployeeHistory(history);
+      setShowHistoryModal(true);
+    } catch (error) {
+      toast.error("Failed to fetch employee history");
     }
   };
 
@@ -333,59 +332,6 @@ export default function ProcessPayroll() {
         </div>
       </div>
     </div>
-  );
-
-  // Type the props for PayrollRow
-  interface PayrollRowProps {
-    period: PayrollPeriod;
-    onProcess: () => void;
-    isLoading: boolean;
-  }
-
-  const PayrollRow = ({ period, onProcess, isLoading }: PayrollRowProps) => (
-    <tr className="hover:bg-gray-50 transition-all duration-200">
-      <td className="px-6 py-4 whitespace-nowrap">
-        <div className="text-sm md:text-base font-medium text-gray-900">
-          {new Date(period.year, period.month - 1).toLocaleString("default", {
-            month: "long",
-            year: "numeric",
-          })}
-        </div>
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm md:text-base text-gray-500">
-        {period.totalEmployees || 0} employees
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm md:text-base font-medium text-gray-900">
-        {formatCurrency(period.totalNetSalary)}
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap">
-        <span
-          className={`px-2 py-1 inline-flex text-xs md:text-sm leading-5 font-semibold rounded-full ${
-            statusColors[period.status as PayrollStatus]
-          }`}
-        >
-          {period.status}
-        </span>
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm md:text-base text-gray-500">
-        {period.processedDate
-          ? new Date(period.processedDate).toLocaleDateString()
-          : "Pending"}
-      </td>
-      <td className="px-6 py-4 whitespace-nowrap text-right">
-        <button
-          className="text-xs md:text-sm px-2 py-1 bg-green-100 text-green-700 rounded-lg 
-                   hover:bg-green-200 transition-all duration-200"
-          onClick={onProcess}
-        >
-          {isLoading
-            ? "Processing..."
-            : period.status === PayrollStatus.PAID
-            ? "View Details"
-            : "Process"}
-        </button>
-      </td>
-    </tr>
   );
 
   const EmptyState = () => (
@@ -434,34 +380,6 @@ export default function ProcessPayroll() {
         backgroundColor: "rgba(34, 197, 94, 0.1)",
       },
     ],
-    options: {
-      interaction: {
-        mode: "index",
-        intersect: false,
-      },
-      tooltips: {
-        callbacks: {
-          label: (context: ChartTooltipContext) => {
-            return `Amount: ${formatCurrency(context.parsed.y)}`;
-          },
-          title: (items: ChartTooltipItem[]) => {
-            if (items.length > 0) {
-              const periodLabel = items[0].label;
-              const period = periodsData.find(
-                (p) =>
-                  `${new Date(p.year, p.month - 1).toLocaleString("default", {
-                    month: "short",
-                  })}/${p.year}` === periodLabel
-              );
-              return `Period: ${periodLabel}\nEmployees: ${
-                period?.totalEmployees || 0
-              }`;
-            }
-            return "";
-          },
-        },
-      },
-    },
   };
 
   const employeeTrendsData: BarChartData = {
@@ -517,16 +435,82 @@ export default function ProcessPayroll() {
             .length,
         ],
         backgroundColor: [
-          "rgba(234, 179, 8, 0.8)", // yellow for Pending
-          "rgba(34, 197, 94, 0.8)", // green for Approved
-          "rgba(59, 130, 246, 0.8)", // blue for Paid
-          "rgba(249, 115, 22, 0.8)", // orange for Processing
+          "rgba(234, 179, 8, 0.8)",
+          "rgba(34, 197, 94, 0.8)",
+          "rgba(59, 130, 246, 0.8)",
+          "rgba(249, 115, 22, 0.8)",
         ],
         borderColor: ["white", "white", "white", "white"],
         borderWidth: 2,
       },
     ],
   };
+
+  // Update the table to use MUI components properly
+  const PayrollTable = () => (
+    <TableContainer component={Paper} className="rounded-lg shadow">
+      <Table>
+        <TableHead className="bg-gray-50">
+          <TableRow>
+            <TableCell>Period</TableCell>
+            <TableCell>Employees</TableCell>
+            <TableCell>Net Salary</TableCell>
+            <TableCell>Status</TableCell>
+            <TableCell>Date</TableCell>
+            <TableCell align="center">Actions</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {filteredPeriods.length > 0 ? (
+            filteredPeriods.map((period) => (
+              <TableRow key={period._id} hover>
+                <TableCell>
+                  {new Date(period.year, period.month - 1).toLocaleString(
+                    "default",
+                    { month: "long", year: "numeric" }
+                  )}
+                </TableCell>
+                <TableCell>{period.totalEmployees || 0} employees</TableCell>
+                <TableCell>{formatCurrency(period.totalNetSalary)}</TableCell>
+                <TableCell>
+                  <span
+                    className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                      statusColors[period.status]
+                    }`}
+                  >
+                    {period.status}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  {period.processedDate
+                    ? new Date(period.processedDate).toLocaleDateString()
+                    : "Pending"}
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center justify-center">
+                    <button
+                      onClick={() => handleViewHistory(period)}
+                      className="text-green-600 hover:text-green-800 px-4 py-2 rounded-md hover:bg-green-50 transition-colors duration-200 flex items-center gap-2 cursor-pointer"
+                      title="View period payroll details"
+                    >
+                      <FaFileAlt className="h-4 w-4" />
+                      <span className="text-sm font-medium">View Details</span>
+                    </button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={6}>
+                <EmptyState />
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
 
   return (
     <div className="space-y-6">
@@ -616,7 +600,7 @@ export default function ProcessPayroll() {
               Status
             </label>
             <select className="mt-1 block w-full rounded-md border-gray-300">
-              <option value="all">All Statuses</option>
+              <option value="all">All STATUS</option>
               {Object.values(PayrollStatus).map((status) => (
                 <option key={status} value={status}>
                   {status}
@@ -660,10 +644,19 @@ export default function ProcessPayroll() {
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow flex flex-wrap gap-4 items-center">
-        <div className="flex items-center">
-          <FaFilter className="h-4 w-4 text-green-600 mr-2" />
+        <div
+          className="flex items-center cursor-pointer"
+          onClick={() => {
+            const select = document.getElementById(
+              "status-filter"
+            ) as HTMLSelectElement;
+            if (select) select.click();
+          }}
+        >
+          <FaFilter className="h-4 w-4 text-green-600 mr-2 cursor-pointer" />
           <select
-            className="text-sm md:text-base border-gray-300 rounded-lg shadow-sm"
+            id="status-filter"
+            className="text-sm md:text-base border-gray-300 rounded-lg shadow-sm cursor-pointer"
             value={selectedStatus}
             onChange={(e) =>
               setSelectedStatus(e.target.value as PayrollStatus | "all")
@@ -680,52 +673,7 @@ export default function ProcessPayroll() {
       </div>
 
       {/* Payroll Table with typed data */}
-      {isLoading ? (
-        <TableSkeleton />
-      ) : (
-        <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Period
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Employees
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Net Salary
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPeriods.length > 0 ? (
-                  filteredPeriods.map((period) => (
-                    <PayrollRow
-                      key={period._id}
-                      period={period}
-                      onProcess={() => handleViewPayslip(period)}
-                      isLoading={isLoading}
-                    />
-                  ))
-                ) : (
-                  <EmptyState />
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {isLoading ? <TableSkeleton /> : <PayrollTable />}
 
       {/* Show PayslipDetail modal when a payslip is selected */}
       {showPayslipModal && selectedPayslip && (
@@ -757,6 +705,28 @@ export default function ProcessPayroll() {
           <EmployeePayrollCharts employeeData={selectedEmployeeData} />
         </div>
       )}
+
+      {/* Period Modal */}
+      <PayrollPeriodModal
+        isOpen={showPeriodModal}
+        onClose={() => {
+          setShowPeriodModal(false);
+          setSelectedPeriodData(null);
+        }}
+        data={selectedPeriodData}
+        onViewPayslip={handleViewPayslip}
+        onViewHistory={handleViewEmployeeHistory}
+      />
+
+      {/* Employee History Modal */}
+      <PayrollHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => {
+          setShowHistoryModal(false);
+          setSelectedEmployeeHistory(null);
+        }}
+        data={selectedEmployeeHistory}
+      />
     </div>
   );
 }

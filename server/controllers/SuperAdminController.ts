@@ -39,26 +39,92 @@ interface PayrollDeductions {
   other: number;
 }
 
+interface PopulatedEmployee {
+  _id: Types.ObjectId;
+  firstName: string;
+  lastName: string;
+  employeeId: string;
+  fullName: string;
+}
+
+interface PopulatedDepartment {
+  _id: Types.ObjectId;
+  name: string;
+  code: string;
+}
+
+interface PopulatedSalaryGrade {
+  _id: Types.ObjectId;
+  level: string;
+  description: string;
+}
+
 interface PopulatedPayrollRecord {
   _id: Types.ObjectId;
-  employee: {
-    _id: Types.ObjectId;
-    firstName: string;
-    lastName: string;
-    employeeId: string;
-  };
-  department: {
-    _id: Types.ObjectId;
-    name: string;
-    code: string;
-  };
-  salaryGrade: {
-    _id: Types.ObjectId;
-    level: string;
-    description: string;
-  };
+  employee: PopulatedEmployee;
+  department: PopulatedDepartment;
+  salaryGrade: PopulatedSalaryGrade;
   month: number;
   year: number;
+  basicSalary: number;
+  allowances: {
+    gradeAllowances: Array<{
+      name: string;
+      type: string;
+      value: number;
+      amount: number;
+      calculationMethod?: string;
+    }>;
+    additionalAllowances: Array<{
+      name: string;
+      type: string;
+      value: number;
+      amount: number;
+    }>;
+    totalAllowances: number;
+  };
+  earnings: {
+    overtime?: {
+      hours: number;
+      rate: number;
+      amount: number;
+    };
+    totalEarnings: number;
+  };
+  deductions: {
+    tax: {
+      taxableAmount: number;
+      taxRate: number;
+      amount: number;
+    };
+    pension: {
+      pensionableAmount: number;
+      rate: number;
+      amount: number;
+    };
+    loans: Array<{
+      description: string;
+      amount: number;
+    }>;
+    others: Array<{
+      description: string;
+      amount: number;
+    }>;
+    totalDeductions: number;
+  };
+  bonuses: {
+    items: Array<{
+      type: string;
+      description: string;
+      amount: number;
+    }>;
+    totalBonuses: number;
+  };
+  payment: {
+    bankName: string;
+    accountNumber: string;
+    accountName: string;
+  };
   totals: {
     basicSalary: number;
     totalAllowances: number;
@@ -69,6 +135,7 @@ interface PopulatedPayrollRecord {
   };
   status: PayrollStatus;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 // For the mongooseUtils error, let's move the asObjectId helper directly into the controller
@@ -718,8 +785,15 @@ export class SuperAdminController {
       const { employeeId } = req.params;
       console.log("🔍 Fetching payroll history for employee:", employeeId);
 
-      // Check if employee exists
-      const employee = await UserModel.findById(employeeId);
+      // Get employee with populated fields
+      const employee = await UserModel.findById(employeeId).populate<{
+        department: { name: string; code: string } | null;
+        salaryGrade: { level: string; description: string } | null;
+      }>([
+        { path: "department", select: "name code" },
+        { path: "salaryGrade", select: "level description" },
+      ]);
+
       if (!employee) {
         return res.status(404).json({
           success: false,
@@ -732,20 +806,56 @@ export class SuperAdminController {
         employee: asObjectId(employeeId),
       })
         .populate([
-          { path: "employee", select: "firstName lastName employeeId" },
-          { path: "department", select: "name code" },
-          { path: "salaryGrade", select: "level description" },
+          {
+            path: "employee",
+            select: "firstName lastName employeeId bankDetails",
+          },
+          {
+            path: "department",
+            select: "name code",
+          },
+          {
+            path: "salaryGrade",
+            select: "level description",
+          },
         ])
-        .sort({ year: -1, month: -1 });
+        .sort({ year: -1, month: -1 })
+        .lean<PopulatedPayrollRecord[]>();
 
-      // Calculate summary statistics
-      const totalPaid = payrollHistory.reduce(
-        (sum, record) =>
-          record.status === PayrollStatus.APPROVED
-            ? sum + record.totals.netPay
-            : sum,
+      // Calculate summary
+      const approvedPayrolls = payrollHistory.filter(
+        (record) => record.status === PayrollStatus.APPROVED
+      );
+
+      const totalPaid = approvedPayrolls.reduce(
+        (sum, record) => sum + record.totals.netPay,
         0
       );
+
+      // Format payroll history to remove redundancy
+      const formattedPayrollHistory = payrollHistory.map((record) => ({
+        period: {
+          month: record.month,
+          year: record.year,
+        },
+        earnings: {
+          basicSalary: record.basicSalary,
+          allowances: record.allowances,
+          bonuses: record.bonuses,
+          totalEarnings: record.totals.grossEarnings,
+        },
+        deductions: record.deductions,
+        totals: record.totals,
+        status: record.status,
+        processedAt: record.createdAt,
+      }));
+
+      // Get the latest salary grade from the most recent payroll record
+      const latestPayroll = payrollHistory[0];
+      const currentSalaryGrade =
+        latestPayroll?.salaryGrade?.level ||
+        employee.salaryGrade?.level ||
+        "Not Assigned";
 
       return res.status(200).json({
         success: true,
@@ -754,14 +864,27 @@ export class SuperAdminController {
             id: employee._id,
             name: `${employee.firstName} ${employee.lastName}`,
             employeeId: employee.employeeId,
+            department: employee.department?.name || "Not Assigned",
+            salaryGrade: currentSalaryGrade,
           },
-          payrollHistory,
+          payrollHistory: formattedPayrollHistory,
           summary: {
             totalRecords: payrollHistory.length,
-            latestPayroll: payrollHistory[0] || null,
+            latestPayroll: {
+              period: latestPayroll
+                ? {
+                    month: latestPayroll.month,
+                    year: latestPayroll.year,
+                  }
+                : null,
+              status: latestPayroll?.status || null,
+              totals: latestPayroll?.totals || null,
+            },
             totalPaid,
             averagePayroll:
-              payrollHistory.length > 0 ? totalPaid / payrollHistory.length : 0,
+              approvedPayrolls.length > 0
+                ? totalPaid / approvedPayrolls.length
+                : 0,
           },
         },
       });
@@ -932,6 +1055,115 @@ export class SuperAdminController {
       console.error("Error fetching payroll stats:", error);
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async getPeriodPayroll(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { month, year } = req.params;
+
+      // Validate month and year
+      const monthNum = parseInt(month);
+      const yearNum = parseInt(year);
+
+      if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid month",
+        });
+      }
+
+      if (isNaN(yearNum) || yearNum < 2000 || yearNum > 2100) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid year",
+        });
+      }
+
+      // Get all payroll records for the specified period with proper typing
+      const payrollRecords = await PayrollModel.find({
+        month: monthNum,
+        year: yearNum,
+      })
+        .populate<{ employee: PopulatedEmployee }>(
+          "employee",
+          "firstName lastName fullName employeeId"
+        )
+        .populate<{ department: PopulatedDepartment }>(
+          "department",
+          "name code"
+        )
+        .populate<{ salaryGrade: PopulatedSalaryGrade }>(
+          "salaryGrade",
+          "level description"
+        )
+        .lean<PopulatedPayrollRecord[]>();
+
+      // Calculate period summary
+      const summary = {
+        totalEmployees: payrollRecords.length,
+        totalNetPay: payrollRecords.reduce(
+          (sum, record) => sum + record.totals.netPay,
+          0
+        ),
+        totalBasicSalary: payrollRecords.reduce(
+          (sum, record) => sum + record.totals.basicSalary,
+          0
+        ),
+        totalAllowances: payrollRecords.reduce(
+          (sum, record) => sum + record.totals.totalAllowances,
+          0
+        ),
+        totalDeductions: payrollRecords.reduce(
+          (sum, record) => sum + record.totals.totalDeductions,
+          0
+        ),
+        statusBreakdown: payrollRecords.reduce((acc, record) => {
+          acc[record.status] = (acc[record.status] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+      };
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          period: {
+            month: monthNum,
+            year: yearNum,
+            monthName: new Date(yearNum, monthNum - 1).toLocaleString(
+              "default",
+              {
+                month: "long",
+              }
+            ),
+          },
+          employees: payrollRecords.map((record) => ({
+            id: record._id,
+            employee: {
+              id: record.employee._id,
+              name: `${record.employee.firstName} ${record.employee.lastName}`, // Using firstName and lastName instead of fullName
+              employeeId: record.employee.employeeId,
+            },
+            department: record.department?.name || "Not Assigned",
+            salaryGrade: {
+              level: record.salaryGrade.level,
+              description: record.salaryGrade.description,
+            },
+            payroll: {
+              basicSalary: record.totals.basicSalary,
+              totalAllowances: record.totals.totalAllowances,
+              totalDeductions: record.totals.totalDeductions,
+              netPay: record.totals.netPay,
+            },
+            status: record.status,
+            processedAt: record.createdAt,
+          })),
+          summary,
+        },
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      return res.status(statusCode).json({ success: false, message });
     }
   }
 

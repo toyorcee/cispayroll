@@ -1,76 +1,144 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Payslip } from "../types/payslip";
+import { Payslip, PayrollStatus } from "../types/payroll";
+
+// Define the type inline since the import isn't working correctly
+type TableConfig = {
+  startY?: number;
+  head?: any[][];
+  body: any[][];
+  theme?: string;
+  headStyles?: {
+    fillColor?: number[];
+    fontSize?: number;
+  };
+  bodyStyles?: {
+    fontSize?: number;
+  };
+  styles?: {
+    halign?: "left" | "center" | "right";
+  };
+};
 
 export const generatePayslipPDF = async (payslip: Payslip) => {
-  // Create new document
   const doc = new jsPDF();
+  let yPos = 20;
 
-  // Add company logo/header
-  doc.setFontSize(20);
-  doc.text("Company Name", 105, 15, { align: "center" });
+  // Add company branding
+  doc.setFontSize(24);
+  doc.setTextColor(22, 163, 74); // text-green-600
+  doc.text("PEOPLEMAX", 105, yPos, { align: "center" });
 
-  doc.setFontSize(16);
-  doc.text("Payslip", 105, 25, { align: "center" });
-
-  // Add pay period
+  yPos += 10;
   doc.setFontSize(12);
-  doc.text(`Pay Period: ${payslip.month} ${payslip.year}`, 20, 40);
-  doc.text(
-    `Payment Date: ${payslip.paymentDate?.toLocaleDateString()}`,
-    20,
-    48
-  );
+  doc.text("Payroll Management System", 105, yPos, { align: "center" });
 
-  // Add earnings table
-  const earningsData = [
-    ["Basic Salary", `₦${payslip.basicSalary.toLocaleString()}`],
-    ...payslip.allowances.map((a) => [a.type, `₦${a.amount.toLocaleString()}`]),
-  ];
+  // Employee & Payment Info
+  doc.setTextColor(0);
+  doc.setFontSize(14);
 
-  autoTable(doc, {
+  // Use the TableConfig type for all table configurations
+  const employeeInfoTable: TableConfig = {
+    startY: yPos + 10,
+    head: [["Employee Information", "Payment Details"]],
+    body: [
+      [
+        `Employee ID: ${payslip.employeeId}\nName: ${payslip.employeeName}`,
+        `Period: ${payslip.month}/${payslip.year}\nStatus: ${payslip.status}`,
+      ],
+    ],
+    theme: "grid",
+    headStyles: {
+      fillColor: [22, 163, 74],
+      fontSize: 12,
+    },
+  };
+
+  autoTable(doc, employeeInfoTable);
+  yPos = (doc as any).lastAutoTable.finalY + 10;
+
+  // Earnings Table
+  const earningsTable: TableConfig = {
+    startY: yPos,
     head: [["Earnings", "Amount"]],
-    body: earningsData,
-    startY: 60,
+    body: [
+      ["Basic Salary", `₦${payslip.basicSalary.toLocaleString()}`],
+      ...payslip.allowances.map((a) => [
+        a.type,
+        `₦${a.amount.toLocaleString()}`,
+      ]),
+    ],
     theme: "grid",
-    headStyles: { fillColor: [76, 175, 80] },
-  });
+    headStyles: {
+      fillColor: [22, 163, 74],
+      fontSize: 12,
+    },
+  };
 
-  // Add deductions table
-  const deductionsData = payslip.deductions.map((d) => [
-    d.type,
-    `₦${d.amount.toLocaleString()}`,
-  ]);
+  autoTable(doc, earningsTable);
+  yPos = (doc as any).lastAutoTable.finalY + 10;
 
-  autoTable(doc, {
+  // Deductions Table
+  const deductionsTable: TableConfig = {
+    startY: yPos,
     head: [["Deductions", "Amount"]],
-    body: deductionsData,
-    startY: (doc as any).lastAutoTable.finalY + 10,
+    body: payslip.deductions.map((d) => [
+      d.type,
+      `₦${d.amount.toLocaleString()}`,
+    ]),
     theme: "grid",
-    headStyles: { fillColor: [76, 175, 80] },
-  });
+    headStyles: {
+      fillColor: [22, 163, 74],
+      fontSize: 12,
+    },
+  };
 
-  // Add summary
-  const totalEarnings =
-    payslip.basicSalary +
-    payslip.allowances.reduce((sum, a) => sum + a.amount, 0);
-  const totalDeductions = payslip.deductions.reduce(
-    (sum, d) => sum + d.amount,
-    0
-  );
+  autoTable(doc, deductionsTable);
+  yPos = (doc as any).lastAutoTable.finalY + 10;
 
-  autoTable(doc, {
+  // Summary Table
+  const summaryTable: TableConfig = {
+    startY: yPos,
     head: [["Summary", "Amount"]],
     body: [
-      ["Total Earnings", `₦${totalEarnings.toLocaleString()}`],
-      ["Total Deductions", `₦${totalDeductions.toLocaleString()}`],
+      [
+        "Total Earnings",
+        `₦${
+          payslip.basicSalary +
+          payslip.allowances.reduce((sum, a) => sum + a.amount, 0)
+        }`,
+      ],
+      [
+        "Total Deductions",
+        `₦${payslip.deductions.reduce((sum, d) => sum + d.amount, 0)}`,
+      ],
       ["Net Pay", `₦${payslip.netPay.toLocaleString()}`],
     ],
-    startY: (doc as any).lastAutoTable.finalY + 10,
     theme: "grid",
-    headStyles: { fillColor: [76, 175, 80] },
-  });
+    headStyles: {
+      fillColor: [22, 163, 74],
+      fontSize: 12,
+    },
+    bodyStyles: {
+      fontSize: 12,
+    },
+  };
+
+  autoTable(doc, summaryTable);
+
+  // Footer
+  const pageHeight = doc.internal.pageSize.height;
+  doc.setFontSize(10);
+  doc.setTextColor(107, 114, 128); // text-gray-500
+  doc.text(
+    `Powered by Century Information Systems | Generated on ${new Date().toLocaleDateString()}`,
+    105,
+    pageHeight - 10,
+    { align: "center" }
+  );
 
   // Save the PDF
-  doc.save(`payslip-${payslip.month}-${payslip.year}.pdf`);
+  doc.save(
+    `payslip-${payslip.employeeId}-${payslip.month}-${payslip.year}.pdf`
+  );
 };
