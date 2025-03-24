@@ -1,16 +1,19 @@
 import React from "react";
-import { Payslip } from "../../types/payslip";
+import { Payslip } from "../../../types/payslip";
 import { FaDownload, FaPrint, FaEnvelope } from "react-icons/fa";
-import { useAuth } from "../../context/AuthContext";
-import { UserRole } from "../../types/auth";
-import { generatePayslipPDF } from "../../utils/pdfGenerator";
+import { useAuth } from "../../../context/AuthContext";
+import { UserRole } from "../../../types/auth";
+import { generatePayslipPDF } from "../../../utils/pdfGenerator";
 
 interface PayslipDetailProps {
   payslip: Payslip;
   onClose: () => void;
 }
 
-export default function PayslipDetail({ payslip, onClose }: PayslipDetailProps) {
+export default function PayslipDetail({
+  payslip,
+  onClose,
+}: PayslipDetailProps) {
   const { user } = useAuth();
 
   const handleDownload = async () => {
@@ -111,13 +114,20 @@ export default function PayslipDetail({ payslip, onClose }: PayslipDetailProps) 
               <div>
                 <h3 className="text-lg font-semibold">Total Earnings</h3>
                 <p className="text-xl text-green-600">
-                  ₦{(payslip.basicSalary + payslip.allowances.reduce((sum, a) => sum + a.amount, 0)).toLocaleString()}
+                  ₦
+                  {(
+                    payslip.basicSalary +
+                    payslip.allowances.reduce((sum, a) => sum + a.amount, 0)
+                  ).toLocaleString()}
                 </p>
               </div>
               <div>
                 <h3 className="text-lg font-semibold">Total Deductions</h3>
                 <p className="text-xl text-red-600">
-                  ₦{payslip.deductions.reduce((sum, d) => sum + d.amount, 0).toLocaleString()}
+                  ₦
+                  {payslip.deductions
+                    .reduce((sum, d) => sum + d.amount, 0)
+                    .toLocaleString()}
                 </p>
               </div>
             </div>

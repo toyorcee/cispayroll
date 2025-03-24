@@ -3,7 +3,7 @@ import { ApiError } from "../utils/errorHandler.js";
 import { Types } from "mongoose";
 import { PayrollStatus } from "../types/payroll.js";
 
-// Update validation to be simpler
+// Keep this simple validation for basic request checking
 export const validatePayrollCreate = (
   req: Request,
   res: Response,
@@ -12,28 +12,28 @@ export const validatePayrollCreate = (
   try {
     const { employee, month, year, salaryGrade } = req.body;
 
-    // Only validate essential inputs
+    // Check required fields
     if (!employee || !month || !year || !salaryGrade) {
       throw new ApiError(400, "Missing required fields");
     }
 
-    // Validate IDs
+    // Validate ID formats
     if (!Types.ObjectId.isValid(employee)) {
-      throw new ApiError(400, "Invalid employee ID");
+      throw new ApiError(400, "Invalid employee ID format");
     }
 
     if (!Types.ObjectId.isValid(salaryGrade)) {
-      throw new ApiError(400, "Invalid salary grade ID");
+      throw new ApiError(400, "Invalid salary grade ID format");
     }
 
-    // Validate month and year
+    // Basic month/year validation
     if (month < 1 || month > 12) {
-      throw new ApiError(400, "Invalid month");
+      throw new ApiError(400, "Month must be between 1 and 12");
     }
 
     const currentYear = new Date().getFullYear();
     if (year < currentYear - 1 || year > currentYear + 1) {
-      throw new ApiError(400, "Invalid year");
+      throw new ApiError(400, "Year is out of valid range");
     }
 
     next();
@@ -118,4 +118,26 @@ export const validatePayrollUpdate = (
   }
 
   next();
+};
+
+export const validateEmployeePayrollHistory = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { employeeId } = req.params;
+
+    if (!employeeId) {
+      throw new ApiError(400, "Employee ID is required");
+    }
+
+    if (!Types.ObjectId.isValid(employeeId)) {
+      throw new ApiError(400, "Invalid employee ID format");
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
 };

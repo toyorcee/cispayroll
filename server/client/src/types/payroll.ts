@@ -12,7 +12,6 @@ import type {
   IBonusFilters,
   IAllowanceFilters,
   IPayrollCalculationResult,
-  PayrollCalculationRequest,
   IPayrollComponent,
 } from "../../../types/payroll";
 
@@ -39,37 +38,92 @@ export type {
   IBonusFilters,
   IAllowanceFilters,
   IPayrollCalculationResult,
-  PayrollCalculationRequest,
   IPayrollComponent,
   ISalaryGrade,
 };
 
 export interface PayrollPeriod {
-  id: string;
+  _id: string;
   month: number;
   year: number;
-  totalEmployees?: number;
-  totalNetSalary?: number;
+  totalEmployees: number;
+  totalNetSalary: number;
   status: PayrollStatus;
-  processedDate?: Date;
-  processedBy?: string;
-  complianceChecks?: {
-    payeCalculated: boolean;
-    pensionDeducted: boolean;
-    nhfDeducted: boolean;
-    taxReportGenerated: boolean;
-  };
+  processedDate?: string;
 }
 
 // Add PayrollStats interface for the summary data
 export interface PayrollStats {
-  totalEmployees: number;
   totalNetSalary: number;
+  totalEmployees: number;
   pendingReviews: number;
-  departmentBreakdown?: {
-    [department: string]: {
-      employees: number;
-      totalCost: number;
+}
+
+export interface PayrollData {
+  _id: string;
+  earnings: {
+    overtime: {
+      hours: number;
+      rate: number;
+      amount: number;
     };
+    bonus: any[];
+    totalEarnings: number;
   };
+  deductions: {
+    tax: {
+      taxableAmount: number;
+      taxRate: number;
+      amount: number;
+    };
+    pension: {
+      pensionableAmount: number;
+      rate: number;
+      amount: number;
+    };
+    others: Array<{
+      name: string;
+      amount: number;
+    }>;
+    totalDeductions: number;
+  };
+  totals: {
+    basicSalary: number;
+    totalAllowances: number;
+    totalBonuses: number;
+    grossEarnings: number;
+    totalDeductions: number;
+    netPay: number;
+  };
+  employee: {
+    _id: string;
+    employeeId: string;
+    firstName: string;
+    lastName: string;
+    fullName: string;
+  };
+  allowances: {
+    gradeAllowances: Array<{
+      name: string;
+      type: string;
+      value: number;
+      amount: number;
+      _id: string;
+    }>;
+    additionalAllowances: any[];
+    totalAllowances: number;
+  };
+  basicSalary: number;
+  month: number;
+  year: number;
+  status: string;
+  createdAt: string;
+}
+
+// Keep only one definition of PayrollCalculationRequest
+export interface PayrollCalculationRequest {
+  employee: string;
+  salaryGrade: string;
+  month: number;
+  year: number;
 }

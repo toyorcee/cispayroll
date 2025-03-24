@@ -12,6 +12,7 @@ import { Response, NextFunction } from "express";
 import {
   validatePayrollCreate,
   validatePayrollUpdate,
+  validateEmployeePayrollHistory,
 } from "../middleware/payrollValidation.js";
 
 const router = Router();
@@ -110,7 +111,6 @@ router.delete(
 );
 
 // ===== Payroll Management Routes =====
-// Basic Payroll Operations
 router.post(
   "/payroll",
   requirePermission([Permission.CREATE_PAYROLL]),
@@ -118,24 +118,30 @@ router.post(
   SuperAdminController.createPayroll as unknown as RequestHandler
 );
 
-// router.patch(
-//   "/payroll/:id",
-//   requirePermission([Permission.EDIT_PAYROLL]),
-//   validatePayrollUpdate,
-//   SuperAdminController.updatePayroll
-// );
+router.get(
+  "/payroll/periods",
+  requirePermission([Permission.VIEW_ALL_PAYROLL]),
+  SuperAdminController.getPayrollPeriods as unknown as RequestHandler
+);
 
-// router.get(
-//   "/payroll",
-//   requirePermission([Permission.VIEW_ALL_PAYROLL]),
-//   SuperAdminController.getAllPayroll as unknown as RequestHandler
-// );
+router.get(
+  "/payroll/stats",
+  requirePermission([Permission.VIEW_PAYROLL_STATS]),
+  SuperAdminController.getPayrollStats as unknown as RequestHandler
+);
 
-// router.get(
-//   "/payroll/:id",
-//   requirePermission([Permission.VIEW_ALL_PAYROLL]),
-//   SuperAdminController.getPayrollById as unknown as RequestHandler
-// );
+//Get all payrolls
+router.get(
+  "/payroll",
+  requirePermission([Permission.VIEW_ALL_PAYROLL]),
+  SuperAdminController.getAllPayroll as unknown as RequestHandler
+);
+
+router.get(
+  "/payroll/:id",
+  requirePermission([Permission.VIEW_ALL_PAYROLL]),
+  SuperAdminController.getPayrollById as unknown as RequestHandler
+);
 
 router.delete(
   "/payroll/:id",
@@ -157,22 +163,17 @@ router.delete(
 // );
 
 // Payroll Views and Statistics
-// router.get(
-//   "/payroll/employee/:employeeId",
-//   requirePermission([Permission.VIEW_ALL_PAYROLL]),
-//   SuperAdminController.getEmployeePayrollHistory as unknown as RequestHandler
-// );
+router.get(
+  "/payroll/employee/:employeeId/history",
+  requirePermission([Permission.VIEW_ALL_PAYROLL]),
+  validateEmployeePayrollHistory,
+  SuperAdminController.getEmployeePayrollHistory as unknown as RequestHandler
+);
 
 // router.get(
 //   "/payroll/department/:departmentId",
 //   requirePermission([Permission.VIEW_ALL_PAYROLL]),
 //   SuperAdminController.getDepartmentPayroll as unknown as RequestHandler
-// );
-
-// router.get(
-//   "/payroll/stats",
-//   requirePermission([Permission.VIEW_PAYROLL_STATS]),
-//   SuperAdminController.getPayrollStats as unknown as RequestHandler
 // );
 
 // Employee Management Routes

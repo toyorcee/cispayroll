@@ -6,6 +6,8 @@ import type {
   PayrollCalculationRequest,
   IPayrollCalculationResult,
   ISalaryGrade,
+  PayrollData,
+  PayrollStats,
 } from "../types/payroll";
 
 const BASE_URL = "/api/super-admin";
@@ -79,25 +81,27 @@ export const payrollService = {
     }
   },
 
-  // Get Payroll Periods
+  // Get Payroll Periods with proper error handling
   getPayrollPeriods: async (): Promise<PayrollPeriod[]> => {
     try {
       console.log("🔄 Fetching payroll periods...");
       const response = await axios.get(`${BASE_URL}/payroll/periods`);
 
       if (!response.data.success) {
-        throw new Error(
-          response.data.message || "Failed to fetch payroll periods"
-        );
+        throw new Error("Failed to fetch payroll periods");
       }
 
-      return response.data.data;
-    } catch (error: any) {
-      console.error("❌ Error fetching payroll periods:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to fetch payroll periods"
+      // Extract the data array from the response
+      const periodsData = response.data.data;
+      console.log("Payroll periods response:", periodsData);
+      return periodsData;
+    } catch (error) {
+      console.error("Error fetching payroll periods:", error);
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch payroll periods"
       );
-      throw error;
     }
   },
 
@@ -122,7 +126,7 @@ export const payrollService = {
     }
   },
 
-  // Delete Payroll
+  // Delete payroll
   deletePayroll: async (id: string): Promise<void> => {
     try {
       console.log("🗑️ Deleting payroll:", id);
@@ -140,24 +144,87 @@ export const payrollService = {
     }
   },
 
-  // Get Payroll Statistics
-  getPayrollStats: async () => {
+  // Get Payroll Statistics with proper error handling
+  getPayrollStats: async (): Promise<PayrollStats> => {
     try {
       console.log("📊 Fetching payroll statistics...");
       const response = await axios.get(`${BASE_URL}/payroll/stats`);
 
       if (!response.data.success) {
+        throw new Error("Failed to fetch payroll stats");
+      }
+
+      // Extract the data from the response
+      const statsData = response.data.data;
+      console.log("Payroll stats response:", statsData);
+      return statsData;
+    } catch (error) {
+      console.error("Error fetching payroll stats:", error);
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to fetch payroll stats"
+      );
+    }
+  },
+
+  // Get Individual Payroll by ID
+  getPayrollById: async (id: string): Promise<PayrollData> => {
+    try {
+      console.log("🔄 Fetching payroll details:", id);
+      const response = await axios.get(`${BASE_URL}/payroll/${id}`);
+
+      if (!response.data.success) {
         throw new Error(
-          response.data.message || "Failed to fetch payroll statistics"
+          response.data.message || "Failed to fetch payroll details"
         );
       }
 
+      console.log("✅ Payroll details fetched:", response.data.data);
       return response.data.data;
     } catch (error: any) {
-      console.error("❌ Error fetching payroll statistics:", error);
+      console.error("❌ Error fetching payroll details:", error);
       toast.error(
-        error.response?.data?.message || "Failed to fetch payroll statistics"
+        error.response?.data?.message || "Failed to fetch payroll details"
       );
+      throw error;
+    }
+  },
+
+  // Create new payroll
+  createPayroll: async (
+    data: PayrollCalculationRequest
+  ): Promise<IPayrollCalculationResult> => {
+    try {
+      console.log("📝 Creating payroll with data:", data);
+      const response = await axios.post(`${BASE_URL}/payroll`, data);
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to create payroll");
+      }
+
+      console.log("✅ Payroll created:", response.data.data);
+      toast.success("Payroll created successfully");
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Error creating payroll:", error);
+      toast.error(error.response?.data?.message || "Failed to create payroll");
+      throw error;
+    }
+  },
+
+  // Add new method to fetch employee payroll history
+  getEmployeePayrollHistory: async (
+    employeeId: string
+  ): Promise<PayrollData[]> => {
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/payroll/employee/${employeeId}/history`
+      );
+      if (!response.data.success) {
+        throw new Error("Failed to fetch employee payroll history");
+      }
+      return response.data.data;
+    } catch (error) {
+      console.error("Error fetching employee payroll history:", error);
       throw error;
     }
   },

@@ -40,6 +40,72 @@ interface BonusCalculation {
   totalBonuses: number;
 }
 
+interface EmployeePayrollHistory {
+  _id: Types.ObjectId;
+  employee: {
+    _id: Types.ObjectId;
+    firstName: string;
+    lastName: string;
+    employeeId: string;
+  };
+  department: {
+    _id: Types.ObjectId;
+    name: string;
+    code: string;
+  };
+  salaryGrade: {
+    _id: Types.ObjectId;
+    level: string;
+    description: string;
+  };
+  month: number;
+  year: number;
+  totals: {
+    basicSalary: number;
+    totalAllowances: number;
+    totalBonuses: number;
+    grossEarnings: number;
+    totalDeductions: number;
+    netPay: number;
+  };
+  status: PayrollStatus;
+  createdAt: Date;
+}
+
+const asObjectId = (id: string): Types.ObjectId => new Types.ObjectId(id);
+
+interface RawPayrollDocument {
+  _id: Types.ObjectId;
+  employee: {
+    _id: Types.ObjectId;
+    firstName: string;
+    lastName: string;
+    employeeId: string;
+  };
+  department: {
+    _id: Types.ObjectId;
+    name: string;
+    code: string;
+  };
+  salaryGrade: {
+    _id: Types.ObjectId;
+    level: string;
+    description: string;
+  };
+  month: number;
+  year: number;
+  totals: {
+    basicSalary: number;
+    totalAllowances: number;
+    totalBonuses: number;
+    grossEarnings: number;
+    totalDeductions: number;
+    netPay: number;
+  };
+  status: PayrollStatus;
+  createdAt: Date;
+}
+
 export class PayrollService {
   static async validateAndGetEmployee(
     employeeId: string | Types.ObjectId
@@ -537,5 +603,65 @@ export class PayrollService {
     this.validatePayrollData(payrollData);
 
     return payrollData;
+  }
+
+  static async getEmployeePayrollHistory(
+    employeeId: string
+  ): Promise<EmployeePayrollHistory[]> {
+    try {
+      console.log("🔍 Fetching payroll history for employee:", employeeId);
+
+      const history = await PayrollModel.find({
+        "employee._id": asObjectId(employeeId),
+      })
+        .sort({ year: -1, month: -1 })
+        .populate([
+          { path: "employee", select: "firstName lastName employeeId" },
+          { path: "department", select: "name code" },
+          { path: "salaryGrade", select: "level description" },
+        ])
+        .lean<RawPayrollDocument[]>();
+
+      // Transform the data to ensure correct types
+      const transformedHistory: EmployeePayrollHistory[] = history.map(
+        (record) => ({
+          _id: record._id,
+          employee: {
+            _id: record.employee._id,
+            firstName: record.employee.firstName,
+            lastName: record.employee.lastName,
+            employeeId: record.employee.employeeId,
+          },
+          department: {
+            _id: record.department._id,
+            name: record.department.name,
+            code: record.department.code,
+          },
+          salaryGrade: {
+            _id: record.salaryGrade._id,
+            level: record.salaryGrade.level,
+            description: record.salaryGrade.description,
+          },
+          month: record.month,
+          year: record.year,
+          totals: {
+            basicSalary: record.totals.basicSalary,
+            totalAllowances: record.totals.totalAllowances,
+            totalBonuses: record.totals.totalBonuses,
+            grossEarnings: record.totals.grossEarnings,
+            totalDeductions: record.totals.totalDeductions,
+            netPay: record.totals.netPay,
+          },
+          status: record.status,
+          createdAt: record.createdAt,
+        })
+      );
+
+      console.log(`📋 Found ${transformedHistory.length} payroll records`);
+      return transformedHistory;
+    } catch (error) {
+      console.error("❌ Error fetching employee payroll history:", error);
+      throw error;
+    }
   }
 }

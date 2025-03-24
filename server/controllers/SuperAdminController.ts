@@ -39,6 +39,38 @@ interface PayrollDeductions {
   other: number;
 }
 
+interface PopulatedPayrollRecord {
+  _id: Types.ObjectId;
+  employee: {
+    _id: Types.ObjectId;
+    firstName: string;
+    lastName: string;
+    employeeId: string;
+  };
+  department: {
+    _id: Types.ObjectId;
+    name: string;
+    code: string;
+  };
+  salaryGrade: {
+    _id: Types.ObjectId;
+    level: string;
+    description: string;
+  };
+  month: number;
+  year: number;
+  totals: {
+    basicSalary: number;
+    totalAllowances: number;
+    totalBonuses: number;
+    grossEarnings: number;
+    totalDeductions: number;
+    netPay: number;
+  };
+  status: PayrollStatus;
+  createdAt: Date;
+}
+
 // For the mongooseUtils error, let's move the asObjectId helper directly into the controller
 // Remove the import for mongooseUtils and keep the helper here
 const asObjectId = (id: string): Types.ObjectId => new Types.ObjectId(id);
@@ -632,6 +664,274 @@ export class SuperAdminController {
         success: false,
         message: message || "Failed to delete payroll record",
       });
+    }
+  }
+
+  //Get all payrolls
+  static async getAllPayroll(req: AuthenticatedRequest, res: Response) {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const month = parseInt(req.query.month as string);
+      const year = parseInt(req.query.year as string);
+      const status = req.query.status as PayrollStatus;
+
+      const query: any = {};
+      if (month) query.month = month;
+      if (year) query.year = year;
+      if (status) query.status = status;
+
+      const payrolls = await PayrollModel.find(query)
+        .populate([
+          { path: "employee", select: "firstName lastName employeeId" },
+          { path: "department", select: "name code" },
+          { path: "salaryGrade", select: "level description" },
+        ])
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit);
+
+      const total = await PayrollModel.countDocuments(query);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          payrolls,
+          pagination: {
+            total,
+            page,
+            pages: Math.ceil(total / limit),
+          },
+        },
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async getEmployeePayrollHistory(
+    req: AuthenticatedRequest,
+    res: Response
+  ) {
+    try {
+      const { employeeId } = req.params;
+      console.log("🔍 Fetching payroll history for employee:", employeeId);
+
+      // Check if employee exists
+      const employee = await UserModel.findById(employeeId);
+      if (!employee) {
+        return res.status(404).json({
+          success: false,
+          message: "Employee not found",
+        });
+      }
+
+      // Get payroll history
+      const payrollHistory = await PayrollModel.find({
+        employee: asObjectId(employeeId),
+      })
+        .populate([
+          { path: "employee", select: "firstName lastName employeeId" },
+          { path: "department", select: "name code" },
+          { path: "salaryGrade", select: "level description" },
+        ])
+        .sort({ year: -1, month: -1 });
+
+      // Calculate summary statistics
+      const totalPaid = payrollHistory.reduce(
+        (sum, record) =>
+          record.status === PayrollStatus.APPROVED
+            ? sum + record.totals.netPay
+            : sum,
+        0
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          employee: {
+            id: employee._id,
+            name: `${employee.firstName} ${employee.lastName}`,
+            employeeId: employee.employeeId,
+          },
+          payrollHistory,
+          summary: {
+            totalRecords: payrollHistory.length,
+            latestPayroll: payrollHistory[0] || null,
+            totalPaid,
+            averagePayroll:
+              payrollHistory.length > 0 ? totalPaid / payrollHistory.length : 0,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error fetching employee payroll history:", error);
+      const { statusCode, message } = handleError(error);
+      return res.status(statusCode).json({
+        success: false,
+        message: message || "Failed to fetch employee payroll history",
+      });
+    }
+  }
+
+  static async getPayrollById(req: AuthenticatedRequest, res: Response) {
+    try {
+      console.log("Fetching payroll by ID:", req.params.id);
+
+      const payroll = await PayrollModel.findById(req.params.id).populate<{
+        employee: {
+          _id: Types.ObjectId;
+          firstName: string;
+          lastName: string;
+          employeeId: string;
+          bankDetails?: {
+            bankName: string;
+            accountNumber: string;
+            accountName: string;
+          };
+        };
+        department: {
+          _id: Types.ObjectId;
+          name: string;
+          code: string;
+        };
+        salaryGrade: {
+          _id: Types.ObjectId;
+          level: string;
+          description: string;
+        };
+      }>([
+        {
+          path: "employee",
+          select: "firstName lastName employeeId bankDetails",
+        },
+        { path: "department", select: "name code" },
+        { path: "salaryGrade", select: "level description" },
+        { path: "processedBy", select: "firstName lastName" },
+        { path: "createdBy", select: "firstName lastName" },
+        { path: "approvalFlow.submittedBy", select: "firstName lastName" },
+        { path: "approvalFlow.approvedBy", select: "firstName lastName" },
+      ]);
+
+      if (!payroll) {
+        throw new ApiError(404, "Payroll record not found");
+      }
+
+      // Generate a unique payslip ID using the populated employee data
+      const payslipId = `PS${payroll.month}${payroll.year}${payroll.employee.employeeId}`;
+
+      console.log("Found payroll record:", payroll._id);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          ...payroll.toObject(),
+          payslipId,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching payroll by ID:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async getPayrollPeriods(req: AuthenticatedRequest, res: Response) {
+    try {
+      const periods = await PayrollModel.aggregate([
+        {
+          $group: {
+            _id: { month: "$month", year: "$year" },
+            totalEmployees: { $sum: 1 },
+            totalNetSalary: { $sum: "$totals.netPay" },
+            status: { $first: "$status" },
+            processedDate: { $first: "$createdAt" },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            month: "$_id.month",
+            year: "$_id.year",
+            totalEmployees: 1,
+            totalNetSalary: 1,
+            status: 1,
+            processedDate: 1,
+          },
+        },
+        { $sort: { year: -1, month: -1 } },
+      ]);
+
+      res.status(200).json({
+        success: true,
+        data: periods,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async getPayrollStats(req: AuthenticatedRequest, res: Response) {
+    try {
+      // Allow query parameters to override default current period
+      const month =
+        parseInt(req.query.month as string) || new Date().getMonth() + 1;
+      const year =
+        parseInt(req.query.year as string) || new Date().getFullYear();
+
+      console.log("Fetching stats for period:", { month, year });
+
+      const stats = await PayrollModel.aggregate([
+        {
+          $match: {
+            month: month,
+            year: year,
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalNetSalary: { $sum: "$totals.netPay" },
+            totalEmployees: { $sum: 1 },
+            pendingReviews: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "PENDING"] }, 1, 0],
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            totalNetSalary: 1,
+            totalEmployees: 1,
+            pendingReviews: 1,
+          },
+        },
+      ]);
+
+      console.log("Aggregated stats:", stats);
+
+      const defaultStats = {
+        totalNetSalary: 0,
+        totalEmployees: 0,
+        pendingReviews: 0,
+      };
+
+      res.status(200).json({
+        success: true,
+        data: stats.length > 0 ? stats[0] : defaultStats,
+        period: {
+          month,
+          year,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching payroll stats:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
     }
   }
 
