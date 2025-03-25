@@ -36,6 +36,11 @@ import {
   Paper,
   Skeleton,
 } from "@mui/material";
+import {
+  departmentService,
+  Department,
+} from "../../../services/departmentService";
+import { RunPayrollModal } from "../../../components/payroll/processpayroll/RunPayrollModal";
 
 const statusColors: Record<PayrollStatus, string> = {
   [PayrollStatus.PENDING]: "bg-yellow-100 text-yellow-800",
@@ -204,6 +209,7 @@ export default function ProcessPayroll() {
   const [showPeriodModal, setShowPeriodModal] = useState(false);
   const [selectedPeriodData, setSelectedPeriodData] =
     useState<PeriodPayrollResponse | null>(null);
+  const [showRunPayrollModal, setShowRunPayrollModal] = useState(false);
 
   // Add queryClient for local updates
   const queryClient = useQueryClient();
@@ -271,34 +277,39 @@ export default function ProcessPayroll() {
 
   const currentSummary = periodsData[0];
 
-  const handleViewHistory = async (period: PayrollPeriod) => {
+  const handleViewPeriodDetails = async (period: PayrollPeriod) => {
     try {
+      // Show the modal first with loading state
+      setShowPeriodModal(true);
+      setSelectedPeriodData(null); // This will trigger the skeleton
+
+      // Then fetch the data
       const periodData = await payrollService.getPeriodPayroll(
         period.month,
         period.year
       );
       setSelectedPeriodData(periodData);
-      setShowPeriodModal(true);
     } catch (error) {
       toast.error("Failed to fetch period payroll data");
+      setShowPeriodModal(false);
     }
   };
 
   const handleViewPayslip = async (employeeId: string) => {
     try {
-      const payrollData = await payrollService.getEmployeePayrollHistory(
-        employeeId
-      );
-      const payslipData = mapToPayslip(payrollData);
-      setSelectedPayslip(payslipData);
+      setShowPeriodModal(false);
+      const payslip = await payrollService.viewPayslip(employeeId);
+      setSelectedPayslip(payslip);
       setShowPayslipModal(true);
     } catch (error) {
-      toast.error("Failed to fetch payslip details");
+      toast.error("Failed to fetch payslip");
+      setShowPeriodModal(true);
     }
   };
 
   const handleViewEmployeeHistory = async (employeeId: string) => {
     try {
+      setShowPeriodModal(false);
       const history = await payrollService.getEmployeePayrollHistory(
         employeeId
       );
@@ -306,6 +317,7 @@ export default function ProcessPayroll() {
       setShowHistoryModal(true);
     } catch (error) {
       toast.error("Failed to fetch employee history");
+      setShowPeriodModal(true);
     }
   };
 
@@ -489,7 +501,7 @@ export default function ProcessPayroll() {
                 <TableCell>
                   <div className="flex items-center justify-center">
                     <button
-                      onClick={() => handleViewHistory(period)}
+                      onClick={() => handleViewPeriodDetails(period)}
                       className="text-green-600 hover:text-green-800 px-4 py-2 rounded-md hover:bg-green-50 transition-colors duration-200 flex items-center gap-2 cursor-pointer"
                       title="View period payroll details"
                     >
@@ -512,14 +524,19 @@ export default function ProcessPayroll() {
     </TableContainer>
   );
 
+  const {
+    data: departments = [] as Department[],
+    isLoading: isDepartmentsLoading,
+  } = departmentService.useGetDepartments();
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold text-gray-900">
           Process Payroll
         </h1>
-        <Link
-          to="/dashboard/payroll/run"
+        <button
+          onClick={() => setShowRunPayrollModal(true)}
           className="inline-flex items-center px-4 py-2 !bg-green-600 !text-white rounded-lg hover:bg-green-700 
                    transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg
                    animate-bounce-slow cursor-pointer focus:outline-none focus:ring-0"
@@ -530,7 +547,7 @@ export default function ProcessPayroll() {
             <FaMoneyBill className="h-5 w-5 mr-2" />
           )}
           Run New Payroll
-        </Link>
+        </button>
       </div>
 
       {/* Summary Cards */}
@@ -575,10 +592,22 @@ export default function ProcessPayroll() {
             <label className="block text-sm font-medium text-gray-700">
               Department
             </label>
-            <select className="mt-1 block w-full rounded-md border-gray-300">
+            <select
+              className="mt-1 block w-full rounded-md border-gray-300"
+              disabled={isDepartmentsLoading}
+            >
               <option value="all">All Departments</option>
-              {/* Add departments dynamically */}
+              {departments.map((dept: Department) => (
+                <option key={dept._id} value={dept._id}>
+                  {dept.name}
+                </option>
+              ))}
             </select>
+            {isDepartmentsLoading && (
+              <p className="text-sm text-gray-500 mt-1">
+                Loading departments...
+              </p>
+            )}
           </div>
 
           {/* Payment Frequency Filter */}
@@ -682,6 +711,7 @@ export default function ProcessPayroll() {
           onClose={() => {
             setShowPayslipModal(false);
             setSelectedPayslip(null);
+            setShowPeriodModal(true);
           }}
         />
       )}
@@ -709,13 +739,12 @@ export default function ProcessPayroll() {
       {/* Period Modal */}
       <PayrollPeriodModal
         isOpen={showPeriodModal}
-        onClose={() => {
-          setShowPeriodModal(false);
-          setSelectedPeriodData(null);
-        }}
+        onClose={() => setShowPeriodModal(false)}
         data={selectedPeriodData}
         onViewPayslip={handleViewPayslip}
         onViewHistory={handleViewEmployeeHistory}
+        isLoading={isLoading}
+        onShowPeriodModal={() => setShowPeriodModal(true)}
       />
 
       {/* Employee History Modal */}
@@ -724,8 +753,19 @@ export default function ProcessPayroll() {
         onClose={() => {
           setShowHistoryModal(false);
           setSelectedEmployeeHistory(null);
+          setShowPeriodModal(true);
         }}
         data={selectedEmployeeHistory}
+      />
+
+      {/* Add RunPayrollModal */}
+      <RunPayrollModal
+        isOpen={showRunPayrollModal}
+        onClose={() => setShowRunPayrollModal(false)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["payrollPeriods"] });
+          queryClient.invalidateQueries({ queryKey: ["payrollStats"] });
+        }}
       />
     </div>
   );

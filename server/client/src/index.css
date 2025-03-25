@@ -4,6 +4,51 @@
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
 }
 
+@media print {
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+
+  /* Hide everything except the payslip */
+  body * {
+    visibility: hidden;
+  }
+
+  .payslip-container,
+  .payslip-container * {
+    visibility: visible !important;
+  }
+
+  .payslip-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white !important;
+  }
+
+  /* Hide the print button when printing */
+  .print-hidden {
+    display: none !important;
+  }
+
+  /* Keep text colors but remove backgrounds */
+  .payslip-container * {
+    background-color: transparent !important;
+  }
+
+  /* Keep only text colors */
+  .payslip-container .text-green-600,
+  .payslip-container h3.text-green-600 {
+    color: rgb(22 163 74) !important;
+  }
+
+  /* Ensure logo and text are visible */
+  .payslip-container img,
+  .payslip-container text {
+    visibility: visible !important;
+  }
+}

@@ -269,11 +269,30 @@ export interface DepartmentBasic {
 }
 
 export interface EmployeeResponse {
-  success: boolean;
-  data: Employee[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-  };
+  employees: Employee[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface DepartmentEmployee {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  employeeId: string;
+  position: string;
+  department: string;
+  status: string;
+  gradeLevel: string;
+  role: "USER" | "ADMIN";
+  isHOD: boolean;
+}
+
+export interface DepartmentEmployeeResponse {
+  employees: DepartmentEmployee[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }

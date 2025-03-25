@@ -8,6 +8,8 @@ import {
 import axios from "axios";
 import { User, UserRole, Permission } from "../types/auth";
 import { toast } from "react-toastify";
+import { useQueryClient } from "@tanstack/react-query";
+import { prefetchDepartments } from "../services/departmentService";
 
 axios.defaults.baseURL =
   import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -38,6 +40,7 @@ export const AuthContext = createContext<AuthContextType | undefined>(
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     // Just fetch user data directly since we're using cookies
@@ -61,9 +64,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = await axios.get("/api/auth/me");
       if (data.user) {
         setUser(parseUserData(data.user));
+        await prefetchDepartments(queryClient);
       } else {
         setUser(null);
-        // Only show login message if not on auth pages
         if (!window.location.pathname.includes("/auth/")) {
           toast.error("Please login to continue");
         }
@@ -85,6 +88,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data.user) {
         setUser(parseUserData(data.user));
+
+        // Prefetch departments immediately after successful login
+        await prefetchDepartments(queryClient);
       } else {
         throw new Error("No user data received");
       }

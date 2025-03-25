@@ -182,6 +182,13 @@ router.get(
 //   SuperAdminController.getDepartmentPayroll as unknown as RequestHandler
 // );
 
+// Add the new payslip view endpoint
+router.get(
+  "/payroll/:payrollId/view",
+  requirePermission([Permission.VIEW_ALL_PAYROLL]),
+  SuperAdminController.viewPayslip as unknown as RequestHandler
+);
+
 // Employee Management Routes
 router.get(
   "/onboarding-employees",
@@ -217,6 +224,12 @@ router.post(
   "/employees/:employeeId/archive",
   requirePermission([Permission.MANAGE_OFFBOARDING]),
   SuperAdminController.archiveEmployee as unknown as RequestHandler
+);
+
+router.get(
+  "/departments/:departmentId/employees",
+  requirePermission([Permission.VIEW_ALL_USERS]),
+  SuperAdminController.getDepartmentEmployees as unknown as RequestHandler
 );
 
 // ===== Leave Management Routes =====

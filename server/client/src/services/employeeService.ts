@@ -7,6 +7,7 @@ import {
   OffboardingDetails,
   DepartmentBasic,
   EmployeeResponse,
+  DepartmentEmployeeResponse,
 } from "../types/employee";
 import { Department, DepartmentFormData } from "../types/department";
 import { OnboardingStats } from "../types/chart";
@@ -40,10 +41,11 @@ interface AdminResponse {
 
 export const employeeService = {
   // Get employees with filtering and pagination
-  getEmployees: async (filters: EmployeeFilters): Promise<EmployeeResponse> => {
-    const response = await axios.get(`${BASE_URL}/super-admin/users`, {
-      params: filters,
-    });
+  getEmployees: async (params: {
+    page: number;
+    limit: number;
+  }): Promise<EmployeeResponse> => {
+    const response = await axios.get("/api/super-admin/users", { params });
     return response.data;
   },
 
@@ -51,17 +53,26 @@ export const employeeService = {
   getDepartmentEmployees: async (
     departmentId: string,
     filters: EmployeeFilters
-  ) => {
-    const queryParams = new URLSearchParams();
-    if (filters.status) queryParams.append("status", filters.status);
-    if (filters.search) queryParams.append("search", filters.search);
-    queryParams.append("page", filters.page.toString());
-    queryParams.append("limit", filters.limit.toString());
+  ): Promise<DepartmentEmployeeResponse> => {
+    try {
+      console.log("🔄 Service: Starting getDepartmentEmployees", {
+        departmentId,
+        filters,
+      });
 
-    const response = await axios.get(
-      `${BASE_URL}/employees/department/${departmentId}?${queryParams}`
-    );
-    return response.data;
+      const queryParams = new URLSearchParams();
+      if (filters.status) queryParams.append("status", filters.status);
+      queryParams.append("page", filters.page.toString());
+      queryParams.append("limit", filters.limit.toString());
+
+      const url = `/api/super-admin/departments/${departmentId}/employees?${queryParams}`;
+      const response = await axios.get(url);
+
+      return response.data.data;
+    } catch (error) {
+      console.error("❌ Service: Error in getDepartmentEmployees:", error);
+      throw error;
+    }
   },
 
   // Create new employee

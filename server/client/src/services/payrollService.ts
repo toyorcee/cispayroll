@@ -18,18 +18,17 @@ export const payrollService = {
   calculatePayroll: async (
     data: PayrollCalculationRequest
   ): Promise<IPayrollCalculationResult> => {
+    console.log("📊 PayrollService: Calculating payroll with data:", data);
     try {
-      console.log("🧮 Calculating payroll with data:", data);
       const response = await axios.post(`${BASE_URL}/payroll`, data);
-
-      if (!response.data.success) {
-        throw new Error(response.data.message || "Failed to calculate payroll");
-      }
-
-      console.log("✅ Payroll calculation result:", response.data);
+      console.log("✅ PayrollService: Calculation successful:", response.data);
       return response.data.data;
     } catch (error: any) {
-      console.error("❌ Error calculating payroll:", error);
+      console.error("❌ PayrollService: Calculation failed:", {
+        error,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
       toast.error(
         error.response?.data?.message || "Failed to calculate payroll"
       );
@@ -128,16 +127,16 @@ export const payrollService = {
   },
 
   // Delete payroll
-  deletePayroll: async (id: string): Promise<void> => {
+  deletePayroll: async (payrollId: string) => {
     try {
-      console.log("🗑️ Deleting payroll:", id);
-      const response = await axios.delete(`${BASE_URL}/payroll/${id}`);
+      const response = await axios.delete(`${BASE_URL}/payroll/${payrollId}`);
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to delete payroll");
       }
 
       toast.success("Payroll deleted successfully");
+      return response.data;
     } catch (error: any) {
       console.error("❌ Error deleting payroll:", error);
       toast.error(error.response?.data?.message || "Failed to delete payroll");
@@ -251,6 +250,29 @@ export const payrollService = {
       console.error("❌ Error fetching period payroll data:", error);
       toast.error(
         error.response?.data?.message || "Failed to fetch period payroll data"
+      );
+      throw error;
+    }
+  },
+
+  // View Payslip
+  viewPayslip: async (payrollId: string) => {
+    try {
+      console.log("🔍 Fetching payslip details:", payrollId);
+      const response = await axios.get(`${BASE_URL}/payroll/${payrollId}/view`);
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to fetch payslip details"
+        );
+      }
+
+      console.log("✅ Payslip details fetched:", response.data.data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Error fetching payslip details:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch payslip details"
       );
       throw error;
     }

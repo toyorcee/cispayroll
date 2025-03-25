@@ -1,5 +1,4 @@
 import React from "react";
-import { FaMoneyCheckAlt } from "react-icons/fa";
 import { PayrollBranding } from "../../shared/PayrollBranding";
 
 interface PayrollData {
@@ -96,13 +95,22 @@ const formatAmount = (amount: number) => {
 };
 
 export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
+  const handlePrint = () => {
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
+
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md print:shadow-none">
-      <div className="border-b pb-4">
-        <PayrollBranding className="mb-4" />
-        <h2 className="text-2xl font-bold text-center">PAYSLIP</h2>
-        <div className="text-sm text-gray-600">
-          <p>Reference: {data._id}</p>
+    <div className="payslip-container bg-white print:shadow-none print:p-0 print:w-full print:max-w-none">
+      {/* Branding and Title */}
+      <div className="border-b pb-6 mb-6 print:pb-4 print:mb-4 print:border-b print:border-gray-300">
+        <PayrollBranding className="mb-6 max-w-[300px] mx-auto print:mb-4" />
+        <h2 className="text-3xl font-bold text-center mb-4 print:text-2xl">
+          PAYSLIP
+        </h2>
+        <div className="text-sm text-gray-600 text-center space-y-1 print:text-black">
+          <p className="font-medium">Reference: {data._id}</p>
           <p>
             Period:{" "}
             {new Date(data.year, data.month - 1).toLocaleString("default", {
@@ -115,7 +123,7 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
       </div>
 
       {/* Employee & Payment Info */}
-      <div className="grid md:grid-cols-2 gap-6 my-4">
+      <div className="grid grid-cols-2 gap-6 my-4 print:grid print:grid-cols-2 print:gap-6 print:my-2">
         <div>
           <h3 className="font-semibold">Employee Information</h3>
           <div className="mt-2 space-y-1 text-sm">
@@ -125,9 +133,9 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
             <p>Position: {data.salaryGrade.description}</p>
           </div>
         </div>
-        <div>
+        <div className="justify-self-end">
           <h3 className="font-semibold">Payment Information</h3>
-          <div className="mt-2 space-y-1 text-sm">
+          <div className="mt-2 space-y-1 text-sm text-right">
             <p>Bank: {data.payment.bankName}</p>
             <p>Account Name: {data.payment.accountName}</p>
             <p>Account Number: {data.payment.accountNumber}</p>
@@ -136,10 +144,12 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
       </div>
 
       {/* Earnings Breakdown */}
-      <div className="my-6">
-        <h3 className="text-lg font-semibold text-green-600 mb-2">Earnings</h3>
-        <table className="w-full text-sm">
-          <tbody>
+      <div className="my-6 print:my-4">
+        <h3 className="text-lg font-semibold text-green-600 print:text-green-600">
+          Earnings
+        </h3>
+        <table className="w-full text-sm print:text-xs">
+          <tbody className="print:text-black">
             <tr className="border-t">
               <td className="py-2">Basic Salary</td>
               <td className="text-right">{formatAmount(data.basicSalary)}</td>
@@ -149,7 +159,10 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
             {data.allowances.gradeAllowances.map((allowance) => (
               <tr key={allowance._id}>
                 <td className="py-2">
-                  {allowance.name} ({allowance.value}%)
+                  {allowance.name}
+                  {allowance.type === "percentage"
+                    ? ` (${allowance.value}%)`
+                    : ""}
                 </td>
                 <td className="text-right">{formatAmount(allowance.amount)}</td>
               </tr>
@@ -179,12 +192,12 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
       </div>
 
       {/* Deductions Breakdown */}
-      <div className="my-6">
-        <h3 className="text-lg font-semibold text-green-600 mb-2">
+      <div className="my-6 print:my-4">
+        <h3 className="text-lg font-semibold text-green-600 print:text-green-600">
           Deductions
         </h3>
-        <table className="w-full text-sm">
-          <tbody>
+        <table className="w-full text-sm print:text-xs">
+          <tbody className="print:text-black">
             <tr className="border-t">
               <td className="py-2">
                 PAYE Tax ({data.deductions.tax.taxRate.toFixed(2)}%)
@@ -220,16 +233,18 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
         </table>
       </div>
 
-      {/* Net Pay */}
-      <div className="bg-gray-100 p-4 rounded-lg mt-6">
+      {/* Net Pay - Remove print background but keep text color */}
+      <div className="bg-gray-100 p-4 rounded-lg mt-6 print:bg-transparent print:border print:border-green-200">
         <div className="grid grid-cols-2 gap-4 text-lg font-bold">
-          <div>Net Pay</div>
-          <div className="text-right">{formatAmount(data.totals.netPay)}</div>
+          <div className="print:text-green-600">Net Pay</div>
+          <div className="text-right text-green-600 print:text-green-600">
+            {formatAmount(data.totals.netPay)}
+          </div>
         </div>
       </div>
 
-      {/* Updated Footer */}
-      <div className="mt-8 text-xs text-gray-500 border-t pt-4">
+      {/* Footer */}
+      <div className="mt-8 text-xs text-gray-500 border-t pt-4 print:mt-4 print:text-black">
         <p>
           Period: {new Date(data.periodStart).toLocaleDateString()} -{" "}
           {new Date(data.periodEnd).toLocaleDateString()}
@@ -243,12 +258,14 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
 
       {/* Print Button */}
       {onPrint && (
-        <button
-          onClick={onPrint}
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 print:hidden"
-        >
-          Print Payslip
-        </button>
+        <div className="mt-8 flex justify-center print-hidden">
+          <button
+            onClick={handlePrint}
+            className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+          >
+            Print Payslip
+          </button>
+        </div>
       )}
     </div>
   );

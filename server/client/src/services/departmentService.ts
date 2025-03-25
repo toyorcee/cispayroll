@@ -1,4 +1,6 @@
 import axios from "axios";
+import { QueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 // Use environment variable if available, fallback to localhost
 const BASE_URL = "/api/super-admin";
@@ -35,6 +37,20 @@ export interface DepartmentFormData {
   headOfDepartment: string;
   status: "active" | "inactive";
 }
+
+export const DEPARTMENTS_QUERY_KEY = ["departments"] as const;
+
+export const prefetchDepartments = async (queryClient: QueryClient) => {
+  await queryClient.prefetchQuery({
+    queryKey: DEPARTMENTS_QUERY_KEY,
+    queryFn: async () => {
+      const departments = await departmentService.getAllDepartments();
+      return departments as Department[];
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+};
 
 export const departmentService = {
   createDepartment: async (data: DepartmentFormData) => {
@@ -79,5 +95,15 @@ export const departmentService = {
     } catch (error) {
       throw error;
     }
+  },
+
+  useGetDepartments: () => {
+    return useQuery<Department[]>({
+      queryKey: DEPARTMENTS_QUERY_KEY,
+      queryFn: async () => {
+        const departments = await departmentService.getAllDepartments();
+        return departments as Department[];
+      },
+    });
   },
 };

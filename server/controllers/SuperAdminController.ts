@@ -1167,6 +1167,107 @@ export class SuperAdminController {
     }
   }
 
+  /* View detailed payslip information for a specific payroll record */
+  static async viewPayslip(req: AuthenticatedRequest, res: Response) {
+    try {
+      console.log("🔍 Fetching payslip details for:", req.params.payrollId);
+
+      const payroll = await PayrollModel.findById(req.params.payrollId)
+        .populate<{
+          employee: {
+            _id: Types.ObjectId;
+            firstName: string;
+            lastName: string;
+            employeeId: string;
+            bankDetails?: {
+              bankName: string;
+              accountNumber: string;
+              accountName: string;
+            };
+          };
+          department: {
+            _id: Types.ObjectId;
+            name: string;
+            code: string;
+          };
+          salaryGrade: {
+            _id: Types.ObjectId;
+            level: string;
+            description: string;
+          };
+        }>([
+          {
+            path: "employee",
+            select: "firstName lastName employeeId bankDetails",
+          },
+          { path: "department", select: "name code" },
+          { path: "salaryGrade", select: "level description" },
+        ])
+        .lean();
+
+      if (!payroll) {
+        throw new ApiError(404, "Payroll record not found");
+      }
+
+      // Format the response with detailed payslip information
+      const payslipData = {
+        payslipId: `PS${payroll.month}${payroll.year}${payroll.employee.employeeId}`,
+        employee: {
+          id: payroll.employee._id,
+          name: `${payroll.employee.firstName} ${payroll.employee.lastName}`,
+          employeeId: payroll.employee.employeeId,
+          department: payroll.department?.name || "Not Assigned",
+          salaryGrade: payroll.salaryGrade?.level || "Not Assigned",
+        },
+        paymentDetails: {
+          bankName: payroll.employee.bankDetails?.bankName || "Not Provided",
+          accountNumber:
+            payroll.employee.bankDetails?.accountNumber || "Not Provided",
+          accountName:
+            payroll.employee.bankDetails?.accountName || "Not Provided",
+        },
+        period: {
+          month: payroll.month,
+          year: payroll.year,
+        },
+        earnings: {
+          basicSalary: payroll.basicSalary,
+          allowances: payroll.allowances,
+          bonuses: payroll.bonuses,
+          totalEarnings: payroll.totals.grossEarnings,
+        },
+        deductions: {
+          tax: payroll.deductions.tax,
+          pension: payroll.deductions.pension,
+          loans: payroll.deductions.loans,
+          others: payroll.deductions.others,
+          totalDeductions: payroll.totals.totalDeductions,
+        },
+        summary: {
+          grossEarnings: payroll.totals.grossEarnings,
+          totalDeductions: payroll.totals.totalDeductions,
+          netPay: payroll.totals.netPay,
+        },
+        status: payroll.status,
+        processedAt: payroll.createdAt,
+      };
+
+      console.log("✅ Payslip details retrieved successfully");
+
+      res.status(200).json({
+        success: true,
+        data: payslipData,
+      });
+    } catch (error) {
+      console.error("❌ Error fetching payslip details:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message: message || "Failed to fetch payslip details",
+      });
+    }
+  }
+
   //Onboarding & Offboarding
   static async getOnboardingEmployees(
     req: AuthenticatedRequest,
@@ -1432,6 +1533,90 @@ export class SuperAdminController {
       return res.status(statusCode).json({
         success: false,
         message: message || "Failed to archive employee",
+      });
+    }
+  }
+
+  static async getDepartmentEmployees(
+    req: AuthenticatedRequest,
+    res: Response
+  ) {
+    try {
+      const departmentId = req.params.departmentId;
+      console.log("🔍 Fetching employees for department:", departmentId);
+
+      // First get the department to get its name
+      const department = await DepartmentModel.findById(departmentId);
+      if (!department) {
+        throw new ApiError(404, "Department not found");
+      }
+
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const status = req.query.status as string;
+
+      // Modified query to include both regular employees and HODs (admins)
+      const query: any = {
+        department: department.name,
+        role: { $in: [UserRole.USER, UserRole.ADMIN] },
+        $or: [
+          { role: UserRole.USER },
+          {
+            $and: [
+              { role: UserRole.ADMIN },
+              { position: { $regex: /head|director|hod/i } },
+            ],
+          },
+        ],
+      };
+
+      if (status) {
+        query.status = status;
+      }
+
+      console.log("📝 Query:", JSON.stringify(query, null, 2));
+
+      const [employees, total] = await Promise.all([
+        UserModel.find(query)
+          .select("-password")
+          .sort({ role: -1, firstName: 1 }) // Sort admins first, then by firstName
+          .skip((page - 1) * limit)
+          .limit(limit),
+        UserModel.countDocuments(query),
+      ]);
+
+      console.log(
+        `✅ Found ${employees.length} employees (including HODs) for department ${department.name}`
+      );
+
+      res.status(200).json({
+        success: true,
+        data: {
+          employees: employees.map((emp) => ({
+            _id: emp._id,
+            firstName: emp.firstName,
+            lastName: emp.lastName,
+            email: emp.email,
+            employeeId: emp.employeeId,
+            position: emp.position,
+            department: department.name,
+            status: emp.status,
+            gradeLevel: emp.gradeLevel,
+            role: emp.role, // Include role to distinguish between regular employees and HODs
+            isHOD: emp.role === UserRole.ADMIN,
+          })),
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error fetching department employees:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message: message || "Failed to fetch department employees",
       });
     }
   }

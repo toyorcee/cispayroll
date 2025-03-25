@@ -33,7 +33,6 @@ import Offboarding from "../pages/dashboard/employees/Offboarding";
 import { GlobalErrorBoundary } from "../components/error/GlobalErrorBoundary";
 import { SkeletonProvider } from "../components/skeletons/SkeletonProvider";
 import { useSkeleton } from "../components/skeletons/SkeletonProvider";
-import { AuthSkeleton } from "../components/skeletons/AuthSkeleton";
 import Dashboard from "../pages/dashboard/Dashboard";
 import AllowanceManagement from "../pages/dashboard/payroll/AllowanceManagement";
 import BonusManagement from "../pages/dashboard/payroll/BonusManagement";
