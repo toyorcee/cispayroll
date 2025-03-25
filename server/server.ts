@@ -204,5 +204,3 @@ const startServer = async (): Promise<void> => {
 
 startServer();
 
-// Update your package.json to include this debug script:
-// "debug": "NODE_ENV=development DEBUG=* nodemon --inspect server.ts"

@@ -103,48 +103,64 @@ export const RunPayrollModal = ({
   };
 
   const handleSubmit = async () => {
-    console.log("🚀 Starting payroll submission");
+    console.log("🚀 Starting payroll process...");
     try {
       setIsSubmitting(true);
 
+      // 1. Get selected employee
       const selectedEmployeeData = employees.find(
         (emp) => emp._id === selectedEmployee
       );
+      console.log("👤 Selected employee:", {
+        id: selectedEmployeeData?._id,
+        name: `${selectedEmployeeData?.firstName} ${selectedEmployeeData?.lastName}`,
+        grade: selectedEmployeeData?.gradeLevel,
+      });
 
       if (!selectedEmployeeData) {
         toast.error("Please select an employee");
         return;
       }
 
-      // Get salary grade ID from grades list
+      // 2. Find matching salary grade
       const salaryGrade = salaryGrades?.find(
         (grade) => grade.level === selectedEmployeeData.gradeLevel
       );
-
-      console.log("📊 Found salary grade:", salaryGrade);
+      console.log("💰 Found salary grade:", {
+        id: salaryGrade?._id,
+        level: salaryGrade?.level,
+        basic: salaryGrade?.basicSalary,
+      });
 
       if (!salaryGrade?._id) {
         toast.error("Invalid salary grade for employee");
         return;
       }
 
-      const calculationRequest = {
+      // 3. Create and send request
+      const calculationRequest: PayrollCalculationRequest = {
         month: payrollData.month,
         year: payrollData.year,
         employee: selectedEmployee,
-        salaryGrade: salaryGrade._id, // Send the actual grade ID
+        salaryGrade: salaryGrade._id as string,
       };
+      console.log("📝 Sending request:", calculationRequest);
 
-      console.log("📝 Payroll Calculation Request:", calculationRequest);
-
+      // 4. Get response
       const result = await payrollService.calculatePayroll(calculationRequest);
-      console.log("✅ Payroll calculation result:", result);
+      console.log("✅ Payroll created:", {
+        employee: `${result.employee?.firstName} ${result.employee?.lastName}`,
+        basicSalary: result.basicSalary,
+        totalEarnings: result.earnings?.totalEarnings,
+        totalDeductions: result.deductions?.totalDeductions,
+        netPay: result.totals?.netPay,
+      });
 
       toast.success("Payroll processed successfully");
       onSuccess();
       onClose();
     } catch (error) {
-      console.error("❌ Payroll calculation error:", error);
+      console.error("❌ Payroll creation failed:", error);
       toast.error("Failed to process payroll");
     } finally {
       setIsSubmitting(false);
