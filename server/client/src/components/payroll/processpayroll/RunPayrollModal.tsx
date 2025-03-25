@@ -5,16 +5,14 @@ import { departmentService } from "../../../services/departmentService";
 import { payrollService } from "../../../services/payrollService";
 import { useQuery, UseQueryResult } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import { FaSpinner } from "react-icons/fa";
+import { FaSpinner, FaCheckCircle } from "react-icons/fa";
 import {
-  Employee,
-  EmployeeResponse,
   DepartmentEmployee,
   DepartmentEmployeeResponse,
 } from "../../../types/employee";
-import { Department } from "../../../types/department";
 import { PayrollCalculationRequest } from "../../../types/payroll";
 import React from "react";
+import { useNavigate } from "react-router-dom";
 
 interface RunPayrollModalProps {
   isOpen: boolean;
@@ -27,6 +25,7 @@ export const RunPayrollModal = ({
   onClose,
   onSuccess,
 }: RunPayrollModalProps) => {
+  const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const [selectedEmployee, setSelectedEmployee] = useState<string>("");
@@ -34,6 +33,7 @@ export const RunPayrollModal = ({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
   });
+  const [showSuccess, setShowSuccess] = useState(false);
 
   // Add salary grade fetching
   const { data: salaryGrades, isLoading: isLoadingSalaryGrades } = useQuery({
@@ -106,6 +106,7 @@ export const RunPayrollModal = ({
     console.log("🚀 Starting payroll process...");
     try {
       setIsSubmitting(true);
+      setShowSuccess(false);
 
       // 1. Get selected employee
       const selectedEmployeeData = employees.find(
@@ -156,9 +157,18 @@ export const RunPayrollModal = ({
         netPay: result.totals?.netPay,
       });
 
-      toast.success("Payroll processed successfully");
+      // Show success animation
+      setShowSuccess(true);
+      toast.success("Payroll processed successfully! 🎉");
+
+      // Wait for animation
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
       onSuccess();
       onClose();
+
+      // Redirect to process payroll page
+      navigate("/dashboard/payroll/process");
     } catch (error) {
       console.error("❌ Payroll creation failed:", error);
       toast.error("Failed to process payroll");
@@ -172,7 +182,7 @@ export const RunPayrollModal = ({
 
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} title="Run New Payroll">
-      <div className="space-y-6 p-6">
+      <div className="space-y-6 p-6 max-h-[70vh] overflow-y-auto">
         {/* Period Selection */}
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -336,6 +346,18 @@ export const RunPayrollModal = ({
             </span>
           </div>
         )}
+
+        {/* Success Animation Overlay */}
+        {showSuccess && (
+          <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-50">
+            <div className="text-center">
+              <FaCheckCircle className="mx-auto h-16 w-16 text-green-500 animate-bounce" />
+              <p className="mt-4 text-lg font-medium text-gray-900">
+                Payroll Processed Successfully!
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal Footer */}
@@ -344,6 +366,7 @@ export const RunPayrollModal = ({
           type="button"
           onClick={onClose}
           className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 cursor-pointer"
+          disabled={isSubmitting}
         >
           Cancel
         </button>
@@ -351,9 +374,16 @@ export const RunPayrollModal = ({
           type="button"
           onClick={handleSubmit}
           disabled={isSubmitting || !selectedEmployee}
-          className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 cursor-pointer"
+          className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 cursor-pointer inline-flex items-center"
         >
-          {isSubmitting ? "Processing..." : "Run Payroll"}
+          {isSubmitting ? (
+            <>
+              <FaSpinner className="animate-spin -ml-1 mr-2 h-4 w-4" />
+              Processing...
+            </>
+          ) : (
+            "Run Payroll"
+          )}
         </button>
       </div>
     </BaseModal>

@@ -202,7 +202,7 @@ export const payrollService = {
       }
 
       console.log("✅ Payroll created:", response.data.data);
-      toast.success("Payroll created successfully");
+      // toast.success("Payroll created successfully");
       return response.data.data;
     } catch (error: any) {
       console.error("❌ Error creating payroll:", error);
