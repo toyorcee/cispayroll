@@ -1,3 +1,4 @@
+import axios from "axios";
 import {
   Employee,
   EmployeeFilters,
@@ -10,8 +11,17 @@ import {
 } from "../types/employee";
 import { Department, DepartmentFormData } from "../types/department";
 import { OnboardingStats } from "../types/chart";
+import { toast } from "react-toastify";
 import { UserRole } from "../types/auth";
-import { api, handleApiResponse, handleApiError } from "../config/api";
+
+const BASE_URL = "http://localhost:5000/api";
+
+// Set default axios config to always include credentials
+axios.defaults.withCredentials = true;
+
+interface DepartmentWithCount extends DepartmentBasic {
+  employeeCount: number;
+}
 
 interface AdminResponse {
   _id: string;
@@ -29,28 +39,14 @@ interface AdminResponse {
   permissions: string[];
 }
 
-// Define specific error types for employee operations
-interface EmployeeError extends Error {
-  code?: string;
-  status?: number;
-}
-
 export const employeeService = {
   // Get employees with filtering and pagination
   getEmployees: async (params: {
     page: number;
     limit: number;
   }): Promise<EmployeeResponse> => {
-    try {
-      const response = await api.get("/super-admin/users", { params });
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view employees");
-      }
-      throw err;
-    }
+    const response = await axios.get("/api/super-admin/users", { params });
+    return response.data;
   },
 
   // Get employees for specific department
@@ -59,157 +55,109 @@ export const employeeService = {
     filters: EmployeeFilters
   ): Promise<DepartmentEmployeeResponse> => {
     try {
+      console.log("🔄 Service: Starting getDepartmentEmployees", {
+        departmentId,
+        filters,
+      });
+
       const queryParams = new URLSearchParams();
       if (filters.status) queryParams.append("status", filters.status);
       queryParams.append("page", filters.page.toString());
       queryParams.append("limit", filters.limit.toString());
 
-      const url = `/super-admin/departments/${departmentId}/employees?${queryParams}`;
-      const response = await api.get(url);
-      return handleApiResponse(response);
+      const url = `/api/super-admin/departments/${departmentId}/employees?${queryParams}`;
+      const response = await axios.get(url);
+
+      return response.data.data;
     } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 404) {
-        throw new Error("Department not found");
-      }
-      if (err.status === 403) {
-        throw new Error(
-          "You don't have permission to view department employees"
-        );
-      }
-      throw err;
+      console.error("❌ Service: Error in getDepartmentEmployees:", error);
+      throw error;
     }
   },
 
   // Create new employee
-  createEmployee: async (
-    employeeData: CreateEmployeeData
-  ): Promise<Employee> => {
+  async createEmployee(employeeData: CreateEmployeeData): Promise<Employee> {
     try {
+      // Format the date without type checking
       const formattedData = {
         ...employeeData,
         dateJoined: new Date(employeeData.dateJoined).toISOString(),
       };
 
-      const response = await api.post("/employees/create", formattedData);
-      return handleApiResponse(response);
+      const response = await axios.post(
+        `${BASE_URL}/employees/create`,
+        formattedData
+      );
+      return response.data;
     } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 400) {
-        throw new Error("Invalid employee data provided");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to create employees");
-      }
-      if (err.status === 409) {
-        throw new Error("Employee with this email already exists");
-      }
-      throw err;
+      console.error("Error creating employee:", error);
+      throw error;
     }
   },
 
   // Update employee
   updateEmployee: async (id: string, employeeData: Partial<Employee>) => {
-    try {
-      const response = await api.put(`/employees/${id}`, employeeData);
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 404) {
-        throw new Error("Employee not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to update employees");
-      }
-      if (err.status === 400) {
-        throw new Error("Invalid employee update data provided");
-      }
-      throw err;
-    }
+    const response = await axios.put(
+      `${BASE_URL}/employees/${id}`,
+      employeeData
+    );
+    return response.data;
   },
 
   // Delete employee
   deleteEmployee: async (id: string) => {
-    try {
-      const response = await api.delete(`/employees/${id}`);
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 404) {
-        throw new Error("Employee not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to delete employees");
-      }
-      if (err.status === 400) {
-        throw new Error("Cannot delete employee: may be in active use");
-      }
-      throw err;
-    }
+    const response = await axios.delete(`${BASE_URL}/employees/${id}`);
+    return response.data;
   },
 
   // Transfer employee to different department
   transferEmployee: async (id: string, newDepartmentId: string) => {
-    try {
-      const response = await api.post(`/employees/${id}/transfer`, {
-        departmentId: newDepartmentId,
-      });
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 404) {
-        throw new Error("Employee or department not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to transfer employees");
-      }
-      if (err.status === 400) {
-        throw new Error("Cannot transfer employee at this time");
-      }
-      throw err;
-    }
+    const response = await axios.post(`${BASE_URL}/employees/${id}/transfer`, {
+      departmentId: newDepartmentId,
+    });
+    return response.data;
   },
 
-  // Department Management
   getDepartments: async (): Promise<DepartmentBasic[]> => {
     try {
-      const response = await api.get("/super-admin/departments");
-      const data = handleApiResponse<DepartmentBasic[]>(response);
-      return data.map((dept) => ({
+      console.log("🔄 Fetching departments from API...");
+      const response = await axios.get<{ data: any[] }>(
+        `${BASE_URL}/super-admin/departments`
+      );
+
+      // Map the response to include both _id and id
+      const departments = response.data.data.map((dept) => ({
         ...dept,
-        id: dept._id,
+        id: dept._id, // Add id field for frontend compatibility
       }));
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view departments");
-      }
-      throw err;
+
+      console.log("✅ Departments fetched:", departments);
+      return departments;
+    } catch (error: any) {
+      console.error("❌ Failed to fetch departments:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch departments"
+      );
+      throw error;
     }
   },
 
   createDepartment: async (data: DepartmentFormData): Promise<Department> => {
     try {
-      const response = await api.post("/super-admin/departments", data);
-      const departmentData = handleApiResponse<Department>(response);
+      const response = await axios.post(
+        `${BASE_URL}/super-admin/departments`,
+        data,
+        { withCredentials: true }
+      );
       return {
-        ...departmentData,
-        id: departmentData._id,
+        ...response.data.data,
+        id: response.data.data._id,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
     } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 400) {
-        throw new Error("Invalid department data provided");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to create departments");
-      }
-      if (err.status === 409) {
-        throw new Error("Department with this name already exists");
-      }
-      throw err;
+      console.error("Failed to create department:", error);
+      throw error;
     }
   },
 
@@ -218,468 +166,324 @@ export const employeeService = {
     data: DepartmentFormData
   ): Promise<Department> => {
     try {
-      const response = await api.put(`/super-admin/departments/${id}`, data);
-      const departmentData = handleApiResponse<Department>(response);
+      const response = await axios.put(
+        `${BASE_URL}/super-admin/departments/${id}`,
+        data,
+        { withCredentials: true }
+      );
       return {
-        ...departmentData,
-        id: departmentData._id,
-        createdAt: new Date(departmentData.createdAt),
-        updatedAt: new Date(departmentData.updatedAt),
+        ...response.data.data,
+        id: response.data.data._id,
+        createdAt: new Date(response.data.data.createdAt),
+        updatedAt: new Date(response.data.data.updatedAt),
       };
     } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 404) {
-        throw new Error("Department not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to update departments");
-      }
-      if (err.status === 400) {
-        throw new Error("Invalid department update data provided");
-      }
-      throw err;
+      console.error("Failed to update department:", error);
+      throw error;
     }
   },
 
   deleteDepartment: async (id: string): Promise<void> => {
     try {
-      await api.delete(`/super-admin/departments/${id}`);
+      await axios.delete(`${BASE_URL}/super-admin/departments/${id}`, {
+        withCredentials: true,
+      });
     } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 404) {
-        throw new Error("Department not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to delete departments");
-      }
-      if (err.status === 400) {
-        throw new Error("Cannot delete department: may have active employees");
-      }
-      throw err;
+      console.error("Failed to delete department:", error);
+      throw error;
     }
   },
 
-  // Onboarding Management
   getOnboardingEmployees: async (): Promise<OnboardingEmployee[]> => {
     try {
-      const response = await api.get("/super-admin/onboarding-employees");
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 403) {
-        throw new Error(
-          "You don't have permission to view onboarding employees"
-        );
-      }
-      throw err;
+      console.log("📤 Fetching onboarding employees");
+      const response = await axios.get<{
+        success: boolean;
+        data: OnboardingEmployee[];
+      }>(`${BASE_URL}/super-admin/onboarding-employees`);
+
+      console.log("📥 Onboarding employees response:", response.data);
+
+      // Return the data array from the response
+      return response.data.data || [];
+    } catch (error: any) {
+      console.error("❌ Error fetching onboarding employees:", error);
+      toast.error(error.response?.data?.message || "Failed to fetch employees");
+      return []; // Return empty array on error
     }
   },
 
-  getEmployeeById: async (id: string): Promise<Partial<Employee>> => {
+  async getEmployeeById(id: string): Promise<Partial<Employee>> {
     try {
-      const response = await api.get(`/employees/${id}`);
-      const employee = handleApiResponse<Employee>(response);
+      const response = await axios.get(`${BASE_URL}/employees/${id}`);
+      const emp = response.data;
 
       // Ensure dates are properly formatted
-      if (employee.dateJoined) {
-        employee.dateJoined = new Date(employee.dateJoined).toISOString();
-      }
-      if (employee.startDate) {
-        employee.startDate = new Date(employee.startDate).toISOString();
+      try {
+        if (emp.dateJoined) {
+          emp.dateJoined = new Date(emp.dateJoined).toISOString();
+        }
+        if (emp.startDate) {
+          emp.startDate = new Date(emp.startDate).toISOString();
+        }
+      } catch {
+        // If date parsing fails, use current date
+        const currentDate = new Date().toISOString();
+        emp.dateJoined = emp.dateJoined || currentDate;
+        emp.startDate = emp.startDate || currentDate;
       }
 
-      return employee;
+      return emp;
     } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 404) {
-        throw new Error("Employee not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view employee details");
-      }
-      throw err;
+      console.error(`Error fetching employee ${id}:`, error);
+      throw error;
     }
   },
 
-  getOnboardingStats: async (): Promise<OnboardingStats> => {
-    try {
-      const response = await api.get("/super-admin/onboarding-stats");
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 403) {
-        throw new Error(
-          "You don't have permission to view onboarding statistics"
-        );
-      }
-      throw err;
-    }
+  async getOnboardingStats(): Promise<OnboardingStats> {
+    const response = await axios.get(
+      `${BASE_URL}/super-admin/onboarding-stats`
+    );
+    return response.data.data;
   },
 
-  // Offboarding Management
-  getOffboardingEmployees: async () => {
+  async getOffboardingEmployees() {
     try {
-      const response = await api.get("/super-admin/offboarding-employees");
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 403) {
-        throw new Error(
-          "You don't have permission to view offboarding employees"
-        );
-      }
-      throw err;
-    }
-  },
-
-  initiateOffboarding: async (employeeId: string) => {
-    try {
-      const response = await api.post(
-        `/super-admin/employees/${employeeId}/offboard`,
-        {}
+      console.log("🔍 Calling getOffboardingEmployees API...");
+      const response = await axios.get(
+        `${BASE_URL}/super-admin/offboarding-employees`,
+        { withCredentials: true }
       );
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 404) {
-        throw new Error("Employee not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to initiate offboarding");
-      }
-      if (err.status === 400) {
+      console.log("📥 API Response:", response);
+
+      if (!response.data.success) {
         throw new Error(
-          "Cannot initiate offboarding: employee may be ineligible"
+          response.data.message || "Failed to fetch offboarding employees"
         );
       }
-      throw err;
+
+      return response.data.data;
+    } catch (error) {
+      console.error("❌ Error in getOffboardingEmployees:", error);
+      throw error;
     }
   },
 
-  updateOffboardingStatus: async (
+  async initiateOffboarding(employeeId: string) {
+    try {
+      console.log("🔄 Initiating offboarding for:", employeeId);
+      const response = await axios.post(
+        `${BASE_URL}/super-admin/employees/${employeeId}/offboard`,
+        {},
+        {
+          withCredentials: true,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to initiate offboarding"
+        );
+      }
+
+      console.log("✅ Offboarding response:", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error(
+        "❌ Failed to initiate offboarding:",
+        error.response?.data || error.message
+      );
+      throw error;
+    }
+  },
+
+  async updateOffboardingStatus(
     employeeId: string,
     updates: Partial<OffboardingDetails>
-  ) => {
+  ) {
     try {
-      const response = await api.patch(
-        `/super-admin/employees/${employeeId}/offboarding`,
-        updates
+      const response = await axios.patch(
+        `${BASE_URL}/super-admin/employees/${employeeId}/offboarding`,
+        updates,
+        { withCredentials: true }
       );
-      return handleApiResponse(response);
+      return response.data;
     } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 404) {
-        throw new Error("Employee not found in offboarding process");
-      }
-      if (err.status === 403) {
-        throw new Error(
-          "You don't have permission to update offboarding status"
-        );
-      }
-      if (err.status === 400) {
-        throw new Error("Invalid offboarding update data provided");
-      }
-      throw err;
+      console.error("Error updating offboarding status:", error);
+      throw error;
     }
   },
 
-  archiveEmployee: async (employeeId: string) => {
+  async archiveEmployee(employeeId: string) {
     try {
-      const response = await api.post(
-        `/super-admin/employees/${employeeId}/archive`,
-        {}
+      const response = await axios.post(
+        `${BASE_URL}/super-admin/employees/${employeeId}/archive`,
+        {},
+        { withCredentials: true }
       );
-      return handleApiResponse(response);
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to archive employee");
+      }
+
+      return response.data.data;
     } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 404) {
-        throw new Error("Employee not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to archive employees");
-      }
-      if (err.status === 400) {
-        throw new Error("Cannot archive employee: may be in active use");
-      }
-      throw err;
+      console.error("Failed to archive employee:", error);
+      throw error;
     }
   },
 
-  removeFromPayroll: async (employeeId: string) => {
+  async removeFromPayroll(employeeId: string) {
     try {
-      const response = await api.post(
-        `/super-admin/employees/${employeeId}/remove-payroll`
+      const response = await axios.post(
+        `${BASE_URL}/super-admin/employees/${employeeId}/remove-payroll`
       );
-      return handleApiResponse(response);
+      return response.data;
     } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 404) {
-        throw new Error("Employee not found");
-      }
-      if (err.status === 403) {
-        throw new Error(
-          "You don't have permission to remove employees from payroll"
-        );
-      }
-      if (err.status === 400) {
-        throw new Error(
-          "Cannot remove employee from payroll: may have pending transactions"
-        );
-      }
-      throw err;
+      console.error("Failed to remove from payroll:", error);
+      throw error;
     }
   },
 
-  generateFinalDocuments: async (employeeId: string) => {
+  async generateFinalDocuments(employeeId: string) {
     try {
-      const response = await api.post(
-        `/super-admin/employees/${employeeId}/generate-documents`
+      const response = await axios.post(
+        `${BASE_URL}/super-admin/employees/${employeeId}/generate-documents`
       );
-      return handleApiResponse(response);
+      return response.data;
     } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 404) {
-        throw new Error("Employee not found");
-      }
-      if (err.status === 403) {
-        throw new Error(
-          "You don't have permission to generate final documents"
-        );
-      }
-      if (err.status === 400) {
-        throw new Error(
-          "Cannot generate documents: offboarding process incomplete"
-        );
-      }
-      throw err;
+      console.error("Failed to generate documents:", error);
+      throw error;
     }
   },
 
-  revertToOnboarding: async (employeeId: string) => {
+  async revertToOnboarding(employeeId: string) {
     try {
-      const response = await api.post(
-        `/super-admin/employees/${employeeId}/revert-onboarding`,
-        {}
+      const response = await axios.post(
+        `${BASE_URL}/super-admin/employees/${employeeId}/revert-onboarding`,
+        {},
+        { withCredentials: true }
       );
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 404) {
-        throw new Error("Employee not found");
-      }
-      if (err.status === 403) {
+
+      if (!response.data.success) {
         throw new Error(
-          "You don't have permission to revert onboarding status"
+          response.data.message || "Failed to revert employee status"
         );
       }
-      if (err.status === 400) {
-        throw new Error("Cannot revert to onboarding: invalid current status");
-      }
-      throw err;
-    }
-  },
 
-  // Leave Management
-  getAllLeaveRequests: async () => {
-    try {
-      const response = await api.get("/super-admin/leaves");
-      return handleApiResponse(response);
+      return response.data.data;
     } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view leave requests");
-      }
-      throw err;
+      console.error("Failed to revert employee status:", error);
+      throw error;
     }
   },
 
-  updateLeaveStatus: async (
-    leaveId: string,
-    status: string,
-    notes?: string
-  ) => {
+  async getAllLeaveRequests() {
     try {
-      const response = await api.patch(
-        `/super-admin/leaves/${leaveId}/status`,
+      const response = await axios.get(`${BASE_URL}/super-admin/leaves`);
+      return response.data.data;
+    } catch (error) {
+      console.error("Error fetching leave requests:", error);
+      throw error;
+    }
+  },
+
+  async updateLeaveStatus(leaveId: string, status: string, notes?: string) {
+    try {
+      const response = await axios.patch(
+        `${BASE_URL}/super-admin/leaves/${leaveId}/status`,
         { status, notes }
       );
-      return handleApiResponse(response);
+      return response.data;
     } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 404) {
-        throw new Error("Leave request not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to update leave status");
-      }
-      if (err.status === 400) {
-        throw new Error("Invalid leave status update");
-      }
-      throw err;
+      console.error("Error updating leave status:", error);
+      throw error;
     }
   },
 
-  getLeaveStatistics: async () => {
+  async getLeaveStatistics() {
     try {
-      const response = await api.get("/super-admin/leaves/statistics");
-      return handleApiResponse(response);
+      const response = await axios.get(
+        `${BASE_URL}/super-admin/leaves/statistics`
+      );
+      return response.data.data;
     } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view leave statistics");
-      }
-      throw err;
+      console.error("Error fetching leave statistics:", error);
+      throw error;
     }
   },
 
   // Payroll Processing
   getAllPayrollPeriods: async () => {
-    try {
-      const response = await api.get("/super-admin/payroll/periods");
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view payroll periods");
-      }
-      throw err;
-    }
+    const response = await axios.get(`${BASE_URL}/super-admin/payroll/periods`);
+    return response.data;
   },
 
   processPayroll: async (data: any) => {
-    try {
-      const response = await api.post("/super-admin/payroll/process", data);
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to process payroll");
-      }
-      if (err.status === 400) {
-        throw new Error("Invalid payroll processing data");
-      }
-      if (err.status === 409) {
-        throw new Error("Payroll for this period has already been processed");
-      }
-      throw err;
-    }
+    const response = await axios.post(
+      `${BASE_URL}/super-admin/payroll/process`,
+      data
+    );
+    return response.data;
   },
 
   // Allowance Management
   getAllowances: async () => {
-    try {
-      const response = await api.get("/super-admin/payroll/allowances");
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view allowances");
-      }
-      throw err;
-    }
+    const response = await axios.get(
+      `${BASE_URL}/super-admin/payroll/allowances`
+    );
+    return response.data;
   },
 
   updateAllowance: async (id: string, data: any) => {
-    try {
-      const response = await api.patch(
-        `/super-admin/payroll/allowances/${id}`,
-        data
-      );
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 404) {
-        throw new Error("Allowance not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to update allowances");
-      }
-      if (err.status === 400) {
-        throw new Error("Invalid allowance update data");
-      }
-      throw err;
-    }
+    const response = await axios.patch(
+      `${BASE_URL}/super-admin/payroll/allowances/${id}`,
+      data
+    );
+    return response.data;
   },
 
   // Bonus Management
   getBonuses: async () => {
-    try {
-      const response = await api.get("/super-admin/payroll/bonuses");
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view bonuses");
-      }
-      throw err;
-    }
+    const response = await axios.get(`${BASE_URL}/super-admin/payroll/bonuses`);
+    return response.data;
   },
 
   createBonus: async (data: any) => {
-    try {
-      const response = await api.post("/super-admin/payroll/bonuses", data);
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to create bonuses");
-      }
-      if (err.status === 400) {
-        throw new Error("Invalid bonus data provided");
-      }
-      throw err;
-    }
+    const response = await axios.post(
+      `${BASE_URL}/super-admin/payroll/bonuses`,
+      data
+    );
+    return response.data;
   },
 
   // Payroll Statistics
   getPayrollStats: async () => {
-    try {
-      const response = await api.get("/super-admin/payroll/statistics");
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view payroll statistics");
-      }
-      throw err;
-    }
+    const response = await axios.get(
+      `${BASE_URL}/super-admin/payroll/statistics`
+    );
+    return response.data;
   },
 
   getAdmins: async (): Promise<AdminResponse[]> => {
     try {
-      const response = await api.get("/super-admin/admins");
-      return handleApiResponse(response);
+      const response = await axios.get("/api/super-admin/admins", {
+        withCredentials: true,
+      });
+      return response.data.data;
     } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view administrators");
-      }
-      throw err;
+      throw error;
     }
   },
 
   updateOnboardingStage: async (employeeId: string, stage: string) => {
-    try {
-      const response = await api.put(
-        `/employees/${employeeId}/onboarding-stage`,
-        { stage }
-      );
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as EmployeeError;
-      if (err.status === 404) {
-        throw new Error("Employee not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to update onboarding stage");
-      }
-      if (err.status === 400) {
-        throw new Error("Invalid stage or cannot update to this stage");
-      }
-      if (err.status === 409) {
-        throw new Error("Cannot update stage: previous tasks are incomplete");
-      }
-      throw err;
-    }
+    const response = await axios.put(
+      `${BASE_URL}/employees/${employeeId}/onboarding-stage`,
+      { stage }
+    );
+    return response.data;
   },
 };

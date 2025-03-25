@@ -1,3 +1,5 @@
+import axios from "axios";
+import { toast } from "react-toastify";
 import type {
   IPayroll,
   PayrollPeriod,
@@ -8,78 +10,98 @@ import type {
   PayrollStats,
   PeriodPayrollResponse,
 } from "../types/payroll";
-import { api, handleApiResponse, handleApiError } from "../config/api";
 
-// Define specific error types for payroll operations
-interface PayrollError extends Error {
-  code?: string;
-  status?: number;
-}
+const BASE_URL = "/api/super-admin";
 
 export const payrollService = {
   // Calculate Payroll
   calculatePayroll: async (
     data: PayrollCalculationRequest
   ): Promise<IPayrollCalculationResult> => {
+    console.log("📊 PayrollService: Calculating payroll with data:", data);
     try {
-      const response = await api.post("/super-admin/payroll", data);
-      return handleApiResponse<IPayrollCalculationResult>(response);
-    } catch (error) {
-      const err = handleApiError(error) as PayrollError;
-      if (err.status === 400) {
-        throw new Error("Invalid payroll calculation data provided");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to calculate payroll");
-      }
-      throw err;
+      const response = await axios.post(`${BASE_URL}/payroll`, data);
+      console.log("✅ PayrollService: Calculation successful:", response.data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ PayrollService: Calculation failed:", {
+        error,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      toast.error(
+        error.response?.data?.message || "Failed to calculate payroll"
+      );
+      throw error;
     }
   },
 
   // Get Salary Grades
   getSalaryGrades: async (): Promise<ISalaryGrade[]> => {
     try {
-      const response = await api.get("/super-admin/salary-grades");
-      return handleApiResponse<ISalaryGrade[]>(response);
-    } catch (error) {
-      const err = handleApiError(error) as PayrollError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view salary grades");
+      console.log("🔄 Fetching salary grades...");
+      const response = await axios.get(`${BASE_URL}/salary-grades`);
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to fetch salary grades"
+        );
       }
-      throw err;
+
+      console.log("✅ Salary grades fetched:", response.data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Error fetching salary grades:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch salary grades"
+      );
+      throw error;
     }
   },
 
   // Get Single Salary Grade
   getSalaryGrade: async (id: string): Promise<ISalaryGrade> => {
     try {
-      const response = await api.get(`/super-admin/salary-grades/${id}`);
-      return handleApiResponse<ISalaryGrade>(response);
-    } catch (error) {
-      const err = handleApiError(error) as PayrollError;
-      if (err.status === 404) {
-        throw new Error("Salary grade not found");
-      }
-      if (err.status === 403) {
+      console.log("🔄 Fetching salary grade:", id);
+      const response = await axios.get(`${BASE_URL}/salary-grades/${id}`);
+
+      if (!response.data.success) {
         throw new Error(
-          "You don't have permission to view salary grade details"
+          response.data.message || "Failed to fetch salary grade"
         );
       }
-      throw err;
+
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Error fetching salary grade:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch salary grade"
+      );
+      throw error;
     }
   },
 
-  // Get Payroll Periods
+  // Get Payroll Periods with proper error handling
   getPayrollPeriods: async (): Promise<PayrollPeriod[]> => {
     try {
-      const response = await api.get("/super-admin/payroll/periods");
-      return handleApiResponse<PayrollPeriod[]>(response);
-    } catch (error) {
-      const err = handleApiError(error) as PayrollError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view payroll periods");
+      console.log("🔄 Fetching payroll periods...");
+      const response = await axios.get(`${BASE_URL}/payroll/periods`);
+
+      if (!response.data.success) {
+        throw new Error("Failed to fetch payroll periods");
       }
-      throw err;
+
+      // Extract the data array from the response
+      const periodsData = response.data.data;
+      console.log("Payroll periods response:", periodsData);
+      return periodsData;
+    } catch (error) {
+      console.error("Error fetching payroll periods:", error);
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch payroll periods"
+      );
     }
   },
 
@@ -88,70 +110,82 @@ export const payrollService = {
     data: PayrollCalculationRequest
   ): Promise<IPayroll> => {
     try {
-      const response = await api.post("/super-admin/payroll/process", data);
-      return handleApiResponse<IPayroll>(response);
-    } catch (error) {
-      const err = handleApiError(error) as PayrollError;
-      if (err.status === 400) {
-        throw new Error("Invalid payroll processing data provided");
+      console.log("🔄 Processing payroll...", data);
+      const response = await axios.post(`${BASE_URL}/payroll/process`, data);
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to process payroll");
       }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to process payroll");
-      }
-      if (err.status === 409) {
-        throw new Error("Payroll for this period has already been processed");
-      }
-      throw err;
+
+      console.log("✅ Payroll processed:", response.data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Error processing payroll:", error);
+      toast.error(error.response?.data?.message || "Failed to process payroll");
+      throw error;
     }
   },
 
   // Delete payroll
-  deletePayroll: async (payrollId: string): Promise<void> => {
+  deletePayroll: async (payrollId: string) => {
     try {
-      await api.delete(`/super-admin/payroll/${payrollId}`);
-    } catch (error) {
-      const err = handleApiError(error) as PayrollError;
-      if (err.status === 404) {
-        throw new Error("Payroll not found");
+      const response = await axios.delete(`${BASE_URL}/payroll/${payrollId}`);
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to delete payroll");
       }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to delete payroll");
-      }
-      if (err.status === 400) {
-        throw new Error("Cannot delete processed payroll");
-      }
-      throw err;
+
+      toast.success("Payroll deleted successfully");
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ Error deleting payroll:", error);
+      toast.error(error.response?.data?.message || "Failed to delete payroll");
+      throw error;
     }
   },
 
-  // Get Payroll Statistics
+  // Get Payroll Statistics with proper error handling
   getPayrollStats: async (): Promise<PayrollStats> => {
     try {
-      const response = await api.get("/super-admin/payroll/stats");
-      return handleApiResponse<PayrollStats>(response);
-    } catch (error) {
-      const err = handleApiError(error) as PayrollError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view payroll statistics");
+      console.log("📊 Fetching payroll statistics...");
+      const response = await axios.get(`${BASE_URL}/payroll/stats`);
+
+      if (!response.data.success) {
+        throw new Error("Failed to fetch payroll stats");
       }
-      throw err;
+
+      // Extract the data from the response
+      const statsData = response.data.data;
+      console.log("Payroll stats response:", statsData);
+      return statsData;
+    } catch (error) {
+      console.error("Error fetching payroll stats:", error);
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to fetch payroll stats"
+      );
     }
   },
 
   // Get Individual Payroll by ID
   getPayrollById: async (id: string): Promise<PayrollData> => {
     try {
-      const response = await api.get(`/super-admin/payroll/${id}`);
-      return handleApiResponse<PayrollData>(response);
-    } catch (error) {
-      const err = handleApiError(error) as PayrollError;
-      if (err.status === 404) {
-        throw new Error("Payroll not found");
+      console.log("🔄 Fetching payroll details:", id);
+      const response = await axios.get(`${BASE_URL}/payroll/${id}`);
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to fetch payroll details"
+        );
       }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view payroll details");
-      }
-      throw err;
+
+      console.log("✅ Payroll details fetched:", response.data.data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Error fetching payroll details:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch payroll details"
+      );
+      throw error;
     }
   },
 
@@ -160,43 +194,36 @@ export const payrollService = {
     data: PayrollCalculationRequest
   ): Promise<IPayrollCalculationResult> => {
     try {
-      const response = await api.post("/super-admin/payroll", data);
-      return handleApiResponse<IPayrollCalculationResult>(response);
-    } catch (error) {
-      const err = handleApiError(error) as PayrollError;
-      if (err.status === 400) {
-        throw new Error("Invalid payroll data provided");
+      console.log("📝 Creating payroll with data:", data);
+      const response = await axios.post(`${BASE_URL}/payroll`, data);
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to create payroll");
       }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to create payroll");
-      }
-      if (err.status === 409) {
-        throw new Error("Payroll for this period already exists");
-      }
-      throw err;
+
+      console.log("✅ Payroll created:", response.data.data);
+      // toast.success("Payroll created successfully");
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Error creating payroll:", error);
+      toast.error(error.response?.data?.message || "Failed to create payroll");
+      throw error;
     }
   },
 
   // Get Employee Payroll History
-  getEmployeePayrollHistory: async (
-    employeeId: string
-  ): Promise<IPayroll[]> => {
+  getEmployeePayrollHistory: async (employeeId: string) => {
     try {
-      const response = await api.get(
-        `/super-admin/payroll/employee/${employeeId}/history`
+      const response = await axios.get(
+        `${BASE_URL}/payroll/employee/${employeeId}/history`
       );
-      return handleApiResponse<IPayroll[]>(response);
+      if (!response.data.success) {
+        throw new Error("Failed to fetch employee payroll history");
+      }
+      return response.data.data;
     } catch (error) {
-      const err = handleApiError(error) as PayrollError;
-      if (err.status === 404) {
-        throw new Error("Employee not found");
-      }
-      if (err.status === 403) {
-        throw new Error(
-          "You don't have permission to view employee payroll history"
-        );
-      }
-      throw err;
+      console.error("Error fetching employee payroll history:", error);
+      throw error;
     }
   },
 
@@ -206,38 +233,48 @@ export const payrollService = {
     year: number
   ): Promise<PeriodPayrollResponse> => {
     try {
-      const response = await api.get(
-        `/super-admin/payroll/period/${month}/${year}`
+      console.log(`🔄 Fetching payroll data for period: ${month}/${year}`);
+      const response = await axios.get(
+        `${BASE_URL}/payroll/period/${month}/${year}`
       );
-      return handleApiResponse<PeriodPayrollResponse>(response);
-    } catch (error) {
-      const err = handleApiError(error) as PayrollError;
-      if (err.status === 404) {
-        throw new Error("No payroll data found for this period");
-      }
-      if (err.status === 403) {
+
+      if (!response.data.success) {
         throw new Error(
-          "You don't have permission to view period payroll data"
+          response.data.message || "Failed to fetch period payroll data"
         );
       }
-      throw err;
+
+      console.log("✅ Period payroll data fetched:", response.data.data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Error fetching period payroll data:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch period payroll data"
+      );
+      throw error;
     }
   },
 
   // View Payslip
-  viewPayslip: async (payrollId: string): Promise<PayrollData> => {
+  viewPayslip: async (payrollId: string) => {
     try {
-      const response = await api.get(`/super-admin/payroll/${payrollId}/view`);
-      return handleApiResponse<PayrollData>(response);
-    } catch (error) {
-      const err = handleApiError(error) as PayrollError;
-      if (err.status === 404) {
-        throw new Error("Payslip not found");
+      console.log("🔍 Fetching payslip details:", payrollId);
+      const response = await axios.get(`${BASE_URL}/payroll/${payrollId}/view`);
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to fetch payslip details"
+        );
       }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view payslip");
-      }
-      throw err;
+
+      console.log("✅ Payslip details fetched:", response.data.data);
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Error fetching payslip details:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch payslip details"
+      );
+      throw error;
     }
   },
 };

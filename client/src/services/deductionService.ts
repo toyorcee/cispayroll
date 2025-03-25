@@ -1,9 +1,15 @@
+import axios from "axios";
+import { toast } from "react-toastify";
 import {
   Deduction,
   DeductionsResponse,
   CalculationMethod,
 } from "../types/deduction";
-import { api, handleApiResponse, handleApiError } from "../config/api";
+
+const BASE_URL = "http://localhost:5000/api";
+
+// Set default axios config
+axios.defaults.withCredentials = true;
 
 // Input types
 interface CreateVoluntaryDeductionInput {
@@ -22,51 +28,32 @@ interface UpdateDeductionInput {
   effectiveDate?: Date;
 }
 
-interface ToggleDeductionResponse {
-  deduction: Deduction;
-  allDeductions: {
-    statutory: Deduction[];
-    voluntary: Deduction[];
-  };
-}
-
-// Define specific error types for deduction operations
-interface DeductionError extends Error {
-  code?: string;
-  status?: number;
-}
-
 export const deductionService = {
   getAllDeductions: async (): Promise<DeductionsResponse["data"]> => {
     try {
-      const response = await api.get("/super-admin/deductions");
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as DeductionError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view deductions");
-      }
-      throw err;
+      const response = await axios.get<DeductionsResponse>(
+        `${BASE_URL}/super-admin/deductions`
+      );
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Failed to fetch deductions:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch deductions"
+      );
+      return { statutory: [], voluntary: [] };
     }
   },
 
   setupStatutoryDeductions: async (): Promise<void> => {
     try {
-      await api.post("/super-admin/deductions/statutory/setup");
-    } catch (error) {
-      const err = handleApiError(error) as DeductionError;
-      if (err.status === 403) {
-        throw new Error(
-          "You don't have permission to setup statutory deductions"
-        );
-      }
-      if (err.status === 409) {
-        throw new Error("Statutory deductions have already been setup");
-      }
-      if (err.status === 400) {
-        throw new Error("Invalid statutory deduction configuration");
-      }
-      throw err;
+      await axios.post(`${BASE_URL}/super-admin/deductions/statutory/setup`);
+      toast.success("Statutory deductions set up successfully");
+    } catch (error: any) {
+      console.error("Failed to setup statutory deductions:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to setup statutory deductions"
+      );
+      throw error;
     }
   },
 
@@ -74,23 +61,18 @@ export const deductionService = {
     data: CreateVoluntaryDeductionInput
   ): Promise<Deduction> => {
     try {
-      const response = await api.post(
-        "/super-admin/deductions/voluntary",
+      const response = await axios.post<{ message: string; data: Deduction }>(
+        `${BASE_URL}/super-admin/deductions/voluntary`,
         data
       );
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as DeductionError;
-      if (err.status === 400) {
-        throw new Error("Invalid deduction data provided");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to create deductions");
-      }
-      if (err.status === 409) {
-        throw new Error("Deduction with this name already exists");
-      }
-      throw err;
+      toast.success(response.data.message);
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Failed to create deduction:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to create deduction"
+      );
+      throw error;
     }
   },
 
@@ -99,66 +81,49 @@ export const deductionService = {
     data: UpdateDeductionInput
   ): Promise<Deduction> => {
     try {
-      const response = await api.patch(`/super-admin/deductions/${id}`, data);
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as DeductionError;
-      if (err.status === 404) {
-        throw new Error("Deduction not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to update deductions");
-      }
-      if (err.status === 400) {
-        throw new Error("Invalid deduction update data provided");
-      }
-      if (err.status === 409) {
-        throw new Error("Deduction with this name already exists");
-      }
-      throw err;
+      const response = await axios.patch(
+        `${BASE_URL}/super-admin/deductions/${id}`,
+        data
+      );
+      toast.success("Deduction updated successfully");
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Failed to update deduction:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to update deduction"
+      );
+      throw error;
     }
   },
 
   toggleDeductionStatus: async (
     id: string
-  ): Promise<ToggleDeductionResponse> => {
+  ): Promise<{
+    deduction: Deduction;
+    allDeductions: { statutory: Deduction[]; voluntary: Deduction[] };
+  }> => {
     try {
-      const response = await api.patch(`/super-admin/deductions/${id}/toggle`);
-      return handleApiResponse(response);
-    } catch (error) {
-      const err = handleApiError(error) as DeductionError;
-      if (err.status === 404) {
-        throw new Error("Deduction not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to toggle deduction status");
-      }
-      if (err.status === 400) {
-        throw new Error(
-          "Cannot toggle deduction status: may be in use or is a statutory deduction"
-        );
-      }
-      throw err;
+      const response = await axios.patch(
+        `${BASE_URL}/super-admin/deductions/${id}/toggle`
+      );
+      toast.success(response.data.message);
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Failed to toggle deduction status:", error);
+      toast.error(error.response?.data?.message || "Failed to toggle status");
+      throw error;
     }
   },
 
   deleteDeduction: async (id: string): Promise<void> => {
     try {
-      await api.delete(`/super-admin/deductions/${id}`);
-    } catch (error) {
-      const err = handleApiError(error) as DeductionError;
-      if (err.status === 404) {
-        throw new Error("Deduction not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to delete deductions");
-      }
-      if (err.status === 400) {
-        throw new Error(
-          "Cannot delete deduction: may be in use or is a statutory deduction"
-        );
-      }
-      throw err;
+      await axios.delete(`${BASE_URL}/super-admin/deductions/${id}`);
+    } catch (error: any) {
+      console.error("Failed to delete deduction:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to delete deduction"
+      );
+      throw error;
     }
   },
 

@@ -1,5 +1,8 @@
+import axios from "axios";
+import { toast } from "react-toastify";
 import type { ISalaryComponent, IAllowanceFilters } from "../types/payroll";
-import { api, handleApiResponse, handleApiError } from "../config/api";
+
+const BASE_URL = "/api";
 
 interface CreateAllowanceRequest {
   name: string;
@@ -10,125 +13,90 @@ interface CreateAllowanceRequest {
   isActive?: boolean;
 }
 
-interface AllowanceResponse {
-  data: ISalaryComponent;
-}
-
-interface AllowancesResponse {
-  data: ISalaryComponent[];
-}
-
-// Define specific error types for allowance operations
-interface AllowanceError extends Error {
-  code?: string;
-  status?: number;
-}
-
 export const allowanceService = {
   createAllowance: async (
     data: Partial<CreateAllowanceRequest>
-  ): Promise<ISalaryComponent> => {
+  ): Promise<{ data: ISalaryComponent }> => {
     try {
-      const response = await api.post("/super-admin/allowances", data);
-      return handleApiResponse<ISalaryComponent>(response);
-    } catch (error) {
-      const err = handleApiError(error) as AllowanceError;
-      if (err.status === 400) {
-        throw new Error("Invalid allowance data provided");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to create allowances");
-      }
-      if (err.status === 409) {
-        throw new Error("Allowance with this name already exists");
-      }
-      throw err;
+      const response = await axios.post(
+        `${BASE_URL}/super-admin/allowances`,
+        data
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ Error creating allowance:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to create allowance"
+      );
+      throw error;
     }
   },
 
   getAllAllowances: async (
     filters?: IAllowanceFilters
-  ): Promise<ISalaryComponent[]> => {
+  ): Promise<{ data: ISalaryComponent[] }> => {
     try {
-      const response = await api.get("/super-admin/allowances", {
+      const response = await axios.get(`${BASE_URL}/super-admin/allowances`, {
         params: filters,
       });
-      return handleApiResponse<ISalaryComponent[]>(response);
-    } catch (error) {
-      const err = handleApiError(error) as AllowanceError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view allowances");
-      }
-      if (err.status === 400) {
-        throw new Error("Invalid filter parameters provided");
-      }
-      throw err;
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ Error fetching allowances:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch allowances"
+      );
+      throw error;
     }
   },
 
   updateAllowance: async (
     id: string,
     data: Partial<CreateAllowanceRequest>
-  ): Promise<ISalaryComponent> => {
+  ): Promise<{ data: ISalaryComponent }> => {
     try {
-      const response = await api.patch(`/super-admin/allowances/${id}`, data);
-      return handleApiResponse<ISalaryComponent>(response);
-    } catch (error) {
-      const err = handleApiError(error) as AllowanceError;
-      if (err.status === 404) {
-        throw new Error("Allowance not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to update allowances");
-      }
-      if (err.status === 400) {
-        throw new Error("Invalid allowance update data provided");
-      }
-      if (err.status === 409) {
-        throw new Error("Allowance with this name already exists");
-      }
-      throw err;
+      const response = await axios.patch(
+        `${BASE_URL}/super-admin/allowances/${id}`,
+        data
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ Error updating allowance:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to update allowance"
+      );
+      throw error;
     }
   },
 
-  toggleAllowanceStatus: async (id: string): Promise<ISalaryComponent> => {
+  toggleAllowanceStatus: async (
+    id: string
+  ): Promise<{ data: ISalaryComponent }> => {
     try {
-      const response = await api.patch(`/super-admin/allowances/${id}/toggle`);
-      return handleApiResponse<ISalaryComponent>(response);
-    } catch (error) {
-      const err = handleApiError(error) as AllowanceError;
-      if (err.status === 404) {
-        throw new Error("Allowance not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to toggle allowance status");
-      }
-      if (err.status === 400) {
-        throw new Error(
-          "Cannot toggle allowance: may be in use or is a system allowance"
-        );
-      }
-      throw err;
+      const response = await axios.patch(
+        `${BASE_URL}/super-admin/allowances/${id}/toggle`
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ Error toggling allowance:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to toggle allowance"
+      );
+      throw error;
     }
   },
 
-  deleteAllowance: async (id: string): Promise<void> => {
+  deleteAllowance: async (id: string) => {
     try {
-      await api.delete(`/super-admin/allowances/${id}`);
-    } catch (error) {
-      const err = handleApiError(error) as AllowanceError;
-      if (err.status === 404) {
-        throw new Error("Allowance not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to delete allowances");
-      }
-      if (err.status === 400) {
-        throw new Error(
-          "Cannot delete allowance: may be in use or is a system allowance"
-        );
-      }
-      throw err;
+      const response = await axios.delete(
+        `${BASE_URL}/super-admin/allowances/${id}`
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ Error deleting allowance:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to delete allowance"
+      );
+      throw error;
     }
   },
 };

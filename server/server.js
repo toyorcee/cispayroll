@@ -104,6 +104,18 @@ app.use(
 app.use(cookieParser());
 app.use(express.json());
 
+// Add this after other middleware declarations (after app.use(express.json()))
+app.use((req, res, next) => {
+  // Set security headers
+  res.setHeader("X-Content-Type-Options", "nosniff");
+
+  // Set correct MIME types for TypeScript files
+  if (req.url.endsWith(".ts")) {
+    res.setHeader("Content-Type", "application/typescript");
+  }
+  next();
+});
+
 // Route error wrapper
 const routeErrorWrapper = (handler) => {
   return async (req, res, next) => {

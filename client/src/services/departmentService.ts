@@ -1,6 +1,6 @@
+import axios from "axios";
 import { QueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { api, handleApiResponse, handleApiError } from "../config/api";
 
 // Use environment variable if available, fallback to localhost
 const BASE_URL = "/api/super-admin";
@@ -38,12 +38,6 @@ export interface DepartmentFormData {
   status: "active" | "inactive";
 }
 
-// Define specific error types for department operations
-interface DepartmentError extends Error {
-  code?: string;
-  status?: number;
-}
-
 export const DEPARTMENTS_QUERY_KEY = ["departments"] as const;
 
 export const prefetchDepartments = async (queryClient: QueryClient) => {
@@ -51,114 +45,65 @@ export const prefetchDepartments = async (queryClient: QueryClient) => {
     queryKey: DEPARTMENTS_QUERY_KEY,
     queryFn: async () => {
       const departments = await departmentService.getAllDepartments();
-      return departments;
+      return departments as Department[];
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 };
 
 export const departmentService = {
-  createDepartment: async (data: DepartmentFormData): Promise<Department> => {
+  createDepartment: async (data: DepartmentFormData) => {
     try {
-      const response = await api.post("/super-admin/departments", data);
-      const departmentData = handleApiResponse<Department>(response);
-      return {
-        ...departmentData,
-        id: departmentData._id,
-        createdAt: new Date(departmentData.createdAt),
-        updatedAt: new Date(departmentData.updatedAt),
-      };
+      const response = await axios.post(`${BASE_URL}/departments`, data, {
+        withCredentials: true,
+      });
+      return response.data.data;
     } catch (error) {
-      const err = handleApiError(error) as DepartmentError;
-      if (err.status === 400) {
-        throw new Error("Invalid department data provided");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to create departments");
-      }
-      if (err.status === 409) {
-        throw new Error("Department with this name or code already exists");
-      }
-      throw err;
+      throw error;
     }
   },
 
-  getAllDepartments: async (): Promise<Department[]> => {
+  getAllDepartments: async () => {
     try {
-      const response = await api.get("/super-admin/departments");
-      const data = handleApiResponse<{ departments: Department[] }>(response);
-      return data.departments.map((dept) => ({
-        ...dept,
-        id: dept._id,
-        createdAt: new Date(dept.createdAt),
-        updatedAt: new Date(dept.updatedAt),
-      }));
+      const response = await axios.get(`${BASE_URL}/departments`, {
+        withCredentials: true,
+      });
+      return response.data.data.departments;
     } catch (error) {
-      const err = handleApiError(error) as DepartmentError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view departments");
-      }
-      throw err;
+      throw error;
     }
   },
 
-  updateDepartment: async (
-    id: string,
-    data: DepartmentFormData
-  ): Promise<Department> => {
+  updateDepartment: async (id: string, data: DepartmentFormData) => {
     try {
-      const response = await api.put(`/super-admin/departments/${id}`, data);
-      const departmentData = handleApiResponse<Department>(response);
-      return {
-        ...departmentData,
-        id: departmentData._id,
-        createdAt: new Date(departmentData.createdAt),
-        updatedAt: new Date(departmentData.updatedAt),
-      };
+      const response = await axios.put(`${BASE_URL}/departments/${id}`, data, {
+        withCredentials: true,
+      });
+      return response.data.data;
     } catch (error) {
-      const err = handleApiError(error) as DepartmentError;
-      if (err.status === 404) {
-        throw new Error("Department not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to update departments");
-      }
-      if (err.status === 400) {
-        throw new Error("Invalid department update data provided");
-      }
-      if (err.status === 409) {
-        throw new Error("Department with this name or code already exists");
-      }
-      throw err;
+      throw error;
     }
   },
 
-  deleteDepartment: async (id: string): Promise<boolean> => {
+  deleteDepartment: async (id: string) => {
     try {
-      const response = await api.delete(`/super-admin/departments/${id}`);
-      return handleApiResponse(response);
+      const response = await axios.delete(`${BASE_URL}/departments/${id}`, {
+        withCredentials: true,
+      });
+      return response.data.success;
     } catch (error) {
-      const err = handleApiError(error) as DepartmentError;
-      if (err.status === 404) {
-        throw new Error("Department not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to delete departments");
-      }
-      if (err.status === 400) {
-        throw new Error(
-          "Cannot delete department: may have active employees or is a system department"
-        );
-      }
-      throw err;
+      throw error;
     }
   },
 
   useGetDepartments: () => {
     return useQuery<Department[]>({
       queryKey: DEPARTMENTS_QUERY_KEY,
-      queryFn: departmentService.getAllDepartments,
+      queryFn: async () => {
+        const departments = await departmentService.getAllDepartments();
+        return departments as Department[];
+      },
     });
   },
 };

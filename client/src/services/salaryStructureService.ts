@@ -1,9 +1,15 @@
+import axios from "axios";
+import { toast } from "react-toastify";
 import {
   ISalaryGrade,
   ISalaryComponent,
   ISalaryComponentInput,
 } from "../types/salary";
-import { api, handleApiResponse, handleApiError } from "../config/api";
+
+const BASE_URL = "http://localhost:5000/api";
+
+// Set default axios config
+axios.defaults.withCredentials = true;
 
 // Create a type for the create salary grade input
 interface CreateSalaryGradeInput {
@@ -21,23 +27,19 @@ interface UpdateSalaryGradeInput {
   components?: ISalaryComponentInput[];
 }
 
-// Define specific error types for salary structure operations
-interface SalaryStructureError extends Error {
-  code?: string;
-  status?: number;
-}
-
 export const salaryStructureService = {
   getAllSalaryGrades: async (): Promise<ISalaryGrade[]> => {
     try {
-      const response = await api.get("/super-admin/salary-grades");
-      return handleApiResponse<ISalaryGrade[]>(response);
-    } catch (error) {
-      const err = handleApiError(error) as SalaryStructureError;
-      if (err.status === 403) {
-        throw new Error("You don't have permission to view salary grades");
-      }
-      throw err;
+      const response = await axios.get<{ data: ISalaryGrade[] }>(
+        `${BASE_URL}/super-admin/salary-grades`
+      );
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Failed to fetch salary grades:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch salary grades"
+      );
+      throw error;
     }
   },
 
@@ -62,20 +64,21 @@ export const salaryStructureService = {
         })),
       };
 
-      const response = await api.post(
-        "/super-admin/salary-grades",
+      console.log("📤 Sending formatted data:", formattedData);
+
+      const response = await axios.post<{ data: ISalaryGrade }>(
+        `${BASE_URL}/super-admin/salary-grades`,
         formattedData
       );
-      return handleApiResponse<ISalaryGrade>(response);
-    } catch (error) {
-      const err = handleApiError(error) as SalaryStructureError;
-      if (err.status === 400) {
-        throw new Error("Invalid salary grade data provided");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to create salary grades");
-      }
-      throw err;
+
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Request failed:", {
+        error,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      throw error;
     }
   },
 
@@ -84,23 +87,18 @@ export const salaryStructureService = {
     data: UpdateSalaryGradeInput
   ): Promise<ISalaryGrade> => {
     try {
-      const response = await api.patch(
-        `/super-admin/salary-grades/${id}`,
+      console.log("📤 Updating salary grade:", { id, data });
+      const response = await axios.patch<{ data: ISalaryGrade }>(
+        `${BASE_URL}/super-admin/salary-grades/${id}`,
         data
       );
-      return handleApiResponse<ISalaryGrade>(response);
-    } catch (error) {
-      const err = handleApiError(error) as SalaryStructureError;
-      if (err.status === 404) {
-        throw new Error("Salary grade not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to update salary grades");
-      }
-      if (err.status === 400) {
-        throw new Error("Invalid update data provided");
-      }
-      throw err;
+      return response.data.data;
+    } catch (error: any) {
+      console.error("❌ Update failed:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to update salary grade"
+      );
+      throw error;
     }
   },
 
@@ -109,23 +107,16 @@ export const salaryStructureService = {
     component: ISalaryComponentInput
   ): Promise<ISalaryGrade> => {
     try {
-      const response = await api.post(
-        `/super-admin/salary-grades/${gradeId}/components`,
+      const response = await axios.post<{ data: ISalaryGrade }>(
+        `${BASE_URL}/super-admin/salary-grades/${gradeId}/components`,
         component
       );
-      return handleApiResponse<ISalaryGrade>(response);
-    } catch (error) {
-      const err = handleApiError(error) as SalaryStructureError;
-      if (err.status === 404) {
-        throw new Error("Salary grade not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to add salary components");
-      }
-      if (err.status === 400) {
-        throw new Error("Invalid component data provided");
-      }
-      throw err;
+      return response.data.data;
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message || "Failed to add salary component"
+      );
+      throw error;
     }
   },
 
@@ -133,27 +124,19 @@ export const salaryStructureService = {
     gradeId: string,
     componentId: string,
     updates: Partial<ISalaryComponent>
-  ): Promise<ISalaryGrade> => {
+  ) => {
     try {
-      const response = await api.patch(
-        `/super-admin/salary-grades/${gradeId}/components/${componentId}`,
+      const response = await axios.patch(
+        `${BASE_URL}/super-admin/salary-grades/${gradeId}/components/${componentId}`,
         updates
       );
-      return handleApiResponse<ISalaryGrade>(response);
-    } catch (error) {
-      const err = handleApiError(error) as SalaryStructureError;
-      if (err.status === 404) {
-        throw new Error("Salary grade or component not found");
-      }
-      if (err.status === 403) {
-        throw new Error(
-          "You don't have permission to update salary components"
-        );
-      }
-      if (err.status === 400) {
-        throw new Error("Invalid component update data provided");
-      }
-      throw err;
+      toast.success("Component updated successfully");
+      return response.data.data;
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message || "Failed to update component"
+      );
+      throw error;
     }
   },
 
@@ -180,37 +163,27 @@ export const salaryStructureService = {
 
   getSalaryGrade: async (id: string): Promise<ISalaryGrade> => {
     try {
-      const response = await api.get(`/super-admin/salary-grades/${id}`);
-      return handleApiResponse<ISalaryGrade>(response);
-    } catch (error) {
-      const err = handleApiError(error) as SalaryStructureError;
-      if (err.status === 404) {
-        throw new Error("Salary grade not found");
-      }
-      if (err.status === 403) {
-        throw new Error(
-          "You don't have permission to view salary grade details"
-        );
-      }
-      throw err;
+      const response = await axios.get<{ data: ISalaryGrade }>(
+        `${BASE_URL}/super-admin/salary-grades/${id}`
+      );
+      return response.data.data;
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message || "Failed to fetch salary grade"
+      );
+      throw error;
     }
   },
 
   deleteSalaryGrade: async (id: string): Promise<void> => {
     try {
-      await api.delete(`/super-admin/salary-grades/${id}`);
-    } catch (error) {
-      const err = handleApiError(error) as SalaryStructureError;
-      if (err.status === 404) {
-        throw new Error("Salary grade not found");
-      }
-      if (err.status === 403) {
-        throw new Error("You don't have permission to delete salary grades");
-      }
-      if (err.status === 400) {
-        throw new Error("Cannot delete salary grade that is in use");
-      }
-      throw err;
+      await axios.delete(`${BASE_URL}/super-admin/salary-grades/${id}`);
+      toast.success("Salary grade deleted successfully");
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message || "Failed to delete salary grade"
+      );
+      throw error;
     }
   },
 };
