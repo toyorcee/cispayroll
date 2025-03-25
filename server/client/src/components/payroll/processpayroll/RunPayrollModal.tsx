@@ -27,8 +27,6 @@ export const RunPayrollModal = ({
   onClose,
   onSuccess,
 }: RunPayrollModalProps) => {
-  console.log("🔄 Initializing RunPayrollModal");
-
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const [selectedEmployee, setSelectedEmployee] = useState<string>("");
@@ -37,11 +35,10 @@ export const RunPayrollModal = ({
     year: new Date().getFullYear(),
   });
 
-  console.log("📊 Current State:", {
-    selectedDepartment,
-    selectedEmployee,
-    payrollData,
-    isSubmitting,
+  // Add salary grade fetching
+  const { data: salaryGrades, isLoading: isLoadingSalaryGrades } = useQuery({
+    queryKey: ["salaryGrades"],
+    queryFn: () => payrollService.getSalaryGrades(),
   });
 
   // Fetch departments
@@ -88,52 +85,69 @@ export const RunPayrollModal = ({
     employees,
   });
 
-  // Reset employee selection when department changes
+  // Get selected employee data for preview
+  const selectedEmployeeData = selectedEmployee
+    ? employees.find((emp) => emp._id === selectedEmployee)
+    : null;
+
+  // Get salary grade for preview
+  const selectedSalaryGrade = selectedEmployeeData
+    ? salaryGrades?.find(
+        (grade) => grade.level === selectedEmployeeData.gradeLevel
+      )
+    : null;
+
   const handleDepartmentChange = (departmentId: string) => {
-    console.log("🏢 Selected department:", departmentId);
     setSelectedDepartment(departmentId);
-    setSelectedEmployee(""); // Reset employee selection
+    setSelectedEmployee("");
   };
 
   const handleSubmit = async () => {
     console.log("🚀 Starting payroll submission");
     try {
       setIsSubmitting(true);
-      console.log("🔍 Finding selected employee data...");
 
       const selectedEmployeeData = employees.find(
-        (emp: DepartmentEmployee) => emp._id === selectedEmployee
+        (emp) => emp._id === selectedEmployee
       );
 
-      console.log("👤 Selected Employee Data:", selectedEmployeeData);
-
       if (!selectedEmployeeData) {
-        console.error("❌ No employee selected");
         toast.error("Please select an employee");
         return;
       }
 
-      const calculationRequest: PayrollCalculationRequest = {
+      // Get salary grade ID from grades list
+      const salaryGrade = salaryGrades?.find(
+        (grade) => grade.level === selectedEmployeeData.gradeLevel
+      );
+
+      console.log("📊 Found salary grade:", salaryGrade);
+
+      if (!salaryGrade?._id) {
+        toast.error("Invalid salary grade for employee");
+        return;
+      }
+
+      const calculationRequest = {
         month: payrollData.month,
         year: payrollData.year,
         employee: selectedEmployee,
-        salaryGrade: selectedEmployeeData.gradeLevel,
+        salaryGrade: salaryGrade._id, // Send the actual grade ID
       };
 
       console.log("📝 Payroll Calculation Request:", calculationRequest);
 
-      await payrollService.calculatePayroll(calculationRequest);
-      console.log("✅ Payroll calculation successful");
+      const result = await payrollService.calculatePayroll(calculationRequest);
+      console.log("✅ Payroll calculation result:", result);
 
-      toast.success("Payroll calculation initiated");
+      toast.success("Payroll processed successfully");
       onSuccess();
       onClose();
     } catch (error) {
       console.error("❌ Payroll calculation error:", error);
-      toast.error("Failed to initiate payroll calculation");
+      toast.error("Failed to process payroll");
     } finally {
       setIsSubmitting(false);
-      console.log("🏁 Payroll submission process completed");
     }
   };
 
@@ -263,6 +277,34 @@ export const RunPayrollModal = ({
                   No employees found in this department
                 </span>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Add preview section */}
+        {selectedEmployee && (
+          <div className="mt-4 p-4 bg-gray-50 rounded-md">
+            <h3 className="font-medium">Payroll Preview</h3>
+            <div className="mt-2 text-sm space-y-2">
+              <p>
+                Employee: {selectedEmployeeData?.firstName}{" "}
+                {selectedEmployeeData?.lastName}
+              </p>
+              <p>Grade Level: {selectedEmployeeData?.gradeLevel}</p>
+              <p>
+                Basic Salary: ₦
+                {selectedSalaryGrade?.basicSalary?.toLocaleString()}
+              </p>
+              <p>
+                Period:{" "}
+                {new Date(
+                  payrollData.year,
+                  payrollData.month - 1
+                ).toLocaleDateString("default", {
+                  month: "long",
+                  year: "numeric",
+                })}
+              </p>
             </div>
           </div>
         )}

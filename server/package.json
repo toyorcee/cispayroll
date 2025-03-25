@@ -5,8 +5,9 @@
   "main": "server.ts",
   "type": "module",
   "scripts": {
-    "start": "node server.ts",
-    "dev": "nodemon",
+  "build": "tsc",
+  "start": "node dist/server.js",
+    "dev": "nodemon --exec 'node --loader ts-node/esm'",
     "debug": "cross-env NODE_ENV=development DEBUG=* nodemon --inspect server.ts",
     "seed": "cross-env NODE_ENV=development node --loader ts-node/esm src/db/seed.ts",
     "flush": "cross-env NODE_ENV=development node --loader ts-node/esm src/db/flush.ts"
