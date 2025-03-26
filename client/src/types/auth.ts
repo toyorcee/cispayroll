@@ -100,6 +100,12 @@ export enum Permission {
   // ===== Profile & Personal Info =====
   VIEW_PERSONAL_INFO = "VIEW_PERSONAL_INFO",
   EDIT_PERSONAL_INFO = "EDIT_PERSONAL_INFO",
+
+  //  ================================================= Feedback =================================================
+  // Feedback
+  MANAGE_FEEDBACK = "MANAGE_FEEDBACK",
+  SUBMIT_FEEDBACK = "SUBMIT_FEEDBACK",
+  APPROVE_FEEDBACK = "APPROVE_FEEDBACK",
 }
 
 export interface BankDetails {

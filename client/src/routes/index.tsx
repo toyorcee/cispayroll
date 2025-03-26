@@ -38,6 +38,8 @@ import AllowanceManagement from "../pages/dashboard/payroll/AllowanceManagement"
 import BonusManagement from "../pages/dashboard/payroll/BonusManagement";
 import Landing from "../pages/Landing";
 import ComingSoonPage from "../pages/Coming/ComingSoonPage";
+import { FeedbackOutlined } from "@mui/icons-material";
+import FeedbackManagemnet from "../pages/feedback/FeedbackManagemnet";
 
 export interface RouteConfig {
   path: string;
@@ -177,6 +179,43 @@ const superAdminRoutes: RouteConfig[] = [
         element: <TaxReports />,
       },
     ],
+  },
+  {
+    path: "feedback",
+    label: "Feedback",
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    permissions: [
+      Permission.VIEW_REPORTS,
+      Permission.MANAGE_FEEDBACK,
+    ],
+    requireAllPermissions: false,
+    element: <FeedbackManagemnet />,
+    // children: [
+    //   {
+    //     path: "payroll",
+    //     label: "Payroll Reports",
+    //     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    //     permissions: [Permission.VIEW_PAYROLL_REPORTS],
+    //     requireAllPermissions: false,
+    //     element: <PayrollReports />,
+    //   },
+    //   {
+    //     path: "employees",
+    //     label: "Employee Reports",
+    //     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    //     permissions: [Permission.VIEW_EMPLOYEE_REPORTS],
+    //     requireAllPermissions: false,
+    //     element: <EmployeeReports />,
+    //   },
+    //   {
+    //     path: "tax",
+    //     label: "Tax Reports",
+    //     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    //     permissions: [Permission.VIEW_TAX_REPORTS],
+    //     requireAllPermissions: false,
+    //     element: <TaxReports />,
+    //   },
+    // ],
   },
 ];
 
