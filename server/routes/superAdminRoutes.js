@@ -137,11 +137,7 @@ router.get(
 );
 
 //Get all payrolls
-router.get(
-  "/payroll",
-  requirePermission([Permission.VIEW_ALL_PAYROLL]),
-  SuperAdminController.getAllPayroll
-);
+router.get("/payroll", SuperAdminController.getAllPayrolls);
 
 router.get(
   "/payroll/:id",
@@ -175,7 +171,7 @@ router.get(
 );
 
 router.get(
-  "/payroll/:payrollId/view",
+  "/payroll/employee/:employeeId/payslip",
   requirePermission([Permission.VIEW_ALL_PAYROLL]),
   SuperAdminController.viewPayslip
 );

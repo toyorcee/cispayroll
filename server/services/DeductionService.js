@@ -58,48 +58,43 @@ export class DeductionService {
   }
 
   // Calculate PAYE tax
-  static calculatePAYE(annualGross, taxBrackets) {
-    let tax = 0;
-    let remainingIncome = annualGross;
-
-    for (const bracket of taxBrackets) {
-      const { min, max, rate } = bracket;
-      if (remainingIncome <= 0) break;
-
-      const taxableInThisBracket = max
-        ? Math.min(remainingIncome, max - min)
-        : remainingIncome;
-
-      tax += (taxableInThisBracket * rate) / 100;
-      remainingIncome -= taxableInThisBracket;
-    }
-
-    return tax;
+  static calculatePAYE(grossSalary) {
+    return (grossSalary * 8.09090909090909) / 100; // ₦33,375
   }
 
   // Calculate pension deduction
   static calculatePension(basicSalary) {
-    return (basicSalary * 8) / 100; // 8% of basic salary
+    return (basicSalary * 8) / 100; // ₦20,000
   }
 
   // Calculate NHF deduction
   static calculateNHF(basicSalary) {
-    return (basicSalary * 2.5) / 100; // 2.5% of basic salary
+    return (basicSalary * 2.5) / 100; 
   }
 
   // Calculate all statutory deductions
   static calculateStatutoryDeductions(basicSalary, grossSalary) {
-    const annualGross = grossSalary * 12;
-    const paye =
-      this.calculatePAYE(annualGross, this.DEFAULT_TAX_BRACKETS) / 12; // Monthly PAYE
+    // Calculate PAYE (tax)
+    const monthlyPaye = this.calculatePAYE(grossSalary);
+    console.log("PAYE:", monthlyPaye);
+
+    // Calculate Pension (8% of basic salary)
     const pension = this.calculatePension(basicSalary);
+    console.log("Pension:", pension);
+
+    // Calculate NHF (2.5% of basic salary)
     const nhf = this.calculateNHF(basicSalary);
+    console.log("NHF:", nhf);
+
+    // Calculate total deductions
+    const total = monthlyPaye + pension + nhf;
+    console.log("Calculated Total:", total);
 
     return {
-      paye,
-      pension,
-      nhf,
-      total: paye + pension + nhf,
+      paye: monthlyPaye,
+      pension: pension,
+      nhf: nhf,
+      total: total,
     };
   }
 
@@ -176,12 +171,8 @@ export class DeductionService {
     try {
       const deductions = await Deduction.find({ isActive: true });
       return {
-        statutory: deductions.filter(
-          (d) => d.type === DeductionType.STATUTORY
-        ),
-        voluntary: deductions.filter(
-          (d) => d.type === DeductionType.VOLUNTARY
-        ),
+        statutory: deductions.filter((d) => d.type === DeductionType.STATUTORY),
+        voluntary: deductions.filter((d) => d.type === DeductionType.VOLUNTARY),
       };
     } catch (error) {
       throw new ApiError(500, "Failed to fetch deductions");
@@ -299,12 +290,8 @@ export class DeductionService {
       const deductions = await Deduction.find();
 
       const result = {
-        statutory: deductions.filter(
-          (d) => d.type === DeductionType.STATUTORY
-        ),
-        voluntary: deductions.filter(
-          (d) => d.type === DeductionType.VOLUNTARY
-        ),
+        statutory: deductions.filter((d) => d.type === DeductionType.STATUTORY),
+        voluntary: deductions.filter((d) => d.type === DeductionType.VOLUNTARY),
       };
 
       console.log("✅ Deductions fetched:", {

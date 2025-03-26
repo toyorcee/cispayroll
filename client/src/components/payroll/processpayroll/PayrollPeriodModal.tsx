@@ -13,7 +13,6 @@ import {
   CircularProgress,
 } from "@mui/material";
 import {
-  FaFileAlt,
   FaFileInvoice,
   FaDownload,
   FaHistory,

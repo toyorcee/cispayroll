@@ -326,10 +326,12 @@ export const payrollService = {
   },
 
   // View Payslip
-  viewPayslip: async (payrollId: string) => {
+  viewPayslip: async (employeeId: string) => {
     try {
-      console.log("🔍 Fetching payslip details:", payrollId);
-      const response = await axios.get(`${BASE_URL}/payroll/${payrollId}/view`);
+      console.log("🔍 Fetching payslip details for employee:", employeeId);
+      const response = await axios.get(
+        `${BASE_URL}/payroll/employee/${employeeId}/payslip`
+      );
 
       if (!response.data.success) {
         throw new Error(
@@ -354,25 +356,36 @@ export const payrollService = {
   },
 
   getAllPayrolls: async (filters?: PayrollFilters) => {
-    console.log("🔍 Applying filters:", filters);
-    const params = new URLSearchParams();
+    try {
+      console.log("🔍 Applying filters:", filters);
+      const params = new URLSearchParams();
 
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value && value !== "all") {
-          params.append(key, value.toString());
+      if (filters) {
+        // Handle date range
+        if (filters.dateRange) {
+          params.append("dateRange", filters.dateRange);
         }
-      });
+        // Handle specific month/year
+        if (filters.month && filters.year) {
+          params.append("month", filters.month.toString());
+          params.append("year", filters.year.toString());
+        }
+        // Handle other filters
+        if (filters.department) params.append("department", filters.department);
+        if (filters.status) params.append("status", filters.status);
+        if (filters.frequency) params.append("frequency", filters.frequency);
+      }
+
+      const url = `${BASE_URL}/payroll${params.toString() ? `?${params}` : ""}`;
+      console.log("🔍 Request URL:", url);
+
+      const response = await axios.get(url);
+      console.log("📊 Payrolls response:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching payrolls:", error);
+      throw error;
     }
-
-    const url = `/api/super-admin/payroll${
-      params.toString() ? `?${params}` : ""
-    }`;
-    console.log("🔍 Request URL:", url);
-
-    const response = await axios.get(url);
-    console.log("📊 Payrolls response:", response.data);
-    return response.data;
   },
 
   approvePayroll: async (

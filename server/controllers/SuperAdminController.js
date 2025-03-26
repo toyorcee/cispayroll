@@ -429,107 +429,55 @@ export class SuperAdminController {
   // ===== Payroll Management =====
   static async createPayroll(req, res) {
     try {
-      console.log("📝 Creating payroll record with data:", req.body);
-      const { employee, month, year, salaryGrade } = req.body;
+      const { employee, month, year, salaryGrade, department } = req.body;
 
-      // First check if payroll already exists
-      const existingPayroll = await PayrollModel.findOne({
-        employee: asObjectId(employee),
-        month,
-        year,
-      });
+      // Validate month and year
+      const currentDate = new Date();
+      if (
+        year < currentDate.getFullYear() ||
+        (year === currentDate.getFullYear() &&
+          month < currentDate.getMonth() + 1)
+      ) {
+        throw new ApiError(400, "Cannot create payroll for past dates");
+      }
 
-      if (existingPayroll) {
-        return res.status(400).json({
-          success: false,
-          message: `Payroll record already exists for employee in ${month}/${year}`,
-          data: existingPayroll,
-        });
+      if (month < 1 || month > 12) {
+        throw new ApiError(400, "Invalid month");
       }
 
       // Get calculations from PayrollService
       const calculations = await PayrollService.calculatePayroll(
-        asObjectId(employee),
-        asObjectId(salaryGrade),
+        employee,
+        salaryGrade,
         month,
         year
       );
 
-      // Calculate allowance amounts based on components
-      const processedComponents = calculations.components.map((component) => {
-        let calculatedAmount = 0;
-        if (component.type === "allowance") {
-          if (component.name === "Housing Allowance") {
-            calculatedAmount =
-              (component.value / 100) * calculations.basicSalary;
-          } else {
-            calculatedAmount = component.value;
-          }
-        }
-        return {
-          ...component,
-          amount: calculatedAmount,
-        };
-      });
-
-      // Calculate total allowances and gross earnings
-      const totalAllowances = processedComponents.reduce(
-        (sum, component) => sum + (component.amount || 0),
-        0
-      );
-      const grossEarnings = calculations.basicSalary + totalAllowances;
-
-      // Prepare payroll data
+      // Create payroll data with all required fields
       const payrollData = {
-        ...calculations,
-        components: processedComponents,
-        allowances: {
-          gradeAllowances: processedComponents
-            .filter((comp) => comp.type === "allowance")
-            .map((comp) => ({
-              name: comp.name,
-              type: "allowance",
-              value: comp.value,
-              amount: comp.amount,
-              calculationMethod: comp.calculationMethod,
-            })),
-          additionalAllowances: [],
-          totalAllowances,
-        },
-        totals: {
-          basicSalary: calculations.basicSalary,
-          totalAllowances,
-          totalBonuses: 0,
-          grossEarnings,
-          totalDeductions: calculations.deductions.totalDeductions,
-          netPay: grossEarnings - calculations.deductions.totalDeductions,
-        },
-        processedBy: asObjectId(req.user.id),
-        createdBy: asObjectId(req.user.id),
-        updatedBy: asObjectId(req.user.id),
+        employee, // Required: Employee ID
+        month, // Required: Month
+        year, // Required: Year
+        salaryGrade, // Required: Salary Grade ID
+        department, // Required: Department ID
+        basicSalary: calculations.totals.basicSalary, // Required: Basic Salary
+        components: calculations.allowances.gradeAllowances, // Required: Components with amounts
+        status: "PENDING",
+        processedBy: req.user.id,
+        createdBy: req.user.id,
+        updatedBy: req.user.id,
         approvalFlow: {
-          submittedBy: asObjectId(req.user.id),
+          submittedBy: req.user.id,
           submittedAt: new Date(),
         },
         payment: {
-          bankName:
-            calculations.employee.bankDetails?.bankName ||
-            "Bank Details Required",
-          accountNumber:
-            calculations.employee.bankDetails?.accountNumber ||
-            "Bank Details Required",
-          accountName:
-            calculations.employee.bankDetails?.accountName ||
-            "Bank Details Required",
+          bankName: "Bank Details Required",
+          accountNumber: "Bank Details Required",
+          accountName: "Bank Details Required",
         },
-        frequency: "monthly",
-        periodStart: new Date(),
-        periodEnd: new Date(),
-        month,
-        year,
+        ...calculations, // Include all calculated values
       };
 
-      // Create and populate payroll record
       const payroll = await PayrollModel.create(payrollData);
       const populatedPayroll = await PayrollModel.findById(
         payroll._id
@@ -546,15 +494,14 @@ export class SuperAdminController {
       });
     } catch (error) {
       console.error("❌ Error in createPayroll:", error);
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({
+      res.status(500).json({
         success: false,
         message: "Failed to create payroll record",
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: error.message,
       });
     }
   }
-  
+
   static async deletePayroll(req, res) {
     try {
       const { id } = req.params;
@@ -581,74 +528,75 @@ export class SuperAdminController {
     }
   }
 
-  //Get all payrolls
-  static async getAllPayroll(req, res) {
+  static async getAllPayrolls(req, res) {
     try {
-      console.log("=== GETTING ALL PAYROLLS WITH FILTERS ===");
-      const { dateRange, department, frequency, status, month, year } =
-        req.query;
+      const {
+        month,
+        year,
+        status,
+        department,
+        dateRange,
+        frequency = "monthly",
+      } = req.query;
 
       let query = {};
 
-      // Apply filters if provided
-      if (department && department !== "all") {
-        query.department = department;
-      }
-
-      if (frequency && frequency !== "all") {
-        query.frequency = frequency;
-      }
-
-      if (status && status !== "all") {
-        query.status = status;
-      }
-
-      // Handle date range or specific month/year
+      // Period filtering
       if (month && year) {
         query.month = parseInt(month);
         query.year = parseInt(year);
       } else if (dateRange) {
-        const now = new Date();
-        let monthsToSubtract;
-        switch (dateRange) {
-          case "last3":
-            monthsToSubtract = 3;
-            break;
-          case "last6":
-            monthsToSubtract = 6;
-            break;
-          case "last12":
-            monthsToSubtract = 12;
-            break;
-        }
-
-        if (monthsToSubtract) {
-          const startDate = new Date(
-            now.setMonth(now.getMonth() - monthsToSubtract)
-          );
-          query.createdAt = { $gte: startDate };
-        }
+        // Handle date range filtering
+        const [startDate, endDate] = dateRange.split(",");
+        query.createdAt = {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate),
+        };
       }
 
-      console.log("🔍 Filter Query:", query);
+      // Status filtering
+      if (status && status !== "all") {
+        query.status = status;
+      }
+
+      // Department filtering
+      if (department && department !== "all") {
+        query.department = department;
+      }
+
+      // Get paginated results
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const skip = (page - 1) * limit;
 
       const payrolls = await PayrollModel.find(query)
-        .populate("employee", "firstName lastName employeeId")
-        .populate("department", "name")
-        .sort({ createdAt: -1 });
+        .sort({ year: -1, month: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate([
+          { path: "employee", select: "firstName lastName employeeId" },
+          { path: "department", select: "name code" },
+          { path: "salaryGrade", select: "level description" },
+        ]);
 
-      console.log(`📊 Found ${payrolls.length} payrolls matching filters`);
+      const total = await PayrollModel.countDocuments(query);
 
-      return res.status(200).json({
+      res.status(200).json({
         success: true,
-        count: payrolls.length,
-        payrolls,
+        data: {
+          payrolls,
+          pagination: {
+            total,
+            page,
+            pages: Math.ceil(total / limit),
+          },
+        },
       });
     } catch (error) {
-      console.error("❌ Error getting payrolls:", error);
-      return res.status(500).json({
+      console.error("❌ Error in getAllPayrolls:", error);
+      res.status(500).json({
         success: false,
-        message: "Failed to get payrolls",
+        message: "Failed to fetch payrolls",
         error: error.message,
       });
     }
@@ -672,28 +620,12 @@ export class SuperAdminController {
         });
       }
 
-      // Get payroll history
-      const payrollHistory = await PayrollModel.find({
-        employee: asObjectId(employeeId),
-      })
-        .populate([
-          {
-            path: "employee",
-            select: "firstName lastName employeeId bankDetails",
-          },
-          {
-            path: "department",
-            select: "name code",
-          },
-          {
-            path: "salaryGrade",
-            select: "level description",
-          },
-        ])
-        .sort({ year: -1, month: -1 })
-        .lean();
+      // Use the service instead of duplicating the query
+      const payrollHistory = await PayrollService.getEmployeePayrollHistory(
+        employeeId
+      );
 
-      // Calculate summary
+      // Rest of the formatting remains the same
       const approvedPayrolls = payrollHistory.filter(
         (record) => record.status === PAYROLL_STATUS.APPROVED
       );
@@ -703,7 +635,6 @@ export class SuperAdminController {
         0
       );
 
-      // Format payroll history to remove redundancy
       const formattedPayrollHistory = payrollHistory.map((record) => ({
         period: {
           month: record.month,
@@ -735,22 +666,22 @@ export class SuperAdminController {
             id: employee._id,
             name: `${employee.firstName} ${employee.lastName}`,
             employeeId: employee.employeeId,
-            department: employee.department?.name || "Not Assigned",
+            department: employee.department || "Not Assigned", // Return full department object
             salaryGrade: currentSalaryGrade,
           },
           payrollHistory: formattedPayrollHistory,
           summary: {
             totalRecords: payrollHistory.length,
-            latestPayroll: {
-              period: latestPayroll
-                ? {
+            latestPayroll: latestPayroll
+              ? {
+                  period: {
                     month: latestPayroll.month,
                     year: latestPayroll.year,
-                  }
-                : null,
-              status: latestPayroll?.status || null,
-              totals: latestPayroll?.totals || null,
-            },
+                  },
+                  status: latestPayroll.status,
+                  totals: latestPayroll.totals,
+                }
+              : null,
             totalPaid,
             averagePayroll:
               approvedPayrolls.length > 0
@@ -1007,64 +938,67 @@ export class SuperAdminController {
 
   static async viewPayslip(req, res) {
     try {
-      console.log("🔍 Fetching payslip details for:", req.params.payrollId);
+      const { employeeId } = req.params;
+      console.log("🔍 Fetching payslip details for employee:", employeeId);
 
-      const payroll = await PayrollModel.findById(req.params.payrollId)
-        .populate([
-          {
-            path: "employee",
-            select: "firstName lastName employeeId bankDetails",
-          },
-          { path: "department", select: "name code" },
-          { path: "salaryGrade", select: "level description" },
-        ])
-        .lean();
+      // Get employee with populated fields
+      const employee = await UserModel.findById(employeeId).populate([
+        { path: "department", select: "name code" },
+        { path: "salaryGrade", select: "level description" },
+      ]);
 
-      if (!payroll) {
-        throw new ApiError(404, "Payroll record not found");
+      if (!employee) {
+        return res.status(404).json({
+          success: false,
+          message: "Employee not found",
+        });
       }
+
+      // Use the service instead of duplicating the query
+      const payrollHistory = await PayrollService.getEmployeePayrollHistory(
+        employeeId
+      );
+      const latestPayroll = payrollHistory[0]; // Get most recent payroll
+
+      if (!latestPayroll) {
+        throw new ApiError(404, "No payroll record found");
+      }
+
+      // Get the latest salary grade from the most recent payroll record
+      const currentSalaryGrade =
+        latestPayroll?.salaryGrade?.level ||
+        employee.salaryGrade?.level ||
+        "Not Assigned";
 
       // Format the response with detailed payslip information
       const payslipData = {
-        payslipId: `PS${payroll.month}${payroll.year}${payroll.employee.employeeId}`,
+        payslipId: `PS${latestPayroll.month}${latestPayroll.year}${employee.employeeId}`,
         employee: {
-          id: payroll.employee._id,
-          name: `${payroll.employee.firstName} ${payroll.employee.lastName}`,
-          employeeId: payroll.employee.employeeId,
-          department: payroll.department?.name || "Not Assigned",
-          salaryGrade: payroll.salaryGrade?.level || "Not Assigned",
+          id: employee._id,
+          name: `${employee.firstName} ${employee.lastName}`,
+          employeeId: employee.employeeId,
+          department: employee.department?.name || "Not Assigned",
+          salaryGrade: currentSalaryGrade, // Using same logic as history
         },
         paymentDetails: {
-          bankName: payroll.employee.bankDetails?.bankName || "Not Provided",
-          accountNumber:
-            payroll.employee.bankDetails?.accountNumber || "Not Provided",
-          accountName:
-            payroll.employee.bankDetails?.accountName || "Not Provided",
+          bankName: employee.bankDetails?.bankName || "Not Provided",
+          accountNumber: employee.bankDetails?.accountNumber || "Not Provided",
+          accountName: employee.bankDetails?.accountName || "Not Provided",
         },
         period: {
-          month: payroll.month,
-          year: payroll.year,
+          month: latestPayroll.month,
+          year: latestPayroll.year,
         },
         earnings: {
-          basicSalary: payroll.basicSalary,
-          allowances: payroll.allowances,
-          bonuses: payroll.bonuses,
-          totalEarnings: payroll.totals.grossEarnings,
+          basicSalary: latestPayroll.basicSalary,
+          allowances: latestPayroll.allowances,
+          bonuses: latestPayroll.bonuses,
+          totalEarnings: latestPayroll.totals.grossEarnings,
         },
-        deductions: {
-          tax: payroll.deductions.tax,
-          pension: payroll.deductions.pension,
-          loans: payroll.deductions.loans,
-          others: payroll.deductions.others,
-          totalDeductions: payroll.totals.totalDeductions,
-        },
-        summary: {
-          grossEarnings: payroll.totals.grossEarnings,
-          totalDeductions: payroll.totals.totalDeductions,
-          netPay: payroll.totals.netPay,
-        },
-        status: payroll.status,
-        processedAt: payroll.createdAt,
+        deductions: latestPayroll.deductions,
+        totals: latestPayroll.totals,
+        status: latestPayroll.status,
+        processedAt: latestPayroll.createdAt,
       };
 
       console.log("✅ Payslip details retrieved successfully");
@@ -2403,4 +2337,29 @@ export class SuperAdminController {
       next(error);
     }
   }
+}
+
+// Add this helper function
+function calculatePeriodEnd(startDate, frequency) {
+  const endDate = new Date(startDate);
+  switch (frequency) {
+    case "weekly":
+      endDate.setDate(endDate.getDate() + 7);
+      break;
+    case "biweekly":
+      endDate.setDate(endDate.getDate() + 14);
+      break;
+    case "monthly":
+      endDate.setMonth(endDate.getMonth() + 1);
+      break;
+    case "quarterly":
+      endDate.setMonth(endDate.getMonth() + 3);
+      break;
+    case "annual":
+      endDate.setFullYear(endDate.getFullYear() + 1);
+      break;
+    default:
+      endDate.setMonth(endDate.getMonth() + 1);
+  }
+  return endDate;
 }
