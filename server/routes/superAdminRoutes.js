@@ -396,4 +396,10 @@ router.delete(
   SuperAdminController.deleteBonus
 );
 
+router.get(
+  "/active-employees",
+  requirePermission([Permission.VIEW_ALL_USERS]),
+  SuperAdminController.getActiveEmployees
+);
+
 export default router;

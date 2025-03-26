@@ -23,6 +23,7 @@ import {
   IconType,
 } from "../../types/navigation";
 import { FaUsers, FaUserPlus, FaUserMinus } from "react-icons/fa";
+import { FaGavel } from "react-icons/fa6";
 
 // Updated icon mapping to include all sections
 const iconMap: Record<string, IconType> = {
@@ -31,6 +32,7 @@ const iconMap: Record<string, IconType> = {
   Payroll: CurrencyDollarIcon,
   Reports: DocumentTextIcon,
   Settings: CogIcon,
+  Disciplinary: FaGavel,
   "My Profile": UserPlusIcon,
   "My Leave": ArrowRightOnRectangleIcon,
   "My Payslips": DocumentTextIcon,

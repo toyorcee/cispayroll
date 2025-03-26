@@ -12,6 +12,8 @@ import {
   ArrowRightOnRectangleIcon,
   UserPlusIcon,
 } from "@heroicons/react/24/outline";
+import { FaGavel } from "react-icons/fa6";
+
 
 type NavigationContextType = {
   activeMenuText: string;
@@ -37,7 +39,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
     // For Super Admin, show ALL main menus (not submenus)
     if (user.role === UserRole.SUPER_ADMIN) {
-      return ["Dashboard", "Employees", "Payroll", "Reports", "Settings"];
+      return ["Dashboard", "Employees", "Payroll", "Reports", "Settings", "Disciplinary"];
     }
 
     // For other roles, check specific permissions
@@ -301,6 +303,17 @@ export const menuItems: NavigationItem[] = [
         requireAllPermissions: false,
       },
     ],
+  },
+  {
+    name: "Disciplinary",
+    href: "/dashboard/disciplinary/general",
+    icon: FaGavel,
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    permissions: [
+      Permission.MANAGE_DISCIPLINARY_ACTIONS,
+      Permission.VIEW_DISCIPLINARY_RECORDS,
+    ],
+    requireAllPermissions: false,
   },
 ].map((item) => {
   console.log(`Menu item ${item.name}:`, {

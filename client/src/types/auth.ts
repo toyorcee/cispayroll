@@ -100,6 +100,10 @@ export enum Permission {
   // ===== Profile & Personal Info =====
   VIEW_PERSONAL_INFO = "VIEW_PERSONAL_INFO",
   EDIT_PERSONAL_INFO = "EDIT_PERSONAL_INFO",
+
+  // ===== Disciplinary =====
+  VIEW_DISCIPLINARY_RECORDS = "VIEW_DISCIPLINARY_RECORDS",
+  MANAGE_DISCIPLINARY_ACTIONS = "MANAGE_DISCIPLINARY_ACTIONS",
 }
 
 export interface BankDetails {

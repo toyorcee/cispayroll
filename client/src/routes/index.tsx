@@ -37,6 +37,7 @@ import Dashboard from "../pages/dashboard/Dashboard";
 import AllowanceManagement from "../pages/dashboard/payroll/AllowanceManagement";
 import BonusManagement from "../pages/dashboard/payroll/BonusManagement";
 import Landing from "../pages/Landing";
+import Disciplinary from "../pages/dashboard/disciplinary/Disciplinary";
 
 export interface RouteConfig {
   path: string;
@@ -177,6 +178,17 @@ const superAdminRoutes: RouteConfig[] = [
       },
     ],
   },
+  {
+    path: "disciplinary/general",
+    label: "Disciplinary Management",
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    // permissions: [
+    //   Permission.VIEW_DISCIPLINARY_RECORDS,
+    //   Permission.MANAGE_DISCIPLINARY_ACTIONS,
+    // ],
+    // requireAllPermissions: false,
+    element: <Disciplinary />, 
+  }
 ];
 
 // Admin routes

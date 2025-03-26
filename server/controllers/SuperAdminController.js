@@ -1157,6 +1157,74 @@ export class SuperAdminController {
   }
 
   //Onboarding & Offboarding
+
+  static async getActiveEmployees(req, res) {
+    try {
+      console.log("🔍 Fetching active employees");
+
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const search = req.query.search;
+      const departmentId = req.query.department;
+
+      const query = {
+        role: { $in: [UserRole.USER, UserRole.ADMIN] },
+        status: { $in: ["active", "pending"] },
+        $nor: [
+          { status: "archived" },
+          { status: "offboarding" },
+          { status: "completed" },
+        ],
+      };
+
+      // Add department filter if provided
+      if (departmentId) {
+        query.department = new Types.ObjectId(departmentId);
+      }
+
+      // Add search filter if provided
+      if (search) {
+        query.$or = [
+          { firstName: { $regex: search, $options: "i" } },
+          { lastName: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+          { employeeId: { $regex: search, $options: "i" } },
+        ];
+      }
+
+      console.log("📝 Query:", JSON.stringify(query, null, 2));
+
+      const [employees, total] = await Promise.all([
+        UserModel.find(query)
+          .select("-password")
+          .populate("department", "name code")
+          .sort({ createdAt: -1 })
+          .skip((page - 1) * limit)
+          .limit(limit),
+        UserModel.countDocuments(query),
+      ]);
+
+      // console.log(✅ Found ${employees.length} active employees);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          employees,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error fetching active employees:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message: message || "Failed to fetch active employees",
+      });
+    }
+  }
   static async getOnboardingEmployees(req, res) {
     try {
       console.log("🔍 Fetching onboarding employees");

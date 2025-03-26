@@ -18,6 +18,7 @@ import regularUserRoutes from "./routes/regularUserRoutes.js";
 import employeeRoutes from "./routes/employeeRoutes.js";
 import invitationRoutes from "./routes/invitationRoutes.js";
 import onboardingRoutes from "./routes/onboardingRoutes.js";
+import disciplinaryRoutes from "./routes/disciplinaryRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -137,6 +138,7 @@ app.use("/api/users", routeErrorWrapper(regularUserRoutes));
 app.use("/api/employees", routeErrorWrapper(employeeRoutes));
 app.use("/api/invitation", routeErrorWrapper(invitationRoutes));
 app.use("/api/onboarding", routeErrorWrapper(onboardingRoutes));
+app.use("/api/disciplinary", routeErrorWrapper(disciplinaryRoutes));
 
 // Enhanced health check
 app.get("/api/health", (_req, res) => {

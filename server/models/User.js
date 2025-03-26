@@ -103,6 +103,10 @@ export const Permission = {
   MANAGE_DOCUMENTS: "MANAGE_DOCUMENTS",
   EDIT_PERSONAL_INFO: "EDIT_PERSONAL_INFO",
   VIEW_OWN_DEDUCTIONS: "VIEW_OWN_DEDUCTIONS",
+
+  // ===== Disciplinary =====
+  VIEW_DISCIPLINARY_RECORDS: "VIEW_DISCIPLINARY_RECORDS",
+  MANAGE_DISCIPLINARY_ACTIONS: "MANAGE_DISCIPLINARY_ACTIONS",
 };
 
 export const OnboardingStatus = {
@@ -447,6 +451,9 @@ UserSchema.pre("save", function (next) {
           Permission.MANAGE_INTEGRATIONS,
           Permission.MANAGE_DOCUMENTS,
           Permission.EDIT_PERSONAL_INFO,
+
+          Permission.VIEW_DISCIPLINARY_RECORDS,
+          Permission.MANAGE_DISCIPLINARY_ACTIONS,
         ];
         break;
 
