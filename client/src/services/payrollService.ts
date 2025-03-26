@@ -9,32 +9,73 @@ import type {
   PayrollData,
   PayrollStats,
   PeriodPayrollResponse,
+  PayrollStatus,
 } from "../types/payroll";
 
 const BASE_URL = "/api/super-admin";
 
+export interface PayrollCounts {
+  PENDING: number;
+  APPROVED: number;
+  REJECTED: number;
+  total: number;
+}
+
+interface PayrollFilters {
+  dateRange?: string;
+  department?: string;
+  frequency?: string;
+  status?: string;
+  month?: number;
+  year?: number;
+}
+
+interface ApprovalResponse {
+  success: boolean;
+  message: string;
+  data: IPayroll;
+}
+
 export const payrollService = {
   // Calculate Payroll
-  calculatePayroll: async (
-    data: PayrollCalculationRequest
-  ): Promise<IPayrollCalculationResult> => {
-    console.log("📊 PayrollService: Calculating payroll with data:", data);
-    try {
-      const response = await axios.post(`${BASE_URL}/payroll`, data);
-      console.log("✅ PayrollService: Calculation successful:", response.data);
-      return response.data.data;
-    } catch (error: any) {
-      console.error("❌ PayrollService: Calculation failed:", {
-        error,
-        response: error.response?.data,
-        status: error.response?.status,
-      });
-      toast.error(
-        error.response?.data?.message || "Failed to calculate payroll"
-      );
-      throw error;
-    }
-  },
+  // calculatePayroll: async (
+  //   data: PayrollCalculationRequest
+  // ): Promise<IPayrollCalculationResult> => {
+  //   try {
+  //     console.log("=== 🧮 CALCULATING PAYROLL ===");
+  //     console.log("📝 Request Data:", data);
+
+  //     const response = await axios.post(`${BASE_URL}/payroll`, data);
+
+  //     if (!response.data) {
+  //       throw new Error("No data received from server");
+  //     }
+
+  //     if (!response.data.success) {
+  //       throw new Error(response.data.message || "Failed to calculate payroll");
+  //     }
+
+  //     console.log("✅ Calculation successful:", response.data.data);
+  //     return response.data.data;
+  //   } catch (error: any) {
+  //     console.error("=== ❌ PAYROLL SERVICE ERROR ===");
+  //     console.error("Original Request: ", data);
+
+  //     if (error.response) {
+  //       // Server responded with error
+  //       console.error("Server Error:", error.response.data);
+  //       throw new Error(error.response.data.message || "Server error occurred");
+  //     } else if (error.request) {
+  //       // Request made but no response
+  //       console.error("No response received");
+  //       throw new Error("No response from server");
+  //     } else {
+  //       // Other errors
+  //       console.error("Error:", error.message);
+  //       throw error;
+  //     }
+  //   }
+  // },
 
   // Get Salary Grades
   getSalaryGrades: async (): Promise<ISalaryGrade[]> => {
@@ -194,20 +235,49 @@ export const payrollService = {
     data: PayrollCalculationRequest
   ): Promise<IPayrollCalculationResult> => {
     try {
-      console.log("📝 Creating payroll with data:", data);
+      console.log("=== 🚀 PAYROLL SERVICE START ===");
+      console.log("📝 Request Data:", {
+        employee: data.employee,
+        month: data.month,
+        year: data.year,
+        salaryGrade: data.salaryGrade,
+      });
+
       const response = await axios.post(`${BASE_URL}/payroll`, data);
 
+      if (!response.data) {
+        console.error("❌ No data in response");
+        throw new Error("No data received from server");
+      }
+
       if (!response.data.success) {
+        console.error("❌ Server reported failure:", response.data.message);
         throw new Error(response.data.message || "Failed to create payroll");
       }
 
-      console.log("✅ Payroll created:", response.data.data);
       // toast.success("Payroll created successfully");
       return response.data.data;
     } catch (error: any) {
-      console.error("❌ Error creating payroll:", error);
-      toast.error(error.response?.data?.message || "Failed to create payroll");
-      throw error;
+      console.error("=== ❌ PAYROLL SERVICE ERROR ===");
+      console.error("Original Request:", data);
+
+      if (error.response) {
+        console.error("Server Error Response:", {
+          status: error.response.status,
+          data: error.response.data,
+        });
+      } else if (error.request) {
+        console.error("No Response Received:", error.request);
+      } else {
+        console.error("Error Details:", error);
+      }
+
+      const errorMessage =
+        error.response?.data?.message || "Failed to create payroll";
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      console.log("=== 🏁 PAYROLL SERVICE END ===");
     }
   },
 
@@ -277,4 +347,107 @@ export const payrollService = {
       throw error;
     }
   },
+
+  getPendingPayrolls: async () => {
+    const response = await axios.get("/api/super-admin/payroll/pending");
+    return response.data;
+  },
+
+  getAllPayrolls: async (filters?: PayrollFilters) => {
+    console.log("🔍 Applying filters:", filters);
+    const params = new URLSearchParams();
+
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value && value !== "all") {
+          params.append(key, value.toString());
+        }
+      });
+    }
+
+    const url = `/api/super-admin/payroll${
+      params.toString() ? `?${params}` : ""
+    }`;
+    console.log("🔍 Request URL:", url);
+
+    const response = await axios.get(url);
+    console.log("📊 Payrolls response:", response.data);
+    return response.data;
+  },
+
+  approvePayroll: async (
+    payrollId: string,
+    remarks?: string
+  ): Promise<ApprovalResponse> => {
+    try {
+      console.log("Approving payroll:", { payrollId, remarks });
+
+      const response = await axios.patch(
+        `${BASE_URL}/payroll/${payrollId}/approve`,
+        { remarks },
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      const data = response.data.data;
+      console.log("Approve response:", data);
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to approve payroll");
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Approve payroll error:", error);
+      throw error;
+    }
+  },
+
+  rejectPayroll: async (
+    payrollId: string,
+    remarks: string
+  ): Promise<ApprovalResponse> => {
+    try {
+      const response = await axios.patch(
+        `${BASE_URL}/payroll/${payrollId}/reject`,
+        { remarks },
+        { headers: { "Content-Type": "application/json" } }
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to reject payroll");
+      }
+
+      return response.data.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  getPayrollCounts: async (
+    filters?: PayrollFilters
+  ): Promise<PayrollCounts> => {
+    try {
+      const queryString = filters
+        ? `?${new URLSearchParams(filters as any)}`
+        : "";
+      const response = await axios.get(
+        `${BASE_URL}/payroll/counts${queryString}`
+      );
+
+      if (!response.data.success) {
+        throw new Error("Failed to fetch payroll counts");
+      }
+
+      return response.data.data;
+    } catch (error) {
+      throw error;
+    }
+  },
 };
+
+export interface PayrollCounts {
+  PENDING: number;
+  APPROVED: number;
+  REJECTED: number;
+  total: number;
+}

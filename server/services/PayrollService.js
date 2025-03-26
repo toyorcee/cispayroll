@@ -70,7 +70,7 @@ export class PayrollService {
     const endDate = new Date(year, month, 0);
 
     return {
-      type: PAYROLL_FREQUENCY.MONTHLY,
+      type: PayrollFrequency.MONTHLY,
       startDate,
       endDate,
       month,
@@ -298,19 +298,19 @@ export class PayrollService {
   static adjustAmountByFrequency(
     amount,
     frequency,
-    targetFrequency = PAYROLL_FREQUENCY.MONTHLY
+    targetFrequency = PayrollFrequency.MONTHLY
   ) {
     const monthlyAmount = (() => {
       switch (frequency) {
-        case PAYROLL_FREQUENCY.YEARLY:
+        case PayrollFrequency.YEARLY:
           return amount / 12;
-        case PAYROLL_FREQUENCY.SEMI_MONTHLY:
+        case PayrollFrequency.SEMI_MONTHLY:
           return amount * 2;
-        case PAYROLL_FREQUENCY.BI_WEEKLY:
+        case PayrollFrequency.BI_WEEKLY:
           return amount * 2.167;
-        case PAYROLL_FREQUENCY.WEEKLY:
+        case PayrollFrequency.WEEKLY:
           return amount * 4.333;
-        case PAYROLL_FREQUENCY.DAILY:
+        case PayrollFrequency.DAILY:
           return amount * 21.75;
         default:
           return amount;
@@ -318,15 +318,15 @@ export class PayrollService {
     })();
 
     switch (targetFrequency) {
-      case PAYROLL_FREQUENCY.YEARLY:
+      case PayrollFrequency.YEARLY:
         return monthlyAmount * 12;
-      case PAYROLL_FREQUENCY.SEMI_MONTHLY:
+      case PayrollFrequency.SEMI_MONTHLY:
         return monthlyAmount / 2;
-      case PAYROLL_FREQUENCY.BI_WEEKLY:
+      case PayrollFrequency.BI_WEEKLY:
         return monthlyAmount / 2.167;
-      case PAYROLL_FREQUENCY.WEEKLY:
+      case PayrollFrequency.WEEKLY:
         return monthlyAmount / 4.333;
-      case PAYROLL_FREQUENCY.DAILY:
+      case PayrollFrequency.DAILY:
         return monthlyAmount / 21.75;
       default:
         return monthlyAmount;
@@ -410,7 +410,7 @@ export class PayrollService {
           type: "allowance",
           value: a.amount,
           amount: a.amount,
-          frequency: PAYROLL_FREQUENCY.MONTHLY,
+          frequency: PayrollFrequency.MONTHLY,
         })),
         totalAllowances: salaryDetails.totalAllowances,
       },
@@ -451,7 +451,7 @@ export class PayrollService {
         netPay: netSalary,
       },
       status: PAYROLL_STATUS.PENDING,
-      frequency: PAYROLL_FREQUENCY.MONTHLY,
+      frequency: PayrollFrequency.MONTHLY,
     };
 
     this.validatePayrollData(payrollData);

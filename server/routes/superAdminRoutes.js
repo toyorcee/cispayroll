@@ -11,6 +11,8 @@ import {
   validatePayrollCreate,
   validatePayrollUpdate,
   validateEmployeePayrollHistory,
+  validatePayrollApproval,
+  validatePayrollRejection,
 } from "../middleware/payrollValidation.js";
 
 const router = Router();
@@ -128,6 +130,12 @@ router.get(
   SuperAdminController.getPayrollStats
 );
 
+router.get(
+  "/payroll/pending",
+  requirePermission([Permission.VIEW_ALL_PAYROLL]),
+  SuperAdminController.getPendingPayrolls
+);
+
 //Get all payrolls
 router.get(
   "/payroll",
@@ -147,7 +155,6 @@ router.delete(
   SuperAdminController.deletePayroll
 );
 
-// Payroll Views and Statistics
 router.get(
   "/payroll/employee/:employeeId/history",
   requirePermission([Permission.VIEW_ALL_PAYROLL]),
@@ -161,11 +168,28 @@ router.get(
   SuperAdminController.getPeriodPayroll
 );
 
-// Add the new payslip view endpoint
+router.get(
+  "/payroll/filtered",
+  requirePermission([Permission.VIEW_ALL_PAYROLL]),
+  SuperAdminController.getFilteredPayrolls
+);
+
 router.get(
   "/payroll/:payrollId/view",
   requirePermission([Permission.VIEW_ALL_PAYROLL]),
   SuperAdminController.viewPayslip
+);
+
+router.patch(
+  "/payroll/:id/approve",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  SuperAdminController.approvePayroll
+);
+
+router.patch(
+  "/payroll/:id/reject",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  SuperAdminController.rejectPayroll
 );
 
 // Employee Management Routes

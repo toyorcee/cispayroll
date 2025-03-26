@@ -9,7 +9,7 @@ import { DepartmentBasic } from "../../../types/employee";
 import { Permission } from "../../../types/auth";
 import { useAuth } from "../../../context/AuthContext";
 import NewSalaryGrade from "../../../components/modals/NewSalaryGrade";
-import { toast } from "react-hot-toast";
+import { toast } from "react-toastify";
 import EditSalaryGrade from "../../../components/modals/EditSalaryGrade";
 import ViewSalaryGrade from "../../../components/modals/ViewSalaryGrade";
 import { ConfirmationModal } from "../../../components/modals/ConfirmationModal";
@@ -67,10 +67,6 @@ export default function SalaryStructure() {
     fetchSalaryGrades();
     toast.success("Salary grade created successfully!");
   }, [fetchSalaryGrades]);
-
-  // Log current state
-  console.log("🏢 Current departments:", departments);
-  console.log("💰 Current salary grades:", salaryGrades);
 
   const canEditSalaryStructure = user?.permissions?.includes(
     Permission.EDIT_SALARY_STRUCTURE

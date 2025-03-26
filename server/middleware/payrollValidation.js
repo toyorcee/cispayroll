@@ -1,10 +1,12 @@
 import { ApiError } from "../utils/errorHandler.js";
 import { Types } from "mongoose";
 import { PAYROLL_STATUS } from "../models/Payroll.js";
+import mongoose from "mongoose";
 
 // Keep this simple validation for basic request checking
 export const validatePayrollCreate = (req, res, next) => {
   try {
+    console.log("🔍 Validating payroll data:", req.body);
     const { employee, month, year, salaryGrade } = req.body;
 
     // Check required fields
@@ -12,27 +14,29 @@ export const validatePayrollCreate = (req, res, next) => {
       throw new ApiError(400, "Missing required fields");
     }
 
-    // Validate ID formats
-    if (!Types.ObjectId.isValid(employee)) {
-      throw new ApiError(400, "Invalid employee ID format");
-    }
-
-    if (!Types.ObjectId.isValid(salaryGrade)) {
-      throw new ApiError(400, "Invalid salary grade ID format");
-    }
-
-    // Basic month/year validation
-    if (month < 1 || month > 12) {
+    // Validate month (1-12)
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
       throw new ApiError(400, "Month must be between 1 and 12");
     }
 
-    const currentYear = new Date().getFullYear();
-    if (year < currentYear - 1 || year > currentYear + 1) {
-      throw new ApiError(400, "Year is out of valid range");
+    // Validate year (reasonable range: 1900-2100)
+    if (!Number.isInteger(year) || year < 1900 || year > 2100) {
+      throw new ApiError(400, `Year must be between 1900 and 2100`);
     }
 
+    // Validate ObjectIds
+    if (!mongoose.Types.ObjectId.isValid(employee)) {
+      throw new ApiError(400, "Invalid employee ID");
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(salaryGrade)) {
+      throw new ApiError(400, "Invalid salary grade ID");
+    }
+
+    console.log("✅ Payroll validation passed");
     next();
   } catch (error) {
+    console.error("❌ Payroll validation failed:", error);
     next(error);
   }
 };
@@ -117,6 +121,61 @@ export const validateEmployeePayrollHistory = (req, res, next) => {
 
     if (!Types.ObjectId.isValid(employeeId)) {
       throw new ApiError(400, "Invalid employee ID format");
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const validatePayrollApproval = (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { remarks } = req.body;
+
+    // Validate payroll ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ApiError(400, "Invalid payroll ID format");
+    }
+
+    // Validate remarks if provided
+    if (remarks !== undefined) {
+      if (typeof remarks !== "string") {
+        throw new ApiError(400, "Remarks must be a string");
+      }
+      if (remarks.length > 500) {
+        throw new ApiError(400, "Remarks cannot exceed 500 characters");
+      }
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const validatePayrollRejection = (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { remarks } = req.body;
+
+    // Validate payroll ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ApiError(400, "Invalid payroll ID format");
+    }
+
+    // Remarks are required for rejection
+    if (
+      !remarks ||
+      typeof remarks !== "string" ||
+      remarks.trim().length === 0
+    ) {
+      throw new ApiError(400, "Remarks are required when rejecting a payroll");
+    }
+
+    if (remarks.length > 500) {
+      throw new ApiError(400, "Remarks cannot exceed 500 characters");
     }
 
     next();
