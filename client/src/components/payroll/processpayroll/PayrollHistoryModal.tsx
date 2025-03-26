@@ -9,13 +9,8 @@ import {
   TableRow,
   Paper,
   TablePagination,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Typography,
 } from "@mui/material";
 import { PayrollStatus } from "../../../types/payroll";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 interface PayrollHistoryModalProps {
   isOpen: boolean;
@@ -59,6 +54,11 @@ interface PayrollHistoryModalProps {
           amount: number;
         };
         pension: {
+          pensionableAmount: number;
+          rate: number;
+          amount: number;
+        };
+        nhf: {
           pensionableAmount: number;
           rate: number;
           amount: number;
@@ -215,200 +215,123 @@ const PayrollHistoryModal: React.FC<PayrollHistoryModalProps> = ({
         </div>
 
         {/* Enhanced Payroll History Table */}
-        <TableContainer
-          component={Paper}
-          className="border border-gray-200 rounded-lg shadow-sm"
-        >
-          <Table size="medium">
-            <TableHead>
-              <TableRow>
-                <TableCell
-                  className={`${periodCellStyle} ${tableCellWithBorder}`}
-                  width="12%"
-                >
-                  <div>Period</div>
-                  <div className="text-xs text-gray-500 font-normal mt-1">
-                    Month/Year
-                  </div>
-                </TableCell>
-                <TableCell
-                  className={`${basicSalaryCellStyle} ${tableCellWithBorder}`}
-                  width="16%"
-                >
-                  <div>Basic Salary</div>
-                  <div className="text-xs text-gray-500 font-normal mt-1">
-                    Base Pay
-                  </div>
-                </TableCell>
-                <TableCell
-                  className={`${allowancesCellStyle} ${tableCellWithBorder}`}
-                  width="24%"
-                >
-                  <div>Allowances</div>
-                  <div className="text-xs text-gray-500 font-normal mt-1">
-                    Detailed Breakdown
-                  </div>
-                </TableCell>
-                <TableCell
-                  className={`${deductionsCellStyle} ${tableCellWithBorder}`}
-                  width="24%"
-                >
-                  <div>Deductions</div>
-                  <div className="text-xs text-gray-500 font-normal mt-1">
-                    Tax & Pension
-                  </div>
-                </TableCell>
-                <TableCell
-                  className={`${netPayCellStyle} ${tableCellWithBorder}`}
-                  width="16%"
-                >
-                  <div>Net Pay</div>
-                  <div className="text-xs text-gray-500 font-normal mt-1">
-                    Final Amount
-                  </div>
-                </TableCell>
-                <TableCell className={statusCellStyle}>
-                  <div>Status</div>
-                  <div className="text-xs text-gray-500 font-normal mt-1">
-                    Current
-                  </div>
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {data.payrollHistory
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((row) => (
-                  <TableRow
-                    key={`${row.period.month}-${row.period.year}`}
-                    className="hover:bg-gray-50 transition-colors duration-150"
+        {/* Wrap TableContainer in a scrollable div */}
+        <div className="max-h-[500px] overflow-y-auto">
+          <TableContainer
+            component={Paper}
+            className="border border-gray-200 rounded-lg shadow-sm"
+          >
+            <Table size="medium">
+              <TableHead>
+                <TableRow>
+                  <TableCell
+                    className={`${periodCellStyle} ${tableCellWithBorder}`}
+                    width="12%"
                   >
-                    <TableCell
-                      className={`${periodCellStyle} ${tableCellWithBorder}`}
+                    <div>Period</div>
+                    <div className="text-xs text-gray-500 font-normal mt-1">
+                      Month/Year
+                    </div>
+                  </TableCell>
+                  <TableCell
+                    className={`${basicSalaryCellStyle} ${tableCellWithBorder}`}
+                    width="16%"
+                  >
+                    <div>Basic Salary</div>
+                    <div className="text-xs text-gray-500 font-normal mt-1">
+                      Base Pay
+                    </div>
+                  </TableCell>
+                  <TableCell
+                    className={`${allowancesCellStyle} ${tableCellWithBorder}`}
+                    width="24%"
+                  >
+                    <div>Allowances</div>
+                    <div className="text-xs text-gray-500 font-normal mt-1">
+                      Detailed Breakdown
+                    </div>
+                  </TableCell>
+                  <TableCell
+                    className={`${deductionsCellStyle} ${tableCellWithBorder}`}
+                    width="24%"
+                  >
+                    <div>Deductions</div>
+                    <div className="text-xs text-gray-500 font-normal mt-1">
+                      Tax & Pension
+                    </div>
+                  </TableCell>
+                  <TableCell
+                    className={`${netPayCellStyle} ${tableCellWithBorder}`}
+                    width="16%"
+                  >
+                    <div>Net Pay</div>
+                    <div className="text-xs text-gray-500 font-normal mt-1">
+                      Final Amount
+                    </div>
+                  </TableCell>
+                  <TableCell className={statusCellStyle}>
+                    <div>Status</div>
+                    <div className="text-xs text-gray-500 font-normal mt-1">
+                      Current
+                    </div>
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data.payrollHistory
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((row) => (
+                    <TableRow
+                      key={`${row.period.month}-${row.period.year}`}
+                      className="hover:bg-gray-50 transition-colors duration-150"
                     >
-                      <div className="font-medium text-gray-900">
-                        {`${row.period.month}/${row.period.year}`}
-                      </div>
-                    </TableCell>
-                    <TableCell
-                      className={`${basicSalaryCellStyle} ${tableCellWithBorder}`}
-                    >
-                      <div className="font-medium text-gray-900">
-                        ₦{row.totals.basicSalary.toLocaleString()}
-                      </div>
-                    </TableCell>
-                    <TableCell
-                      className={`${allowancesCellStyle} ${tableCellWithBorder}`}
-                    >
-                      <div className="space-y-3">
-                        <div className="font-medium text-green-600">
-                          ₦{row.totals.totalAllowances.toLocaleString()}
-                        </div>
-                        <div className="space-y-2 border-t pt-2">
-                          {row.earnings.allowances.gradeAllowances.map(
-                            (allowance) => (
-                              <div
-                                key={allowance._id}
-                                className="flex items-center justify-between text-sm"
-                              >
-                                <span className="text-gray-600 flex-1">
-                                  {allowance.name}
-                                </span>
-                                <span className="text-gray-900 font-medium ml-4">
-                                  ₦{allowance.amount.toLocaleString()}
-                                </span>
-                              </div>
-                            )
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell
-                      className={`${deductionsCellStyle} ${tableCellWithBorder}`}
-                    >
-                      <div className="space-y-3">
-                        <div className="font-medium text-red-600">
-                          ₦{row.totals.totalDeductions.toLocaleString()}
-                        </div>
-                        <div className="space-y-2 border-t pt-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <div className="text-gray-600 flex-1">
-                              <div>Tax (PAYE)</div>
-                              <div className="text-xs text-gray-500">
-                                Rate: {row.deductions.tax.taxRate.toFixed(1)}%
-                              </div>
-                            </div>
-                            <span className="text-gray-900 font-medium ml-4">
-                              ₦{row.deductions.tax.amount.toLocaleString()}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-sm">
-                            <div className="text-gray-600 flex-1">
-                              <div>Pension</div>
-                              <div className="text-xs text-gray-500">
-                                Rate: {row.deductions.pension.rate}%
-                              </div>
-                            </div>
-                            <span className="text-gray-900 font-medium ml-4">
-                              ₦{row.deductions.pension.amount.toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell
-                      className={`${netPayCellStyle} ${tableCellWithBorder}`}
-                    >
-                      <div className="space-y-3">
-                        <div className="font-medium text-green-600 text-lg">
-                          ₦{row.totals.netPay.toLocaleString()}
-                        </div>
-                        <div className="space-y-2 border-t pt-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-600">Gross</span>
-                            <span className="text-gray-900 font-medium">
-                              ₦{row.totals.grossEarnings.toLocaleString()}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-600">Deductions</span>
-                            <span className="text-red-600 font-medium">
-                              -₦{row.totals.totalDeductions.toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className={statusCellStyle}>
-                      <span
-                        className={`inline-flex px-2.5 py-1 text-xs font-semibold rounded-full ${
-                          statusColors[row.status]
-                        }`}
+                      <TableCell
+                        className={`${periodCellStyle} ${tableCellWithBorder}`}
                       >
-                        {row.status}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-            </TableBody>
-          </Table>
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
-            component="div"
-            count={data.payrollHistory.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            className="border-t"
-          />
-        </TableContainer>
+                        <div className="font-medium text-gray-900">{`${row.period.month}/${row.period.year}`}</div>
+                      </TableCell>
+                      <TableCell
+                        className={`${basicSalaryCellStyle} ${tableCellWithBorder}`}
+                      >
+                        ₦{row.earnings.basicSalary.toLocaleString()}
+                      </TableCell>
+                      <TableCell
+                        className={`${allowancesCellStyle} ${tableCellWithBorder}`}
+                      >
+                        ₦
+                        {row.earnings.allowances.totalAllowances.toLocaleString()}
+                      </TableCell>
+                      <TableCell
+                        className={`${deductionsCellStyle} ${tableCellWithBorder}`}
+                      >
+                        ₦{row.deductions.totalDeductions.toLocaleString()}
+                      </TableCell>
+                      <TableCell
+                        className={`${netPayCellStyle} ${tableCellWithBorder}`}
+                      >
+                        ₦{row.totals.netPay.toLocaleString()}
+                      </TableCell>
+                      <TableCell className={statusCellStyle}>
+                        <span
+                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            statusColors[row.status]
+                          }`}
+                        >
+                          {row.status}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </div>
 
         {/* Modal Actions */}
         <div className="flex justify-end space-x-4 pt-4">
           <button
             onClick={onClose}
-            className=" px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            className=" px-6 py-2 text-sm font-medium !text-white !bg-green-600 border border-gray-300 rounded-md cursor-pointer"
           >
             Close
           </button>

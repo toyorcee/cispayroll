@@ -71,11 +71,6 @@ const SalaryGradeSchema = new Schema(
       required: [true, "Basic salary is required"],
       min: [0, "Basic salary cannot be negative"],
     },
-    frequency: {
-      type: String,
-      enum: ["weekly", "biweekly", "monthly", "quarterly", "annual"],
-      default: "monthly",
-    },
     components: [SalaryComponentSchema],
     description: {
       type: String,

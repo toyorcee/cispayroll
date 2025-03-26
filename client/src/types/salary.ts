@@ -1,17 +1,46 @@
-import { Types } from "mongoose";
 import { DepartmentBasic } from "./employee";
 
+// Define the possible types as constants
+export type ComponentType = "allowance" | "deduction";
+export type CalculationMethod = "fixed" | "percentage";
+
+// Interface for creating a new component
 export interface ISalaryComponentInput {
   name: string;
-  type: "fixed" | "percentage";
+  type: ComponentType;
+  calculationMethod: CalculationMethod;
   value: number;
   isActive: boolean;
 }
 
+// Interface for creating a new salary grade
+export interface CreateSalaryGradeDTO {
+  level: string;
+  basicSalary: number;
+  description: string;
+  department: string | null;
+  components: ISalaryComponentInput[];
+}
+
+// Interface for a component in the response
 export interface ISalaryComponent extends ISalaryComponentInput {
   _id: string;
-  createdBy: string;
-  updatedBy: string;
+  createdBy: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    fullName: string;
+    id: string;
+  };
+  updatedBy: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    fullName: string;
+    id: string;
+  };
 }
 
 export interface ISalaryGrade {

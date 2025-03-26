@@ -59,6 +59,7 @@ export default function SalaryStructure() {
   useEffect(() => {
     fetchSalaryGrades();
     fetchDepartments();
+    console.log("🔍 Current salary grades:", salaryGrades);
   }, []); // Empty dependency array - only runs once on mount
 
   const handleSalaryGradeCreated = useCallback(() => {

@@ -620,12 +620,28 @@ export class SuperAdminController {
         });
       }
 
-      // Use the service instead of duplicating the query
-      const payrollHistory = await PayrollService.getEmployeePayrollHistory(
-        employeeId
-      );
+      // Get payroll history
+      const payrollHistory = await PayrollModel.find({
+        employee: asObjectId(employeeId),
+      })
+        .populate([
+          {
+            path: "employee",
+            select: "firstName lastName employeeId bankDetails",
+          },
+          {
+            path: "department",
+            select: "name code",
+          },
+          {
+            path: "salaryGrade",
+            select: "level description",
+          },
+        ])
+        .sort({ year: -1, month: -1 })
+        .lean();
 
-      // Rest of the formatting remains the same
+      // Calculate summary
       const approvedPayrolls = payrollHistory.filter(
         (record) => record.status === PAYROLL_STATUS.APPROVED
       );
@@ -635,6 +651,7 @@ export class SuperAdminController {
         0
       );
 
+      // Format payroll history to remove redundancy
       const formattedPayrollHistory = payrollHistory.map((record) => ({
         period: {
           month: record.month,
@@ -666,22 +683,22 @@ export class SuperAdminController {
             id: employee._id,
             name: `${employee.firstName} ${employee.lastName}`,
             employeeId: employee.employeeId,
-            department: employee.department || "Not Assigned", // Return full department object
+            department: employee.department?.name || "Not Assigned",
             salaryGrade: currentSalaryGrade,
           },
           payrollHistory: formattedPayrollHistory,
           summary: {
             totalRecords: payrollHistory.length,
-            latestPayroll: latestPayroll
-              ? {
-                  period: {
+            latestPayroll: {
+              period: latestPayroll
+                ? {
                     month: latestPayroll.month,
                     year: latestPayroll.year,
-                  },
-                  status: latestPayroll.status,
-                  totals: latestPayroll.totals,
-                }
-              : null,
+                  }
+                : null,
+              status: latestPayroll?.status || null,
+              totals: latestPayroll?.totals || null,
+            },
             totalPaid,
             averagePayroll:
               approvedPayrolls.length > 0
@@ -938,67 +955,65 @@ export class SuperAdminController {
 
   static async viewPayslip(req, res) {
     try {
-      const { employeeId } = req.params;
-      console.log("🔍 Fetching payslip details for employee:", employeeId);
+      console.log("🔍 Fetching payslip details for:", req.params.payrollId);
 
-      // Get employee with populated fields
-      const employee = await UserModel.findById(employeeId).populate([
-        { path: "department", select: "name code" },
-        { path: "salaryGrade", select: "level description" },
-      ]);
+      const payroll = await PayrollModel.findById(req.params.payrollId)
+        .populate([
+          {
+            path: "employee",
+            select: "firstName lastName employeeId bankDetails",
+          },
+          { path: "department", select: "name code" },
+          { path: "salaryGrade", select: "level description" },
+        ])
+        .lean();
 
-      if (!employee) {
-        return res.status(404).json({
-          success: false,
-          message: "Employee not found",
-        });
+      if (!payroll) {
+        throw new ApiError(404, "Payroll record not found");
       }
-
-      // Use the service instead of duplicating the query
-      const payrollHistory = await PayrollService.getEmployeePayrollHistory(
-        employeeId
-      );
-      const latestPayroll = payrollHistory[0]; // Get most recent payroll
-
-      if (!latestPayroll) {
-        throw new ApiError(404, "No payroll record found");
-      }
-
-      // Get the latest salary grade from the most recent payroll record
-      const currentSalaryGrade =
-        latestPayroll?.salaryGrade?.level ||
-        employee.salaryGrade?.level ||
-        "Not Assigned";
 
       // Format the response with detailed payslip information
       const payslipData = {
-        payslipId: `PS${latestPayroll.month}${latestPayroll.year}${employee.employeeId}`,
+        payslipId: `PS${payroll.month}${payroll.year}${payroll.employee.employeeId}`,
         employee: {
-          id: employee._id,
-          name: `${employee.firstName} ${employee.lastName}`,
-          employeeId: employee.employeeId,
-          department: employee.department?.name || "Not Assigned",
-          salaryGrade: currentSalaryGrade, // Using same logic as history
+          id: payroll.employee._id,
+          name: `${payroll.employee.firstName} ${payroll.employee.lastName}`,
+          employeeId: payroll.employee.employeeId,
+          department: payroll.department?.name || "Not Assigned",
+          salaryGrade: payroll.salaryGrade?.level || "Not Assigned",
         },
         paymentDetails: {
-          bankName: employee.bankDetails?.bankName || "Not Provided",
-          accountNumber: employee.bankDetails?.accountNumber || "Not Provided",
-          accountName: employee.bankDetails?.accountName || "Not Provided",
+          bankName: payroll.employee.bankDetails?.bankName || "Not Provided",
+          accountNumber:
+            payroll.employee.bankDetails?.accountNumber || "Not Provided",
+          accountName:
+            payroll.employee.bankDetails?.accountName || "Not Provided",
         },
         period: {
-          month: latestPayroll.month,
-          year: latestPayroll.year,
+          month: payroll.month,
+          year: payroll.year,
         },
         earnings: {
-          basicSalary: latestPayroll.basicSalary,
-          allowances: latestPayroll.allowances,
-          bonuses: latestPayroll.bonuses,
-          totalEarnings: latestPayroll.totals.grossEarnings,
+          basicSalary: payroll.basicSalary,
+          allowances: payroll.allowances,
+          bonuses: payroll.bonuses,
+          totalEarnings: payroll.totals.grossEarnings,
         },
-        deductions: latestPayroll.deductions,
-        totals: latestPayroll.totals,
-        status: latestPayroll.status,
-        processedAt: latestPayroll.createdAt,
+        deductions: {
+          tax: payroll.deductions.tax,
+          pension: payroll.deductions.pension,
+          nhf: payroll.deductions.nhf,
+          loans: payroll.deductions.loans,
+          others: payroll.deductions.others,
+          totalDeductions: payroll.totals.totalDeductions,
+        },
+        summary: {
+          grossEarnings: payroll.totals.grossEarnings,
+          totalDeductions: payroll.totals.totalDeductions,
+          netPay: payroll.totals.netPay,
+        },
+        status: payroll.status,
+        processedAt: payroll.createdAt,
       };
 
       console.log("✅ Payslip details retrieved successfully");
@@ -1429,6 +1444,74 @@ export class SuperAdminController {
     }
   }
 
+  static async getActiveEmployees(req, res) {
+    try {
+      console.log("🔍 Fetching active employees");
+
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const search = req.query.search;
+      const departmentId = req.query.department;
+
+      const query = {
+        role: { $in: [UserRole.USER, UserRole.ADMIN] },
+        status: { $in: ["active", "pending"] },
+        $nor: [
+          { status: "archived" },
+          { status: "offboarding" },
+          { status: "completed" },
+        ],
+      };
+
+      // Add department filter if provided
+      if (departmentId) {
+        query.department = new Types.ObjectId(departmentId);
+      }
+
+      // Add search filter if provided
+      if (search) {
+        query.$or = [
+          { firstName: { $regex: search, $options: "i" } },
+          { lastName: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+          { employeeId: { $regex: search, $options: "i" } },
+        ];
+      }
+
+      console.log("📝 Query:", JSON.stringify(query, null, 2));
+
+      const [employees, total] = await Promise.all([
+        UserModel.find(query)
+          .select("-password")
+          .populate("department", "name code")
+          .sort({ createdAt: -1 })
+          .skip((page - 1) * limit)
+          .limit(limit),
+        UserModel.countDocuments(query),
+      ]);
+
+      console.log(`✅ Found ${employees.length} active employees`);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          employees,
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error fetching active employees:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message: message || "Failed to fetch active employees",
+      });
+    }
+  }
+
   // ===== Leave Management =====
   static async getAllLeaves(req, res) {
     try {
@@ -1540,17 +1623,12 @@ export class SuperAdminController {
   }
 
   // ===== Salary Structure Management =====
+
   static async createSalaryGrade(req, res) {
     try {
       console.log("📝 Creating new salary grade");
       const { level, basicSalary, components, description, department } =
         req.body;
-
-      console.log("👤 User info:", {
-        id: req.user?.id,
-        _id: req.user?._id,
-        fullUser: req.user,
-      });
 
       const existingGrade = await SalaryGrade.findOne({ level });
       if (existingGrade) {
@@ -1567,7 +1645,8 @@ export class SuperAdminController {
         department: department ? new Types.ObjectId(department) : null,
         components: components.map((comp) => ({
           name: comp.name.trim(),
-          type: comp.type,
+          type: "allowance", // Always allowance for now
+          calculationMethod: comp.type === "fixed" ? "fixed" : "percentage", // Map from frontend type
           value: Number(comp.value),
           isActive: comp.isActive,
           _id: new Types.ObjectId(),
@@ -1598,7 +1677,6 @@ export class SuperAdminController {
       });
     }
   }
-
   static async getAllSalaryGrades(req, res) {
     try {
       console.log("🔍 Fetching all salary grades");
@@ -1628,13 +1706,6 @@ export class SuperAdminController {
       const userId = req.user.id;
       const { department, components, ...updateData } = req.body;
 
-      console.log("📝 Updating salary grade with data:", {
-        gradeId: req.params.id,
-        updateData,
-        department,
-        components,
-      });
-
       const salaryGrade = await SalaryGrade.findById(req.params.id);
       if (!salaryGrade) {
         throw new ApiError(404, "Salary grade not found");
@@ -1649,7 +1720,8 @@ export class SuperAdminController {
       if (components) {
         salaryGrade.components = components.map((comp) => ({
           name: comp.name,
-          type: comp.type,
+          type: "allowance", // Always allowance for now
+          calculationMethod: comp.type === "fixed" ? "fixed" : "percentage", // Map from frontend type
           value: Number(comp.value),
           isActive: comp.isActive,
           _id: comp._id ? new Types.ObjectId(comp._id) : new Types.ObjectId(),
@@ -1727,11 +1799,12 @@ export class SuperAdminController {
 
       const existingComponent = salaryGrade.components[componentIndex];
       salaryGrade.components[componentIndex] = {
-        ...existingComponent,
-        name: existingComponent.name,
-        type: existingComponent.type,
-        createdBy: existingComponent.createdBy,
+        ...existingComponent.toObject(),
         ...req.body,
+        type: req.body.type || existingComponent.type,
+        calculationMethod:
+          req.body.calculationMethod || existingComponent.calculationMethod,
+        value: Number(req.body.value || existingComponent.value),
         updatedBy: userId,
       };
 
@@ -1801,9 +1874,7 @@ export class SuperAdminController {
 
   static async setupStatutoryDeductions(req, res) {
     try {
-      console.log("🔄 Setting up statutory deductions");
       await DeductionService.createStatutoryDeductions(asObjectId(req.user.id));
-      console.log("✅ Statutory deductions set up successfully");
       res.status(201).json({
         success: true,
         message: "Statutory deductions set up successfully",

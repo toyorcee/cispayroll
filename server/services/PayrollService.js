@@ -489,7 +489,7 @@ export class PayrollService {
       console.log("🔍 Fetching payroll history for employee:", employeeId);
 
       const history = await PayrollModel.find({
-        employee: asObjectId(employeeId),
+        "employee._id": asObjectId(employeeId),
       })
         .sort({ year: -1, month: -1 })
         .populate([
@@ -499,8 +499,40 @@ export class PayrollService {
         ])
         .lean();
 
-      console.log(`📋 Found ${history.length} payroll records`);
-      return history;
+      const transformedHistory = history.map((record) => ({
+        _id: record._id,
+        employee: {
+          _id: record.employee._id,
+          firstName: record.employee.firstName,
+          lastName: record.employee.lastName,
+          employeeId: record.employee.employeeId,
+        },
+        department: {
+          _id: record.department._id,
+          name: record.department.name,
+          code: record.department.code,
+        },
+        salaryGrade: {
+          _id: record.salaryGrade._id,
+          level: record.salaryGrade.level,
+          description: record.salaryGrade.description,
+        },
+        month: record.month,
+        year: record.year,
+        totals: {
+          basicSalary: record.totals.basicSalary,
+          totalAllowances: record.totals.totalAllowances,
+          totalBonuses: record.totals.totalBonuses,
+          grossEarnings: record.totals.grossEarnings,
+          totalDeductions: record.totals.totalDeductions,
+          netPay: record.totals.netPay,
+        },
+        status: record.status,
+        createdAt: record.createdAt,
+      }));
+
+      console.log(`📋 Found ${transformedHistory.length} payroll records`);
+      return transformedHistory;
     } catch (error) {
       console.error("❌ Error fetching employee payroll history:", error);
       throw error;

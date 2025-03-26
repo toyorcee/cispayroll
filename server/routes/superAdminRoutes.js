@@ -171,7 +171,7 @@ router.get(
 );
 
 router.get(
-  "/payroll/employee/:employeeId/payslip",
+  "/payroll/:payrollId/view",
   requirePermission([Permission.VIEW_ALL_PAYROLL]),
   SuperAdminController.viewPayslip
 );
@@ -229,6 +229,12 @@ router.get(
   "/departments/:departmentId/employees",
   requirePermission([Permission.VIEW_ALL_USERS]),
   SuperAdminController.getDepartmentEmployees
+);
+
+router.get(
+  "/active-employees",
+  requirePermission([Permission.VIEW_ALL_USERS]),
+  SuperAdminController.getActiveEmployees
 );
 
 // ===== Leave Management Routes =====
