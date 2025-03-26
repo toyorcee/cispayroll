@@ -245,4 +245,15 @@ export class EmployeeController {
       next(error);
     }
   }
+  static async deleteEmployee(req, res, next) {
+    try {
+      const employee = await EmployeeService.deleteEmployee(req.params.id);
+      res.status(200).json({
+        success: true,
+        message: `Employee ${employee.employeeId} deleted successfully`,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

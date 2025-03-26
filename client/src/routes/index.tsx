@@ -37,6 +37,7 @@ import Dashboard from "../pages/dashboard/Dashboard";
 import AllowanceManagement from "../pages/dashboard/payroll/AllowanceManagement";
 import BonusManagement from "../pages/dashboard/payroll/BonusManagement";
 import Landing from "../pages/Landing";
+import ComingSoonPage from "../pages/Coming/ComingSoonPage";
 
 export interface RouteConfig {
   path: string;
@@ -551,6 +552,10 @@ export const router = createBrowserRouter([
       {
         path: "/home",
         element: <Landing />,
+      },
+      {
+        path: "/coming-soon/:moduleName",
+        element: <ComingSoonPage />,
       },
     ],
   },

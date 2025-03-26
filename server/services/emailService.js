@@ -6,10 +6,10 @@ config();
 
 export class EmailService {
   static transporter = nodemailer.createTransport({
-    service: "gmail",
+    service: process.env.MAIL_HOST,
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD,
+      user: process.env.MAIL_USERNAME,
+      pass: process.env.MAIL_PASSWORD,
     },
     // For development/testing, you might want to add:
     tls: {
@@ -104,9 +104,10 @@ export class EmailService {
   static async sendEmail(config) {
     try {
       await this.transporter.sendMail({
-        from: process.env.EMAIL_FROM,
+        from: process.env.MAIL_FROM_ADDRESS,
         ...config,
       });
+      console.log("Email sent successfully");
     } catch (error) {
       console.error("Email sending failed:", error);
       throw new Error("Failed to send email");

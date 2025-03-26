@@ -302,10 +302,4 @@ export const menuItems: NavigationItem[] = [
       },
     ],
   },
-].map((item) => {
-  console.log(`Menu item ${item.name}:`, {
-    roles: item.roles,
-    permissions: item.permissions,
-  });
-  return item;
-});
+];
