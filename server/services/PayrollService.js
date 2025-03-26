@@ -438,6 +438,11 @@ export class PayrollService {
           rate: 8,
           amount: deductionDetails.statutory.pension,
         },
+        nhf: {
+          pensionableAmount: salaryDetails.basicSalary,
+          rate: 2.5,
+          amount: deductionDetails.statutory.nhf,
+        },
         loans: [],
         others: [],
         totalDeductions: deductionDetails.total,
