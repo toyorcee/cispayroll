@@ -37,7 +37,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
     // For Super Admin, show ALL main menus (not submenus)
     if (user.role === UserRole.SUPER_ADMIN) {
-      return ["Dashboard", "Employees", "Payroll", "Reports", "Settings"];
+      return ["Dashboard", "Employees", "Payroll", "Reports", "Settings" , "Feedback", "Approvals"];
     }
 
     // For other roles, check specific permissions
@@ -69,6 +69,9 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
     if (user.permissions.includes(Permission.MANAGE_SYSTEM)) {
       availableMenus.push("Settings");
+    }
+    if (user.permissions.includes(Permission.MANAGE_FEEDBACK)) {
+      availableMenus.push("Feedback");
     }
 
     return availableMenus;
@@ -302,4 +305,18 @@ export const menuItems: NavigationItem[] = [
       },
     ],
   },
+  {
+    name: "Feedback",
+    href: "/dashboard/feedback",
+    icon: DocumentTextIcon,
+    roles: [UserRole.SUPER_ADMIN],
+    permissions: [Permission.MANAGE_FEEDBACK],
+  },
+  // {
+  //   name: "Approvals",
+  //   href: "/dashboard/approvals",
+  //   icon: UserPlusIcon,
+  //   roles: [UserRole.SUPER_ADMIN],
+  //   permissions: [Permission.MANAGE_APPROVALS],
+  // },
 ];

@@ -325,7 +325,7 @@ const modules: ModuleItem[] = [
     description: "Manage salaries, deductions, and employee benefits seamlessly",
     icon: <FaMoneyCheckAlt className="w-full h-full text-green-600" />,
     path: "/dashboard/payroll",
-    isReady: true, // Change to true when ready
+    isReady: true, 
   },
   {
     title: "Offboarding",
@@ -375,7 +375,7 @@ const modules: ModuleItem[] = [
     description: "Generate insights and collect employee input",
     icon: <FaChartBar className="w-full h-full text-green-600" />,
     path: "/dashboard/reports",
-    isReady: false, // Change to true when ready
+    isReady: true,
   },
   {
     title: "Disciplinary",
