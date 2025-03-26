@@ -318,7 +318,7 @@ const modules: ModuleItem[] = [
     description: "Streamline new hire processes with digital forms and workflows",
     icon: <FaUserPlus className="w-full h-full text-green-600" />,
     path: "/dashboard/employees/onboarding",
-    isReady: false, // Change to true when ready
+    isReady: true, 
   },
   {
     title: "Payroll & Benefits",
@@ -326,6 +326,13 @@ const modules: ModuleItem[] = [
     icon: <FaMoneyCheckAlt className="w-full h-full text-green-600" />,
     path: "/dashboard/payroll",
     isReady: true, // Change to true when ready
+  },
+  {
+    title: "Offboarding",
+    description: "Manage exit processes and final settlements efficiently",
+    icon: <FaUserMinus className="w-full h-full text-green-600" />,
+    path: "/dashboard/employees/offboarding",
+    isReady: true, 
   },
   {
     title: "Transfer Management",
@@ -348,13 +355,7 @@ const modules: ModuleItem[] = [
     path: "/dashboard/employees/performance",
     isReady: false, // Change to true when ready
   },
-  {
-    title: "Offboarding",
-    description: "Manage exit processes and final settlements efficiently",
-    icon: <FaUserMinus className="w-full h-full text-green-600" />,
-    path: "/dashboard/employees/offboarding",
-    isReady: false, // Change to true when ready
-  },
+  
   {
     title: "Skills & Competency",
     description: "Map and develop workforce capabilities",
