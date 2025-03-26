@@ -32,11 +32,8 @@ const iconMap: Record<string, IconType> = {
   Payroll: CurrencyDollarIcon,
   Reports: DocumentTextIcon,
   Settings: CogIcon,
-<<<<<<< HEAD
   Disciplinary: FaGavel,
-=======
   Feedback: DocumentTextIcon,
->>>>>>> 57b374b1b0a961de56f44daa05cca8bc72acdc1a
   "My Profile": UserPlusIcon,
   "My Leave": ArrowRightOnRectangleIcon,
   "My Payslips": DocumentTextIcon,

@@ -101,17 +101,14 @@ export enum Permission {
   VIEW_PERSONAL_INFO = "VIEW_PERSONAL_INFO",
   EDIT_PERSONAL_INFO = "EDIT_PERSONAL_INFO",
 
-<<<<<<< HEAD
   // ===== Disciplinary =====
   VIEW_DISCIPLINARY_RECORDS = "VIEW_DISCIPLINARY_RECORDS",
   MANAGE_DISCIPLINARY_ACTIONS = "MANAGE_DISCIPLINARY_ACTIONS",
-=======
   //  ================================================= Feedback =================================================
   // Feedback
   MANAGE_FEEDBACK = "MANAGE_FEEDBACK",
   SUBMIT_FEEDBACK = "SUBMIT_FEEDBACK",
   APPROVE_FEEDBACK = "APPROVE_FEEDBACK",
->>>>>>> 57b374b1b0a961de56f44daa05cca8bc72acdc1a
 }
 
 export interface BankDetails {

@@ -39,11 +39,8 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
     // For Super Admin, show ALL main menus (not submenus)
     if (user.role === UserRole.SUPER_ADMIN) {
-<<<<<<< HEAD
       return ["Dashboard", "Employees", "Payroll", "Reports", "Settings", "Disciplinary"];
-=======
       return ["Dashboard", "Employees", "Payroll", "Reports", "Settings" , "Feedback", "Approvals"];
->>>>>>> 57b374b1b0a961de56f44daa05cca8bc72acdc1a
     }
 
     // For other roles, check specific permissions
@@ -312,7 +309,6 @@ export const menuItems: NavigationItem[] = [
     ],
   },
   {
-<<<<<<< HEAD
     name: "Disciplinary",
     href: "/dashboard/disciplinary/general",
     icon: FaGavel,
@@ -323,6 +319,15 @@ export const menuItems: NavigationItem[] = [
     ],
     requireAllPermissions: false,
   },
+
+  {
+    name: "Feedback",
+    href: "/dashboard/feedback",
+    icon: DocumentTextIcon,
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    permissions: [Permission.MANAGE_FEEDBACK],
+    requireAllPermissions: false,
+  },
 ].map((item) => {
   console.log(`Menu item ${item.name}:`, {
     roles: item.roles,
@@ -330,19 +335,4 @@ export const menuItems: NavigationItem[] = [
   });
   return item;
 });
-=======
-    name: "Feedback",
-    href: "/dashboard/feedback",
-    icon: DocumentTextIcon,
-    roles: [UserRole.SUPER_ADMIN],
-    permissions: [Permission.MANAGE_FEEDBACK],
-  },
-  // {
-  //   name: "Approvals",
-  //   href: "/dashboard/approvals",
-  //   icon: UserPlusIcon,
-  //   roles: [UserRole.SUPER_ADMIN],
-  //   permissions: [Permission.MANAGE_APPROVALS],
-  // },
-];
->>>>>>> 57b374b1b0a961de56f44daa05cca8bc72acdc1a
+

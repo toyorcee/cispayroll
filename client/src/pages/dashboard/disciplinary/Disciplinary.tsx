@@ -98,7 +98,7 @@ const DisciplinaryDashboard = () => {
       });
   
       // Send POST request with the correct FormData object
-      const response = await axios.post("http://localhost:5000/api/disciplinary/cases", newCaseData, {
+      const response = await axios.post("/api/disciplinary/cases", newCaseData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
   
