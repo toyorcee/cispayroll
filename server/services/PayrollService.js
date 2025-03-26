@@ -9,6 +9,7 @@ import SalaryGrade from "../models/SalaryStructure.js";
 import { DeductionService } from "./DeductionService.js";
 import { AllowanceService } from "./AllowanceService.js";
 import { BonusService } from "./BonusService.js";
+import { SalaryStructureService } from "./SalaryStructureService.js";
 
 const asObjectId = (id) => new Types.ObjectId(id);
 
@@ -356,107 +357,131 @@ export class PayrollService {
     });
   }
 
+  static roundToKobo(amount) {
+    return parseFloat((Math.round(amount * 100) / 100).toFixed(2));
+  }
+
+  static getMonthPeriod(month, year) {
+    // Create dates in UTC to avoid timezone issues
+    const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
+    const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+    return { startDate, endDate };
+  }
+
   static async calculatePayroll(employeeId, salaryGradeId, month, year) {
-    console.log("📊 Calculating payroll for:", {
-      employeeId,
-      salaryGradeId,
+    const existingPayroll = await PayrollModel.findOne({
+      employee: employeeId,
       month,
       year,
     });
 
-    const employee = await this.validateAndGetEmployee(employeeId);
-    const salaryDetails = await this.calculateSalaryComponents(
-      salaryGradeId,
-      employeeId
+    if (existingPayroll) {
+      throw new ApiError(
+        400,
+        `Payroll record already exists for employee in ${month}/${year}`
+      );
+    }
+
+    const salaryGrade = await SalaryStructureService.getSalaryGradeById(
+      salaryGradeId
     );
-    const deductionDetails = await this.calculateDeductions(
-      salaryDetails.basicSalary,
-      salaryDetails.grossSalary
+    if (!salaryGrade) {
+      throw new ApiError(404, "Salary grade not found");
+    }
+
+    const salaryDetails =
+      SalaryStructureService.calculateTotalSalary(salaryGrade);
+    const grossSalary = this.roundToKobo(salaryDetails.grossSalary);
+
+    const deductionDetails =
+      await DeductionService.calculateStatutoryDeductions(
+        salaryDetails.basicSalary,
+        grossSalary
+      );
+
+    const totalDeductions = this.roundToKobo(
+      deductionDetails.paye + deductionDetails.pension + deductionDetails.nhf
     );
 
-    const { startDate, endDate } = this.calculatePayPeriod(month, year);
-    const bonuses = await this.calculateBonuses(employeeId, startDate, endDate);
+    const totalAllowances = this.roundToKobo(salaryDetails.totalAllowances);
 
-    const grossSalary = salaryDetails.grossSalary + bonuses.totalBonuses;
-    const netSalary = grossSalary - deductionDetails.total;
+    // Process components with amounts
+    const gradeAllowances = salaryGrade.components.map((comp) => {
+      const amount =
+        comp.type === "percentage" ||
+        (comp.type === "allowance" && comp.name === "Housing Allowance")
+          ? this.roundToKobo((comp.value / 100) * salaryDetails.basicSalary)
+          : this.roundToKobo(comp.value);
 
-    const payrollData = {
-      employee,
-      department:
-        typeof employee.department === "string"
-          ? new Types.ObjectId(employee.department)
-          : employee.department._id,
-      salaryGrade: salaryGradeId,
+      return {
+        name: comp.name,
+        type: comp.type,
+        value: comp.value,
+        amount,
+      };
+    });
+
+    // Get correct period dates
+    const { startDate: periodStart, endDate: periodEnd } = this.getMonthPeriod(
+      month,
+      year
+    );
+
+    return {
       month,
       year,
-      periodStart: startDate,
-      periodEnd: endDate,
-      basicSalary: salaryDetails.basicSalary,
-      components: salaryDetails.components.map((c) => ({
-        ...c,
-        amount: c.amount,
-      })),
-      allowances: {
-        gradeAllowances: salaryDetails.components
-          .filter((c) => c.type === "allowance" && c.isActive)
-          .map((c) => ({
-            name: c.name,
-            type: c.type,
-            value: c.value,
-            amount: c.amount,
-          })),
-        additionalAllowances: salaryDetails.additionalAllowances.map((a) => ({
-          name: a.name,
-          type: "allowance",
-          value: a.amount,
-          amount: a.amount,
-          frequency: PayrollFrequency.MONTHLY,
-        })),
-        totalAllowances: salaryDetails.totalAllowances,
-      },
-      bonuses: {
-        items: bonuses.items.map((bonus) => ({
-          type: bonus.type,
-          description: bonus.type,
-          amount: bonus.amount,
-        })),
-        totalBonuses: bonuses.totalBonuses,
-      },
+      employee: employeeId,
+      salaryGrade: salaryGradeId,
+      basicSalary: this.roundToKobo(salaryDetails.basicSalary),
+      components: gradeAllowances,
       earnings: {
         overtime: { hours: 0, rate: 0, amount: 0 },
-        bonus: bonuses.items,
+        bonus: [],
         totalEarnings: grossSalary,
       },
       deductions: {
         tax: {
           taxableAmount: grossSalary,
-          taxRate: (deductionDetails.statutory.paye / grossSalary) * 100,
-          amount: deductionDetails.statutory.paye,
+          taxRate: this.roundToKobo(
+            (deductionDetails.paye / grossSalary) * 100
+          ),
+          amount: this.roundToKobo(deductionDetails.paye),
         },
         pension: {
-          pensionableAmount: salaryDetails.basicSalary,
+          pensionableAmount: this.roundToKobo(salaryDetails.basicSalary),
           rate: 8,
-          amount: deductionDetails.statutory.pension,
+          amount: this.roundToKobo(deductionDetails.pension),
+        },
+        nhf: {
+          pensionableAmount: this.roundToKobo(salaryDetails.basicSalary),
+          rate: 2.5,
+          amount: this.roundToKobo(deductionDetails.nhf),
         },
         loans: [],
         others: [],
-        totalDeductions: deductionDetails.total,
+        totalDeductions,
       },
       totals: {
-        basicSalary: salaryDetails.basicSalary,
-        totalAllowances: salaryDetails.totalAllowances,
-        totalBonuses: bonuses.totalBonuses,
+        basicSalary: this.roundToKobo(salaryDetails.basicSalary),
+        totalAllowances,
+        totalBonuses: 0,
         grossEarnings: grossSalary,
-        totalDeductions: deductionDetails.total,
-        netPay: netSalary,
+        totalDeductions,
+        netPay: this.roundToKobo(grossSalary - totalDeductions),
       },
-      status: PAYROLL_STATUS.PENDING,
-      frequency: PayrollFrequency.MONTHLY,
+      allowances: {
+        gradeAllowances,
+        additionalAllowances: [],
+        totalAllowances,
+      },
+      bonuses: {
+        items: [],
+        totalBonuses: 0,
+      },
+      frequency: "monthly",
+      periodStart,
+      periodEnd,
     };
-
-    this.validatePayrollData(payrollData);
-
-    return payrollData;
   }
 
   static async getEmployeePayrollHistory(employeeId) {

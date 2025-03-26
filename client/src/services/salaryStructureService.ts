@@ -4,6 +4,7 @@ import {
   ISalaryGrade,
   ISalaryComponent,
   ISalaryComponentInput,
+  CreateSalaryGradeDTO,
 } from "../types/salary";
 
 const BASE_URL = "http://localhost:5000/api";
@@ -43,13 +44,9 @@ export const salaryStructureService = {
     }
   },
 
-  createSalaryGrade: async (data: {
-    level: string;
-    basicSalary: number;
-    description: string;
-    department: string | null;
-    components: ISalaryComponentInput[];
-  }): Promise<ISalaryGrade> => {
+  createSalaryGrade: async (
+    data: CreateSalaryGradeDTO
+  ): Promise<ISalaryGrade> => {
     try {
       const formattedData = {
         level: data.level,
@@ -59,6 +56,7 @@ export const salaryStructureService = {
         components: data.components.map((comp) => ({
           name: comp.name.trim(),
           type: comp.type,
+          calculationMethod: comp.calculationMethod,
           value: Number(comp.value),
           isActive: comp.isActive,
         })),
@@ -73,11 +71,7 @@ export const salaryStructureService = {
 
       return response.data.data;
     } catch (error: any) {
-      console.error("❌ Request failed:", {
-        error,
-        response: error.response?.data,
-        status: error.response?.status,
-      });
+      console.error("❌ Request failed:", error);
       throw error;
     }
   },
@@ -141,24 +135,30 @@ export const salaryStructureService = {
   },
 
   calculateTotalSalary: (grade: ISalaryGrade) => {
+    console.log("📊 Calculating total for grade:", grade);
     const basicSalary = grade.basicSalary;
     let totalAllowances = 0;
 
     grade.components.forEach((component) => {
+      console.log("💰 Processing component:", component);
       if (component.isActive) {
-        if (component.type === "fixed") {
-          totalAllowances += component.value;
-        } else {
-          totalAllowances += (basicSalary * component.value) / 100;
-        }
+        const value =
+          component.type === "fixed"
+            ? component.value
+            : (basicSalary * component.value) / 100;
+
+        console.log(`${component.name}: ${value}`);
+        totalAllowances += value;
       }
     });
 
-    return {
+    const result = {
       basicSalary,
       totalAllowances,
       grossSalary: basicSalary + totalAllowances,
     };
+    console.log("🧮 Calculation result:", result);
+    return result;
   },
 
   getSalaryGrade: async (id: string): Promise<ISalaryGrade> => {

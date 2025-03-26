@@ -140,6 +140,7 @@ app.use("/api/invitation", routeErrorWrapper(invitationRoutes));
 app.use("/api/onboarding", routeErrorWrapper(onboardingRoutes));
 app.use("/api/disciplinary", routeErrorWrapper(disciplinaryRoutes));
 
+
 // Enhanced health check
 app.get("/api/health", (_req, res) => {
   const health = {

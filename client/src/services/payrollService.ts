@@ -290,6 +290,7 @@ export const payrollService = {
       if (!response.data.success) {
         throw new Error("Failed to fetch employee payroll history");
       }
+      console.log("response history", response)
       return response.data.data;
     } catch (error) {
       console.error("Error fetching employee payroll history:", error);

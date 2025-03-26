@@ -153,4 +153,33 @@ export class EmployeeService {
       throw error;
     }
   }
+
+  static async updateEmployee(employeeId, data) {
+    try {
+      const employee = await UserModel.findByIdAndUpdate(
+        employeeId,
+        data,
+        { new: true, runValidators: true }
+      );
+      if (!employee) {
+        throw new ApiError(404, "Employee not found");
+      }
+      return this.formatEmployeeResponse(employee);
+    } catch (error) {
+      console.error("Error in updateEmployee:", error);
+      throw error;
+    }
+  }
+  static async deleteEmployee(employeeId) {
+    try {
+      const employee = await UserModel.findByIdAndDelete(employeeId);
+      if (!employee) {
+        throw new ApiError(404, "Employee not found");
+      }
+      return this.formatEmployeeResponse(employee);
+    } catch (error) {
+      console.error("Error in deleteEmployee:", error);
+      throw error;
+    }
+  }
 }

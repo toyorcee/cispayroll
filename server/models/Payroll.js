@@ -97,6 +97,11 @@ const PayrollSchema = new Schema(
         rate: { type: Number, default: 0 },
         amount: { type: Number, default: 0 },
       },
+      nhf: {
+        pensionableAmount: { type: Number, default: 0 },
+        rate: { type: Number, default: 0 },
+        amount: { type: Number, default: 0 },
+      },
       loans: [
         {
           description: {
@@ -294,6 +299,7 @@ PayrollSchema.methods.calculateTotals = function () {
   // Calculate deductions
   const taxDeductions = this.deductions.tax.amount;
   const pensionDeductions = this.deductions.pension.amount;
+  const nhfDeductions = this.deductions.nhf?.amount || 0;
   const loanDeductions = this.deductions.loans.reduce(
     (sum, loan) => sum + loan.amount,
     0
@@ -303,7 +309,11 @@ PayrollSchema.methods.calculateTotals = function () {
     0
   );
   const totalDeductions =
-    taxDeductions + pensionDeductions + loanDeductions + otherDeductions;
+    taxDeductions +
+    pensionDeductions +
+    nhfDeductions +
+    loanDeductions +
+    otherDeductions;
 
   // Update totals
   this.totals = {

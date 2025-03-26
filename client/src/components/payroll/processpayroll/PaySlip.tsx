@@ -23,6 +23,11 @@ interface PayrollData {
       rate: number;
       amount: number;
     };
+    nhf: {
+      pensionableAmount: number;
+      rate: number;
+      amount: number;
+    };
     loans: any[];
     others: any[];
     totalDeductions: number;
@@ -118,7 +123,7 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
               year: "numeric",
             })}
           </p>
-          <p>Frequency: {data.frequency}</p>
+          {/* <p>Frequency: {data.frequency}</p> */}
         </div>
       </div>
 
@@ -130,7 +135,7 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
             <p>Name: {data.employee.fullName}</p>
             <p>Employee ID: {data.employee.employeeId}</p>
             <p>Grade: {data.salaryGrade.level}</p>
-            <p>Position: {data.salaryGrade.description}</p>
+            <p>Department: {data.salaryGrade.description}</p>
           </div>
         </div>
         <div className="justify-self-end">
@@ -214,7 +219,15 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
                 {formatAmount(data.deductions.pension.amount)}
               </td>
             </tr>
-
+            <tr>
+              <td className="py-2">
+                Nhf ({data.deductions.nhf.rate}%)
+              </td>
+              <td className="text-right">
+                {formatAmount(data.deductions.nhf.amount)}
+              </td>
+            </tr>
+            
             {/* Other deductions if any */}
             {data.deductions.others.map((deduction, index) => (
               <tr key={index}>

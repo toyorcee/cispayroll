@@ -32,7 +32,11 @@ const iconMap: Record<string, IconType> = {
   Payroll: CurrencyDollarIcon,
   Reports: DocumentTextIcon,
   Settings: CogIcon,
+<<<<<<< HEAD
   Disciplinary: FaGavel,
+=======
+  Feedback: DocumentTextIcon,
+>>>>>>> 57b374b1b0a961de56f44daa05cca8bc72acdc1a
   "My Profile": UserPlusIcon,
   "My Leave": ArrowRightOnRectangleIcon,
   "My Payslips": DocumentTextIcon,
@@ -170,62 +174,62 @@ export function Sidebar() {
     return true;
   });
 
-  const payrollItems = [
-    {
-      name: "Salary Structure",
-      path: "/dashboard/payroll/structure",
-      icon: CurrencyDollarIcon,
-      permissions: [Permission.VIEW_SALARY_STRUCTURE],
-      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    },
-    {
-      name: "Allowances",
-      path: "/dashboard/payroll/allowances",
-      icon: CurrencyDollarIcon,
-      permissions: [Permission.VIEW_ALLOWANCES, Permission.MANAGE_ALLOWANCES],
-      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    },
-    {
-      name: "Bonuses",
-      path: "/dashboard/payroll/bonuses",
-      icon: CurrencyDollarIcon,
-      permissions: [Permission.VIEW_BONUSES, Permission.MANAGE_BONUSES],
-      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    },
-    {
-      name: "Deductions",
-      path: "/dashboard/payroll/deductions",
-      icon: CurrencyDollarIcon,
-      permissions: [Permission.VIEW_DEDUCTIONS, Permission.MANAGE_DEDUCTIONS],
-      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    },
-    {
-      name: "Process Payroll",
-      path: "/dashboard/payroll/process",
-      icon: CurrencyDollarIcon,
-      permissions: [Permission.CREATE_PAYROLL, Permission.EDIT_PAYROLL],
-      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    },
-  ];
+  // const payrollItems = [
+  //   {
+  //     name: "Salary Structure",
+  //     path: "/dashboard/payroll/structure",
+  //     icon: CurrencyDollarIcon,
+  //     permissions: [Permission.VIEW_SALARY_STRUCTURE],
+  //     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+  //   },
+  //   {
+  //     name: "Allowances",
+  //     path: "/dashboard/payroll/allowances",
+  //     icon: CurrencyDollarIcon,
+  //     permissions: [Permission.VIEW_ALLOWANCES, Permission.MANAGE_ALLOWANCES],
+  //     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+  //   },
+  //   {
+  //     name: "Bonuses",
+  //     path: "/dashboard/payroll/bonuses",
+  //     icon: CurrencyDollarIcon,
+  //     permissions: [Permission.VIEW_BONUSES, Permission.MANAGE_BONUSES],
+  //     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+  //   },
+  //   {
+  //     name: "Deductions",
+  //     path: "/dashboard/payroll/deductions",
+  //     icon: CurrencyDollarIcon,
+  //     permissions: [Permission.VIEW_DEDUCTIONS, Permission.MANAGE_DEDUCTIONS],
+  //     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+  //   },
+  //   {
+  //     name: "Process Payroll",
+  //     path: "/dashboard/payroll/process",
+  //     icon: CurrencyDollarIcon,
+  //     permissions: [Permission.CREATE_PAYROLL, Permission.EDIT_PAYROLL],
+  //     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+  //   },
+  // ];
 
-  const filteredPayrollItems = payrollItems.filter((item) => {
-    // Super Admin sees everything
-    if (hasRole(UserRole.SUPER_ADMIN)) {
-      return true;
-    }
+  // const filteredPayrollItems = payrollItems.filter((item) => {
+  //   // Super Admin sees everything
+  //   if (hasRole(UserRole.SUPER_ADMIN)) {
+  //     return true;
+  //   }
 
-    // Check roles
-    if (item.roles && !item.roles.some((role) => hasRole(role))) {
-      return false;
-    }
+  //   // Check roles
+  //   if (item.roles && !item.roles.some((role) => hasRole(role))) {
+  //     return false;
+  //   }
 
-    // Check permissions
-    if (item.permissions) {
-      return item.permissions.some((permission) => hasPermission(permission));
-    }
+  //   // Check permissions
+  //   if (item.permissions) {
+  //     return item.permissions.some((permission) => hasPermission(permission));
+  //   }
 
-    return true;
-  });
+  //   return true;
+  // });
 
   // Close sidebar handler
   const handleCloseSidebar = () => {
@@ -335,7 +339,7 @@ export function Sidebar() {
                 </div>
               );
             })}
-            {openSubmenu === "Payroll" && (
+            {/* {openSubmenu === "Payroll" && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
@@ -357,7 +361,7 @@ export function Sidebar() {
                   </Link>
                 ))}
               </motion.div>
-            )}
+            )} */}
           </div>
           <div className="p-4 border-t border-gray-200 bg-gray-50/50">
             <ProfileMenu variant="sidebar" />

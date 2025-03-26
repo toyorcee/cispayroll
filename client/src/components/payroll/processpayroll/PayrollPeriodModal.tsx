@@ -13,7 +13,6 @@ import {
   CircularProgress,
 } from "@mui/material";
 import {
-  FaFileAlt,
   FaFileInvoice,
   FaDownload,
   FaHistory,
@@ -67,7 +66,7 @@ const mapPayslipDataToComponentFormat = (data: any) => {
       fullName: data.employee.name,
     },
     salaryGrade: {
-      _id: "grade-id", // This might need to be adjusted
+      _id: "grade-id", 
       level: data.employee.salaryGrade,
       description: data.employee.department,
     },

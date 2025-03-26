@@ -137,11 +137,7 @@ router.get(
 );
 
 //Get all payrolls
-router.get(
-  "/payroll",
-  requirePermission([Permission.VIEW_ALL_PAYROLL]),
-  SuperAdminController.getAllPayroll
-);
+router.get("/payroll", SuperAdminController.getAllPayrolls);
 
 router.get(
   "/payroll/:id",
@@ -233,6 +229,12 @@ router.get(
   "/departments/:departmentId/employees",
   requirePermission([Permission.VIEW_ALL_USERS]),
   SuperAdminController.getDepartmentEmployees
+);
+
+router.get(
+  "/active-employees",
+  requirePermission([Permission.VIEW_ALL_USERS]),
+  SuperAdminController.getActiveEmployees
 );
 
 // ===== Leave Management Routes =====
