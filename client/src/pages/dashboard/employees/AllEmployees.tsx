@@ -80,9 +80,9 @@ export default function AllEmployees() {
       try {
         const response = await employeeService.getEmployees(filters);
         console.log("API Response:", response);
-
-        // Set employees from response.data
         setEmployees(response.data);
+        // Set employees from response.data
+        // setEmployees(response.);
         // Set total from response.pagination
         setTotalEmployees(response.pagination.total);
       } catch (err) {
@@ -230,7 +230,7 @@ export default function AllEmployees() {
       await employeeService.deleteEmployee(selectedEmployee.id);
       setEmployees(employees.filter((e) => e.id !== selectedEmployee.id));
       await refreshDepartments();
-      toast.success("Employee deleted successfully");
+      // toast.success("Employee deleted successfully");
     } catch (error) {
       toast.error("Failed to delete employee");
     }
@@ -554,8 +554,8 @@ export default function AllEmployees() {
                       {(employee as any).role === "SUPER_ADMIN"
                         ? "Super Admin"
                         : (employee as any).role === "ADMIN"
-                        ? "Admin"
-                        : "Employee"}
+                          ? "Admin"
+                          : "Employee"}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -646,15 +646,15 @@ export default function AllEmployees() {
         employee={
           selectedEmployee
             ? {
-                id: selectedEmployee.id,
-                name: `${selectedEmployee.firstName} ${selectedEmployee.lastName}`,
-                currentDepartment: selectedEmployee.department,
-              }
+              id: selectedEmployee.id,
+              name: `${selectedEmployee.firstName} ${selectedEmployee.lastName}`,
+              currentDepartment: selectedEmployee.department,
+            }
             : {
-                id: "",
-                name: "",
-                currentDepartment: "",
-              }
+              id: "",
+              name: "",
+              currentDepartment: "",
+            }
         }
         departments={departments}
         onTransfer={handleTransfer}

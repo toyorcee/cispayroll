@@ -73,4 +73,5 @@ router.post(
   EmployeeController.updateProfileImage
 );
 
+router.delete('/:id', requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]), EmployeeController.deleteEmployee);
 export default router;
