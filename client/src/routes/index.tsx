@@ -191,15 +191,16 @@ const superAdminRoutes: RouteConfig[] = [
     // ],
     // requireAllPermissions: false,
     element: <Disciplinary />, 
-  },{
+  },
+  {
     path: "feedback",
     label: "Feedback",
     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    permissions: [
-      Permission.VIEW_REPORTS,
-      Permission.MANAGE_FEEDBACK,
-    ],
-    requireAllPermissions: false,
+    // permissions: [
+    //   Permission.VIEW_REPORTS,
+    //   Permission.MANAGE_FEEDBACK,
+    // ],
+    // requireAllPermissions: false,
     element: <FeedbackManagemnet />,
   
     // children: [
