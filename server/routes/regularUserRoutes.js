@@ -26,9 +26,9 @@ router.put(
 
 // Payslip
 router.get(
-  "/payslips",
-  requirePermission([Permission.VIEW_OWN_PAYSLIP]),
-  RegularUserController.getOwnPayslips
+  "/payroll/:payrollId/view",
+  requirePermission([Permission.VIEW_ALL_PAYROLL]),
+  RegularUserController.viewPayslip
 );
 
 router.get(

@@ -66,25 +66,81 @@ export class RegularUserController {
   }
 
   // Payslip Management
-  static async getOwnPayslips(req, res, next) {
+  static async viewPayslip(req, res) {
     try {
-      const payslips = await PayrollModel.find({
-        employee: req.user.id,
-        status: "APPROVED",
-      })
-        .populate("department", "name code")
-        .sort({ createdAt: -1 });
+      console.log("🔍 Fetching payslip details for:", req.params.payrollId);
+
+      const payroll = await PayrollModel.findById(req.params.payrollId)
+        .populate([
+          {
+            path: "employee",
+            select: "firstName lastName employeeId bankDetails",
+          },
+          { path: "department", select: "name code" },
+          { path: "salaryGrade", select: "level description" },
+        ])
+        .lean();
+
+      if (!payroll) {
+        throw new ApiError(404, "Payroll record not found");
+      }
+
+      // Format the response with detailed payslip information
+      const payslipData = {
+        payslipId: `PS${payroll.month}${payroll.year}${payroll.employee.employeeId}`,
+        employee: {
+          id: payroll.employee._id,
+          name: `${payroll.employee.firstName} ${payroll.employee.lastName}`,
+          employeeId: payroll.employee.employeeId,
+          department: payroll.department?.name || "Not Assigned",
+          salaryGrade: payroll.salaryGrade?.level || "Not Assigned",
+        },
+        paymentDetails: {
+          bankName: payroll.employee.bankDetails?.bankName || "Not Provided",
+          accountNumber:
+            payroll.employee.bankDetails?.accountNumber || "Not Provided",
+          accountName:
+            payroll.employee.bankDetails?.accountName || "Not Provided",
+        },
+        period: {
+          month: payroll.month,
+          year: payroll.year,
+        },
+        earnings: {
+          basicSalary: payroll.basicSalary,
+          allowances: payroll.allowances,
+          bonuses: payroll.bonuses,
+          totalEarnings: payroll.totals.grossEarnings,
+        },
+        deductions: {
+          tax: payroll.deductions.tax,
+          pension: payroll.deductions.pension,
+          nhf: payroll.deductions.nhf,
+          loans: payroll.deductions.loans,
+          others: payroll.deductions.others,
+          totalDeductions: payroll.totals.totalDeductions,
+        },
+        summary: {
+          grossEarnings: payroll.totals.grossEarnings,
+          totalDeductions: payroll.totals.totalDeductions,
+          netPay: payroll.totals.netPay,
+        },
+        status: payroll.status,
+        processedAt: payroll.createdAt,
+      };
+
+      console.log("✅ Payslip details retrieved successfully");
 
       res.status(200).json({
         success: true,
-        payslips,
-        count: payslips.length,
+        data: payslipData,
       });
     } catch (error) {
+      console.error("❌ Error fetching payslip details:", error);
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({
         success: false,
-        message,
+        message: message || "Failed to fetch payslip details",
       });
     }
   }

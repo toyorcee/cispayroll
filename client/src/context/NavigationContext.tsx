@@ -149,26 +149,32 @@ export const menuItems: NavigationItem[] = [
     name: "Payroll",
     href: "/dashboard/payroll",
     icon: CurrencyDollarIcon,
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
     permissions: [
       Permission.VIEW_ALL_PAYROLL,
       Permission.VIEW_DEPARTMENT_PAYROLL,
+      Permission.VIEW_OWN_PAYSLIP,
     ],
+    requireAllPermissions: false,
     subItems: [
+      // Admin-only items
       {
         name: "Salary Structure",
         href: "/dashboard/payroll/structure",
         permissions: [Permission.VIEW_SALARY_STRUCTURE],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
       },
       {
         name: "Allowances",
         href: "/dashboard/payroll/allowances",
         permissions: [Permission.VIEW_ALLOWANCES, Permission.MANAGE_ALLOWANCES],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
       },
       {
         name: "Bonuses",
         href: "/dashboard/payroll/bonuses",
         permissions: [Permission.VIEW_BONUSES, Permission.MANAGE_BONUSES],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
       },
       {
         name: "Deductions",
@@ -180,7 +186,14 @@ export const menuItems: NavigationItem[] = [
         name: "Process Payroll",
         href: "/dashboard/payroll/process",
         permissions: [Permission.CREATE_PAYROLL, Permission.EDIT_PAYROLL],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
       },
+      {
+        name: "My Payslips",
+        href: "/dashboard/payroll/my-payslips",
+        permissions: [Permission.VIEW_OWN_PAYSLIP],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+      }
     ],
   },
   {

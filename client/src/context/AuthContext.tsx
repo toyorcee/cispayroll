@@ -48,10 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const hasRole = (role: UserRole): boolean => {
-    console.log("=== DEBUG: hasRole ===");
-    console.log("Checking role:", role);
-    console.log("User role:", user?.role);
-    console.log("Is SUPER_ADMIN?", user?.role === UserRole.SUPER_ADMIN);
+    // console.log("=== DEBUG: hasRole ===");
+    // console.log("Checking role:", role);
+    // console.log("User role:", user?.role);
+    // console.log("Is SUPER_ADMIN?", user?.role === UserRole.SUPER_ADMIN);
 
     if (!user) return false;
     if (user.role === UserRole.SUPER_ADMIN) return true;

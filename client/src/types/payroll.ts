@@ -298,7 +298,11 @@ export interface PayrollData {
       rate: number;
       amount: number;
     };
-    bonus: any[];
+    bonus: Array<{
+      type: string;
+      description: string;
+      amount: number;
+    }>;
     totalEarnings: number;
   };
   deductions: {
@@ -341,7 +345,10 @@ export interface PayrollData {
       amount: number;
       _id: string;
     }>;
-    additionalAllowances: any[];
+    additionalAllowances: Array<{
+      name: string;
+      amount: number;
+    }>;
     totalAllowances: number;
   };
   basicSalary: number;

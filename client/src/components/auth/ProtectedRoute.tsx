@@ -42,9 +42,30 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Payroll Routes with specific submenu checks
   if (path.startsWith("/dashboard/payroll")) {
-    // Debug log
-    console.log("Current user permissions:", user.permissions);
+    console.log("🚀 PAYROLL ACCESS DEBUG 🚀", {
+      path: path,
+      userRole: user?.role,
+      userPermissions: user?.permissions,
+      hasViewOwnPayslip: user?.permissions?.includes(Permission.VIEW_OWN_PAYSLIP),
+      isSuperAdmin: user?.role === UserRole.SUPER_ADMIN,
+      isAdmin: user?.role === UserRole.ADMIN,
+      isUser: user?.role === UserRole.USER,
+      currentTime: new Date().toISOString()
+    });
+  
+    if (path.includes("/my-payslips")) {
+      console.log("🟢 Checking My Payslips access");
+      if (user.permissions?.includes(Permission.VIEW_OWN_PAYSLIP)) {
+        console.log("✅ Granted My Payslips access");
 
+        return <>{children || element}</>;
+      }
+      console.log("❌ Denied My Payslips - missing VIEW_OWN_PAYSLIP");
+      toast.error("Access denied: Cannot view payslips");
+      return <Navigate to="/dashboard" replace />;
+    }
+
+    console.log("🔍 Checking admin payroll permissions");
     const payrollPermissions = [
       Permission.VIEW_ALL_PAYROLL,
       Permission.VIEW_DEPARTMENT_PAYROLL,
@@ -65,7 +86,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       return <Navigate to="/dashboard" replace />;
     }
 
-    // Specific checks for each payroll section
     if (path.includes("/structure")) {
       if (!user.permissions?.includes(Permission.VIEW_SALARY_STRUCTURE)) {
         toast.error("Access denied: Cannot view salary structure");
@@ -107,7 +127,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
 
     if (path.includes("/deductions")) {
-      // Debug log
       console.log("Checking deductions permissions:", {
         userPermissions: user.permissions,
         hasViewDeductions: user.permissions?.includes(
@@ -119,12 +138,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         userRole: user.role,
       });
 
-      // Super admin should always have access
       if (user.role === UserRole.SUPER_ADMIN) {
         return <>{children || element}</>;
       }
 
-      // For other roles, check specific permissions
       if (
         !user.permissions?.some((p) =>
           [
@@ -155,7 +172,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
   }
 
-
   if (path.startsWith("/dashboard/disciplinary")) {
     const disciplinaryPermissions = [
       Permission.MANAGE_DISCIPLINARY_ACTIONS,
@@ -164,14 +180,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       // Permission.APPROVE_DISCIPLINARY_ACTIONS,
       // Permission.VIEW_POLICY_COMPLIANCE,
     ];
-  
+
     // if (!disciplinaryPermissions.some((perm) => user.permissions?.includes(perm))) {
     //   toast.error("Access denied: No disciplinary case management permissions");
     //   return <Navigate to="/dashboard" replace />;
     // }
-
   }
-  
 
   // Settings Routes
   if (path.startsWith("/dashboard/settings")) {
