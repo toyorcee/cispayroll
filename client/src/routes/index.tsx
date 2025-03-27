@@ -40,7 +40,7 @@ import Landing from "../pages/Landing";
 import Disciplinary from "../pages/dashboard/disciplinary/Disciplinary";
 import ComingSoonPage from "../pages/Coming/ComingSoonPage";
 import { FeedbackOutlined } from "@mui/icons-material";
-import FeedbackManagemnet from "../pages/feedback/FeedbackManagemnet";
+import FeedbackManagemnet from "../pages/feedback/FeedbackManagement";
 
 export interface RouteConfig {
   path: string;
@@ -195,12 +195,8 @@ const superAdminRoutes: RouteConfig[] = [
   {
     path: "feedback",
     label: "Feedback",
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    // permissions: [
-    //   Permission.VIEW_REPORTS,
-    //   Permission.MANAGE_FEEDBACK,
-    // ],
-    // requireAllPermissions: false,
+    roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPER_ADMIN],
+   
     element: <FeedbackManagemnet />,
   
     // children: [

@@ -39,8 +39,13 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
     // For Super Admin, show ALL main menus (not submenus)
     if (user.role === UserRole.SUPER_ADMIN) {
-      return ["Dashboard", "Employees", "Payroll", "Reports", "Settings", "Disciplinary"];
-      return ["Dashboard", "Employees", "Payroll", "Reports", "Settings" , "Feedback", "Approvals"];
+      return ["Dashboard", "Employees", "Payroll", "Reports", "Settings", "Disciplinary", "Feedback", "Approvals"];
+    }
+    if (user.role === UserRole.ADMIN) {
+      return ["Dashboard", "Employees", "Payroll", "Reports", "Settings", "Disciplinary" , "Feedback"];
+    }
+    if (user.role === UserRole.USER) {
+      return ["Dashboard", "Feedback"];
     }
 
     // For other roles, check specific permissions
@@ -324,9 +329,9 @@ export const menuItems: NavigationItem[] = [
     name: "Feedback",
     href: "/dashboard/feedback",
     icon: DocumentTextIcon,
-    roles: [UserRole.SUPER_ADMIN],
+    roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPER_ADMIN],
     permissions: [Permission.MANAGE_FEEDBACK],
-    requireAllPermissions: false,
+    requireAllPermissions: true,
   },
 ].map((item) => {
   console.log(`Menu item ${item.name}:`, {

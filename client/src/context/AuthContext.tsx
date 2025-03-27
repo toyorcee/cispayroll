@@ -12,7 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { prefetchDepartments } from "../services/departmentService";
 
 axios.defaults.baseURL =
-  import.meta.env.VITE_API_URL || "https://payrollapi.digitalentshub.net";
+  import.meta.env.VITE_API_URL || "http://localhost:5000";
 axios.defaults.withCredentials = true;
 
 interface AuthContextType {
@@ -71,8 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         toast.error("Session expired. Please log in again.");
       }
-    } catch (error) {
-      console.error("❌ Auth check failed:", error.response?.data || error);
+    } catch (error: unknown) {
+      console.error("❌ Auth check failed:", axios.isAxiosError(error) ? error.response?.data || error : error);
       setUser(null);
     } finally {
       setLoading(false);
@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         throw new Error("No user data received");
       }
-    } catch (error) {
+    } catch (error: unknown) {
       handleAuthError(error);
     }
   };
@@ -120,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         throw new Error("No user data received");
       }
-    } catch (error) {
+    } catch (error: unknown) {
       handleAuthError(error);
     }
   };
@@ -131,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await axios.get("/api/auth/logout");
       setUser(null);
       toast.success("Logged out successfully");
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Logout failed:", error);
       setUser(null);
     } finally {
