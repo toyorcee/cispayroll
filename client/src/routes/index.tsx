@@ -40,7 +40,7 @@ import Landing from "../pages/Landing";
 import Disciplinary from "../pages/dashboard/disciplinary/Disciplinary";
 import ComingSoonPage from "../pages/Coming/ComingSoonPage";
 import { FeedbackOutlined } from "@mui/icons-material";
-import FeedbackManagemnet from "../pages/feedback/FeedbackManagemnet";
+import FeedbackManagemnet from "../pages/feedback/FeedbackManagement";
 import MyPayslipsPage from "../pages/dashboard/payroll/MyPayslips";
 
 export interface RouteConfig {
@@ -196,12 +196,8 @@ const superAdminRoutes: RouteConfig[] = [
   {
     path: "feedback",
     label: "Feedback",
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    // permissions: [
-    //   Permission.VIEW_REPORTS,
-    //   Permission.MANAGE_FEEDBACK,
-    // ],
-    // requireAllPermissions: false,
+    roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPER_ADMIN],
+   
     element: <FeedbackManagemnet />,
   
     // children: [
@@ -430,7 +426,7 @@ function LazyRoute({
   element,
   skeletonType = "content",
 }: {
-  component?: React.LazyExoticComponent<React.ComponentType<any>>;
+  component?: React.LazyExoticComponent<React.ComponentType<unknown>>;
   element?: React.ReactNode;
   skeletonType: "content" | "auth";
 }) {
