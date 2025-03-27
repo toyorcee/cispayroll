@@ -37,13 +37,10 @@ import Dashboard from "../pages/dashboard/Dashboard";
 import AllowanceManagement from "../pages/dashboard/payroll/AllowanceManagement";
 import BonusManagement from "../pages/dashboard/payroll/BonusManagement";
 import Landing from "../pages/Landing";
-<<<<<<< HEAD
 import Disciplinary from "../pages/dashboard/disciplinary/Disciplinary";
-=======
 import ComingSoonPage from "../pages/Coming/ComingSoonPage";
 import { FeedbackOutlined } from "@mui/icons-material";
 import FeedbackManagemnet from "../pages/feedback/FeedbackManagemnet";
->>>>>>> 57b374b1b0a961de56f44daa05cca8bc72acdc1a
 
 export interface RouteConfig {
   path: string;
@@ -185,7 +182,6 @@ const superAdminRoutes: RouteConfig[] = [
     ],
   },
   {
-<<<<<<< HEAD
     path: "disciplinary/general",
     label: "Disciplinary Management",
     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
@@ -195,8 +191,7 @@ const superAdminRoutes: RouteConfig[] = [
     // ],
     // requireAllPermissions: false,
     element: <Disciplinary />, 
-  }
-=======
+  },{
     path: "feedback",
     label: "Feedback",
     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
@@ -206,6 +201,7 @@ const superAdminRoutes: RouteConfig[] = [
     ],
     requireAllPermissions: false,
     element: <FeedbackManagemnet />,
+  
     // children: [
     //   {
     //     path: "payroll",
@@ -233,7 +229,6 @@ const superAdminRoutes: RouteConfig[] = [
     //   },
     // ],
   },
->>>>>>> 57b374b1b0a961de56f44daa05cca8bc72acdc1a
 ];
 
 // Admin routes

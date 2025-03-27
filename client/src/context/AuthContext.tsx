@@ -12,7 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { prefetchDepartments } from "../services/departmentService";
 
 axios.defaults.baseURL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
+  import.meta.env.VITE_API_URL || "https://payrollapi.digitalentshub.net";
 axios.defaults.withCredentials = true;
 
 interface AuthContextType {
@@ -62,22 +62,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUserData = async () => {
     try {
       const { data } = await axios.get("/api/auth/me");
+      console.log("🔍 Fetched user data:", data);
+  
       if (data.user) {
         setUser(parseUserData(data.user));
         await prefetchDepartments(queryClient);
       } else {
         setUser(null);
-        if (!window.location.pathname.includes("/auth/")) {
-          toast.error("Please login to continue");
-        }
+        toast.error("Session expired. Please log in again.");
       }
     } catch (error) {
-      console.error("Auth check failed:", error);
+      console.error("❌ Auth check failed:", error.response?.data || error);
       setUser(null);
     } finally {
       setLoading(false);
     }
   };
+  
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -85,9 +86,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
       });
-
+      console.log("user data", data)
       if (data.user) {
         setUser(parseUserData(data.user));
+        console.log("user set sucessfully");
 
         // Prefetch departments immediately after successful login
         await prefetchDepartments(queryClient);
@@ -203,8 +205,8 @@ const parseUserData = (data: Partial<User>): User => ({
   role: data.role || UserRole.USER,
   permissions: Array.isArray(data.permissions)
     ? data.permissions.filter((p): p is Permission =>
-        Object.values(Permission).includes(p as Permission)
-      )
+      Object.values(Permission).includes(p as Permission)
+    )
     : [],
   department: data.department,
   position: data.position || "",

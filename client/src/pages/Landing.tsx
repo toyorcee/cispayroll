@@ -381,13 +381,8 @@ const modules: ModuleItem[] = [
     title: "Disciplinary",
     description: "Handle incidents and maintain policy compliance",
     icon: <FaExclamationTriangle className="w-full h-full text-green-600" />,
-<<<<<<< HEAD
     path: "/dashboard/disciplinary/general",
-    isComponent: true,
-=======
-    path: "/dashboard/employees/disciplinary",
-    isReady: false, // Change to true when ready
->>>>>>> 57b374b1b0a961de56f44daa05cca8bc72acdc1a
+    isReady: true,
   },
   {
     title: "Self-Service",
