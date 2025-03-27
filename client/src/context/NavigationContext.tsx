@@ -326,8 +326,6 @@ export const menuItems: NavigationItem[] = [
     icon: DocumentTextIcon,
     roles: [UserRole.SUPER_ADMIN],
     permissions: [Permission.MANAGE_FEEDBACK],
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    permissions: [Permission.MANAGE_FEEDBACK],
     requireAllPermissions: false,
   },
 ].map((item) => {
