@@ -21,11 +21,17 @@ export default function SalaryStructure() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // const [setIsModalOpen] = useState(false);
   const [editingGrade, setEditingGrade] = useState<ISalaryGrade | null>(null);
   const [viewingGradeId, setViewingGradeId] = useState<string | null>(null);
   const [deleteGradeId, setDeleteGradeId] = useState<string | null>(null);
 
+  // interface NewSalaryGradeProps {
+  //   isOpen: boolean;
+  //   onClose: () => void;
+  //   onSuccess: () => void;
+  // }
+  
   const fetchSalaryGrades = useCallback(async () => {
     if (authLoading || !user) return;
 
@@ -61,12 +67,11 @@ export default function SalaryStructure() {
     fetchDepartments();
   }, []); // Empty dependency array - only runs once on mount
 
-  const handleSalaryGradeCreated = useCallback(() => {
-    setIsModalOpen(false);
-    // Refresh the list after creation
-    fetchSalaryGrades();
-    toast.success("Salary grade created successfully!");
-  }, [fetchSalaryGrades]);
+  // const handleSalaryGradeCreated = useCallback(() => {
+  //   setIsModalOpen(false);
+  //   fetchSalaryGrades();
+  //   toast.success("Salary grade created successfully!");
+  // }, [fetchSalaryGrades]);
 
   const canEditSalaryStructure = user?.permissions?.includes(
     Permission.EDIT_SALARY_STRUCTURE
@@ -146,7 +151,7 @@ export default function SalaryStructure() {
       {canManageSalaryStructure && (
         <div className="flex justify-end">
           <button
-            onClick={() => setIsModalOpen(true)}
+            // onClick={}
             className="inline-flex items-center px-4 py-2 !bg-green-600 !text-white rounded-lg hover:bg-green-700 
                transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg
                animate-bounce-slow cursor-pointer focus:outline-none focus:ring-0"
@@ -309,9 +314,9 @@ export default function SalaryStructure() {
       </div>
 
       <NewSalaryGrade
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={handleSalaryGradeCreated}
+        // isOpen={isModalOpen}
+        // onClose={() => setIsModalOpen(false)}
+        // onSuccess={handleSalaryGradeCreated}
       />
 
       {editingGrade && (
