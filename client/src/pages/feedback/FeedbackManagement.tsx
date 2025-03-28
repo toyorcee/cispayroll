@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
 import { 
   MessageSquare, 
-  PieChart, 
   Users, 
   AlertTriangle, 
   FileText, 
   BarChart4, 
-  Activity,
   CheckCircle,
   Clock,
   ClipboardCheck

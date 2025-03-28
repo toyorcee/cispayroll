@@ -13,8 +13,6 @@ const BASE_URL = import.meta.env.VITE_API_URL;
 // Set default axios config
 axios.defaults.withCredentials = true;
 
-// Create a type for the create salary grade input
-
 interface UpdateSalaryGradeInput {
   level?: string;
   basicSalary?: number;
@@ -155,7 +153,11 @@ export const salaryStructureService = {
       console.log("💰 Processing component:", component);
       if (component.isActive) {
         const value =
+<<<<<<< HEAD
           component.type === "fixed" as ComponentType
+=======
+          component.calculationMethod === "fixed"
+>>>>>>> d9f7436e121164963cf10c21abe9ba579b2b2f5e
             ? component.value
             : (basicSalary * component.value) / 100;
 

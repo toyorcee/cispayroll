@@ -1,6 +1,5 @@
 import { Status, BankDetails, Allowance, Deduction } from "./common";
 import { UserRole, Permission } from "./auth";
-
 export enum LeaveStatus {
   pending = "pending",
   approved = "approved",
@@ -140,6 +139,7 @@ export interface OnboardingTask {
 
 export interface OnboardingEmployee {
   id: string;
+  employeeId: string;
   firstName: string;
   lastName: string;
   email: string;
