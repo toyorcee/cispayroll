@@ -85,7 +85,7 @@ const AnonymousFeedback = () => {
 
     setLoading(true);
     try {
-      const response = await axios.post("/api/feedback/anonymous", formData);
+      await axios.post("/api/feedback/anonymous", formData);
       setSuccess(true);
       toast.success("Anonymous feedback submitted successfully!");
       
@@ -99,9 +99,14 @@ const AnonymousFeedback = () => {
         });
         setSuccess(false);
       }, 2000);
-    } catch (error: any) {
-      console.error("Error submitting anonymous feedback:", error);
-      toast.error(error.response?.data?.message || "Failed to submit feedback");
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.data?.message) {
+        console.error("Error submitting anonymous feedback:", error);
+        toast.error(error.response.data.message);
+      } else {
+        console.error("Error submitting anonymous feedback:", error);
+        toast.error("Failed to submit feedback");
+      }
     } finally {
       setLoading(false);
     }

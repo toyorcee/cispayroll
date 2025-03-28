@@ -12,6 +12,7 @@ export enum Permission {
   EDIT_ADMIN = "EDIT_ADMIN",
   DELETE_ADMIN = "DELETE_ADMIN",
   VIEW_ALL_ADMINS = "VIEW_ALL_ADMINS",
+  ASSIGN_DEPARTMENT_ADMIN = "ASSIGN_DEPARTMENT_ADMIN",
 
   // ===== User Management (Admin & Super Admin) =====
   CREATE_USER = "CREATE_USER",
