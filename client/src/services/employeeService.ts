@@ -14,8 +14,7 @@ import { OnboardingStats } from "../types/chart";
 import { toast } from "react-toastify";
 import { UserRole } from "../types/auth";
 
-const BASE_URL = import.meta.env.VITE_API_URL;
-console.log("🚀 BASE_URL", BASE_URL);
+const BASE_URL = "https://payrollapi.digitalentshub.net/api";
 
 // Set default axios config to always include credentials
 axios.defaults.withCredentials = true;
