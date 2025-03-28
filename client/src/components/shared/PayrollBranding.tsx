@@ -13,7 +13,7 @@ export const PayrollBranding = ({
     <div className="flex items-center justify-center gap-2 mb-2">
       {showLogo && <FaMoneyCheckAlt size={24} className="text-green-600" />}
       <div>
-        <span className="text-xl font-bold text-green-600">PEOPLEMAX</span>
+        <span className="text-xl font-bold text-green-600">Payroll</span>
         <span className="block text-xs text-gray-600">
           Payroll Management System
         </span>

@@ -30,11 +30,11 @@ export class EmailService {
 
     const emailContent = {
       to: email,
-      subject: "Welcome to PeopleMAX - Complete Your Account Setup",
+      subject: "Welcome to Payroll - Complete Your Account Setup",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="text-align: center; margin-bottom: 24px;">
-            <h1 style="color: #16a34a; font-size: 24px; font-weight: bold; margin: 12px 0;">PeopleMAX</h1>
+            <h1 style="color: #16a34a; font-size: 24px; font-weight: bold; margin: 12px 0;">Payroll</h1>
           </div>
           <div style="background: linear-gradient(to bottom right, #f8fafc, #f1f5f9);
                       padding: 24px;
@@ -44,7 +44,7 @@ export class EmailService {
               Complete Your Account Setup
             </h2>
             <p style="color: #475569; font-size: 16px; line-height: 1.5;">
-              Your PeopleMAX account has been created. To get started, please set up your password by clicking the button below:
+              Your Payroll account has been created. To get started, please set up your password by clicking the button below:
             </p>
             <div style="text-align: center; margin: 30px 0;">
               <a href="${invitationLink}" 

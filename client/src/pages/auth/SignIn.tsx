@@ -161,7 +161,7 @@ export default function SignIn() {
             className="inline-flex justify-center items-center gap-2"
           >
             <PeopleMaxIcon />
-            <span className="text-2xl font-bold text-gray-900">PeopleMAX</span>
+            <span className="text-2xl font-bold text-gray-900">Payroll</span>
           </Link>
 
           <h2 className="mt-4 text-2xl font-bold tracking-tight text-gray-900">
