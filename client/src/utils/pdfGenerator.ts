@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Payslip, PayrollStatus } from "../types/payroll";
+import { Payslip } from "../types/payroll";
 
 // Define the type inline since the import isn't working correctly
 type TableConfig = {

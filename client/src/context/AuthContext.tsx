@@ -62,22 +62,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUserData = async () => {
     try {
       const { data } = await axios.get("/api/auth/me");
+      console.log("🔍 Fetched user data:", data);
+  
       if (data.user) {
         setUser(parseUserData(data.user));
         await prefetchDepartments(queryClient);
       } else {
         setUser(null);
-        if (!window.location.pathname.includes("/auth/")) {
-          toast.error("Please login to continue");
-        }
+        toast.error("Session expired. Please log in again.");
       }
-    } catch (error) {
-      console.error("Auth check failed:", error);
+    } catch (error: unknown) {
+      console.error("❌ Auth check failed:", axios.isAxiosError(error) ? error.response?.data || error : error);
       setUser(null);
     } finally {
       setLoading(false);
     }
   };
+  
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -85,16 +86,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
       });
-
+      console.log("user data", data)
       if (data.user) {
         setUser(parseUserData(data.user));
+        console.log("user set sucessfully");
 
         // Prefetch departments immediately after successful login
         await prefetchDepartments(queryClient);
       } else {
         throw new Error("No user data received");
       }
-    } catch (error) {
+    } catch (error: unknown) {
       handleAuthError(error);
     }
   };
@@ -118,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         throw new Error("No user data received");
       }
-    } catch (error) {
+    } catch (error: unknown) {
       handleAuthError(error);
     }
   };
@@ -129,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await axios.get("/api/auth/logout");
       setUser(null);
       toast.success("Logged out successfully");
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Logout failed:", error);
       setUser(null);
     } finally {
@@ -203,8 +205,8 @@ const parseUserData = (data: Partial<User>): User => ({
   role: data.role || UserRole.USER,
   permissions: Array.isArray(data.permissions)
     ? data.permissions.filter((p): p is Permission =>
-        Object.values(Permission).includes(p as Permission)
-      )
+      Object.values(Permission).includes(p as Permission)
+    )
     : [],
   department: data.department,
   position: data.position || "",

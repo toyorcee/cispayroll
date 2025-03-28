@@ -382,7 +382,7 @@ const modules: ModuleItem[] = [
     description: "Handle incidents and maintain policy compliance",
     icon: <FaExclamationTriangle className="w-full h-full text-green-600" />,
     path: "/dashboard/disciplinary/general",
-    isReady: true, //nge to true when ready
+    isReady: true,
   },
   {
     title: "Self-Service",

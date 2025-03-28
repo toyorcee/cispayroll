@@ -12,13 +12,6 @@ const BASE_URL = "http://localhost:5000/api";
 // Set default axios config
 axios.defaults.withCredentials = true;
 
-// Create a type for the create salary grade input
-interface CreateSalaryGradeInput {
-  level: string;
-  basicSalary: number;
-  description: string;
-  components: ISalaryComponentInput[];
-}
 
 interface UpdateSalaryGradeInput {
   level?: string;
@@ -143,7 +136,7 @@ export const salaryStructureService = {
       console.log("💰 Processing component:", component);
       if (component.isActive) {
         const value =
-          component.type === "fixed"
+          component.calculationMethod === "fixed"
             ? component.value
             : (basicSalary * component.value) / 100;
 

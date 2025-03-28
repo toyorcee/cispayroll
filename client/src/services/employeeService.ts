@@ -19,9 +19,6 @@ const BASE_URL = "https://payrollapi.digitalentshub.net/api";
 // Set default axios config to always include credentials
 axios.defaults.withCredentials = true;
 
-interface DepartmentWithCount extends DepartmentBasic {
-  employeeCount: number;
-}
 
 interface AdminResponse {
   _id: string;

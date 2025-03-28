@@ -80,11 +80,8 @@ export default function AllEmployees() {
       try {
         const response = await employeeService.getEmployees(filters);
         console.log("API Response:", response);
-        setEmployees(response.data);
-        // Set employees from response.data
-        // setEmployees(response.);
-        // Set total from response.pagination
-        setTotalEmployees(response.pagination.total);
+        setEmployees(response as unknown as Employee[]);
+        setTotalEmployees((response as any).pagination?.total || 0);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
         console.error("Error fetching employees:", err);
@@ -119,10 +116,10 @@ export default function AllEmployees() {
           status: "active",
           page: 1,
           limit: 100,
-        });
+        } as any);
 
         // Map Employee type to User type with proper type casting
-        const adminUsers: User[] = response.data.map((emp: Employee) => ({
+        const adminUsers: User[] = (response as unknown as Employee[]).map((emp: Employee) => ({
           _id: emp.id,
           id: emp.id,
           firstName: emp.firstName,
@@ -241,7 +238,7 @@ export default function AllEmployees() {
     try {
       await employeeService.transferEmployee(selectedEmployee.id, departmentId);
       const response = await employeeService.getEmployees(filters);
-      setEmployees(response.data);
+      setEmployees(response as unknown as Employee[]);
       await refreshDepartments();
       toast.success("Employee transferred successfully");
     } catch (error) {
@@ -278,9 +275,9 @@ export default function AllEmployees() {
       console.log("Server response:", response);
 
       const employeesResponse = await employeeService.getEmployees(filters);
-      setEmployees(employeesResponse.data);
+      setEmployees(employeesResponse as unknown as Employee[]);
       // Fix: Use total directly instead of pagination.total
-      setTotalEmployees(employeesResponse.pagination.total);
+      setTotalEmployees((employeesResponse as any).pagination?.total || 0);
       setShowCreateModal(false);
 
       // Reset form
@@ -311,7 +308,7 @@ export default function AllEmployees() {
     try {
       await employeeService.updateEmployee(selectedEmployee.id, data);
       const response = await employeeService.getEmployees(filters);
-      setEmployees(response.data);
+      setEmployees(response as unknown as Employee[]);
       setShowEditModal(false);
       toast.success("Employee updated successfully");
     } catch (error) {

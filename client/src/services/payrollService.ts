@@ -9,7 +9,7 @@ import type {
   PayrollData,
   PayrollStats,
   PeriodPayrollResponse,
-  PayrollStatus,
+ 
 } from "../types/payroll";
 
 const BASE_URL = "/api/super-admin";

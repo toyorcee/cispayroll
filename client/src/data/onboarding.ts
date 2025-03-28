@@ -1,4 +1,4 @@
-import { OnboardingEmployee } from "../types/employee";
+import { OnboardingEmployee, OnboardingTask } from "../types/employee";
 
 export const onboardingEmployees: OnboardingEmployee[] = [
   {
@@ -8,7 +8,7 @@ export const onboardingEmployees: OnboardingEmployee[] = [
     lastName: "Adeleke",
     position: "Frontend Developer",
     department: "Engineering",
-    startDate: new Date("2024-04-15"),
+    startDate: "2024-04-15",
     status: "documentation_pending",
     progress: 75,
     supervisor: "Oluwaseun Adebayo",
@@ -23,7 +23,7 @@ export const onboardingEmployees: OnboardingEmployee[] = [
       { name: "training", completed: false, assignedTo: "Oluwaseun Adebayo" },
       { name: "bank_setup", completed: true, assignedTo: "Chidinma Okonkwo" },
       { name: "pension_setup", completed: false, assignedTo: "Aisha Ibrahim" },
-    ],
+    ] as OnboardingTask[],
     documents: {
       contractSigned: true,
       idSubmitted: true,
@@ -38,7 +38,7 @@ export const onboardingEmployees: OnboardingEmployee[] = [
     lastName: "Ogunleye",
     position: "Sales Executive",
     department: "Sales",
-    startDate: new Date("2024-04-10"),
+    startDate: "2024-04-10",
     status: "it_setup_pending",
     progress: 50,
     supervisor: "Chidinma Okonkwo",
@@ -53,7 +53,7 @@ export const onboardingEmployees: OnboardingEmployee[] = [
       { name: "training", completed: false, assignedTo: "Chidinma Okonkwo" },
       { name: "bank_setup", completed: true, assignedTo: "Chidinma Okonkwo" },
       { name: "pension_setup", completed: false, assignedTo: "Aisha Ibrahim" },
-    ],
+    ] as OnboardingTask[],
     documents: {
       contractSigned: true,
       idSubmitted: true,
@@ -68,7 +68,7 @@ export const onboardingEmployees: OnboardingEmployee[] = [
     lastName: "Balogun",
     position: "HR Associate",
     department: "HR",
-    startDate: new Date("2024-04-20"),
+    startDate: "2024-04-20",
     status: "contract_pending",
     progress: 25,
     supervisor: "Aisha Ibrahim",
@@ -83,7 +83,7 @@ export const onboardingEmployees: OnboardingEmployee[] = [
       { name: "training", completed: false, assignedTo: "Aisha Ibrahim" },
       { name: "bank_setup", completed: false, assignedTo: "Chidinma Okonkwo" },
       { name: "pension_setup", completed: false, assignedTo: "Aisha Ibrahim" },
-    ],
+    ] as OnboardingTask[],
     documents: {
       contractSigned: false,
       idSubmitted: true,
