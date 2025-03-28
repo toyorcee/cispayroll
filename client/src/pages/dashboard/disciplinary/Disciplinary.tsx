@@ -1,24 +1,14 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Dialog } from "@headlessui/react";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Title } from "chart.js";
 import { Bar } from "react-chartjs-2";
 import { CheckCircle, AlertCircle, FileText, UploadCloud, PlusCircle } from "lucide-react";
 import axios from "axios";
+import { employeeService } from "../../../services/employeeService";
+import { toast } from "react-toastify";
+import 'react-toastify/dist/ReactToastify.css';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Title);
-
-
-const employeeList = [
-  { id: 1, name: "John Doe" },
-  { id: 2, name: "Jane Smith" },
-  { id: 3, name: "Michael Johnson" },
-];
-
-const casesData = [
-  { id: 1, title: "Incident at Warehouse", description: "Details about warehouse incident.", status: "Active", employee: "John Doe", evidence: "dummy_image1.jpg" },
-  { id: 2, title: "Safety Violation", description: "Details about safety violation.", status: "Resolved", employee: "Jane Smith", evidence: "dummy_image2.jpg" },
-  { id: 3, title: "Policy Breach", description: "Details about policy breach.", status: "Active", employee: "Michael Johnson", evidence: "dummy_image3.jpg" },
-];
 
 const chartData = {
   labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
@@ -50,6 +40,11 @@ const DisciplinaryDashboard = () => {
     date: "",
     evidenceFiles: [],
   });
+  const [chartData, setChartData] = useState({
+    labels: [],
+    datasets: [{ label: "Monthly Cases", data: [], backgroundColor: "#6366F1" }],
+  });
+  const [loading, setLoading] = useState(true);
 
   const handleViewDetails = (caseData) => {
     setSelectedCase(caseData);
@@ -65,6 +60,94 @@ const DisciplinaryDashboard = () => {
       setIsCaseDetailsModalOpen(false);
     }
   };
+
+
+// State Hooks
+const [employees, setEmployees] = useState([]);
+const [activeCases, setActiveCases] = useState([]);
+const [loadingEmployees, setLoadingEmployees] = useState(true);
+const [loadingCases, setLoadingCases] = useState(true);
+const [error, setError] = useState(null);
+
+
+
+  const fetchMonthlyCases = async () => {
+    try {
+      const response = await axios.get("/api/disciplinary/monthly-cases"); // Call backend endpoint
+      const caseData = response.data; // Example format: [{_id: 1, count: 10}, {_id: 2, count: 12}]
+
+      // Map data to labels and counts
+      const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const labels = [];
+      const data = [];
+
+      // Create an array of last 6 months dynamically
+      const currentMonth = new Date().getMonth();
+      for (let i = 5; i >= 0; i--) {
+        labels.push(monthLabels[(currentMonth - i + 12) % 12]);
+      }
+
+      // Initialize data array with zeros
+      const monthlyCounts = Array(6).fill(0);
+
+      // Fill data dynamically based on fetched case data
+      caseData.forEach((entry) => {
+        const monthIndex = (entry._id - (currentMonth - 5 + 12) % 12 + 6) % 6; // Calculate the last 6 months' index
+        monthlyCounts[monthIndex] = entry.count;
+      });
+
+      // Update chart state
+      setChartData({
+        labels,
+        datasets: [{ label: "Monthly Cases", data: monthlyCounts, backgroundColor: "#6366F1" }],
+      });
+    } catch (error) {
+      console.error("Error fetching chart data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    fetchMonthlyCases();
+  }, []);
+  // Fetch active employees on component mount
+  useEffect(() => {
+    const fetchActiveEmployees = async () => {
+      try {
+        const filters = { role: "USER", status: "active" }; // Filter by role and active status
+        const response = await employeeService.getEmployees(filters);
+        console.log("API Response (Employees):", response.data);
+        setEmployees(response.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to fetch active employees.");
+        console.error("Error fetching employees:", err);
+      } finally {
+        setLoadingEmployees(false);
+      }
+    };
+
+    fetchActiveEmployees();
+  }, []);
+
+    const fetchActiveCases = async () => {
+      try {
+        const response = await axios.get("/api/disciplinary/cases", {
+          params: { status: "Active" }, // Pass query params to filter by status
+        });
+        console.log("Fetched Active Cases:", response.data);
+        setActiveCases(response.data); // Update state with active cases
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to fetch active cases.");
+        console.error("Error fetching active cases:", err);
+      } finally {
+        setLoadingCases(false);
+      }
+    };
+
+    useEffect(() => {
+      fetchActiveCases(); // Call it once during component mount
+    }, []);
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -104,7 +187,9 @@ const DisciplinaryDashboard = () => {
   
       if (response.status === 201) {
         console.log("Case submitted successfully!", response.data);
-        alert("Case logged successfully!");
+        toast.success("Case logged successfully!");
+        fetchActiveCases();
+        fetchMonthlyCases();
         setIsLogCaseModalOpen(false); // Close modal on success
       } else {
         alert("Something went wrong while saving the case.");
@@ -142,21 +227,21 @@ const DisciplinaryDashboard = () => {
           <CheckCircle className="text-green-500 w-10 h-10" />
           <div>
             <p className="text-sm text-gray-600">Total Cases</p>
-            <p className="text-2xl font-semibold">170</p>
+            <p className="text-2xl font-semibold">{activeCases.filter((c) => c.status === "Active").length}</p>
           </div>
         </div>
         <div className="bg-white shadow-lg rounded-2xl p-6 flex items-center space-x-4">
           <AlertCircle className="text-red-500 w-10 h-10" />
           <div>
             <p className="text-sm text-gray-600">Active Cases</p>
-            <p className="text-2xl font-semibold">{casesData.filter((c) => c.status === "Active").length}</p>
+            <p className="text-2xl font-semibold">{activeCases.filter((c) => c.status === "Active").length}</p>
           </div>
         </div>
         <div className="bg-white shadow-lg rounded-2xl p-6 flex items-center space-x-4">
           <FileText className="text-blue-500 w-10 h-10" />
           <div>
             <p className="text-sm text-gray-600">Resolved Cases</p>
-            <p className="text-2xl font-semibold">{casesData.filter((c) => c.status === "Resolved").length}</p>
+            <p className="text-2xl font-semibold">{activeCases.filter((c) => c.status === "Resolved").length}</p>
           </div>
         </div>
       </div>
@@ -165,34 +250,42 @@ const DisciplinaryDashboard = () => {
       <div className="bg-white shadow-lg rounded-2xl p-6">
         <h2 className="text-lg font-semibold mb-4">Recent Resolved Cases</h2>
         <ul className="space-y-2">
-          {casesData
-            .filter((caseItem) => caseItem.status === "Resolved")
-            .map((caseItem) => (
-              <li key={caseItem.id} className="p-3 border rounded-lg flex justify-between items-center">
-                <span>{caseItem.title}</span>
-                <button onClick={() => handleViewDetails(caseItem)} className="bg-blue-600 text-white px-4 py-1 rounded-lg">
-                  View Details
-                </button>
-              </li>
-            ))}
+        {activeCases
+          .filter((caseItem) => caseItem.status === "Resolved")
+          .map((caseItem) => (
+            <li key={caseItem.id} className="p-3 border rounded-lg flex justify-between items-center">
+              <span>{caseItem.title}</span>
+              <button onClick={() => handleViewDetails(caseItem)} className="bg-blue-600 text-white px-4 py-1 rounded-lg">
+                View Details
+              </button>
+            </li>
+          ))}
         </ul>
       </div>
 
       {/* Active Cases Section */}
       <div className="bg-white shadow-lg rounded-2xl p-6">
         <h2 className="text-lg font-semibold mb-4">Active Cases</h2>
-        <ul className="space-y-2">
-          {casesData
-            .filter((caseItem) => caseItem.status === "Active")
-            .map((caseItem) => (
+
+        {loadingCases ? (
+          <p>Loading active cases...</p> // Show loading state while fetching cases
+        ) : activeCases.length > 0 ? (
+          <ul className="space-y-2">
+            {activeCases.map((caseItem) => (
               <li key={caseItem.id} className="p-3 border rounded-lg flex justify-between items-center">
                 <span>{caseItem.title}</span>
-                <button onClick={() => handleViewDetails(caseItem)} className="bg-red-600 text-white px-4 py-1 rounded-lg">
+                <button
+                  onClick={() => handleViewDetails(caseItem)}
+                  className="bg-red-600 text-white px-4 py-1 rounded-lg"
+                >
                   View Details
                 </button>
               </li>
             ))}
-        </ul>
+          </ul>
+        ) : (
+          <p>No active cases found.</p> // Handle empty state if no active cases exist
+        )}
       </div>
 
       {/* Chart */}
@@ -202,43 +295,55 @@ const DisciplinaryDashboard = () => {
       </div>
 
       <Dialog open={isCaseDetailsModalOpen} onClose={() => setIsCaseDetailsModalOpen(false)} className="relative z-10">
-        <div className="fixed inset-0  bg-opacity-30 backdrop-blur-sm"></div>
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md relative">
-            {/* Close Button */}
-            <button
-              onClick={() => setIsCaseDetailsModalOpen(false)}
-              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 focus:outline-none"
-            >
-              ✖
-            </button>
+  <div className="fixed inset-0 bg-opacity-30 backdrop-blur-sm"></div>
+  <div className="fixed inset-0 flex items-center justify-center p-4">
+    <Dialog.Panel className="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md relative">
+      {/* Close Button */}
+      <button
+        onClick={() => setIsCaseDetailsModalOpen(false)}
+        className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 focus:outline-none"
+      >
+        ✖
+      </button>
 
-            <Dialog.Title className="text-2xl font-semibold mb-4">{selectedCase?.title}</Dialog.Title>
+      {/* Title */}
+      <Dialog.Title className="text-2xl font-semibold mb-4">{selectedCase?.title}</Dialog.Title>
 
-            {/* Employee Name */}
-            <p className="text-sm text-gray-600 mb-2">
-              <strong>Employee:</strong> {selectedCase?.employee}
-            </p>
+      {/* Employee Name */}
+      <p className="text-sm text-gray-600 mb-2">
+        <strong>Employee:</strong> {selectedCase?.employee?.fullName || "Employee name not available"}
+      </p>
 
-            <p className="mt-2 text-gray-700">{selectedCase?.description}</p>
+      {/* Description */}
+      <p className="mt-2 text-gray-700">{selectedCase?.description}</p>
 
-            <img
-              src={selectedCase?.evidence}
-              alt="Evidence"
-              className="w-full h-48 object-cover mt-4 rounded-lg border"
-            />
+      {/* Evidence Image */}
+      {selectedCase?.evidence ? (
+        <img
+          src={`http://localhost:5000${selectedCase?.evidence}`} // Use the saved image path
+          alt="Evidence"
+          className="w-full h-48 object-cover mt-4 rounded-lg border"
+        />
+      ) : (
+        <p className="text-gray-500 mt-4">No evidence image provided</p>
+      )}
 
-            {selectedCase?.status === "Active" && (
-              <div className="flex space-x-4 mt-4">
-                <button onClick={handleResolve} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-                  Resolve
-                </button>
-                <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Approve</button>
-              </div>
-            )}
-          </Dialog.Panel>
+      {/* Action Buttons */}
+      {selectedCase?.status === "Active" && (
+        <div className="flex space-x-4 mt-4">
+          <button
+            onClick={handleResolve}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+          >
+            Resolve
+          </button>
+          <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Approve</button>
         </div>
-      </Dialog>
+      )}
+    </Dialog.Panel>
+  </div>
+</Dialog>
+
 
 
 
@@ -287,9 +392,9 @@ const DisciplinaryDashboard = () => {
                 required
               >
                 <option value="">Select Employee</option>
-                {employeeList.map((emp) => (
-                  <option key={emp.id} value={emp.name}>
-                    {emp.name}
+                {employees.map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.fullName}
                   </option>
                 ))}
               </select>

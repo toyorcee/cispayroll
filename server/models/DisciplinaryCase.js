@@ -10,7 +10,7 @@ const disciplinaryCaseSchema = new mongoose.Schema({
     required: true,
   },
   employee: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId, ref: "User", required: true,
     required: true,
   },
   evidence: {

@@ -187,6 +187,7 @@ export class SuperAdminController {
       const limit = parseInt(req.query.limit) || 10;
       const search = req.query.search;
       const status = req.query.status;
+      const role = req.query.role;
       const departmentName = req.query.department;
 
       // Base query - now includes all roles
