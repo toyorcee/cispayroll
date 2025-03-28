@@ -10,7 +10,7 @@ import { Permission } from "../../../types/auth";
 import { useAuth } from "../../../context/AuthContext";
 import NewSalaryGrade from "../../../components/modals/NewSalaryGrade";
 import { toast } from "react-toastify";
-import EditSalaryGrade from "../../../components/modals/EditSalaryGrade";
+// import EditSalaryGrade from "../../../components/modals/EditSalaryGrade";
 import ViewSalaryGrade from "../../../components/modals/ViewSalaryGrade";
 import { ConfirmationModal } from "../../../components/modals/ConfirmationModal";
 
@@ -22,7 +22,7 @@ export default function SalaryStructure() {
   const [error, setError] = useState<string | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
   // const [setIsModalOpen] = useState(false);
-  const [editingGrade, setEditingGrade] = useState<ISalaryGrade | null>(null);
+  // const [setEditingGrade] = useState<ISalaryGrade | null>(null);
   const [viewingGradeId, setViewingGradeId] = useState<string | null>(null);
   const [deleteGradeId, setDeleteGradeId] = useState<string | null>(null);
 
@@ -276,7 +276,7 @@ export default function SalaryStructure() {
                                     deptId: freshGrade.department?._id,
                                     deptName: freshGrade.department?.name,
                                   });
-                                  setEditingGrade(freshGrade);
+                                  // setEditingGrade(freshGrade);
                                 });
                             }}
                             className="text-xs md:text-sm px-2 py-1 bg-blue-100 text-blue-700 rounded-lg 
@@ -319,9 +319,9 @@ export default function SalaryStructure() {
         // onSuccess={handleSalaryGradeCreated}
       />
 
-      {editingGrade && (
+      {/* {editingGrade && (
         <EditSalaryGrade
-          isOpen={!!editingGrade}
+          // isOpen={!!editingGrade}
           onClose={() => setEditingGrade(null)}
           onSuccess={() => {
             fetchSalaryGrades();
@@ -329,7 +329,7 @@ export default function SalaryStructure() {
           }}
           grade={editingGrade}
         />
-      )}
+      )} */}
 
       {viewingGradeId && (
         <ViewSalaryGrade
