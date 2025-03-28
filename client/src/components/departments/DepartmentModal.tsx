@@ -21,8 +21,8 @@ export const DepartmentModal = ({
   onDelete,
   departments,
   admins,
-  isLoading,
-}: DepartmentModalProps) => {
+}: // isLoading,
+DepartmentModalProps) => {
   const [formData, setFormData] = useState<DepartmentFormData>({
     name: "",
     code: "",

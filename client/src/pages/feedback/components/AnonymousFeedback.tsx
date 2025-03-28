@@ -12,7 +12,7 @@ const categories = [
   "Technology",
   "Team Dynamics",
   "Professional Development",
-  "Other"
+  "Other",
 ];
 
 // Define interfaces
@@ -36,7 +36,7 @@ const AnonymousFeedback = () => {
     title: "",
     category: "",
     description: "",
-    recipientDepartment: ""
+    recipientDepartment: "",
   });
 
   useEffect(() => {
@@ -52,7 +52,7 @@ const AnonymousFeedback = () => {
             { _id: "it", name: "IT Department" },
             { _id: "operations", name: "Operations" },
             { _id: "finance", name: "Finance" },
-            { _id: "management", name: "Management" }
+            { _id: "management", name: "Management" },
           ]);
         }
       } catch (error) {
@@ -63,7 +63,7 @@ const AnonymousFeedback = () => {
           { _id: "it", name: "IT Department" },
           { _id: "operations", name: "Operations" },
           { _id: "finance", name: "Finance" },
-          { _id: "management", name: "Management" }
+          { _id: "management", name: "Management" },
         ]);
       }
     };
@@ -71,9 +71,13 @@ const AnonymousFeedback = () => {
     fetchDepartments();
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -88,14 +92,14 @@ const AnonymousFeedback = () => {
       await axios.post("/api/feedback/anonymous", formData);
       setSuccess(true);
       toast.success("Anonymous feedback submitted successfully!");
-      
+
       // Reset form after short delay to show success state
       setTimeout(() => {
         setFormData({
           title: "",
           category: "",
           description: "",
-          recipientDepartment: ""
+          recipientDepartment: "",
         });
         setSuccess(false);
       }, 2000);
@@ -121,8 +125,8 @@ const AnonymousFeedback = () => {
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Thank You!</h2>
           <p className="text-gray-600 mb-6">
-            Your anonymous feedback has been submitted successfully.
-            Your identity remains completely confidential.
+            Your anonymous feedback has been submitted successfully. Your
+            identity remains completely confidential.
           </p>
           <button
             onClick={() => setSuccess(false)}
@@ -148,14 +152,18 @@ const AnonymousFeedback = () => {
           <div className="flex items-center gap-3 bg-purple-50 border-l-4 border-purple-500 p-4 m-6 rounded-r-lg">
             <EyeOff className="text-purple-600 flex-shrink-0" size={20} />
             <p className="text-sm text-purple-700">
-              <strong>Your privacy is protected:</strong> This feedback will be completely anonymous. 
-              Your identity will not be recorded or tracked in any way.
+              <strong>Your privacy is protected:</strong> This feedback will be
+              completely anonymous. Your identity will not be recorded or
+              tracked in any way.
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="title">
+              <label
+                className="block text-sm font-medium text-gray-700 mb-1"
+                htmlFor="title"
+              >
                 Title <span className="text-red-500">*</span>
               </label>
               <input
@@ -171,7 +179,10 @@ const AnonymousFeedback = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="category">
+              <label
+                className="block text-sm font-medium text-gray-700 mb-1"
+                htmlFor="category"
+              >
                 Category <span className="text-red-500">*</span>
               </label>
               <select
@@ -182,15 +193,22 @@ const AnonymousFeedback = () => {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                 required
               >
-                <option value="" disabled>Select a category</option>
-                {categories.map(category => (
-                  <option key={category} value={category}>{category}</option>
+                <option value="" disabled>
+                  Select a category
+                </option>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="recipientDepartment">
+              <label
+                className="block text-sm font-medium text-gray-700 mb-1"
+                htmlFor="recipientDepartment"
+              >
                 Recipient Department
               </label>
               <select
@@ -201,14 +219,19 @@ const AnonymousFeedback = () => {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
               >
                 <option value="">Select a department (optional)</option>
-                {departments.map(dept => (
-                  <option key={dept._id} value={dept._id}>{dept.name}</option>
+                {departments.map((dept) => (
+                  <option key={dept._id} value={dept._id}>
+                    {dept.name}
+                  </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="description">
+              <label
+                className="block text-sm font-medium text-gray-700 mb-1"
+                htmlFor="description"
+              >
                 Description <span className="text-red-500">*</span>
               </label>
               <textarea
@@ -249,4 +272,4 @@ const AnonymousFeedback = () => {
   );
 };
 
-export default AnonymousFeedback; 
+export default AnonymousFeedback;
