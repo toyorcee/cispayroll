@@ -71,8 +71,6 @@ export default function NewSalaryGrade({
     register,
     handleSubmit,
     reset,
-    watch,
-    setValue,
     formState: { errors, isSubmitting },
   } = useForm<SalaryGradeFormData>({
     resolver: zodResolver(salaryGradeSchema),
@@ -90,8 +88,6 @@ export default function NewSalaryGrade({
   const [departments, setDepartments] = useState<DepartmentBasic[]>([]);
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
 
-  // Watch the departmentId value
-  const selectedDepartmentWatch = watch("departmentId");
 
   // Update the department change handler
   const handleDeptChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -156,7 +152,7 @@ export default function NewSalaryGrade({
   const handleComponentChange = (
     index: number,
     field: keyof ISalaryComponentInput,
-    value: any
+    value: string | number | boolean
   ) => {
     const newComponents = [...components];
     newComponents[index] = {
@@ -207,12 +203,13 @@ export default function NewSalaryGrade({
       reset();
       setComponents([defaultComponent]);
       onSuccess();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Submission error:", error);
-      toast.error(
-        error.response?.data?.message ||
-          "Failed to create salary grade. Please try again."
-      );
+      if (error instanceof Error && (error as any).response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else {
+        toast.error("Failed to create salary grade. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }

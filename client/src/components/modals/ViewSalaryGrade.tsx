@@ -4,13 +4,11 @@ import { BaseModal } from "../shared/BaseModal";
 import { salaryStructureService } from "../../services/salaryStructureService";
 import { ISalaryGrade } from "../../types/salary";
 import {
-  FaBuilding,
   FaMoneyBill,
   FaPercentage,
   FaChartLine,
   FaCalendarAlt,
   FaUserEdit,
-  FaTimes,
 } from "react-icons/fa";
 import moment from "moment";
 
@@ -136,7 +134,7 @@ export default function ViewSalaryGrade({
                       <div>
                         <p className="text-sm text-gray-500">Type</p>
                         <div className="flex items-center gap-1 h-[24px] text-center align-center justify-center">
-                          {component.type === "percentage" ? (
+                          {component.type === ComponentType.Percentage ? (
                             <>
                               <FaPercentage
                                 className="!text-blue-600 shrink-0"
@@ -162,7 +160,7 @@ export default function ViewSalaryGrade({
                       <div>
                         <p className="text-sm text-gray-500">Value</p>
                         <p className="font-medium text-gray-900">
-                          {component.type === "percentage"
+                          {component.type === ComponentType.Percentage
                             ? `${component.value}%`
                             : `₦${component.value.toLocaleString()}`}
                         </p>

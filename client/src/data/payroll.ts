@@ -3,7 +3,6 @@ import { Employee } from "../types/employee";
 import { employees } from "./employees";
 import { Allowance, Deduction } from "../types/common";
 
-// Define the interfaces used in this file
 interface PayrollEntry {
   id: string;
   periodId: string;
@@ -73,7 +72,7 @@ const calculateDeductions = (employee: Employee): number =>
 const findDeductionAmount = (employee: Employee, type: string): number => 
   employee.salary.deductions.find(d => d.type === type)?.amount || 0;
 
-export const currentPayrollEntries: PayrollEntry[] = employees.map(employee => ({
+export const currentPayrollEntries: PayrollEntry[] = employees.map((employee: Employee): PayrollEntry => ({
   id: `PE-${employee.employeeId}-2024-03`,
   periodId: "PAY-2024-03",
   employeeId: employee.employeeId,
@@ -160,21 +159,32 @@ export const paymentBatches: PaymentBatch[] = [
   }
 ];
 
+interface DepartmentBreakdown {
+  employees: number;
+  totalCost: number;
+}
+
+interface ComplianceStatus {
+  payeSubmitted: boolean;
+  pensionRemitted: boolean;
+  nhfRemitted: boolean;
+}
+
 export const payrollSummaries: PayrollSummary[] = [
   {
     periodId: "PAY-2024-03",
     totalEmployees: employees.length,
-    totalBasicSalary: currentPayrollEntries.reduce((sum, entry) => sum + entry.basicSalary, 0),
-    totalAllowances: currentPayrollEntries.reduce((sum, entry) => sum + entry.grossAllowances, 0),
-    totalDeductions: currentPayrollEntries.reduce((sum, entry) => sum + entry.grossDeductions, 0),
-    totalNetSalary: currentPayrollEntries.reduce((sum, entry) => sum + entry.netSalary, 0),
-    totalTax: currentPayrollEntries.reduce((sum, entry) => sum + entry.tax, 0),
-    totalPension: currentPayrollEntries.reduce((sum, entry) => sum + entry.pension, 0),
-    totalNHF: currentPayrollEntries.reduce((sum, entry) => sum + entry.nhf, 0),
+    totalBasicSalary: currentPayrollEntries.reduce((sum: number, entry: PayrollEntry) => sum + entry.basicSalary, 0),
+    totalAllowances: currentPayrollEntries.reduce((sum: number, entry: PayrollEntry) => sum + entry.grossAllowances, 0),
+    totalDeductions: currentPayrollEntries.reduce((sum: number, entry: PayrollEntry) => sum + entry.grossDeductions, 0),
+    totalNetSalary: currentPayrollEntries.reduce((sum: number, entry: PayrollEntry) => sum + entry.netSalary, 0),
+    totalTax: currentPayrollEntries.reduce((sum: number, entry: PayrollEntry) => sum + entry.tax, 0),
+    totalPension: currentPayrollEntries.reduce((sum: number, entry: PayrollEntry) => sum + entry.pension, 0),
+    totalNHF: currentPayrollEntries.reduce((sum: number, entry: PayrollEntry) => sum + entry.nhf, 0),
     totalOvertime: 0,
     totalBonuses: 0,
     totalArrears: 0,
-    departmentBreakdown: employees.reduce((acc, emp) => {
+    departmentBreakdown: employees.reduce((acc: Record<string, DepartmentBreakdown>, emp: Employee) => {
       const dept = emp.department;
       if (!acc[dept]) {
         acc[dept] = { employees: 0, totalCost: 0 };
@@ -182,11 +192,11 @@ export const payrollSummaries: PayrollSummary[] = [
       acc[dept].employees += 1;
       acc[dept].totalCost += emp.salary.basic + calculateAllowances(emp);
       return acc;
-    }, {} as Record<string, { employees: number; totalCost: number }>),
+    }, {} as Record<string, DepartmentBreakdown>),
     complianceStatus: {
       payeSubmitted: false,
       pensionRemitted: false,
       nhfRemitted: false
-    }
+    } as ComplianceStatus
   }
 ];

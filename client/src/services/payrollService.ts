@@ -12,7 +12,7 @@ import type {
  
 } from "../types/payroll";
 
-const BASE_URL = "/api/super-admin";
+const BASE_URL = "http://localhost:5000/api/super-admin";
 
 export interface PayrollCounts {
   PENDING: number;

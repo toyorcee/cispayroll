@@ -8,7 +8,7 @@ import {
   // ComponentType, // Add this import
 } from "../types/salary";
 
-const BASE_URL = import.meta.env.VITE_API_URL;
+const BASE_URL = "http://localhost:5000/api";
 
 // Set default axios config
 axios.defaults.withCredentials = true;
