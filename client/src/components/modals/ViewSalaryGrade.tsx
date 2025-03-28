@@ -71,12 +71,10 @@ export default function ViewSalaryGrade({
           <div className="space-y-4">
             {/* Header */}
             <div className="border-b pb-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <FaMoneyBill className="!text-green-600" />
-                  Grade Level {grade.level}
-                </h2>
-              </div>
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <FaMoneyBill className="!text-green-600" />
+                Grade Level {grade.level}
+              </h2>
               <p className="text-sm text-gray-500 mt-1">
                 {grade.department?.name || "Global Grade Structure"}
               </p>
@@ -84,24 +82,25 @@ export default function ViewSalaryGrade({
 
             {/* Salary Summary Cards */}
             <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
-                <p className="text-sm text-gray-500 mb-1">Basic Salary</p>
-                <p className="text-lg font-semibold text-gray-900">
-                  ₦{basicSalary.toLocaleString()}
-                </p>
-              </div>
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                <p className="text-sm text-gray-500 mb-1">Total Allowances</p>
-                <p className="text-lg font-semibold !text-blue-600">
-                  ₦{totalAllowances.toLocaleString()}
-                </p>
-              </div>
-              <div className="p-3 bg-green-50 rounded-lg border border-green-100">
-                <p className="text-sm text-gray-500 mb-1">Gross Salary</p>
-                <p className="text-lg font-semibold !text-green-600">
-                  ₦{grossSalary.toLocaleString()}
-                </p>
-              </div>
+              {[
+                { label: "Basic Salary", value: basicSalary, bg: "gray" },
+                {
+                  label: "Total Allowances",
+                  value: totalAllowances,
+                  bg: "blue",
+                },
+                { label: "Gross Salary", value: grossSalary, bg: "green" },
+              ].map(({ label, value, bg }) => (
+                <div
+                  key={label}
+                  className={`p-3 bg-${bg}-50 rounded-lg border border-${bg}-100`}
+                >
+                  <p className="text-sm text-gray-500 mb-1">{label}</p>
+                  <p className={`text-lg font-semibold !text-${bg}-600`}>
+                    ₦{value.toLocaleString()}
+                  </p>
+                </div>
+              ))}
             </div>
 
             {/* Description */}
@@ -133,34 +132,29 @@ export default function ViewSalaryGrade({
                       </div>
                       <div>
                         <p className="text-sm text-gray-500">Type</p>
-                        <div className="flex items-center gap-1 h-[24px] text-center align-center justify-center">
-                          {component.type === ComponentType.Percentage ? (
-                            <>
-                              <FaPercentage
-                                className="!text-blue-600 shrink-0"
-                                size={16}
-                              />
-                              <span className="font-medium text-gray-900">
-                                Percentage
-                              </span>
-                            </>
+                        <div className="flex items-center gap-1 h-[24px] justify-center">
+                          {component.calculationMethod === "percentage" ? (
+                            <FaPercentage
+                              className="!text-blue-600"
+                              size={16}
+                            />
                           ) : (
-                            <>
-                              <FaMoneyBill
-                                className="!text-green-600 shrink-0"
-                                size={16}
-                              />
-                              <span className="font-medium text-gray-900">
-                                Fixed
-                              </span>
-                            </>
+                            <FaMoneyBill
+                              className="!text-green-600"
+                              size={16}
+                            />
                           )}
+                          <span className="font-medium text-gray-900">
+                            {component.calculationMethod === "percentage"
+                              ? "Percentage"
+                              : "Fixed"}
+                          </span>
                         </div>
                       </div>
                       <div>
                         <p className="text-sm text-gray-500">Value</p>
                         <p className="font-medium text-gray-900">
-                          {component.type === ComponentType.Percentage
+                          {component.calculationMethod === "percentage"
                             ? `${component.value}%`
                             : `₦${component.value.toLocaleString()}`}
                         </p>
