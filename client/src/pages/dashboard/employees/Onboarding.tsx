@@ -312,10 +312,7 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
     }
   };
 
-  const handlePageChange = (
-    event: React.ChangeEvent<unknown>,
-    value: number
-  ) => {
+  const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
     setPage(value);
   };
 
@@ -634,7 +631,7 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
             <Pagination
               count={Math.ceil(getFilteredEmployees().length / itemsPerPage)}
               page={page}
-              onChange={handlePageChange}
+              onChange={(event, page) => handlePageChange(event, page)}
               color="primary"
               size="large"
             />

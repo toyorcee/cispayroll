@@ -3,19 +3,14 @@ import { IconType } from "react-icons";
 
 interface ActivityItemProps {
   activity: {
-    id: number;
-    type: string;
     action: string;
     time: string;
-    icon: IconType;
-    description?: string; 
     name?: string;
     department?: string;
-    status?: string;
     details?: string;
-    period?: string;
-    duration?: string;
-    count?: string;
+    status?: string;
+    description?: string;
+    icon: IconType;
   };
   index: number;
 }
@@ -59,6 +54,9 @@ const ActivityItem = ({ activity, index }: ActivityItemProps) => {
         )}
         {activity.details && (
           <p className="text-sm text-gray-500 mt-1">{activity.details}</p>
+        )}
+        {activity.description && (
+          <p className="text-sm text-gray-500 mt-1">{activity.description}</p>
         )}
         {activity.status && (
           <span

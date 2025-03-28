@@ -55,6 +55,7 @@ export const mockPayslips: Payslip[] = [
     ],
     netPay: 218000,
     status: "pending",
+    paymentDate: null, // or provide a valid Date object
     createdAt: new Date("2024-03-24"),
   },
   {

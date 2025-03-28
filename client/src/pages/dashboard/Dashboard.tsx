@@ -78,8 +78,8 @@ export default function Dashboard() {
             type: activityItem.type || "Unknown",
             action: activityItem.action || "No action specified",
             time: activityItem.time || new Date().toISOString(),
-            icon: (activityItem.icon as IconType) || (() => null), // Ensure icon is of type IconType
-            description: activityItem.description || "No description available",
+            icon: (activityItem.icon as IconType) || (() => null), 
+            description: "No description available",
           })
         );
 

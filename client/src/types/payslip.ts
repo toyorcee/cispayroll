@@ -1,7 +1,7 @@
 export interface Payslip {
   id: string;
   employeeId: string;
-  month: number;
+  month: string;
   year: number;
   basicSalary: number;
   allowances: Array<{
@@ -14,6 +14,6 @@ export interface Payslip {
   }>;
   netPay: number;
   status: "pending" | "processed" | "paid";
-  paymentDate: Date;
+  paymentDate: Date | null;
   createdAt: Date;
 }

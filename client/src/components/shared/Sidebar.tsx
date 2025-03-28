@@ -15,14 +15,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { FaTimes } from "react-icons/fa";
 import { ProfileMenu } from "./ProfileMenu";
 import { useAuth } from "../../context/AuthContext";
-import { UserRole, Permission } from "../../types/auth";
+import { UserRole } from "../../types/auth";
 import { menuItems } from "../../context/NavigationContext";
 import {
   NavigationItem,
   NavigationSubItem,
   IconType,
 } from "../../types/navigation";
-import { FaUsers, FaUserPlus, FaUserMinus } from "react-icons/fa";
+// import { FaUsers, FaUserPlus, FaUserMinus } from "react-icons/fa";
 import { FaGavel } from "react-icons/fa6";
 
 // Updated icon mapping to include all sections
@@ -40,7 +40,7 @@ const iconMap: Record<string, IconType> = {
 };
 
 export function Sidebar() {
-  const { hasPermission, hasRole, user } = useAuth();
+  const { hasPermission, hasRole } = useAuth();
   const location = useLocation();
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
   const { setActiveMenuText, isSidebarOpen, setIsSidebarOpen } =
@@ -122,54 +122,9 @@ export function Sidebar() {
   };
 
   // Updated employee items with proper permission checks
-  const employeeItems = [
-    {
-      name: "All Employees",
-      path: "/dashboard/employees/list",
-      icon: FaUsers,
-      permissions: [Permission.VIEW_ALL_USERS],
-    },
-    {
-      name: "Onboarding",
-      path: "/dashboard/employees/onboarding",
-      icon: FaUserPlus,
-      permissions: [Permission.MANAGE_ONBOARDING],
-      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    },
-    {
-      name: "Offboarding",
-      path: "/dashboard/employees/offboarding",
-      icon: FaUserMinus,
-      permissions: [Permission.MANAGE_OFFBOARDING],
-      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    },
-    {
-      name: "Leave Management",
-      path: "/dashboard/employees/leave",
-      icon: DocumentTextIcon,
-      permissions: [Permission.APPROVE_LEAVE, Permission.VIEW_TEAM_LEAVE],
-      roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    },
-  ];
+  // Removed unused employeeItems to resolve the error
 
-  const filteredEmployeeItems = employeeItems.filter((item) => {
-    // Super Admin sees everything
-    if (hasRole(UserRole.SUPER_ADMIN)) {
-      return true;
-    }
-
-    // Check roles
-    if (item.roles && !item.roles.some((role) => hasRole(role))) {
-      return false;
-    }
-
-    // Check permissions
-    if (item.permissions) {
-      return item.permissions.some((permission) => hasPermission(permission));
-    }
-
-    return true;
-  });
+  // Removed unused filteredEmployeeItems to resolve the error
 
   // const payrollItems = [
   //   {

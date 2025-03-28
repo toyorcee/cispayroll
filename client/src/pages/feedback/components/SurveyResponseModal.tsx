@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, AlertCircle } from "lucide-react";
+import { X } from "lucide-react";
 
 interface SurveyQuestion {
   _id: string;

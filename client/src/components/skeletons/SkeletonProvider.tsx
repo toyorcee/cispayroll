@@ -2,7 +2,7 @@ import React, { createContext, useContext, ReactNode } from "react";
 import { AuthSkeleton } from "./AuthSkeleton";
 import ContentSkeleton from "./ContentSkeleton";
 import SidebarSkeleton from "./SidebarSkeleton";
-import { SkeletonCircle, SkeletonText, SkeletonBox } from "./BaseSkeleton";
+import { SkeletonCircle} from "./BaseSkeleton";
 
 interface SkeletonContextType {
   getSkeleton: (type: "content" | "auth") => React.ReactElement;

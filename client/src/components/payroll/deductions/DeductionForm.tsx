@@ -36,13 +36,13 @@ export const DeductionForm = ({
   const [showTaxBrackets, setShowTaxBrackets] = useState(
     deduction?.calculationMethod === CalculationMethod.PROGRESSIVE
   );
-  const [calculationMethod, setCalculationMethod] = useState(
+  const [calculationMethod] = useState(
     deduction?.calculationMethod || CalculationMethod.FIXED
   );
 
   const {
     register,
-    handleSubmit,
+    // handleSubmit,
     formState: { errors },
     watch,
     setValue,
@@ -75,15 +75,6 @@ export const DeductionForm = ({
     setValue("taxBrackets", newBrackets);
   };
 
-  const formatValue = (value: number) => {
-    if (calculationMethod === CalculationMethod.FIXED) {
-      return new Intl.NumberFormat("en-NG", {
-        style: "currency",
-        currency: "NGN",
-      }).format(value);
-    }
-    return `${value}%`;
-  };
 
   const handleSubmitForm = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

@@ -9,8 +9,6 @@ import {
   CurrencyDollarIcon,
   DocumentTextIcon,
   CogIcon,
-  ArrowRightOnRectangleIcon,
-  UserPlusIcon,
 } from "@heroicons/react/24/outline";
 import { FaGavel } from "react-icons/fa6";
 

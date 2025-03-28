@@ -1,4 +1,4 @@
-import { BaseSkeleton, SkeletonCircle, SkeletonText } from "./BaseSkeleton";
+import { SkeletonCircle, SkeletonText } from "./BaseSkeleton";
 
 export default function SidebarSkeleton() {
   return (

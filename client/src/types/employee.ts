@@ -142,17 +142,19 @@ export interface OnboardingEmployee {
   employeeId: string;
   firstName: string;
   lastName: string;
-  email: string;
-  phone: string;
   position: string;
   department: string;
-  gradeLevel: string;
-  workLocation: string;
-  progress: number;
   startDate: string;
-  supervisor: string;
   status: string;
-  tasks: Task[];
+  progress: number;
+  supervisor: string;
+  tasks: OnboardingTask[];
+  documents: {
+    contractSigned: boolean;
+    idSubmitted: boolean;
+    bankDetailsProvided: boolean;
+    taxInfoSubmitted: boolean;
+  };
 }
 
 export type OffboardingStatus = "pending_exit" | "in_progress" | "completed";
