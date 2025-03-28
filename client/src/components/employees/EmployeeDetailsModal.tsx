@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog } from "@headlessui/react";
 import { EmployeeDetails } from "../../types/employee";
-import { FaTimes, FaLinkedin, FaTwitter, FaFileAlt } from "react-icons/fa";
+import { FaTimes} from "react-icons/fa";
 
 interface EmployeeDetailsModalProps {
   employee: EmployeeDetails | null;

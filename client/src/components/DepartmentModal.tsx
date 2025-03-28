@@ -12,20 +12,11 @@ import {
 import { Department, DepartmentFormData } from "../types/department";
 import { UserRole, Permission } from "../types/auth";
 
-// Define a specific type for the admin data we need
-interface AdminSelectOption {
-  _id: string;
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-}
 
 interface DepartmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (department: DepartmentFormData) => Promise<void>;
-  onDelete?: (id: string) => Promise<void>;
   departments?: Department[];
   isLoading: boolean;
   admins: Array<{
@@ -50,8 +41,6 @@ const DepartmentModal: React.FC<DepartmentModalProps> = ({
   isOpen,
   onClose,
   onSave,
-  onDelete,
-  departments = [],
   isLoading: isSubmitting,
   admins = [],
 }) => {

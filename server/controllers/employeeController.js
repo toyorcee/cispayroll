@@ -5,16 +5,23 @@ import UserModel from "../models/User.js";
 import PayrollModel from "../models/Payroll.js";
 import LeaveModel from "../models/Leave.js";
 import { LEAVE_STATUS } from "../models/Leave.js";
+import { v4 as uuidv4 } from "uuid";
 import { UserRole } from "../models/User.js";
+import { EmailService } from "../services/emailService.js";
 
 export class EmployeeController {
   // Admin/Super Admin creating an employee
   static async createEmployee(req, res, next) {
     try {
+      console.log("Request body:", req.body); // Log the incoming request body
+
       const { role = UserRole.USER, ...employeeData } = req.body;
 
       // Validate role creation permissions
       if (role === UserRole.ADMIN && req.user.role !== UserRole.SUPER_ADMIN) {
+        console.log(
+          "Permission denied: Only super admins can create admin accounts"
+        );
         throw new ApiError(403, "Only super admins can create admin accounts");
       }
 
@@ -25,28 +32,105 @@ export class EmployeeController {
           ? new Types.ObjectId(req.user.department)
           : undefined,
       };
+      console.log("Creator details:", creator); // Log the creator details
 
-      // Pass the role to the service
-      const { employee, invitationToken } =
-        await EmployeeService.createEmployee(
-          { ...employeeData, role },
-          creator
-        );
+      // Generate employee ID with dynamic prefix
+      const today = new Date();
+      const day = today.getDate().toString().padStart(2, "0");
+      const month = (today.getMonth() + 1).toString().padStart(2, "0");
 
-      // Customize message based on role
-      const message = `${
-        role === UserRole.ADMIN ? "Admin" : "Employee"
-      } created successfully. Invitation sent.`;
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const todayEmployeesCount = await UserModel.countDocuments({
+        createdAt: { $gte: startOfDay, $lte: endOfDay },
+      });
+      console.log("Today's employee count:", todayEmployeesCount); // Log the count of employees created today
+
+      const sequentialNumber = (todayEmployeesCount + 1)
+        .toString()
+        .padStart(3, "0");
+      const prefix = role === UserRole.ADMIN ? "ADM" : "EMP";
+      const employeeId = `${prefix}${day}${month}${sequentialNumber}`;
+      console.log("Generated employee ID:", employeeId); // Log the generated employee ID
+
+      // Generate invitation token
+      const invitationToken = uuidv4();
+      const invitationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Token expires in 7 days
+      console.log("Generated invitation token:", invitationToken); // Log the invitation token
+
+      const employee = new UserModel({
+        ...employeeData,
+        employeeId,
+        role,
+        status: "pending",
+        invitationToken,
+        invitationExpires,
+        createdBy: creator._id,
+      });
+      console.log("Employee data to be saved:", employee); // Log the employee data before saving
+
+      await employee.save();
+      console.log("Employee saved successfully"); // Log after saving the employee
+
+      // Send invitation email
+      console.log("Sending invitation email to:", employee.email); // Log the email being sent
+      await EmailService.sendInvitationEmail(employee.email, invitationToken);
+      console.log("Invitation email sent successfully"); // Log after sending the email
 
       res.status(201).json({
         success: true,
-        message,
+        message: `${
+          role === UserRole.ADMIN ? "Admin" : "Employee"
+        } created successfully. Invitation sent.`,
         employee,
       });
     } catch (error) {
+      console.error("Error in createEmployee:", error); // Log the error
       next(error);
     }
   }
+  // static async createEmployee(req, res, next) {
+  //   try {
+  //     const { role = UserRole.USER, ...employeeData } = req.body;
+
+  //     // Validate role creation permissions
+  //     if (role === UserRole.ADMIN && req.user.role !== UserRole.SUPER_ADMIN) {
+  //       throw new ApiError(403, "Only super admins can create admin accounts");
+  //     }
+
+  //     const creator = {
+  //       _id: new Types.ObjectId(req.user.id),
+  //       role: req.user.role,
+  //       department: req.user.department
+  //         ? new Types.ObjectId(req.user.department)
+  //         : undefined,
+  //     };
+
+  //     // Pass the role to the service
+  //     const { employee, invitationToken } =
+  //       await EmployeeService.createEmployee(
+  //         { ...employeeData, role },
+  //         creator
+  //       );
+
+  //     // Customize message based on role
+  //     const message = `${
+  //       role === UserRole.ADMIN ? "Admin" : "Employee"
+  //     } created successfully. Invitation sent.`;
+
+  //     res.status(201).json({
+  //       success: true,
+  //       message,
+  //       employee,
+  //     });
+  //   } catch (error) {
+  //     next(error);
+  //   }
+  // }
 
   // Employee viewing their own profile
   static async getOwnProfile(req, res, next) {

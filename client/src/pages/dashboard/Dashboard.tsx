@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { IconType } from "react-icons";
 import { motion, useInView } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
 import { UserRole } from "../../types/auth";
@@ -20,9 +21,31 @@ import PieChart from "../../components/charts/PieChart";
 export default function Dashboard() {
   const { user } = useAuth();
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<any[]>([]);
-  const [activities, setActivities] = useState<any[]>([]);
-  const [chartData, setChartData] = useState({
+  interface Stat {
+    name: string;
+    value: number;
+    icon?: string;
+  }
+
+  const [stats, setStats] = useState<Stat[]>([]);
+  interface Activity {
+    id: number;
+    type: string;
+    action: string;
+    time: string;
+    icon: IconType;
+    name?: string;
+    department?: string;
+    status?: string;
+    details?: string;
+    period?: string;
+    duration?: string;
+    count?: string;
+    description?: string;
+  }
+
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [chartData] = useState({
     payroll: payrollData,
     department: departmentData,
   });
@@ -40,8 +63,26 @@ export default function Dashboard() {
     const fetchDashboardData = async () => {
       try {
         setError(null);
-        const fetchedStats = getRoleStats(user?.role);
-        const fetchedActivities = getRoleActivities(user?.role);
+
+        // Fetch and process stats
+        const fetchedStats = getRoleStats(user?.role).map((stat) => ({
+          ...stat,
+          value: Number(stat.value),
+          icon: typeof stat.icon === "function" ? stat.icon.name : stat.icon,
+        }));
+
+        // Fetch and process activities
+        const fetchedActivities = getRoleActivities(user?.role).map(
+          (activityItem) => ({
+            id: activityItem.id,
+            type: activityItem.type || "Unknown",
+            action: activityItem.action || "No action specified",
+            time: activityItem.time || new Date().toISOString(),
+            icon: (activityItem.icon as IconType) || (() => null), // Ensure icon is of type IconType
+            description: activityItem.description || "No description available",
+          })
+        );
+
         setStats(fetchedStats);
         setActivities(fetchedActivities);
       } catch (err) {
@@ -107,7 +148,12 @@ export default function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
             >
-              <StatCard {...stat} />
+              <StatCard
+                {...stat}
+                icon={stat.icon as unknown as IconType}
+                subtext="Additional info here"
+                href="/default-link"
+              />
             </motion.div>
           ))}
         </div>
@@ -197,7 +243,7 @@ export default function Dashboard() {
               {activities.map((activity, index) => (
                 <ActivityItem
                   key={activity.id}
-                  activity={activity}
+                  activity={activity} 
                   index={index}
                 />
               ))}

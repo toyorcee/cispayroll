@@ -5,20 +5,15 @@ import {
   ISalaryComponent,
   ISalaryComponentInput,
   CreateSalaryGradeDTO,
+  ComponentType, // Add this import
 } from "../types/salary";
 
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = import.meta.env.VITE_API_URL;
 
 // Set default axios config
 axios.defaults.withCredentials = true;
 
 // Create a type for the create salary grade input
-interface CreateSalaryGradeInput {
-  level: string;
-  basicSalary: number;
-  description: string;
-  components: ISalaryComponentInput[];
-}
 
 interface UpdateSalaryGradeInput {
   level?: string;
@@ -35,11 +30,16 @@ export const salaryStructureService = {
         `${BASE_URL}/super-admin/salary-grades`
       );
       return response.data.data;
-    } catch (error: any) {
-      console.error("Failed to fetch salary grades:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to fetch salary grades"
-      );
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response) {
+        console.error("Failed to fetch salary grades:", error);
+        toast.error(
+          error.response.data?.message || "Failed to fetch salary grades"
+        );
+      } else {
+        console.error("An unexpected error occurred:", error);
+        toast.error("Failed to fetch salary grades");
+      }
       throw error;
     }
   },
@@ -70,7 +70,7 @@ export const salaryStructureService = {
       );
 
       return response.data.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Request failed:", error);
       throw error;
     }
@@ -87,11 +87,15 @@ export const salaryStructureService = {
         data
       );
       return response.data.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Update failed:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to update salary grade"
-      );
+      if (axios.isAxiosError(error) && error.response) {
+        toast.error(
+          error.response.data?.message || "Failed to update salary grade"
+        );
+      } else {
+        toast.error("Failed to update salary grade");
+      }
       throw error;
     }
   },
@@ -106,10 +110,14 @@ export const salaryStructureService = {
         component
       );
       return response.data.data;
-    } catch (error: any) {
-      toast.error(
-        error.response?.data?.message || "Failed to add salary component"
-      );
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response) {
+        toast.error(
+          error.response.data?.message || "Failed to add salary component"
+        );
+      } else {
+        toast.error("Failed to add salary component");
+      }
       throw error;
     }
   },
@@ -126,10 +134,14 @@ export const salaryStructureService = {
       );
       toast.success("Component updated successfully");
       return response.data.data;
-    } catch (error: any) {
-      toast.error(
-        error.response?.data?.message || "Failed to update component"
-      );
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response) {
+        toast.error(
+          error.response.data?.message || "Failed to update component"
+        );
+      } else {
+        toast.error("Failed to update component");
+      }
       throw error;
     }
   },
@@ -143,7 +155,7 @@ export const salaryStructureService = {
       console.log("💰 Processing component:", component);
       if (component.isActive) {
         const value =
-          component.type === "fixed"
+          component.type === "fixed" as ComponentType
             ? component.value
             : (basicSalary * component.value) / 100;
 
@@ -167,10 +179,14 @@ export const salaryStructureService = {
         `${BASE_URL}/super-admin/salary-grades/${id}`
       );
       return response.data.data;
-    } catch (error: any) {
-      toast.error(
-        error.response?.data?.message || "Failed to fetch salary grade"
-      );
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response) {
+        toast.error(
+          error.response.data?.message || "Failed to fetch salary grade"
+        );
+      } else {
+        toast.error("Failed to fetch salary grade");
+      }
       throw error;
     }
   },
@@ -179,10 +195,14 @@ export const salaryStructureService = {
     try {
       await axios.delete(`${BASE_URL}/super-admin/salary-grades/${id}`);
       toast.success("Salary grade deleted successfully");
-    } catch (error: any) {
-      toast.error(
-        error.response?.data?.message || "Failed to delete salary grade"
-      );
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response) {
+        toast.error(
+          error.response.data?.message || "Failed to delete salary grade"
+        );
+      } else {
+        toast.error("Failed to delete salary grade");
+      }
       throw error;
     }
   },

@@ -95,7 +95,6 @@ export default function SignUp() {
       await signUp(
         formData.firstName,
         formData.lastName,
-        formData.username,
         formData.email,
         formData.password
       );

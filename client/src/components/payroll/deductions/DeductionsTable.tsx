@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   FaEdit,
-  FaEye,
   FaToggleOn,
   FaToggleOff,
   FaInfoCircle,
@@ -9,7 +8,6 @@ import {
 } from "react-icons/fa";
 import {
   Deduction,
-  CalculationMethod,
   TaxBracket,
 } from "../../../types/deduction";
 import { TableSkeleton } from "./Skeletons";
@@ -82,20 +80,7 @@ const TaxBracketsModal = ({
   );
 };
 
-const formatValue = (
-  deduction: Deduction,
-  onViewBrackets: (brackets: TaxBracket[]) => void
-) => {
-  if (deduction.calculationMethod === CalculationMethod.PERCENTAGE) {
-    return `${deduction.value}%`;
-  } else if (deduction.calculationMethod === CalculationMethod.FIXED) {
-    return new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency: "NGN",
-    }).format(deduction.value);
-  }
-  return deduction.value;
-};
+// Removed unused formatValue function
 
 export const DeductionsTable = ({
   deductions,

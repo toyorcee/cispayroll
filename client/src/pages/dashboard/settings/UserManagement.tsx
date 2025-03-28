@@ -7,7 +7,7 @@ import axios from "axios";
 import { User, UserRole, Permission } from "../../../types/auth";
 import { toast } from "react-toastify";
 import { CircularProgress } from "@mui/material";
-import { roles, userStats } from "../../../data/settings";
+// import { roles, userStats } from "../../../data/settings";
 
 export default function UserManagement() {
   const { user: currentUser } = useAuth();
@@ -56,9 +56,11 @@ export default function UserManagement() {
       const response = await axios.get("/api/admin/users");
       console.log("Users API response:", response.data);
       setUsers(response.data.users);
-    } catch (error: any) {
-      console.error("Error fetching users:", error);
-      toast.error(error.response?.data?.message || "Failed to fetch users");
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        console.error("Error fetching users:", error);
+        toast.error(error.response?.data?.message || "Failed to fetch users");
+      }
     } finally {
       setLoading(false);
     }
@@ -87,22 +89,31 @@ export default function UserManagement() {
         status: "active",
       });
       fetchUsers();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to create user");
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to create user");
+      } else {
+        toast.error("An unexpected error occurred");
+      }
     }
   };
 
   const handleEditUser = async (userId: string) => {
     try {
       const response = await axios.put(`/api/admin/users/${userId}`, {
-        // updated user data
+        // Add updated user data here
       });
+      console.log("User updated:", response.data);
       toast.success("User updated successfully", {
         style: { backgroundColor: "#10B981", color: "white" },
       });
       fetchUsers();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to update user");
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to update user");
+      } else {
+        toast.error("An unexpected error occurred");
+      }
     }
   };
 
@@ -114,15 +125,19 @@ export default function UserManagement() {
           style: { backgroundColor: "#10B981", color: "white" },
         });
         fetchUsers();
-      } catch (error: any) {
-        toast.error(error.response?.data?.message || "Failed to delete user");
+      } catch (error: unknown) {
+        if (axios.isAxiosError(error)) {
+          toast.error(error.response?.data?.message || "Failed to delete user");
+        } else {
+          toast.error("An unexpected error occurred");
+        }
       }
     }
   };
 
   // Update the permission check
   const canManageUsers = currentUser?.permissions?.includes(
-    Permission.MANAGE_USERS
+    Permission.MANAGE_BONUSES
   );
 
   // Function to get default permissions based on role
@@ -130,10 +145,9 @@ export default function UserManagement() {
     switch (role) {
       case UserRole.ADMIN:
         return [
-          Permission.MANAGE_USERS,
-          Permission.MANAGE_PAYROLL,
+          Permission.MANAGE_BONUSES,
+          Permission.MANAGE_BONUSES,
           Permission.VIEW_REPORTS,
-          Permission.MANAGE_DEPARTMENTS,
           Permission.APPROVE_LEAVE,
           Permission.VIEW_PERSONAL_INFO,
         ];
@@ -363,7 +377,7 @@ export default function UserManagement() {
       )}
 
       {/* Stats Section */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-4 rounded-lg shadow">
           <h3 className="text-lg font-medium text-gray-900">Total Users</h3>
           <p className="text-2xl font-bold text-green-600">{userStats.total}</p>
@@ -380,7 +394,7 @@ export default function UserManagement() {
             {userStats.pending}
           </p>
         </div>
-      </div>
+      </div> */}
 
       {/* Users Table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
@@ -462,7 +476,7 @@ export default function UserManagement() {
       </div>
 
       {/* Role Management Section */}
-      <div className="bg-white shadow rounded-lg p-6">
+      {/* <div className="bg-white shadow rounded-lg p-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">
           Role Management
         </h2>
@@ -489,7 +503,7 @@ export default function UserManagement() {
             </div>
           ))}
         </div>
-      </div>
+      </div> */}
 
       {showAddUser && <AddUserForm />}
     </div>

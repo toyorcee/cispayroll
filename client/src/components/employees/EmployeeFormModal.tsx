@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { BaseModal } from "../shared/BaseModal";
 import { Employee } from "../../types/employee";
 import { Status } from "../../types/common";
-import { motion } from "framer-motion";
+// import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import { LoadingSpinner } from "../shared/LoadingSpinner";
 
@@ -63,7 +63,7 @@ export const EmployeeFormModal = ({
         { className: "bg-green-500 text-white" }
       );
       onClose();
-    } catch (error) {
+    } catch {
       toast.error("An error occurred. Please try again.");
     } finally {
       setLoading(false);
@@ -208,7 +208,7 @@ export const EmployeeFormModal = ({
                   <option value="">Select Department</option>
                   {departments.map((dept) => (
                     <option key={dept.id} value={dept.name}>
-                      {dept.name} ({dept.employeeCount || 0} employees)
+                      {dept.name}
                     </option>
                   ))}
                 </select>

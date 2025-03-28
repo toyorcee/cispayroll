@@ -10,7 +10,7 @@ import {
   DepartmentEmployee,
   DepartmentEmployeeResponse,
 } from "../../../types/employee";
-import { PayrollCalculationRequest } from "../../../types/payroll";
+// import { PayrollCalculationRequest } from "../../../types/payroll";
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -36,7 +36,7 @@ export const RunPayrollModal = ({
   const [showSuccess, setShowSuccess] = useState(false);
 
   // Add salary grade fetching
-  const { data: salaryGrades, isLoading: isLoadingSalaryGrades } = useQuery({
+  const { data: salaryGrades } = useQuery({
     queryKey: ["salaryGrades"],
     queryFn: () => payrollService.getSalaryGrades(),
   });
@@ -125,7 +125,7 @@ export const RunPayrollModal = ({
         return;
       }
 
-      const result = await payrollService.createPayroll({
+      await payrollService.createPayroll({
         month: payrollData.month,
         year: payrollData.year,
         employee: selectedEmployee,

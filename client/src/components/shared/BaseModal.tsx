@@ -9,6 +9,7 @@ interface BaseModalProps {
   children: React.ReactNode;
   maxWidth?: string;
   className?: string;
+  size?: "sm" | "md" | "lg" | "xl";
 }
 
 export const BaseModal: React.FC<BaseModalProps> = ({

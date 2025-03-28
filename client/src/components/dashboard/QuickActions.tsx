@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
-import { UserRole, Permission } from "../../types/auth";
+import { UserRole } from "../../types/auth";
 import { FaPlus, FaUserPlus, FaFileAlt, FaCalendarPlus } from "react-icons/fa";
-import { Link } from "react-router-dom";
 import { IconType } from "react-icons";
 
 interface Action {
@@ -14,13 +13,11 @@ interface Action {
 
 interface QuickActionsProps {
   role?: UserRole;
-  permissions?: Permission[];
   onAddAdmin: () => void;
 }
 
 const QuickActions = ({
   role,
-  permissions = [],
   onAddAdmin,
 }: QuickActionsProps) => {
   const actions: Record<UserRole, Action[]> = {

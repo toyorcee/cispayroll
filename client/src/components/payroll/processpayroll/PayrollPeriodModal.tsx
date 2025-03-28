@@ -12,13 +12,13 @@ import {
   TablePagination,
   CircularProgress,
 } from "@mui/material";
+import { FaFileInvoice, FaDownload, FaHistory, FaTrash } from "react-icons/fa";
 import {
-  FaFileInvoice,
-  FaDownload,
-  FaHistory,
-  FaTrash,
-} from "react-icons/fa";
-import { PayrollStatus, PeriodPayrollResponse } from "../../../types/payroll";
+  // PayrollFrequency,
+  PayrollStatus,
+  PeriodPayrollResponse,
+  PayrollData,
+} from "../../../types/payroll";
 import { generatePayslipPDF } from "../../../utils/pdfGenerator";
 import { toast } from "react-toastify";
 import { payrollService } from "../../../services/payrollService";
@@ -55,9 +55,11 @@ const getChipColor = (status: string) => {
   }
 };
 
-const mapPayslipDataToComponentFormat = (data: any) => {
+const mapPayslipDataToComponentFormat = (
+  data: PeriodPayrollResponse["employees"][number]
+): PayrollData => {
   return {
-    _id: data.payslipId,
+    _id: data.id,
     employee: {
       _id: data.employee.id,
       employeeId: data.employee.employeeId,
@@ -65,32 +67,74 @@ const mapPayslipDataToComponentFormat = (data: any) => {
       lastName: data.employee.name.split(" ")[1] || "",
       fullName: data.employee.name,
     },
-    salaryGrade: {
-      _id: "grade-id", 
-      level: data.employee.salaryGrade,
-      description: data.employee.department,
-    },
-    month: data.period.month,
-    year: data.period.year,
-    basicSalary: data.earnings.basicSalary,
-    earnings: {
-      overtime: data.earnings?.overtime || { hours: 0, rate: 0, amount: 0 },
-      bonus: [],
-      totalEarnings: data.earnings.totalEarnings,
-    },
-    deductions: data.deductions,
-    totals: data.summary,
-    payment: data.paymentDetails,
     allowances: {
-      gradeAllowances: data.earnings.allowances.gradeAllowances,
+      gradeAllowances: [],
       additionalAllowances: [],
-      totalAllowances: data.earnings.allowances.totalAllowances,
+      totalAllowances: data.payroll.totalAllowances,
     },
+    earnings: {
+      overtime: {
+        hours: 0,
+        rate: 0,
+        amount: 0,
+      },
+      bonus: [],
+      totalEarnings: data.payroll.basicSalary + data.payroll.totalAllowances,
+    },
+    deductions: {
+      tax: {
+        taxableAmount: 0,
+        taxRate: 0,
+        amount: 0,
+      },
+      pension: {
+        pensionableAmount: 0,
+        rate: 0,
+        amount: 0,
+      },
+      nhf: {
+        rate: 0,
+        amount: 0,
+      },
+      others: Array.isArray(data.payroll.deductions?.others)
+        ? data.payroll.deductions.others.map((item: { description: string; amount: number }) => ({
+            name: item.description || "Unknown",
+            amount: item.amount || 0,
+          }))
+        : [],
+      totalDeductions: data.payroll.totalDeductions,
+    },
+    totals: {
+      basicSalary: data.payroll.basicSalary,
+      totalAllowances: data.payroll.totalAllowances,
+      totalBonuses: 0,
+      grossEarnings: data.payroll.basicSalary + data.payroll.totalAllowances,
+      totalDeductions: data.payroll.totalDeductions,
+      netPay: data.payroll.netPay,
+    },
+    salaryGrade: {
+      level: data.salaryGrade.level,
+      description: data.salaryGrade.description,
+    },
+    basicSalary: data.payroll.basicSalary,
+    month: data.payroll.month,
+    year: data.payroll.year,
+    
     status: data.status,
     createdAt: data.processedAt,
-    frequency: "monthly", // Add default if not provided
-    periodStart: data.periodStart || new Date(),
-    periodEnd: data.periodEnd || new Date(),
+    periodStart: "",
+    periodEnd: "",
+    bonuses: {
+      items: [],
+      totalBonuses: 0,
+    },
+    approvalFlow: [],
+    processedBy: "",
+    payment: {
+      bankName: "",
+      accountName: "",
+      accountNumber: "",
+    },
   };
 };
 
@@ -141,16 +185,18 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
   isOpen,
   onClose,
   data,
-  onViewPayslip,
+  // onViewPayslip,
   onViewHistory,
   isLoading,
   onShowPeriodModal,
 }) => {
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(5);
-  const [payslipData, setPayslipData] = React.useState<any>(null);
+  // const [payslipData, setPayslipData] = React.useState<any>(null);
   const [showPayslip, setShowPayslip] = React.useState(false);
-  const [selectedPayslip, setSelectedPayslip] = React.useState<any>(null);
+  const [selectedPayslip, setSelectedPayslip] = React.useState<ReturnType<
+    typeof mapPayslipDataToComponentFormat
+  > | null>(null);
   const [loadingPayslipId, setLoadingPayslipId] = React.useState<string | null>(
     null
   );
@@ -347,142 +393,147 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
   return (
     <>
       {/* Period Modal */}
-      <BaseModal
-        isOpen={isOpen}
-        onClose={onClose}
-        title={
-          data
-            ? `Payroll Details - ${data.period.monthName} ${data.period.year}`
-            : "Loading Payroll Details..."
-        }
-        maxWidth="max-w-7xl"
-        className="z-[1000]"
-      >
-        {isLoading || !data ? (
-          <PeriodModalSkeleton />
-        ) : (
-          <div className="space-y-6">
-            {/* Summary Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm font-medium text-gray-700">
-                  Total Net Pay
-                </p>
-                <p className="text-xl font-semibold text-green-600">
-                  ₦{data.summary.totalNetPay.toLocaleString()}
-                </p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm font-medium text-gray-700">
-                  Total Employees
-                </p>
-                <p className="text-xl font-semibold text-blue-600">
-                  {data.summary.totalEmployees}
-                </p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm font-medium text-gray-700">
-                  Status Breakdown
-                </p>
-                <div className="flex gap-2 flex-wrap mt-2">
-                  {Object.entries(data.summary.statusBreakdown).map(
-                    ([status, count]) => (
-                      <Chip
-                        key={status}
-                        label={`${status}: ${count}`}
-                        size="small"
-                        color={getChipColor(status)}
-                      />
-                    )
-                  )}
+      {activeModal === "period" && (
+        <BaseModal
+          isOpen={isOpen}
+          onClose={onClose}
+          title={
+            data
+              ? `Payroll Details - ${data.period.monthName} ${data.period.year}`
+              : "Loading Payroll Details..."
+          }
+          maxWidth="max-w-7xl"
+          className="z-[1000]"
+        >
+          {isLoading || !data ? (
+            <PeriodModalSkeleton />
+          ) : (
+            <div className="space-y-6">
+              {/* Summary Statistics */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm font-medium text-gray-700">
+                    Total Net Pay
+                  </p>
+                  <p className="text-xl font-semibold text-green-600">
+                    ₦{data.summary.totalNetPay.toLocaleString()}
+                  </p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm font-medium text-gray-700">
+                    Total Employees
+                  </p>
+                  <p className="text-xl font-semibold text-blue-600">
+                    {data.summary.totalEmployees}
+                  </p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm font-medium text-gray-700">
+                    Status Breakdown
+                  </p>
+                  <div className="flex gap-2 flex-wrap mt-2">
+                    {Object.entries(data.summary.statusBreakdown).map(
+                      ([status, count]) => (
+                        <Chip
+                          key={status}
+                          label={`${status}: ${count}`}
+                          size="small"
+                          color={getChipColor(status)}
+                        />
+                      )
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Employees Table */}
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Employee</TableCell>
-                    <TableCell>Department</TableCell>
-                    <TableCell>Grade Level</TableCell>
-                    <TableCell>Basic Salary</TableCell>
-                    <TableCell>Allowances</TableCell>
-                    <TableCell>Deductions</TableCell>
-                    <TableCell>Net Pay</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {data.employees
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((row) => (
-                      <TableRow key={row.id}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">
-                              {row.employee.name}
+              {/* Employees Table */}
+              <TableContainer component={Paper}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Employee</TableCell>
+                      <TableCell>Department</TableCell>
+                      <TableCell>Grade Level</TableCell>
+                      <TableCell>Basic Salary</TableCell>
+                      <TableCell>Allowances</TableCell>
+                      <TableCell>Deductions</TableCell>
+                      <TableCell>Net Pay</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {data.employees
+                      .slice(
+                        page * rowsPerPage,
+                        page * rowsPerPage + rowsPerPage
+                      )
+                      .map((row) => (
+                        <TableRow key={row.id}>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">
+                                {row.employee.name}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {row.employee.employeeId}
+                              </div>
                             </div>
-                            <div className="text-sm text-gray-500">
-                              {row.employee.employeeId}
+                          </TableCell>
+                          <TableCell>{row.department}</TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">
+                                {row.salaryGrade.level}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {row.salaryGrade.description}
+                              </div>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{row.department}</TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">
-                              {row.salaryGrade.level}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {row.salaryGrade.description}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          ₦{row.payroll.basicSalary.toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          ₦{row.payroll.totalAllowances.toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          ₦{row.payroll.totalDeductions.toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          ₦{row.payroll.netPay.toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={row.status}
-                            color={getChipColor(row.status)}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell className="min-w-[250px]">
-                          <ActionButtons
-                            employeeId={row.employee.id}
-                            payrollId={row.id}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-              <TablePagination
-                rowsPerPageOptions={[5, 10, 25]}
-                component="div"
-                count={data.employees.length}
-                rowsPerPage={rowsPerPage}
-                page={page}
-                onPageChange={handleChangePage}
-                onRowsPerPageChange={handleChangeRowsPerPage}
-              />
-            </TableContainer>
-          </div>
-        )}
-      </BaseModal>
+                          </TableCell>
+                          <TableCell>
+                            ₦{row.payroll.basicSalary.toLocaleString()}
+                          </TableCell>
+                          <TableCell>
+                            ₦{row.payroll.totalAllowances.toLocaleString()}
+                          </TableCell>
+                          <TableCell>
+                            ₦{row.payroll.totalDeductions.toLocaleString()}
+                          </TableCell>
+                          <TableCell>
+                            ₦{row.payroll.netPay.toLocaleString()}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={row.status}
+                              color={getChipColor(row.status)}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell className="min-w-[250px]">
+                            <ActionButtons
+                              employeeId={row.employee.id}
+                              payrollId={row.id}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+                <TablePagination
+                  rowsPerPageOptions={[5, 10, 25]}
+                  component="div"
+                  count={data.employees.length}
+                  rowsPerPage={rowsPerPage}
+                  page={page}
+                  onPageChange={handleChangePage}
+                  onRowsPerPageChange={handleChangeRowsPerPage}
+                />
+              </TableContainer>
+            </div>
+          )}
+        </BaseModal>
+      )}
 
       {/* PaySlip Modal Overlay */}
       {showPayslip && selectedPayslip && (

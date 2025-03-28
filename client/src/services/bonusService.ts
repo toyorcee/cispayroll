@@ -4,12 +4,6 @@ import type { IBonus, BonusType, IBonusFilters } from "../types/payroll";
 
 const BASE_URL = "/api";
 
-interface BonusFilters {
-  employee?: string;
-  department?: string;
-  status?: string;
-  type?: BonusType;
-}
 
 interface CreateBonusData {
   employee: string;
@@ -28,9 +22,20 @@ export const bonusService = {
         data
       );
       return response.data;
-    } catch (error: any) {
-      console.error("❌ Error creating bonus:", error);
-      toast.error(error.response?.data?.message || "Failed to create bonus");
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        const errorMessage = axios.isAxiosError(error)
+          ? error.response?.data?.message || "Failed to create bonus"
+          : "An unexpected error occurred";
+        toast.error(errorMessage);
+      } else {
+        toast.error("An unexpected error occurred");
+      }
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to create bonus");
+      } else {
+        toast.error("An unexpected error occurred");
+      }
       throw error;
     }
   },
@@ -43,9 +48,13 @@ export const bonusService = {
         params: filters,
       });
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Error fetching bonuses:", error);
-      toast.error(error.response?.data?.message || "Failed to fetch bonuses");
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to fetch bonuses");
+      } else {
+        toast.error("An unexpected error occurred");
+      }
       throw error;
     }
   },
@@ -60,9 +69,13 @@ export const bonusService = {
         data
       );
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Error updating bonus:", error);
-      toast.error(error.response?.data?.message || "Failed to update bonus");
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to update bonus");
+      } else {
+        toast.error("An unexpected error occurred");
+      }
       throw error;
     }
   },
@@ -77,9 +90,13 @@ export const bonusService = {
         { approved }
       );
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Error approving bonus:", error);
-      toast.error(error.response?.data?.message || "Failed to approve bonus");
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to approve bonus");
+      } else {
+        toast.error("An unexpected error occurred");
+      }
       throw error;
     }
   },
@@ -90,9 +107,13 @@ export const bonusService = {
         `${BASE_URL}/super-admin/bonuses/${id}`
       );
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Error deleting bonus:", error);
-      toast.error(error.response?.data?.message || "Failed to delete bonus");
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to delete bonus");
+      } else {
+        toast.error("An unexpected error occurred");
+      }
       throw error;
     }
   },

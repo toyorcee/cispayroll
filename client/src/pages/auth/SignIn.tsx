@@ -43,7 +43,7 @@ const PeopleMaxIcon = () => (
 );
 
 export default function SignIn() {
-  const { signIn, googleSignIn } = useAuth();
+  const { signIn } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

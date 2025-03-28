@@ -1,12 +1,12 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Payslip, PayrollStatus } from "../types/payroll";
+import { Payslip } from "../types/payroll";
 
 // Define the type inline since the import isn't working correctly
 type TableConfig = {
   startY?: number;
-  head?: any[][];
-  body: any[][];
+  head?: string[][];
+  body: (string | number)[][];
   theme?: string;
   headStyles?: {
     fillColor?: number[];
@@ -55,7 +55,8 @@ export const generatePayslipPDF = async (payslip: Payslip) => {
   };
 
   autoTable(doc, employeeInfoTable);
-  yPos = (doc as any).lastAutoTable.finalY + 10;
+  const employeeInfoLastAutoTable = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable;
+  yPos = employeeInfoLastAutoTable.finalY + 10;
 
   // Earnings Table
   const earningsTable: TableConfig = {
@@ -76,7 +77,8 @@ export const generatePayslipPDF = async (payslip: Payslip) => {
   };
 
   autoTable(doc, earningsTable);
-  yPos = (doc as any).lastAutoTable.finalY + 10;
+  const earningsLastAutoTable = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable;
+  yPos = earningsLastAutoTable.finalY + 10;
 
   // Deductions Table
   const deductionsTable: TableConfig = {
@@ -94,7 +96,8 @@ export const generatePayslipPDF = async (payslip: Payslip) => {
   };
 
   autoTable(doc, deductionsTable);
-  yPos = (doc as any).lastAutoTable.finalY + 10;
+  const deductionsLastAutoTable = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable;
+  yPos = deductionsLastAutoTable.finalY + 10;
 
   // Summary Table
   const summaryTable: TableConfig = {

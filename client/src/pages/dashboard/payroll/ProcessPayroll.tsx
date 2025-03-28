@@ -12,12 +12,10 @@ import {
   type PayrollPeriod,
   type PayrollStats,
   type PayrollData,
-  type PayrollCalculationRequest,
   type PeriodPayrollResponse,
   type Payslip,
 } from "../../../types/payroll";
 import { payrollService } from "../../../services/payrollService";
-import { Link } from "react-router-dom";
 import TableSkeleton from "../../../components/skeletons/TableSkeleton";
 import { toast } from "react-toastify";
 import PayslipDetail from "../../../components/payroll/processpayroll/PayslipDetail";
@@ -25,7 +23,6 @@ import { BarChart, LineChart, PieChart } from "../../../components/charts";
 import { useInView } from "framer-motion";
 import PayrollHistoryModal from "../../../components/payroll/processpayroll/PayrollHistoryModal";
 import PayrollPeriodModal from "../../../components/payroll/processpayroll/PayrollPeriodModal";
-import { mapToPayslip } from "../../../utils/payrollUtils";
 import {
   TableContainer,
   Table,
@@ -34,7 +31,6 @@ import {
   TableRow,
   TableCell,
   Paper,
-  Skeleton,
 } from "@mui/material";
 import {
   departmentService,
@@ -58,20 +54,6 @@ const formatCurrency = (amount: number | undefined) => {
     currency: "NGN",
   }).format(amount);
 };
-
-// Add these type definitions for chart data
-interface ChartDataset {
-  label: string;
-  data: number[];
-  borderColor: string | string[];
-  backgroundColor: string | string[];
-  borderWidth?: number;
-}
-
-interface ChartData {
-  labels: string[];
-  datasets: ChartDataset[];
-}
 
 // For LineChart
 interface LineChartData {
@@ -110,33 +92,12 @@ interface PieChartData {
   ];
 }
 
-// Add chart configuration types
-interface ChartTooltipContext {
-  parsed: { y: number };
-  label: string;
-}
-
-interface ChartTooltipItem {
-  label: string;
-}
-
 // Add proper typing for EmployeePayrollCharts
 interface EmployeePayrollChartsProps {
   employeeData: {
     employeeId: string;
     payrollHistory: PayrollData[];
   };
-}
-
-// Add proper typing for allowances and deductions
-interface Allowance {
-  name: string;
-  amount: number;
-}
-
-interface Deduction {
-  name: string;
-  amount: number;
 }
 
 const EmployeePayrollCharts: React.FC<EmployeePayrollChartsProps> = ({
@@ -223,11 +184,6 @@ export default function ProcessPayroll() {
   });
 
   const {
-    data: statsData = {
-      totalNetSalary: 0,
-      totalEmployees: 0,
-      pendingReviews: 0,
-    } as PayrollStats,
     isLoading: isStatsLoading,
   } = useQuery<PayrollStats>({
     queryKey: ["payrollStats"],
@@ -243,8 +199,6 @@ export default function ProcessPayroll() {
     )
     .reduce((sum, period) => sum + (period.totalNetSalary || 0), 0);
 
-  // Get the current period's data (most recent)
-  const currentPeriod = periodsData[0];
 
   // Calculate employees to process (only PENDING payrolls)
   const employeesToProcess = periodsData
@@ -256,18 +210,6 @@ export default function ProcessPayroll() {
     (period) => period.status === PayrollStatus.PENDING
   ).length;
 
-  // Add a function to handle payroll creation in this component
-  const handlePayrollCreation = async (data: PayrollCalculationRequest) => {
-    try {
-      await payrollService.createPayroll(data);
-      // Refresh both queries locally
-      await queryClient.invalidateQueries({ queryKey: ["payrollPeriods"] });
-      await queryClient.invalidateQueries({ queryKey: ["payrollStats"] });
-    } catch (error) {
-      console.error("Failed to create payroll:", error);
-      toast.error("Failed to create payroll");
-    }
-  };
 
   // Fixed filtered periods
   const filteredPeriods =
@@ -275,7 +217,6 @@ export default function ProcessPayroll() {
       ? periodsData
       : periodsData.filter((period) => period.status === selectedStatus);
 
-  const currentSummary = periodsData[0];
 
   const handleViewPeriodDetails = async (period: PayrollPeriod) => {
     try {
@@ -289,7 +230,7 @@ export default function ProcessPayroll() {
         period.year
       );
       setSelectedPeriodData(periodData);
-    } catch (error) {
+    } catch {
       toast.error("Failed to fetch period payroll data");
       setShowPeriodModal(false);
     }
@@ -301,7 +242,7 @@ export default function ProcessPayroll() {
       const payslip = await payrollService.viewPayslip(employeeId);
       setSelectedPayslip(payslip);
       setShowPayslipModal(true);
-    } catch (error) {
+    } catch {
       toast.error("Failed to fetch payslip");
       setShowPeriodModal(true);
     }
@@ -315,7 +256,7 @@ export default function ProcessPayroll() {
       );
       setSelectedEmployeeHistory(history);
       setShowHistoryModal(true);
-    } catch (error) {
+    } catch {
       toast.error("Failed to fetch employee history");
       setShowPeriodModal(true);
     }
@@ -366,14 +307,11 @@ export default function ProcessPayroll() {
   const isLoading = isPeriodsLoading || isStatsLoading;
 
   // Add refs for chart animations
-  const payrollTrendsRef = useRef(null);
   const statusDistRef = useRef(null);
-  const employeeTrendsRef = useRef(null);
   const monthlyCompRef = useRef(null);
 
-  const isPayrollTrendsInView = useInView(payrollTrendsRef, { amount: 0.5 });
+  // Removed unused isPayrollTrendsInView variable
   const isStatusDistInView = useInView(statusDistRef, { amount: 0.5 });
-  const isEmployeeTrendsInView = useInView(employeeTrendsRef, { amount: 0.5 });
   const isMonthlyCompInView = useInView(monthlyCompRef, { amount: 0.5 });
 
   // Update the chart data preparation with tooltips

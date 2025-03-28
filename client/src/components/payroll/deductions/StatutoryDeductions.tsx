@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { FaEdit, FaSave, FaTimes } from "react-icons/fa";
+import { FaEdit, FaTimes } from "react-icons/fa";
 import {
   Deduction,
   DeductionType,
@@ -32,7 +32,7 @@ export const StatutoryDeductions = ({
       await onUpdate(deduction._id, { value: newValue });
       toast.success("Statutory deduction updated successfully");
       setEditingId(null);
-    } catch (error) {
+    } catch {
       toast.error("Failed to update statutory deduction");
     } finally {
       setSubmitting(false);

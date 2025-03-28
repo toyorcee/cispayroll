@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import Chart from "chart.js/auto";
-import { ChartType, ScriptableContext } from "chart.js";
+import { ScriptableContext } from "chart.js";
 import { useInView } from "framer-motion";
 
 interface BarChartProps {

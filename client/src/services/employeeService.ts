@@ -14,14 +14,12 @@ import { OnboardingStats } from "../types/chart";
 import { toast } from "react-toastify";
 import { UserRole } from "../types/auth";
 
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = import.meta.env.VITE_API_URL;
+console.log("🚀 BASE_URL", BASE_URL);
 
 // Set default axios config to always include credentials
 axios.defaults.withCredentials = true;
 
-interface DepartmentWithCount extends DepartmentBasic {
-  employeeCount: number;
-}
 
 interface AdminResponse {
   _id: string;
@@ -121,7 +119,7 @@ export const employeeService = {
   getDepartments: async (): Promise<DepartmentBasic[]> => {
     try {
       console.log("🔄 Fetching departments from API...");
-      const response = await axios.get<{ data: any[] }>(
+      const response = await axios.get<{ data: DepartmentBasic[] }>(
         `${BASE_URL}/super-admin/departments`
       );
 
@@ -133,10 +131,10 @@ export const employeeService = {
 
       console.log("✅ Departments fetched:", departments);
       return departments;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Failed to fetch departments:", error);
       toast.error(
-        error.response?.data?.message || "Failed to fetch departments"
+        (axios.isAxiosError(error) && error.response?.data?.message) || "Failed to fetch departments"
       );
       throw error;
     }
@@ -206,9 +204,13 @@ export const employeeService = {
 
       // Return the data array from the response
       return response.data.data || [];
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Error fetching onboarding employees:", error);
-      toast.error(error.response?.data?.message || "Failed to fetch employees");
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to fetch employees");
+      } else {
+        toast.error("Failed to fetch employees");
+      }
       return []; // Return empty array on error
     }
   },
@@ -291,10 +293,10 @@ export const employeeService = {
 
       console.log("✅ Offboarding response:", response.data);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(
         "❌ Failed to initiate offboarding:",
-        error.response?.data || error.message
+        axios.isAxiosError(error) ? error.response?.data || error.message : String(error)
       );
       throw error;
     }
@@ -422,7 +424,7 @@ export const employeeService = {
     return response.data;
   },
 
-  processPayroll: async (data: any) => {
+  processPayroll: async (data: { employeeId: string; amount: number; period: string }) => {
     const response = await axios.post(
       `${BASE_URL}/super-admin/payroll/process`,
       data
@@ -438,7 +440,7 @@ export const employeeService = {
     return response.data;
   },
 
-  updateAllowance: async (id: string, data: any) => {
+  updateAllowance: async (id: string, data: { name: string; amount: number; description?: string }) => {
     const response = await axios.patch(
       `${BASE_URL}/super-admin/payroll/allowances/${id}`,
       data
@@ -452,7 +454,7 @@ export const employeeService = {
     return response.data;
   },
 
-  createBonus: async (data: any) => {
+  createBonus: async (data: { name: string; amount: number; description?: string }) => {
     const response = await axios.post(
       `${BASE_URL}/super-admin/payroll/bonuses`,
       data
@@ -469,14 +471,10 @@ export const employeeService = {
   },
 
   getAdmins: async (): Promise<AdminResponse[]> => {
-    try {
-      const response = await axios.get("/api/super-admin/admins", {
-        withCredentials: true,
-      });
-      return response.data.data;
-    } catch (error) {
-      throw error;
-    }
+    const response = await axios.get("/api/super-admin/admins", {
+      withCredentials: true,
+    });
+    return response.data.data;
   },
 
   updateOnboardingStage: async (employeeId: string, stage: string) => {

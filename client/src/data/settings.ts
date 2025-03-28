@@ -14,7 +14,6 @@ import type {
   NotificationChannels,
 } from "../types/settings";
 import type { TaxBracket, TaxSettings } from "../types/settings";
-import type { User, Role, UserStats } from "../types/settings";
 
 export const generalSettings: GeneralSettings = {
   payrollSettings: {
@@ -324,62 +323,62 @@ export const taxSettings: TaxSettings = {
   nhfRate: 2.5,
 };
 
-export const users: User[] = [
-  {
-    id: 1,
-    name: "John Smith",
-    email: "john.smith@company.com",
-    role: "Admin",
-    department: "HR",
-    status: "Active",
-    lastActive: "2024-03-20",
-  },
-  {
-    id: 2,
-    name: "Sarah Johnson",
-    email: "sarah.j@company.com",
-    role: "Manager",
-    department: "Payroll",
-    status: "Active",
-    lastActive: "2024-03-21",
-  },
-  {
-    id: 3,
-    name: "Mike Wilson",
-    email: "mike.w@company.com",
-    role: "Viewer",
-    department: "Finance",
-    status: "Inactive",
-    lastActive: "2024-03-15",
-  },
-];
+// export const users: User[] = [
+//   {
+//     id: "1",
+//     name: "John Smith",
+//     email: "john.smith@company.com",
+//     role: "Admin",
+//     department: "HR",
+//     status: "Active",
+//     lastActive: "2024-03-20",
+//   },
+//   {
+//     id: "2",
+//     name: "Sarah Johnson",
+//     email: "sarah.j@company.com",
+//     role: "Manager",
+//     department: "Payroll",
+//     status: "Active",
+//     lastActive: "2024-03-21",
+//   },
+//   {
+//     id: "3",
+//     name: "Mike Wilson",
+//     email: "mike.w@company.com",
+//     role: "Viewer",
+//     department: "Finance",
+//     status: "inactive",
+//     lastActive: "2024-03-15",
+//   },
+// ];
 
-export const roles: Role[] = [
-  {
-    name: "Admin",
-    permissions: [
-      "Full system access",
-      "User management",
-      "Payroll processing",
-      "Report generation",
-    ],
-  },
-  {
-    name: "Manager",
-    permissions: [
-      "Payroll processing",
-      "Report generation",
-      "Employee management",
-    ],
-  },
-  {
-    name: "Viewer",
-    permissions: ["View reports", "View employee data"],
-  },
-];
+// export const roles: Role[] = [
+//   {
+//     name: "Admin",
+//     permissions: [
+//       "Full system access",
+//       "User management",
+//       "Payroll processing",
+//       "Report generation",
+//     ],
+//   },
+//   {
+//     name: "Manager",
+//     permissions: [
+//       "Payroll processing",
+//       "Report generation",
+//       "Employee management",
+//     ],
+//   },
+//   {
+//     name: "Viewer",
+//     permissions: ["View reports", "View employee data"],
+//   },
+// ];
 
-export const userStats: UserStats = {
-  total: 15,
-  active: 12,
-  pending: 3,
-};
+// export const userStats: UserStats = {
+//   total: 15,
+//   active: 12,
+//   pending: 3,
+// };

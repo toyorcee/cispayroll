@@ -3,9 +3,8 @@ import { motion } from "framer-motion";
 import { employeeService } from "../../../services/employeeService";
 import { Employee, OffboardingChecklist } from "../../../types/employee";
 import { Grid, Select, MenuItem, FormControl, InputLabel } from "@mui/material";
-import { FaSpinner, FaSync, FaFilter, FaSort } from "react-icons/fa";
+import { FaSpinner, FaSync, FaSort } from "react-icons/fa";
 import { toast } from "react-toastify";
-import { saveAs } from "file-saver";
 
 type OffboardingStatus = "pending_exit" | "in_progress" | "completed";
 type SortOption = "name" | "date" | "progress";
@@ -103,7 +102,8 @@ export default function Offboarding() {
             new Date(b.offboarding?.initiatedAt || 0).getTime() -
             new Date(a.offboarding?.initiatedAt || 0).getTime()
           );
-        case "progress":
+        case "progress": {
+          // Wrap this block in curly braces
           const getProgress = (emp: Employee) => {
             const checklist = emp.offboarding?.checklist || {};
             return (
@@ -112,6 +112,7 @@ export default function Offboarding() {
             );
           };
           return getProgress(b) - getProgress(a);
+        }
         default:
           return 0;
       }

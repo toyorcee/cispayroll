@@ -8,6 +8,7 @@ interface ActivityItemProps {
     action: string;
     time: string;
     icon: IconType;
+    description?: string; 
     name?: string;
     department?: string;
     status?: string;

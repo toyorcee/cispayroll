@@ -8,6 +8,14 @@ export enum PayrollStatus {
   CANCELLED = "CANCELLED",
 }
 
+export interface AllowanceWithId extends ISalaryComponent {
+  _id: string;
+  isActive: boolean;
+  lastModified?: Date;
+  departmentsApplied?: string;
+  employeesAffected?: number;
+}
+
 export enum AllowanceType {
   HOUSING = "housing",
   TRANSPORT = "transport",
@@ -316,6 +324,10 @@ export interface PayrollData {
       rate: number;
       amount: number;
     };
+    nhf: {
+      rate: number;
+      amount: number;
+    };
     others: Array<{
       name: string;
       amount: number;
@@ -351,11 +363,37 @@ export interface PayrollData {
     }>;
     totalAllowances: number;
   };
+  salaryGrade: {
+    level: string;
+    description: string;
+  };
   basicSalary: number;
   month: number;
   year: number;
   status: string;
   createdAt: string;
+  periodStart: string;
+  periodEnd: string;
+  bonuses: {
+    items: Array<{
+      type: string;
+      description: string;
+      amount: number;
+    }>;
+    totalBonuses: number;
+  };
+  approvalFlow?: Array<{
+    step: string;
+    approver: string;
+    status: string;
+    date?: string;
+  }>;
+  processedBy?: string;
+  payment?: {
+    bankName: string;
+    accountName: string;
+    accountNumber: string;
+  };
 }
 
 export interface PayrollCalculationRequest {
@@ -388,6 +426,14 @@ export interface PeriodPayrollResponse {
       totalAllowances: number;
       totalDeductions: number;
       netPay: number;
+      month: number; // Add this
+      year: number; // Add this
+      deductions?: {
+        others?: Array<{
+          description: string;
+          amount: number;
+        }>;
+      };
     };
     status: PayrollStatus;
     processedAt: string;

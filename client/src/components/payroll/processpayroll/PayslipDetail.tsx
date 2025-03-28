@@ -1,11 +1,7 @@
 import React from "react";
 import { Payslip } from "../../../types/payroll";
-import {
-  FaDownload,
-  FaPrint,
-  FaEnvelope,
-} from "react-icons/fa";
-import { useAuth } from "../../../context/AuthContext";
+import { FaDownload, FaPrint, FaEnvelope } from "react-icons/fa";
+// import { useAuth } from "../../../context/AuthContext";
 import { generatePayslipPDF } from "../../../utils/pdfGenerator";
 import { PayrollBranding } from "../../shared/PayrollBranding";
 
@@ -18,7 +14,7 @@ export default function PayslipDetail({
   payslip,
   onClose,
 }: PayslipDetailProps) {
-  const { user } = useAuth();
+  //   const { user } = useAuth();
 
   const handleDownload = async () => {
     await generatePayslipPDF(payslip);

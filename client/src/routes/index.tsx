@@ -22,10 +22,6 @@ import Compliance from "../pages/dashboard/settings/Compliance";
 import UserManagement from "../pages/dashboard/settings/UserManagement";
 import Notifications from "../pages/dashboard/settings/Notifications";
 import Integrations from "../pages/dashboard/settings/Integrations";
-import UserProfile from "../pages/dashboard/profile/UserProfile";
-import Payslips from "../pages/dashboard/settings/Payslips";
-import UserDocuments from "../pages/dashboard/settings/UserDocuments";
-import UserLeaveManagement from "../pages/dashboard/employees/UserLeaveManagement";
 import { AuthProvider } from "../context/AuthContext";
 import { UserRole, Permission } from "../types/auth";
 import DepartmentManagement from "../pages/dashboard/settings/DepartmentManagement";
@@ -39,7 +35,6 @@ import BonusManagement from "../pages/dashboard/payroll/BonusManagement";
 import Landing from "../pages/Landing";
 import Disciplinary from "../pages/dashboard/disciplinary/Disciplinary";
 import ComingSoonPage from "../pages/Coming/ComingSoonPage";
-import { FeedbackOutlined } from "@mui/icons-material";
 import FeedbackManagemnet from "../pages/feedback/FeedbackManagement";
 import MyPayslipsPage from "../pages/dashboard/payroll/MyPayslips";
 

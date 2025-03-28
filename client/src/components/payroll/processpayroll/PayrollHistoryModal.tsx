@@ -8,7 +8,6 @@ import {
   TableHead,
   TableRow,
   Paper,
-  TablePagination,
 } from "@mui/material";
 import { PayrollStatus } from "../../../types/payroll";
 
@@ -38,11 +37,21 @@ interface PayrollHistoryModalProps {
             value: number;
             amount: number;
           }>;
-          additionalAllowances: Array<any>;
+          additionalAllowances: Array<{
+            _id: string;
+            name: string;
+            type: string;
+            value: number;
+            amount: number;
+          }>;
           totalAllowances: number;
         };
         bonuses: {
-          items: Array<any>;
+          items: Array<{
+            id: string;
+            description: string;
+            amount: number;
+          }>;
           totalBonuses: number;
         };
         totalEarnings: number;
@@ -63,8 +72,16 @@ interface PayrollHistoryModalProps {
           rate: number;
           amount: number;
         };
-        loans: Array<any>;
-        others: Array<any>;
+        loans: Array<{
+          id: string;
+          description: string;
+          amount: number;
+        }>;
+        others: Array<{
+          id: string;
+          description: string;
+          amount: number;
+        }>;
         totalDeductions: number;
       };
       totals: {
@@ -123,21 +140,10 @@ const PayrollHistoryModal: React.FC<PayrollHistoryModalProps> = ({
   onClose,
   data,
 }) => {
+  const [page] = React.useState(0);
+  const [rowsPerPage] = React.useState(5);
+
   if (!data) return null;
-
-  const [page, setPage] = React.useState(0);
-  const [rowsPerPage, setRowsPerPage] = React.useState(5);
-
-  const handleChangePage = (event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
 
   return (
     <BaseModal

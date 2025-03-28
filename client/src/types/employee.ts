@@ -1,6 +1,5 @@
 import { Status, BankDetails, Allowance, Deduction } from "./common";
 import { UserRole, Permission } from "./auth";
-import * as Types from "mongoose";
 
 export enum LeaveStatus {
   pending = "pending",

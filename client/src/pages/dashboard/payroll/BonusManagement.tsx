@@ -1,8 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { FaPlus, FaEdit, FaClock, FaTrophy, FaChartLine } from "react-icons/fa";
-import { toast } from "react-toastify";
-import { employeeService } from "../../../services/employeeService";
+import { FaPlus, FaEdit, FaClock, FaTrophy } from "react-icons/fa";
+// import { toast } from "react-toastify";
+// import { employeeService } from "../../../services/employeeService";
+
+type BonusType = 
+  | "performance"
+  | "thirteenth_month"
+  | "special"
+  | "achievement"
+  | "retention"
+  | "project";
 
 interface Bonus {
   id: string;
@@ -16,35 +24,25 @@ interface Bonus {
   taxable: boolean;
 }
 
-// Add bonus type options
-const bonusTypeOptions = [
-  { value: "performance", label: "Performance Bonus" },
-  { value: "thirteenth_month", label: "13th Month" },
-  { value: "special", label: "Special Bonus" },
-  { value: "achievement", label: "Achievement Bonus" },
-  { value: "retention", label: "Retention Bonus" },
-  { value: "project", label: "Project Bonus" },
-];
-
 export default function BonusManagement() {
-  const [bonuses, setBonuses] = useState<Bonus[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [bonuses] = useState<Bonus[]>([]);
+  // Removed unused loading state
   const [selectedType, setSelectedType] = useState<string>("all");
 
-  useEffect(() => {
-    fetchBonuses();
-  }, []);
+  // useEffect(() => {
+  //   fetchBonuses();
+  // }, []);
 
-  const fetchBonuses = async () => {
-    try {
-      const data = await employeeService.getBonuses();
-      setBonuses(data);
-    } catch (error) {
-      toast.error("Failed to fetch bonuses");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // const fetchBonuses = async () => {
+  //   try {
+  //     const data = await employeeService.getBonuses();
+  //     setBonuses(data);
+  //   } catch (error) {
+  //     toast.error("Failed to fetch bonuses");
+  //   } finally {
+  //     // Removed setLoading as loading state is no longer used
+  //   }
+  // };
 
   return (
     <motion.div
@@ -118,20 +116,20 @@ export default function BonusManagement() {
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800">
-                    {bonus.employeeName}
+                    {bonus.employee}
                   </h3>
                   <p className="text-sm text-gray-500">{bonus.department}</p>
                 </div>
                 <span
                   className={`px-2 py-1 text-xs rounded-full ${
-                    bonus.status === "approved"
+                    bonus.approvalStatus === "approved"
                       ? "bg-green-100 text-green-800"
-                      : bonus.status === "pending"
+                      : bonus.approvalStatus === "pending"
                       ? "bg-yellow-100 text-yellow-800"
                       : "bg-blue-100 text-blue-800"
                   }`}
                 >
-                  {bonus.status}
+                  {bonus.approvalStatus}
                 </span>
               </div>
 
@@ -152,7 +150,7 @@ export default function BonusManagement() {
 
               <div className="flex items-center text-sm text-gray-500">
                 <FaClock className="mr-2" />
-                <span>{new Date(bonus.date).toLocaleDateString()}</span>
+                <span>{new Date(bonus.paymentDate).toLocaleDateString()}</span>
               </div>
 
               <div className="pt-4 flex justify-end space-x-3">

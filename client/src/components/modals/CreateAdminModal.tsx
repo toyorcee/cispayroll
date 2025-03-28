@@ -52,7 +52,7 @@ const CreateAdminModal = ({
       setIsLoading(true);
 
       // Just create the admin in pending state - don't create onboarding entry yet
-      const response = await axios.post(
+      await axios.post(
         "http://localhost:5000/api/employees/create",
         {
           ...data,

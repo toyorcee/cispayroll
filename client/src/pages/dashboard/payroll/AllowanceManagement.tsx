@@ -1,27 +1,11 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
-import {
-  FaPlus,
-  FaEdit,
-  FaTrash,
-  FaChartLine,
-  FaHistory,
-} from "react-icons/fa";
+import { FaPlus, FaEdit, FaTrash, FaHistory } from "react-icons/fa";
 import { allowanceService } from "../../../services/allowanceService";
 import AllowanceForm from "../../../components/payroll/allowance/AllowanceForm";
-import type { ISalaryComponent } from "../../../types/payroll";
-import { Types } from "mongoose";
-
-interface AllowanceWithId extends ISalaryComponent {
-  _id: Types.ObjectId | string;
-  departmentsApplied?: number;
-  employeesAffected?: number;
-  lastModified?: Date;
-}
+import type { AllowanceWithId } from "../../../types/payroll";
 
 export default function AllowanceManagement() {
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
   const [allowances, setAllowances] = useState<AllowanceWithId[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingAllowance, setEditingAllowance] = useState<
@@ -31,7 +15,6 @@ export default function AllowanceManagement() {
 
   const fetchAllowances = async () => {
     try {
-      setIsInitialLoading(true);
       console.log("🔄 Fetching allowances...");
       const response = await allowanceService.getAllAllowances();
       console.log("📦 Received allowances:", response.data);
@@ -40,7 +23,7 @@ export default function AllowanceManagement() {
       console.error("❌ Error fetching allowances:", error);
       toast.error("Failed to fetch allowances");
     } finally {
-      setIsInitialLoading(false);
+      // Removed isInitialLoading setter
     }
   };
 
@@ -48,23 +31,23 @@ export default function AllowanceManagement() {
     fetchAllowances();
   }, []);
 
-  const handleUpdate = async (id: string, data: Partial<ISalaryComponent>) => {
-    try {
-      const updateData = {
-        ...data,
-        type: data.type as "allowance" | "deduction",
-      };
-      await allowanceService.updateAllowance(id, updateData);
-      await fetchAllowances();
-      toast.success("Allowance updated successfully");
-    } catch (error) {
-      toast.error("Failed to update allowance");
-    }
-  };
+  // const handleUpdate = async (id: string, data: Partial<ISalaryComponent>) => {
+  //   try {
+  //     const updateData = {
+  //       ...data,
+  //       type: data.type as "allowance" | "deduction",
+  //     };
+  //     await allowanceService.updateAllowance(id, updateData);
+  //     await fetchAllowances();
+  //     toast.success("Allowance updated successfully");
+  //   } catch {
+  //     toast.error("Failed to update allowance");
+  //   }
+  // };
 
   const handleToggleStatus = async (id: string) => {
     try {
-      setIsLoading(true);
+      // setIsLoading(true);
       await allowanceService.toggleAllowanceStatus(id);
       await fetchAllowances();
       toast.success("Status updated successfully");
@@ -72,7 +55,7 @@ export default function AllowanceManagement() {
       console.error("Toggle status failed:", error);
       toast.error("Failed to toggle status");
     } finally {
-      setIsLoading(false);
+      // setIsLoading(false);
     }
   };
 
@@ -92,24 +75,24 @@ export default function AllowanceManagement() {
     setShowAddForm(true);
   };
 
-  const handleCreateAllowance = async (data: Partial<ISalaryComponent>) => {
-    try {
-      setIsLoading(true);
-      const createData = {
-        ...data,
-        type: data.type as "allowance" | "deduction",
-      };
-      await allowanceService.createAllowance(createData);
-      await fetchAllowances();
-      setShowAddForm(false);
-      toast.success("Allowance created successfully");
-    } catch (error) {
-      console.error("Create allowance failed:", error);
-      toast.error("Failed to create allowance");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // const handleCreateAllowance = async () => {
+  //   // try {
+  //   //   setIsLoading(true);
+  //   //   const createData = {
+  //   //     ...data,
+  //   //     type: data.type as "allowance" | "deduction",
+  //   //   };
+  //   //   await allowanceService.createAllowance(createData);
+  //   //   await fetchAllowances();
+  //   //   setShowAddForm(false);
+  //   //   toast.success("Allowance created successfully");
+  //   // } catch (error) {
+  //   //   console.error("Create allowance failed:", error);
+  //   //   toast.error("Failed to create allowance");
+  //   // } finally {
+  //   //   setIsLoading(false);
+  //   // }
+  // };
 
   return (
     <div className="space-y-6">
@@ -322,21 +305,21 @@ export default function AllowanceManagement() {
               </button>
             </div>
             <AllowanceForm
-              allowance={editingAllowance}
-              isLoading={isLoading}
-              onSubmit={async (data: Partial<ISalaryComponent>) => {
-                if (editingAllowance) {
-                  await handleUpdate(editingAllowance._id.toString(), data);
-                } else {
-                  await handleCreateAllowance(data);
-                }
-                setShowAddForm(false);
-                setEditingAllowance(undefined);
-              }}
-              onCancel={() => {
-                setShowAddForm(false);
-                setEditingAllowance(undefined);
-              }}
+              // allowance={editingAllowance}
+              // isLoading={isLoading}
+              // onSubmit={async (data: Partial<ISalaryComponent>) => {
+              //   if (editingAllowance) {
+              //     await handleUpdate(editingAllowance._id.toString(), data);
+              //   } else {
+              //     await handleCreateAllowance(data);
+              //   }
+              //   setShowAddForm(false);
+              //   setEditingAllowance(undefined);
+              // }}
+              // onCancel={() => {
+              //   setShowAddForm(false);
+              //   setEditingAllowance(undefined);
+              // }}
             />
           </div>
         </div>

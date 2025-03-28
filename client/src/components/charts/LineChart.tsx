@@ -1,20 +1,20 @@
 import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import Chart from "chart.js/auto";
-import { TooltipItem, ChartType } from "chart.js";
+import { TooltipItem } from "chart.js";
 
 // Define proper tooltip types
-interface ChartTooltipContext {
-  dataset: {
-    label: string;
-    data: number[];
-  };
-  parsed: {
-    y: number;
-  };
-  formattedValue: string;
-  label: string;
-}
+// interface ChartTooltipContext {
+//   dataset: {
+//     label: string;
+//     data: number[];
+//   };
+//   parsed: {
+//     y: number;
+//   };
+//   formattedValue: string;
+//   label: string;
+// }
 
 interface LineChartProps {
   data: {

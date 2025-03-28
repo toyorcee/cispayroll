@@ -1,12 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { useInView } from "framer-motion";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   FaUserPlus,
-  FaUser,
   FaUsers,
   FaBuildingColumns,
-  FaTrash,
   FaUserMinus,
 } from "react-icons/fa6";
 import { FaTimes, FaSpinner } from "react-icons/fa";
@@ -17,10 +14,9 @@ import { DepartmentModal } from "../../../components/departments/DepartmentModal
 import { Department, DepartmentFormData } from "../../../types/department";
 import { useAuth } from "../../../context/AuthContext";
 import { UserRole, User, Permission } from "../../../types/auth";
+import { AxiosError } from "axios";
 import {
   CreateEmployeeData,
-  Employee,
-  Task,
   OnboardingEmployee,
 } from "../../../types/employee";
 import { Pagination } from "@mui/material";
@@ -71,9 +67,15 @@ const useOnboardingData = () => {
 
       setOnboardingEmployees(filteredEmps);
       setError(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Error in fetchData:", error);
-      setError(error.message || "Failed to load data");
+
+      if (error instanceof Error) {
+        setError(error.message || "Failed to load data");
+      } else {
+        setError("An unknown error occurred");
+      }
+
       setOnboardingEmployees([]);
     } finally {
       setIsLoading(false);
@@ -206,69 +208,76 @@ export default function Onboarding() {
     );
   };
 
-  const handleCreateEmployee = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsCreating(true);
+const handleCreateEmployee = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setIsCreating(true);
 
-    try {
-      // Validate department selection
-      if (!formData.department && user?.role === UserRole.SUPER_ADMIN) {
-        toast.error("Please select a department");
-        setIsCreating(false);
-        return;
-      }
-
-      // Ensure department is always a string
-      const departmentValue =
-        user?.role === UserRole.SUPER_ADMIN
-          ? formData.department
-          : user?.department ?? "";
-
-      // Validate department value
-      if (!departmentValue) {
-        toast.error("Department is required");
-        setIsCreating(false);
-        return;
-      }
-
-      const employeeData: CreateEmployeeData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phone: formData.phone,
-        position: formData.position,
-        gradeLevel: formData.gradeLevel,
-        workLocation: formData.workLocation,
-        dateJoined: new Date(formData.dateJoined),
-        department: departmentValue,
-      };
-
-      // Just create the employee - don't add to onboarding list yet
-      await employeeService.createEmployee(employeeData);
-
-      setShowCreateModal(false);
-
-      // Reset form
-      setFormData({
-        firstName: "",
-        lastName: "",
-        email: "",
-        phone: "",
-        position: "",
-        gradeLevel: "",
-        workLocation: "",
-        dateJoined: new Date().toISOString().split("T")[0],
-        department: "",
-      });
-
-      toast.success("Employee invitation sent successfully");
-    } catch (error: any) {
-      console.error("Error creating employee:", error);
-      toast.error(error.response?.data?.message || "Failed to create employee");
-    } finally {
+  try {
+    // Validate department selection
+    if (!formData.department && user?.role === UserRole.SUPER_ADMIN) {
+      toast.error("Please select a department");
       setIsCreating(false);
+      return;
     }
-  };
+
+    // Ensure department is always a string
+    const departmentValue =
+      user?.role === UserRole.SUPER_ADMIN
+        ? formData.department
+        : user?.department ?? "";
+
+    // Validate department value
+    if (!departmentValue) {
+      toast.error("Department is required");
+      setIsCreating(false);
+      return;
+    }
+
+    const employeeData: CreateEmployeeData = {
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      email: formData.email,
+      phone: formData.phone,
+      position: formData.position,
+      gradeLevel: formData.gradeLevel,
+      workLocation: formData.workLocation,
+      dateJoined: new Date(formData.dateJoined),
+      department: departmentValue,
+    };
+
+    // Just create the employee - don't add to onboarding list yet
+    await employeeService.createEmployee(employeeData);
+
+    setShowCreateModal(false);
+
+    // Reset form
+    setFormData({
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      position: "",
+      gradeLevel: "",
+      workLocation: "",
+      dateJoined: new Date().toISOString().split("T")[0],
+      department: "",
+    });
+
+    toast.success("Employee invitation sent successfully");
+  } catch (error: unknown) {
+    console.error("Error creating employee:", error);
+
+    if (error instanceof AxiosError && error.response?.data?.message) {
+      toast.error(error.response.data.message);
+    } else if (error instanceof Error) {
+      toast.error(error.message || "Failed to create employee");
+    } else {
+      toast.error("An unknown error occurred");
+    }
+  } finally {
+    setIsCreating(false);
+  }
+};
 
   const handleDepartmentSave = async (formData: DepartmentFormData) => {
     try {
@@ -446,9 +455,6 @@ export default function Onboarding() {
     );
   }
 
-  // Now you can safely use user throughout your component
-  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
-
   const startIndex = (page - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const displayedEmployees = getFilteredEmployees().slice(startIndex, endIndex);
@@ -603,6 +609,19 @@ export default function Onboarding() {
                         <span className="font-medium">
                           Initiate Offboarding
                         </span>
+                      </button>
+                    </div>
+                    {/* Add a delete button for each employee */}
+                    <div className="mt-4">
+                      <button
+                        onClick={() => handleDeleteEmployee(employee.id)}
+                        className="w-full flex items-center justify-center space-x-2 px-4 py-2 
+                                 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 
+                                 hover:to-red-700 text-white rounded-lg transition-all duration-200 
+                                 transform hover:scale-[1.02]"
+                      >
+                        <FaTimes className="text-lg" />
+                        <span className="font-medium">Delete Employee</span>
                       </button>
                     </div>
                   </div>

@@ -173,13 +173,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (path.startsWith("/dashboard/disciplinary")) {
-    const disciplinaryPermissions = [
-      Permission.MANAGE_DISCIPLINARY_ACTIONS,
-      Permission.VIEW_DISCIPLINARY_RECORDS,
-      // Permission.UPLOAD_EVIDENCE,
-      // Permission.APPROVE_DISCIPLINARY_ACTIONS,
-      // Permission.VIEW_POLICY_COMPLIANCE,
-    ];
+    // const disciplinaryPermissions = [
+    //   Permission.MANAGE_DISCIPLINARY_ACTIONS,
+    //   Permission.VIEW_DISCIPLINARY_RECORDS,
+    //   // Permission.UPLOAD_EVIDENCE,
+    //   // Permission.APPROVE_DISCIPLINARY_ACTIONS,
+    //   // Permission.VIEW_POLICY_COMPLIANCE,
+    // ];
 
     // if (!disciplinaryPermissions.some((perm) => user.permissions?.includes(perm))) {
     //   toast.error("Access denied: No disciplinary case management permissions");

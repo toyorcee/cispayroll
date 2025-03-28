@@ -15,6 +15,8 @@ export interface Department extends DepartmentBasic {
     lastName: string;
     email: string;
   };
+  adminId: string;
+  adminName: string;
   status: "active" | "inactive";
   createdAt: Date;
   updatedAt: Date;

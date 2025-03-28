@@ -4,8 +4,6 @@ import { FaPlus } from "react-icons/fa";
 import { deductionService } from "../../../services/deductionService";
 import {
   Deduction,
-  DeductionType,
-  CalculationMethod,
   CreateVoluntaryDeductionInput,
 } from "../../../types/deduction";
 import { DeductionsTable } from "../../../components/payroll/deductions/DeductionsTable";
@@ -55,28 +53,11 @@ export default function Deductions() {
     fetchDeductions();
   }, []);
 
-  const handleAddDeduction = async (data: Partial<Deduction>) => {
-    try {
-      await deductionService.createDeduction({
-        name: data.name!,
-        description: data.description,
-        calculationMethod: data.calculationMethod || CalculationMethod.FIXED,
-        value: data.value!,
-        effectiveDate: data.effectiveDate,
-      });
-      await fetchDeductions();
-      setShowAddForm(false);
-      toast.success("Deduction created successfully");
-    } catch (error) {
-      console.error("Error creating deduction:", error);
-    }
-  };
-
   const handleUpdate = async (id: string, data: Partial<Deduction>) => {
     try {
       await deductionService.updateDeduction(id, data);
       await fetchDeductions();
-    } catch (error) {
+    } catch {
       toast.error("Failed to update deduction");
     }
   };

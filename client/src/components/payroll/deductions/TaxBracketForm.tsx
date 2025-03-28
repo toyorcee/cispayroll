@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { FaSave, FaTimes } from "react-icons/fa";
+import { FaTimes } from "react-icons/fa";
 import { Deduction, TaxBracket } from "../../../types/deduction";
 
 interface TaxBracketFormProps {
@@ -27,7 +27,7 @@ export const TaxBracketForm = ({
       await onUpdate(deduction._id, { taxBrackets: brackets });
       toast.success("Tax brackets updated successfully");
       onClose();
-    } catch (error) {
+    } catch{
       toast.error("Failed to update tax brackets");
     } finally {
       setSubmitting(false);

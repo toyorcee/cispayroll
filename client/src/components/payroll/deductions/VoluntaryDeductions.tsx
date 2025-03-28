@@ -33,13 +33,13 @@ export const VoluntaryDeductions = ({
   const [editingDeduction, setEditingDeduction] = useState<Deduction | null>(
     null
   );
-  const [submitting, setSubmitting] = useState(false);
+  // Removed unused 'submitting' state
 
   if (isLoading) return <FormSkeleton />;
 
   const handleSubmit = async (data: Partial<Deduction>) => {
     try {
-      setSubmitting(true);
+      // Removed 'setSubmitting' call
       if (editingDeduction) {
         await onUpdate(editingDeduction._id, data);
         toast.success("Deduction updated successfully");
@@ -49,14 +49,12 @@ export const VoluntaryDeductions = ({
       }
       setShowForm(false);
       setEditingDeduction(null);
-    } catch (error) {
+    } catch  {
       toast.error(
         editingDeduction
           ? "Failed to update deduction"
           : "Failed to add deduction"
       );
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -64,7 +62,7 @@ export const VoluntaryDeductions = ({
     try {
       await onToggle(id);
       toast.success("Deduction status updated successfully");
-    } catch (error) {
+    } catch  {
       toast.error("Failed to update deduction status");
     }
   };
@@ -76,7 +74,7 @@ export const VoluntaryDeductions = ({
     try {
       await onDelete(id);
       toast.success("Deduction deleted successfully");
-    } catch (error) {
+    } catch{
       toast.error("Failed to delete deduction");
     }
   };

@@ -1,7 +1,7 @@
 import React from "react";
 import { PayrollBranding } from "../../shared/PayrollBranding";
 
-interface PayrollData {
+export interface PayrollData {
   _id: string;
   earnings: {
     overtime: {
@@ -9,7 +9,11 @@ interface PayrollData {
       rate: number;
       amount: number;
     };
-    bonus: any[];
+    bonus: Array<{
+      type: string;
+      description: string;
+      amount: number;
+    }>;
     totalEarnings: number;
   };
   deductions: {
@@ -24,12 +28,13 @@ interface PayrollData {
       amount: number;
     };
     nhf: {
-      pensionableAmount: number;
       rate: number;
       amount: number;
     };
-    loans: any[];
-    others: any[];
+    others: Array<{
+      name: string;
+      amount: number;
+    }>;
     totalDeductions: number;
   };
   totals: {
@@ -40,14 +45,12 @@ interface PayrollData {
     totalDeductions: number;
     netPay: number;
   };
-  approvalFlow: {
-    submittedBy: string;
-    submittedAt: string;
-  };
-  payment: {
-    bankName: string;
-    accountNumber: string;
-    accountName: string;
+  employee: {
+    _id: string;
+    employeeId: string;
+    firstName: string;
+    lastName: string;
+    fullName: string;
   };
   allowances: {
     gradeAllowances: Array<{
@@ -57,34 +60,49 @@ interface PayrollData {
       amount: number;
       _id: string;
     }>;
-    additionalAllowances: any[];
+    additionalAllowances: Array<{
+      name: string;
+      amount: number;
+    }>;
     totalAllowances: number;
   };
-  bonuses: {
-    items: any[];
-    totalBonuses: number;
-  };
-  employee: {
-    _id: string;
-    employeeId: string;
-    firstName: string;
-    lastName: string;
-    fullName: string;
-  };
   salaryGrade: {
-    _id: string;
     level: string;
     description: string;
   };
+  basicSalary: number;
   month: number;
   year: number;
-  basicSalary: number;
   status: string;
-  frequency: string;
+  createdAt: string;
   periodStart: string;
   periodEnd: string;
-  createdAt: string;
-  processedBy: string;
+
+  // Add the bonuses property
+  bonuses: {
+    items: Array<{
+      type: string;
+      description: string;
+      amount: number;
+    }>;
+    totalBonuses: number;
+  };
+
+  // Optional properties
+  approvalFlow?: Array<{
+    step: string;
+    approver: string;
+    status: string;
+    date?: string;
+  }>;
+  processedBy?: string;
+
+  // Payment information
+  payment?: {
+    bankName: string;
+    accountName: string;
+    accountNumber: string;
+  };
 }
 
 interface PaySlipProps {
@@ -141,9 +159,9 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
         <div className="justify-self-end">
           <h3 className="font-semibold">Payment Information</h3>
           <div className="mt-2 space-y-1 text-sm text-right">
-            <p>Bank: {data.payment.bankName}</p>
-            <p>Account Name: {data.payment.accountName}</p>
-            <p>Account Number: {data.payment.accountNumber}</p>
+            <p>Bank: {data.payment?.bankName}</p>
+            <p>Account Name: {data.payment?.accountName || "N/A"}</p>
+            <p>Account Number: {data.payment?.accountNumber}</p>
           </div>
         </div>
       </div>
@@ -220,14 +238,12 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
               </td>
             </tr>
             <tr>
-              <td className="py-2">
-                Nhf ({data.deductions.nhf.rate}%)
-              </td>
+              <td className="py-2">Nhf ({data.deductions.nhf.rate}%)</td>
               <td className="text-right">
                 {formatAmount(data.deductions.nhf.amount)}
               </td>
             </tr>
-            
+
             {/* Other deductions if any */}
             {data.deductions.others.map((deduction, index) => (
               <tr key={index}>

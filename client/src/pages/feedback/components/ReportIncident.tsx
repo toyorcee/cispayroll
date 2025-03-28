@@ -44,7 +44,7 @@ const ReportIncident = () => {
 
     setLoading(true);
     try {
-      const response = await axios.post("/api/feedback/incident", formData);
+      await axios.post("/api/feedback/incident", formData);
       toast.success("Incident reported successfully!");
       setFormData({
         title: "",
@@ -55,7 +55,6 @@ const ReportIncident = () => {
         involvedPersons: ""
       });
     } catch (error: any) {
-      console.error("Error reporting incident:", error);
       toast.error(error.response?.data?.message || "Failed to report incident");
     } finally {
       setLoading(false);

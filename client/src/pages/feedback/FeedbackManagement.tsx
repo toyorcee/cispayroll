@@ -33,7 +33,7 @@ interface Analytics {
 
 const FeedbackManagement = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
-  const { user, hasRole } = useAuth();
+  const { hasRole } = useAuth();
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   

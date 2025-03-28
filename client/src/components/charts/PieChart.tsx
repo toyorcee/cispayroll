@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { motion, useInView } from "framer-motion";
 import Chart from "chart.js/auto";
-import { ChartData, ChartDataset, Color } from "chart.js";
+import { ChartDataset } from "chart.js";
 
 interface PieChartDataset {
   label?: string;
@@ -104,13 +104,14 @@ const PieChart = ({ data }: PieChartProps) => {
                     });
                   },
                 },
-                onClick: (e, legendItem) => {
+                onClick: (legendItem) => {
+                  const item = legendItem as unknown as { index: number };
                   if (
                     chartInstance.current &&
-                    typeof legendItem.index === "number"
+                    typeof item.index === "number"
                   ) {
                     chartInstance.current.toggleDataVisibility(
-                      legendItem.index
+                      item.index
                     );
                     chartInstance.current.update();
                   }
