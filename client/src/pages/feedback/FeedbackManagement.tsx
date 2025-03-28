@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
 import { 
   MessageSquare, 
-  PieChart, 
   Users, 
   AlertTriangle, 
   FileText, 
   BarChart4, 
-  Activity,
   CheckCircle,
   Clock,
   ClipboardCheck
@@ -33,7 +31,7 @@ interface Analytics {
 
 const FeedbackManagement = () => {
   const [activeTab, setActiveTab] = useState("dashboard");
-  const { user, hasRole } = useAuth();
+  const { hasRole } = useAuth();
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   

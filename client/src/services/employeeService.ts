@@ -19,9 +19,6 @@ const BASE_URL = "http://localhost:5000/api";
 // Set default axios config to always include credentials
 axios.defaults.withCredentials = true;
 
-interface DepartmentWithCount extends DepartmentBasic {
-  employeeCount: number;
-}
 
 interface AdminResponse {
   _id: string;

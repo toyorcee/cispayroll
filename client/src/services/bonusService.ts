@@ -4,12 +4,6 @@ import type { IBonus, BonusType, IBonusFilters } from "../types/payroll";
 
 const BASE_URL = "/api";
 
-interface BonusFilters {
-  employee?: string;
-  department?: string;
-  status?: string;
-  type?: BonusType;
-}
 
 interface CreateBonusData {
   employee: string;

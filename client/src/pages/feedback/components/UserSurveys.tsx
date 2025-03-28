@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { FileText, ClipboardCheck, Check, Clock, ArrowRight, Search, Filter, RefreshCcw } from "lucide-react";
+import { ClipboardCheck, Check, Clock, ArrowRight, Search, RefreshCcw } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
-import { useAuth } from "../../../context/AuthContext";
 import SurveyResponseModal from "./SurveyResponseModal";
 
 // Define interfaces for type safety
@@ -32,15 +31,10 @@ interface SurveyResponse {
   answer: string | string[];
 }
 
-// Ensure the modalSurvey is properly typed
-interface SurveyResponseProps {
-  survey: Survey;
-  onClose: () => void;
-  onSubmit: (responses: SurveyResponse[]) => void;
-}
+
 
 const UserSurveys = () => {
-  const { user } = useAuth();
+
   const [loading, setLoading] = useState(true);
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [showResponseModal, setShowResponseModal] = useState(false);

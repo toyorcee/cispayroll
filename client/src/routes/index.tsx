@@ -39,7 +39,6 @@ import BonusManagement from "../pages/dashboard/payroll/BonusManagement";
 import Landing from "../pages/Landing";
 import Disciplinary from "../pages/dashboard/disciplinary/Disciplinary";
 import ComingSoonPage from "../pages/Coming/ComingSoonPage";
-import { FeedbackOutlined } from "@mui/icons-material";
 import FeedbackManagemnet from "../pages/feedback/FeedbackManagement";
 
 export interface RouteConfig {

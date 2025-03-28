@@ -1,4 +1,4 @@
-import { UserRole, Permission } from "../types/auth";
+import { UserRole } from "../types/auth";
 
 // Define all available permissions
 export const ALL_PERMISSIONS = {
