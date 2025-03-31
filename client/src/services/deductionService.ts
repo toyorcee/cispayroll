@@ -58,19 +58,26 @@ export const deductionService = {
   },
 
   createDeduction: async (
+    type: "statutory" | "voluntary",
     data: CreateVoluntaryDeductionInput
   ): Promise<Deduction> => {
     try {
+      const endpoint =
+        type === "statutory"
+          ? `${BASE_URL}/super-admin/deductions/statutory`
+          : `${BASE_URL}/super-admin/deductions/voluntary`;
+
       const response = await axios.post<{ message: string; data: Deduction }>(
-        `${BASE_URL}/super-admin/deductions/voluntary`,
+        endpoint,
         data
       );
+
       toast.success(response.data.message);
       return response.data.data;
     } catch (error: any) {
-      console.error("❌ Failed to create deduction:", error);
+      console.error(`❌ Failed to create ${type} deduction:`, error);
       toast.error(
-        error.response?.data?.message || "Failed to create deduction"
+        error.response?.data?.message || `Failed to create ${type} deduction`
       );
       throw error;
     }

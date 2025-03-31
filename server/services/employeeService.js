@@ -1,8 +1,13 @@
-import { Types } from "mongoose";
-import UserModel, { UserRole } from "../models/User.js";
+import UserModel, {
+  UserRole,
+  UserLifecycleState,
+  OnboardingStatus,
+  OffboardingType,
+  OffboardingStatus,
+} from "../models/User.js";
 import { ApiError } from "../utils/errorHandler.js";
-import { generateInvitationToken } from "../utils/tokenUtils.js";
 import { EmailService } from "./emailService.js";
+import { v4 as uuidv4 } from "uuid";
 
 export class EmployeeService {
   static async createEmployee(data, creator) {
@@ -24,31 +29,57 @@ export class EmployeeService {
         throw new ApiError(400, "Email already registered");
       }
 
-      // Generate employee/admin ID based on role
-      const employeeId = await this.generateId(data.role || UserRole.USER);
-      const invitationToken = generateInvitationToken();
-      const invitationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const invitationToken = uuidv4();
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-      // Create employee with minimal data
       const employeeData = {
         ...data,
-        employeeId,
+        employeeId: await this.generateId(data.role || UserRole.USER),
         role: data.role || UserRole.USER,
         status: "pending",
         isEmailVerified: false,
-        invitationToken,
-        invitationExpires,
+        invitation: {
+          token: invitationToken,
+          expiresAt,
+          sentAt: new Date(),
+        },
+        lifecycle: {
+          currentState: UserLifecycleState.INVITED,
+          history: [
+            {
+              state: UserLifecycleState.INVITED,
+              timestamp: new Date(),
+              updatedBy: creator._id,
+              notes: `Invited by ${creator.firstName} ${creator.lastName}`,
+            },
+          ],
+        },
         createdBy: creator._id,
-        permissions: [],
         department:
           creator.role === UserRole.ADMIN
             ? creator.department
             : data.department,
+        onboarding: {
+          status: OnboardingStatus.NOT_STARTED,
+          tasks: [
+            {
+              name: "Welcome Meeting",
+              description: "Initial orientation and welcome meeting",
+              category: "orientation",
+              deadline: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+            },
+            {
+              name: "Department Introduction",
+              description: "Meet team and understand department workflow",
+              category: "orientation",
+              deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+            },
+            // Add more default tasks
+          ],
+        },
       };
 
       const employee = await UserModel.create(employeeData);
-
-      // Send invitation email
       await EmailService.sendInvitationEmail(employee.email, invitationToken);
 
       return {
@@ -156,11 +187,10 @@ export class EmployeeService {
 
   static async updateEmployee(employeeId, data) {
     try {
-      const employee = await UserModel.findByIdAndUpdate(
-        employeeId,
-        data,
-        { new: true, runValidators: true }
-      );
+      const employee = await UserModel.findByIdAndUpdate(employeeId, data, {
+        new: true,
+        runValidators: true,
+      });
       if (!employee) {
         throw new ApiError(404, "Employee not found");
       }
@@ -181,5 +211,127 @@ export class EmployeeService {
       console.error("Error in deleteEmployee:", error);
       throw error;
     }
+  }
+
+  static async completeRegistration(invitationToken, userData) {
+    const user = await UserModel.findOne({
+      "invitation.token": invitationToken,
+    });
+    if (!user) throw new ApiError(404, "Invalid invitation token");
+    if (user.invitation.expiresAt < new Date())
+      throw new ApiError(400, "Invitation expired");
+
+    user.password = userData.hashedPassword;
+    user.emergencyContact = userData.emergencyContact;
+    user.bankDetails = userData.bankDetails;
+    if (userData.profileImage) {
+      user.profileImage = userData.profileImage;
+    }
+
+    // Update lifecycle state
+    await user.updateLifecycleState(
+      UserLifecycleState.REGISTERED,
+      user._id,
+      "Completed registration"
+    );
+
+    // Clear invitation data
+    user.invitation.token = undefined;
+    user.invitation.expiresAt = undefined;
+
+    await user.save();
+    await EmailService.sendLifecycleUpdateEmail(
+      user,
+      UserLifecycleState.REGISTERED
+    );
+
+    return user;
+  }
+
+  static async startOnboarding(userId, supervisorId) {
+    const user = await UserModel.findById(userId);
+    if (!user) throw new ApiError(404, "User not found");
+
+    await user.updateLifecycleState(
+      UserLifecycleState.ONBOARDING,
+      supervisorId,
+      "Started onboarding process"
+    );
+
+    user.onboarding.supervisor = supervisorId;
+    user.onboarding.expectedCompletionDate = new Date(
+      Date.now() + 14 * 24 * 60 * 60 * 1000
+    );
+    await user.save();
+
+    return user;
+  }
+
+  static async completeOnboarding(userId, completedBy) {
+    const user = await UserModel.findById(userId);
+    if (!user) throw new ApiError(404, "User not found");
+
+    await user.updateLifecycleState(
+      UserLifecycleState.ACTIVE,
+      completedBy,
+      "Completed onboarding process"
+    );
+
+    return user;
+  }
+
+  static async startOffboarding(userId, data) {
+    const user = await UserModel.findById(userId);
+    if (!user) throw new ApiError(404, "User not found");
+
+    const { type, reason, targetExitDate, initiatedBy } = data;
+
+    await user.updateLifecycleState(
+      UserLifecycleState.OFFBOARDING,
+      initiatedBy,
+      `Started offboarding process - ${type}`
+    );
+
+    user.offboarding = {
+      status: OffboardingStatus.IN_PROGRESS,
+      type,
+      reason,
+      initiatedAt: new Date(),
+      initiatedBy,
+      targetExitDate,
+      checklist: [
+        { task: "Exit Interview Scheduled" },
+        { task: "System Access Review" },
+        { task: "Equipment Return" },
+        { task: "Knowledge Transfer" },
+        { task: "Final Documentation" },
+      ],
+    };
+
+    await user.save();
+    return user;
+  }
+
+  static async updatePassword(userId, hashedPassword) {
+    const user = await UserModel.findById(userId);
+    if (!user) throw new ApiError(404, "User not found");
+
+    user.password = hashedPassword;
+    await user.save();
+    return this.formatEmployeeResponse(user);
+  }
+
+  static async resetPassword(resetToken, hashedPassword) {
+    const user = await UserModel.findOne({
+      resetPasswordToken: resetToken,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+    if (!user) throw new ApiError(400, "Invalid or expired reset token");
+
+    user.password = hashedPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+    return this.formatEmployeeResponse(user);
   }
 }

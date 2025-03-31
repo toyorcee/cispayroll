@@ -15,12 +15,12 @@ import { Types } from "mongoose";
 import mongoose from "mongoose";
 import { DeductionService } from "../services/DeductionService.js";
 import Deduction from "../models/Deduction.js";
-import { DepartmentService } from "../services/departmentService.js";
 import { AllowanceService } from "../services/AllowanceService.js";
 import { BonusService } from "../services/BonusService.js";
-import Bonus from "../models/Bonus.js";
 import Allowance from "../models/Allowance.js";
 import Notification from "../models/Notification.js";
+import { DepartmentService } from "../services/departmentService.js";
+import { DeductionType } from "../models/Deduction.js";
 
 // Helper function for converting string IDs to ObjectId
 const asObjectId = (id) => new Types.ObjectId(id);
@@ -38,10 +38,24 @@ export class SuperAdminController {
   // ===== Admin Management =====
   static async getAllAdmins(req, res, next) {
     try {
+      console.log("🔍 Fetching all admins for HOD selection");
+
       const admins = await UserModel.find({ role: UserRole.ADMIN })
         .select("-password")
         .populate("department", "name code")
         .sort({ createdAt: -1 });
+
+      console.log(`✅ Found ${admins.length} admins`);
+      console.log(
+        "📊 Admins with HOD positions:",
+        admins
+          .filter((admin) => admin.position?.toLowerCase().includes("head of"))
+          .map((hod) => ({
+            id: hod._id,
+            name: `${hod.firstName} ${hod.lastName}`,
+            department: hod.department?.name,
+          }))
+      );
 
       res.status(200).json({
         success: true,
@@ -49,6 +63,7 @@ export class SuperAdminController {
         count: admins.length,
       });
     } catch (error) {
+      console.error("❌ Error fetching admins:", error);
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
     }
@@ -187,32 +202,11 @@ export class SuperAdminController {
       const limit = parseInt(req.query.limit) || 10;
       const search = req.query.search;
       const status = req.query.status;
-      const role = req.query.role;
-      const departmentName = req.query.department;
+      const departmentFilter = req.query.department;
 
-      // Base query - now includes all roles
       const query = {};
 
-      // If user is admin, only show users from their department
-      if (req.user.role === UserRole.ADMIN) {
-        query.department = req.user.department;
-        query.role = { $ne: UserRole.SUPER_ADMIN };
-      }
-
-      // Add other filters if provided
-      if (status) {
-        query.status = status;
-      }
-
-      // Modified department filter to handle null/undefined departments
-      if (departmentName && req.user.role === UserRole.SUPER_ADMIN) {
-        if (departmentName === "No Department") {
-          query.department = { $in: [null, undefined] };
-        } else {
-          query.department = departmentName;
-        }
-      }
-
+      // Add search filter
       if (search) {
         query.$or = [
           { firstName: { $regex: search, $options: "i" } },
@@ -221,16 +215,44 @@ export class SuperAdminController {
         ];
       }
 
-      const total = await UserModel.countDocuments(query);
-      const totalPages = Math.ceil(total / limit);
-      const skip = (page - 1) * limit;
+      // Add status filter
+      if (status) {
+        query.status = status;
+      }
+
+      // Handle department filter properly
+      if (departmentFilter && departmentFilter !== "No Department") {
+        // Always find the department first to get its ID
+        const department = await DepartmentModel.findOne({
+          $or: [
+            {
+              _id: Types.ObjectId.isValid(departmentFilter)
+                ? departmentFilter
+                : null,
+            },
+            { name: departmentFilter },
+          ],
+        });
+
+        if (department) {
+          // Only filter by department ID
+          query.department = department._id;
+        }
+      } else if (departmentFilter === "No Department") {
+        query.department = null;
+      }
 
       const users = await UserModel.find(query)
         .select("-password")
-        .populate("department", "name code")
+        .populate({
+          path: "department",
+          select: "name code",
+        })
         .sort({ createdAt: -1 })
-        .skip(skip)
+        .skip((page - 1) * limit)
         .limit(limit);
+
+      const total = await UserModel.countDocuments(query);
 
       res.status(200).json({
         success: true,
@@ -239,13 +261,12 @@ export class SuperAdminController {
           total,
           page,
           limit,
-          totalPages,
+          totalPages: Math.ceil(total / limit),
         },
       });
     } catch (error) {
       console.error("Error fetching users:", error);
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
+      res.status(500).json({ success: false, message: error.message });
     }
   }
 
@@ -268,16 +289,19 @@ export class SuperAdminController {
 
   static async createUser(req, res) {
     try {
-      if (!req.body.department) {
-        throw new ApiError(400, "Department is required");
+      const userData = req.body;
+
+      // If department is provided as a name, convert it to ID
+      if (userData.department && typeof userData.department === "string") {
+        const department = await DepartmentModel.findOne({
+          name: userData.department,
+        });
+        if (department) {
+          userData.department = department._id;
+        }
       }
 
-      const userData = {
-        ...req.body,
-        role: UserRole.USER,
-        isEmailVerified: true, // Since super admin creates it, it's verified
-      };
-
+      // Create user with department ID
       const user = await UserModel.create(userData);
 
       res.status(201).json({
@@ -293,15 +317,29 @@ export class SuperAdminController {
         },
       });
     } catch (error) {
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
+      console.error("Error creating user:", error);
+      res.status(500).json({ success: false, message: error.message });
     }
   }
 
-  static async updateUser(req, res, next) {
+  static async updateUser(req, res) {
     try {
-      const userId = req.params.id;
-      const user = await UserModel.findById(userId);
+      const { id } = req.params;
+      const updateData = req.body;
+
+      // If updating department, ensure it's an ID
+      if (updateData.department && typeof updateData.department === "string") {
+        const department = await DepartmentModel.findOne({
+          name: updateData.department,
+        });
+        if (department) {
+          updateData.department = department._id;
+        }
+      }
+
+      const user = await UserModel.findByIdAndUpdate(id, updateData, {
+        new: true,
+      }).populate("department");
 
       if (!user) {
         throw new ApiError(404, "User not found");
@@ -321,20 +359,14 @@ export class SuperAdminController {
         }
       }
 
-      const updatedUser = await UserModel.findByIdAndUpdate(
-        userId,
-        { $set: req.body },
-        { new: true, runValidators: true }
-      ).select("-password");
-
       res.status(200).json({
         success: true,
         message: "User updated successfully",
-        user: updatedUser,
+        user: user,
       });
     } catch (error) {
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
+      console.error("Error updating user:", error);
+      res.status(500).json({ success: false, message: error.message });
     }
   }
 
@@ -368,10 +400,22 @@ export class SuperAdminController {
   // ===== Department Management =====
   static async getAllDepartments(req, res) {
     try {
-      const departments = await DepartmentService.getAllDepartments();
+      const { page = 1, limit = 10, search, status } = req.query;
+      const filter = {
+        ...(search && { search }),
+        ...(status && { status }),
+      };
+
+      const departments = await DepartmentService.getAllDepartments(
+        parseInt(page),
+        parseInt(limit),
+        filter
+      );
+
       res.status(200).json({
         success: true,
-        data: { departments },
+        data: departments.data,
+        pagination: departments.pagination,
       });
     } catch (error) {
       const { statusCode, message } = handleError(error);
@@ -381,10 +425,28 @@ export class SuperAdminController {
 
   static async createDepartment(req, res) {
     try {
+      const departmentData = {
+        ...req.body,
+        createdBy: req.user.id,
+        updatedBy: req.user.id,
+      };
+
+      // Validate required fields
+      if (
+        !departmentData.name ||
+        !departmentData.code ||
+        !departmentData.headOfDepartment
+      ) {
+        throw new ApiError(
+          400,
+          "Name, code, and head of department are required"
+        );
+      }
+
       const department = await DepartmentService.createDepartment(
-        req.body,
-        req.user.id
+        departmentData
       );
+
       res.status(201).json({
         success: true,
         message: "Department created successfully",
@@ -398,11 +460,17 @@ export class SuperAdminController {
 
   static async updateDepartment(req, res) {
     try {
+      const { id } = req.params;
+      const updateData = {
+        ...req.body,
+        updatedBy: req.user.id,
+      };
+
       const department = await DepartmentService.updateDepartment(
-        req.params.id,
-        req.body,
-        req.user.id
+        id,
+        updateData
       );
+
       res.status(200).json({
         success: true,
         message: "Department updated successfully",
@@ -416,7 +484,9 @@ export class SuperAdminController {
 
   static async deleteDepartment(req, res) {
     try {
-      await DepartmentService.deleteDepartment(req.params.id);
+      const { id } = req.params;
+      await DepartmentService.deleteDepartment(id);
+
       res.status(200).json({
         success: true,
         message: "Department deleted successfully",
@@ -427,10 +497,45 @@ export class SuperAdminController {
     }
   }
 
+  static async getDepartmentEmployees(req, res) {
+    try {
+      const { departmentId } = req.params;
+      const { page = 1, limit = 10, status, role } = req.query;
+
+      const result = await DepartmentService.getDepartmentEmployees(
+        departmentId,
+        {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          status,
+          role,
+        }
+      );
+
+      res.status(200).json({
+        success: true,
+        data: result.data,
+        pagination: result.pagination,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message: message || "Failed to fetch department employees",
+      });
+    }
+  }
+
   // ===== Payroll Management =====
   static async createPayroll(req, res) {
     try {
-      const { employee, month, year, salaryGrade, department } = req.body;
+      const {
+        employee,
+        month,
+        year,
+        salaryGrade,
+        frequency = PayrollFrequency.MONTHLY,
+      } = req.body;
 
       // Validate month and year
       const currentDate = new Date();
@@ -446,24 +551,23 @@ export class SuperAdminController {
         throw new ApiError(400, "Invalid month");
       }
 
+      // Validate frequency
+      if (!Object.values(PayrollFrequency).includes(frequency)) {
+        throw new ApiError(400, "Invalid payroll frequency");
+      }
+
       // Get calculations from PayrollService
       const calculations = await PayrollService.calculatePayroll(
         employee,
         salaryGrade,
         month,
-        year
+        year,
+        frequency
       );
 
       // Create payroll data with all required fields
       const payrollData = {
-        employee, // Required: Employee ID
-        month, // Required: Month
-        year, // Required: Year
-        salaryGrade, // Required: Salary Grade ID
-        department, // Required: Department ID
-        basicSalary: calculations.totals.basicSalary, // Required: Basic Salary
-        components: calculations.allowances.gradeAllowances, // Required: Components with amounts
-        status: "PENDING",
+        ...calculations,
         processedBy: req.user.id,
         createdBy: req.user.id,
         updatedBy: req.user.id,
@@ -476,17 +580,36 @@ export class SuperAdminController {
           accountNumber: "Bank Details Required",
           accountName: "Bank Details Required",
         },
-        ...calculations, // Include all calculated values
       };
 
       const payroll = await PayrollModel.create(payrollData);
       const populatedPayroll = await PayrollModel.findById(
         payroll._id
       ).populate([
-        { path: "employee", select: "firstName lastName employeeId" },
+        {
+          path: "employee",
+          select: "firstName lastName employeeId department",
+          populate: {
+            path: "department",
+            select: "name code",
+          },
+        },
         { path: "department", select: "name code" },
         { path: "salaryGrade", select: "level description" },
+        { path: "processedBy", select: "firstName lastName" },
+        { path: "createdBy", select: "firstName lastName" },
+        { path: "updatedBy", select: "firstName lastName" },
+        { path: "approvalFlow.submittedBy", select: "firstName lastName" },
       ]);
+
+      // Ensure department is set from employee's department if not already set
+      if (
+        !populatedPayroll.department &&
+        populatedPayroll.employee.department
+      ) {
+        populatedPayroll.department = populatedPayroll.employee.department;
+        await populatedPayroll.save();
+      }
 
       res.status(201).json({
         success: true,
@@ -1110,69 +1233,21 @@ export class SuperAdminController {
 
   static async getActiveEmployees(req, res) {
     try {
-      console.log("🔍 Fetching active employees");
-
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
-      const search = req.query.search;
-      const departmentId = req.query.department;
-
-      const query = {
-        role: { $in: [UserRole.USER, UserRole.ADMIN] },
-        status: { $in: ["active", "pending"] },
-        $nor: [
-          { status: "archived" },
-          { status: "offboarding" },
-          { status: "completed" },
-        ],
-      };
-
-      // Add department filter if provided
-      if (departmentId) {
-        query.department = new Types.ObjectId(departmentId);
-      }
-
-      // Add search filter if provided
-      if (search) {
-        query.$or = [
-          { firstName: { $regex: search, $options: "i" } },
-          { lastName: { $regex: search, $options: "i" } },
-          { email: { $regex: search, $options: "i" } },
-          { employeeId: { $regex: search, $options: "i" } },
-        ];
-      }
-
-      console.log("📝 Query:", JSON.stringify(query, null, 2));
-
-      const [employees, total] = await Promise.all([
-        UserModel.find(query)
-          .select("-password")
-          .populate("department", "name code")
-          .sort({ createdAt: -1 })
-          .skip((page - 1) * limit)
-          .limit(limit),
-        UserModel.countDocuments(query),
-      ]);
-
-      // console.log(✅ Found ${employees.length} active employees);
+      const employees = await UserModel.find({
+        status: "active",
+        role: { $ne: UserRole.SUPER_ADMIN },
+      })
+        .select("-password")
+        .populate("department", "name code")
+        .sort({ firstName: 1 });
 
       res.status(200).json({
         success: true,
-        data: {
-          employees,
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
+        data: employees,
       });
     } catch (error) {
-      console.error("❌ Error fetching active employees:", error);
       const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({
-        success: false,
-        message: message || "Failed to fetch active employees",
-      });
+      res.status(statusCode).json({ success: false, message });
     }
   }
   static async getOnboardingEmployees(req, res) {
@@ -1434,153 +1509,6 @@ export class SuperAdminController {
     }
   }
 
-  static async getDepartmentEmployees(req, res) {
-    try {
-      const departmentId = req.params.departmentId;
-      console.log("🔍 Fetching employees for department:", departmentId);
-
-      const department = await DepartmentModel.findById(departmentId);
-      if (!department) {
-        throw new ApiError(404, "Department not found");
-      }
-
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
-      const status = req.query.status;
-
-      const query = {
-        department: department.name,
-        role: { $in: [UserRole.USER, UserRole.ADMIN] },
-        $or: [
-          { role: UserRole.USER },
-          {
-            $and: [
-              { role: UserRole.ADMIN },
-              { position: { $regex: /head|director|hod/i } },
-            ],
-          },
-        ],
-      };
-
-      if (status) {
-        query.status = status;
-      }
-
-      console.log("📝 Query:", JSON.stringify(query, null, 2));
-
-      const [employees, total] = await Promise.all([
-        UserModel.find(query)
-          .select("-password")
-          .sort({ role: -1, firstName: 1 })
-          .skip((page - 1) * limit)
-          .limit(limit),
-        UserModel.countDocuments(query),
-      ]);
-
-      console.log(
-        `✅ Found ${employees.length} employees (including HODs) for department ${department.name}`
-      );
-
-      res.status(200).json({
-        success: true,
-        data: {
-          employees: employees.map((emp) => ({
-            _id: emp._id,
-            firstName: emp.firstName,
-            lastName: emp.lastName,
-            email: emp.email,
-            employeeId: emp.employeeId,
-            position: emp.position,
-            department: department.name,
-            status: emp.status,
-            gradeLevel: emp.gradeLevel,
-            role: emp.role,
-            isHOD: emp.role === UserRole.ADMIN,
-          })),
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
-      });
-    } catch (error) {
-      console.error("❌ Error fetching department employees:", error);
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({
-        success: false,
-        message: message || "Failed to fetch department employees",
-      });
-    }
-  }
-
-  static async getActiveEmployees(req, res) {
-    try {
-      console.log("🔍 Fetching active employees");
-
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10;
-      const search = req.query.search;
-      const departmentId = req.query.department;
-
-      const query = {
-        role: { $in: [UserRole.USER, UserRole.ADMIN] },
-        status: { $in: ["active", "pending"] },
-        $nor: [
-          { status: "archived" },
-          { status: "offboarding" },
-          { status: "completed" },
-        ],
-      };
-
-      // Add department filter if provided
-      if (departmentId) {
-        query.department = new Types.ObjectId(departmentId);
-      }
-
-      // Add search filter if provided
-      if (search) {
-        query.$or = [
-          { firstName: { $regex: search, $options: "i" } },
-          { lastName: { $regex: search, $options: "i" } },
-          { email: { $regex: search, $options: "i" } },
-          { employeeId: { $regex: search, $options: "i" } },
-        ];
-      }
-
-      console.log("📝 Query:", JSON.stringify(query, null, 2));
-
-      const [employees, total] = await Promise.all([
-        UserModel.find(query)
-          .select("-password")
-          .populate("department", "name code")
-          .sort({ createdAt: -1 })
-          .skip((page - 1) * limit)
-          .limit(limit),
-        UserModel.countDocuments(query),
-      ]);
-
-      console.log(`✅ Found ${employees.length} active employees`);
-
-      res.status(200).json({
-        success: true,
-        data: {
-          employees,
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
-      });
-    } catch (error) {
-      console.error("❌ Error fetching active employees:", error);
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({
-        success: false,
-        message: message || "Failed to fetch active employees",
-      });
-    }
-  }
-
   // ===== Leave Management =====
   static async getAllLeaves(req, res) {
     try {
@@ -1699,25 +1627,41 @@ export class SuperAdminController {
       const { level, basicSalary, components, description, department } =
         req.body;
 
-      const existingGrade = await SalaryGrade.findOne({ level });
-      if (existingGrade) {
-        throw new ApiError(
-          400,
-          `Salary grade with level '${level}' already exists`
-        );
+      // Validate components
+      if (!components || !Array.isArray(components)) {
+        throw new ApiError(400, "Components must be an array");
       }
 
-      const salaryGrade = await SalaryGrade.create({
+      // Validate each component
+      components.forEach((comp, index) => {
+        if (!comp.calculationMethod) {
+          throw new ApiError(
+            400,
+            `Calculation method is required for component ${index + 1}`
+          );
+        }
+        if (!["fixed", "percentage"].includes(comp.calculationMethod)) {
+          throw new ApiError(
+            400,
+            `Invalid calculation method for component ${index + 1}`
+          );
+        }
+      });
+
+      const salaryGradeData = {
         level,
         basicSalary: Number(basicSalary),
         description: description || "",
-        department: department ? new Types.ObjectId(department) : null,
+        // Only include department if it's provided and valid
+        ...(department && department !== "department_id_here"
+          ? { department: new Types.ObjectId(department) }
+          : {}),
         components: components.map((comp) => ({
           name: comp.name.trim(),
-          type: "allowance", // Always allowance for now
-          calculationMethod: comp.type === "fixed" ? "fixed" : "percentage", // Map from frontend type
+          type: "allowance",
+          calculationMethod: comp.calculationMethod,
           value: Number(comp.value),
-          isActive: comp.isActive,
+          isActive: comp.isActive ?? true,
           _id: new Types.ObjectId(),
           createdBy: new Types.ObjectId(req.user.id),
           updatedBy: new Types.ObjectId(req.user.id),
@@ -1725,12 +1669,14 @@ export class SuperAdminController {
         createdBy: new Types.ObjectId(req.user.id),
         updatedBy: new Types.ObjectId(req.user.id),
         isActive: true,
-      });
+      };
+
+      const salaryGrade = await SalaryGrade.create(salaryGradeData);
 
       const populatedGrade = await SalaryGrade.findById(salaryGrade._id)
         .populate("department", "name code")
-        .populate("components.createdBy", "name")
-        .populate("components.updatedBy", "name");
+        .populate("components.createdBy", "firstName lastName")
+        .populate("components.updatedBy", "firstName lastName");
 
       res.status(201).json({
         success: true,
@@ -1746,6 +1692,7 @@ export class SuperAdminController {
       });
     }
   }
+
   static async getAllSalaryGrades(req, res) {
     try {
       console.log("🔍 Fetching all salary grades");
@@ -1789,8 +1736,8 @@ export class SuperAdminController {
       if (components) {
         salaryGrade.components = components.map((comp) => ({
           name: comp.name,
-          type: "allowance", // Always allowance for now
-          calculationMethod: comp.type === "fixed" ? "fixed" : "percentage", // Map from frontend type
+          type: "allowance",
+          calculationMethod: comp.calculationMethod,
           value: Number(comp.value),
           isActive: comp.isActive,
           _id: comp._id ? new Types.ObjectId(comp._id) : new Types.ObjectId(),
@@ -1827,8 +1774,18 @@ export class SuperAdminController {
         throw new ApiError(404, "Salary grade not found");
       }
 
+      // Validate calculationMethod
+      const validCalculationMethods = ["fixed", "percentage"];
+      if (!validCalculationMethods.includes(req.body.calculationMethod)) {
+        throw new ApiError(400, "Invalid calculation method");
+      }
+
       const newComponent = {
         ...req.body,
+        type: "allowance", // Always allowance
+        calculationMethod: req.body.calculationMethod,
+        value: Number(req.body.value),
+        isActive: true,
         createdBy: userId,
         updatedBy: userId,
         _id: new mongoose.Types.ObjectId(),
@@ -1852,7 +1809,6 @@ export class SuperAdminController {
   static async updateSalaryComponent(req, res) {
     try {
       const userId = new mongoose.Types.ObjectId(req.user.id);
-
       const salaryGrade = await SalaryGrade.findById(req.params.id);
       if (!salaryGrade) {
         throw new ApiError(404, "Salary grade not found");
@@ -1867,10 +1823,20 @@ export class SuperAdminController {
       }
 
       const existingComponent = salaryGrade.components[componentIndex];
+
+      // Validate calculationMethod
+      const validCalculationMethods = ["fixed", "percentage"];
+      if (
+        req.body.calculationMethod &&
+        !validCalculationMethods.includes(req.body.calculationMethod)
+      ) {
+        throw new ApiError(400, "Invalid calculation method");
+      }
+
       salaryGrade.components[componentIndex] = {
         ...existingComponent.toObject(),
         ...req.body,
-        type: req.body.type || existingComponent.type,
+        type: "allowance", // Always allowance
         calculationMethod:
           req.body.calculationMethod || existingComponent.calculationMethod,
         value: Number(req.body.value || existingComponent.value),
@@ -1943,10 +1909,19 @@ export class SuperAdminController {
 
   static async setupStatutoryDeductions(req, res) {
     try {
-      await DeductionService.createStatutoryDeductions(asObjectId(req.user.id));
+      console.log("🔄 Setting up statutory deductions");
+
+      const userId = asObjectId(req.user.id);
+
+      // Create all statutory deductions at once
+      const deductions = await DeductionService.createStatutoryDeductions(
+        userId
+      );
+
       res.status(201).json({
         success: true,
         message: "Statutory deductions set up successfully",
+        data: deductions,
       });
     } catch (error) {
       console.error("❌ Error setting up statutory deductions:", error);
@@ -1978,27 +1953,43 @@ export class SuperAdminController {
 
   static async createVoluntaryDeduction(req, res) {
     try {
-      // Validate request body
+      console.log("📝 Creating voluntary deduction");
+
+      // Validate required fields
       if (
         !req.body.name ||
         !req.body.calculationMethod ||
         req.body.value === undefined
       ) {
-        console.log("❌ Validation failed: Missing required fields");
-        throw new Error("Missing required fields");
+        throw new ApiError(
+          400,
+          "Missing required fields: name, calculationMethod, value"
+        );
+      }
+
+      // Validate deduction value
+      if (req.body.value < 0) {
+        throw new ApiError(400, "Deduction value cannot be negative");
+      }
+
+      if (req.body.calculationMethod === "percentage" && req.body.value > 100) {
+        throw new ApiError(400, "Percentage deduction cannot exceed 100%");
       }
 
       const userId = asObjectId(req.user.id);
-      console.log("🔑 Converted user ID:", userId);
-
       const deductionData = {
         name: req.body.name,
         description: req.body.description,
         calculationMethod: req.body.calculationMethod,
         value: req.body.value,
-        effectiveDate: req.body.effectiveDate || new Date(),
+        effectiveDate: req.body.effectiveDate
+          ? new Date(req.body.effectiveDate)
+          : new Date(),
+        category: req.body.category || "general",
+        isActive: true,
+        createdBy: userId,
+        updatedBy: userId,
       };
-      console.log("✅ Prepared deduction data:", deductionData);
 
       const deduction = await DeductionService.createVoluntaryDeduction(
         userId,
@@ -2013,11 +2004,46 @@ export class SuperAdminController {
         data: deduction,
       });
     } catch (error) {
-      console.error("❌ Error in controller:", error);
-      console.error(
-        "Stack trace:",
-        error instanceof Error ? error.stack : "No stack trace"
+      console.error("❌ Error creating deduction:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async createBulkDeductions(req, res) {
+    try {
+      console.log("📦 Creating bulk deductions");
+
+      if (
+        !Array.isArray(req.body.deductions) ||
+        req.body.deductions.length === 0
+      ) {
+        throw new ApiError(400, "Deductions array is required");
+      }
+
+      const userId = asObjectId(req.user.id);
+      const results = await Promise.all(
+        req.body.deductions.map((deduction) =>
+          DeductionService.createVoluntaryDeduction(userId, {
+            ...deduction,
+            effectiveDate: deduction.effectiveDate || new Date(),
+            category: deduction.category || "general",
+            isActive: true,
+            createdBy: userId,
+            updatedBy: userId,
+          })
+        )
       );
+
+      console.log(`✅ Created ${results.length} deductions successfully`);
+
+      res.status(201).json({
+        success: true,
+        message: "Bulk deductions created successfully",
+        data: results,
+      });
+    } catch (error) {
+      console.error("❌ Error creating bulk deductions:", error);
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
     }
@@ -2025,10 +2051,7 @@ export class SuperAdminController {
 
   static async updateDeduction(req, res) {
     try {
-      console.log("📝 Updating deduction:", {
-        id: req.params.id,
-        updates: req.body,
-      });
+      console.log("📝 Updating deduction:", req.params.id);
 
       const deduction = await Deduction.findById(req.params.id);
       if (!deduction) {
@@ -2048,11 +2071,52 @@ export class SuperAdminController {
         );
       }
 
+      // Validate new value if provided
+      if (req.body.value !== undefined) {
+        if (req.body.value < 0) {
+          throw new ApiError(400, "Deduction value cannot be negative");
+        }
+        if (
+          deduction.calculationMethod === "percentage" &&
+          req.body.value > 100
+        ) {
+          throw new ApiError(400, "Percentage deduction cannot exceed 100%");
+        }
+      }
+
+      // Validate dates if provided
+      if (req.body.effectiveDate) {
+        const effectiveDate = new Date(req.body.effectiveDate);
+        if (effectiveDate < new Date()) {
+          throw new ApiError(400, "Effective date cannot be in the past");
+        }
+      }
+
+      if (req.body.expiryDate) {
+        const expiryDate = new Date(req.body.expiryDate);
+        const effectiveDate = req.body.effectiveDate
+          ? new Date(req.body.effectiveDate)
+          : deduction.effectiveDate;
+        if (expiryDate <= effectiveDate) {
+          throw new ApiError(400, "Expiry date must be after effective date");
+        }
+      }
+
+      // Store previous values for history
+      const historyEntry = {
+        previousValue: deduction.value,
+        newValue: req.body.value,
+        updatedBy: req.user.id,
+        updatedAt: new Date(),
+        changes: req.body,
+      };
+
       const updatedDeduction = await Deduction.findByIdAndUpdate(
         req.params.id,
         {
           ...req.body,
           updatedBy: asObjectId(req.user.id),
+          $push: { history: historyEntry },
         },
         { new: true }
       );
@@ -2073,11 +2137,17 @@ export class SuperAdminController {
 
   static async toggleDeductionStatus(req, res) {
     try {
-      const { id } = req.params;
+      console.log("🔄 Toggling deduction status:", req.params.id);
 
       const result = await DeductionService.toggleDeductionStatus(
-        asObjectId(id),
+        asObjectId(req.params.id),
         asObjectId(req.user.id)
+      );
+
+      console.log(
+        `✅ Deduction ${
+          result.deduction.isActive ? "activated" : "deactivated"
+        } successfully`
       );
 
       res.json({
@@ -2099,16 +2169,19 @@ export class SuperAdminController {
 
   static async deleteDeduction(req, res) {
     try {
+      console.log("🗑️ Deleting deduction:", req.params.id);
+
       const deduction = await Deduction.findById(req.params.id);
       if (!deduction) {
         throw new ApiError(404, "Deduction not found");
       }
 
       // Don't allow deleting statutory deductions
-      if (deduction.type === "statutory") {
+      if (deduction.type === DeductionType.STATUTORY) {
         throw new ApiError(400, "Cannot delete statutory deductions");
       }
 
+      // Actually delete the deduction instead of just archiving
       await Deduction.findByIdAndDelete(req.params.id);
 
       console.log("✅ Deduction deleted successfully");
@@ -2475,6 +2548,256 @@ export class SuperAdminController {
       });
     } catch (error) {
       next(error);
+    }
+  }
+
+  // Allowance Management Methods
+  static async getAllAllowances(req, res) {
+    try {
+      const allowances = await Allowance.find()
+        .populate("department", "name")
+        .populate("employee", "firstName lastName email")
+        .populate("salaryGrade", "level basicSalary")
+        .sort({ createdAt: -1 });
+
+      res.status(200).json({
+        success: true,
+        data: allowances,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  static async createAllowance(req, res) {
+    try {
+      const allowance = await Allowance.create({
+        ...req.body,
+        createdBy: req.user._id,
+        updatedBy: req.user._id,
+      });
+
+      res.status(201).json({
+        success: true,
+        data: allowance,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  static async getAllowanceDetails(req, res) {
+    try {
+      const allowance = await Allowance.findById(req.params.id)
+        .populate("department", "name")
+        .populate("employee", "firstName lastName email")
+        .populate("salaryGrade", "level basicSalary")
+        .populate("createdBy", "firstName lastName")
+        .populate("updatedBy", "firstName lastName");
+
+      if (!allowance) {
+        return res.status(404).json({
+          success: false,
+          error: "Allowance not found",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: allowance,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  static async updateAllowance(req, res) {
+    try {
+      const allowance = await Allowance.findByIdAndUpdate(
+        req.params.id,
+        {
+          ...req.body,
+          updatedBy: req.user._id,
+        },
+        { new: true, runValidators: true }
+      );
+
+      if (!allowance) {
+        return res.status(404).json({
+          success: false,
+          error: "Allowance not found",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: allowance,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  static async deleteAllowance(req, res) {
+    try {
+      const allowance = await Allowance.findByIdAndDelete(req.params.id);
+
+      if (!allowance) {
+        return res.status(404).json({
+          success: false,
+          error: "Allowance not found",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {},
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  static async approveAllowance(req, res) {
+    try {
+      const allowance = await Allowance.findByIdAndUpdate(
+        req.params.id,
+        {
+          status: AllowanceStatus.APPROVED,
+          approvedBy: req.user._id,
+          approvedAt: Date.now(),
+          updatedBy: req.user._id,
+        },
+        { new: true, runValidators: true }
+      );
+
+      if (!allowance) {
+        return res.status(404).json({
+          success: false,
+          error: "Allowance not found",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: allowance,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  static async rejectAllowance(req, res) {
+    try {
+      const { rejectionReason } = req.body;
+
+      const allowance = await Allowance.findByIdAndUpdate(
+        req.params.id,
+        {
+          status: AllowanceStatus.REJECTED,
+          rejectionReason,
+          updatedBy: req.user._id,
+        },
+        { new: true, runValidators: true }
+      );
+
+      if (!allowance) {
+        return res.status(404).json({
+          success: false,
+          error: "Allowance not found",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: allowance,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+
+  // Add this new method for custom statutory deductions
+  static async createCustomStatutoryDeduction(req, res) {
+    try {
+      console.log("📝 Creating custom statutory deduction");
+
+      // Validate required fields
+      if (
+        !req.body.name ||
+        !req.body.calculationMethod ||
+        req.body.value === undefined
+      ) {
+        throw new ApiError(
+          400,
+          "Missing required fields: name, calculationMethod, value"
+        );
+      }
+
+      // Validate deduction value
+      if (req.body.value < 0) {
+        throw new ApiError(400, "Deduction value cannot be negative");
+      }
+
+      if (req.body.calculationMethod === "percentage" && req.body.value > 100) {
+        throw new ApiError(400, "Percentage deduction cannot exceed 100%");
+      }
+
+      const userId = asObjectId(req.user.id);
+      const deductionData = {
+        name: req.body.name,
+        type: DeductionType.STATUTORY, // Set type as statutory
+        description: req.body.description,
+        calculationMethod: req.body.calculationMethod,
+        value: req.body.value,
+        effectiveDate: req.body.effectiveDate
+          ? new Date(req.body.effectiveDate)
+          : new Date(), // Use provided date or today
+        isActive: true,
+        createdBy: userId,
+        updatedBy: userId,
+      };
+
+      const deduction = await DeductionService.createCustomStatutoryDeduction(
+        userId,
+        deductionData
+      );
+
+      console.log(
+        "✅ Custom statutory deduction created successfully:",
+        deduction
+      );
+
+      res.status(201).json({
+        success: true,
+        message: "Custom statutory deduction created successfully",
+        data: deduction,
+      });
+    } catch (error) {
+      console.error("❌ Error creating custom statutory deduction:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
     }
   }
 }

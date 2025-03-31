@@ -107,12 +107,49 @@ export const Permission = {
   // ===== Disciplinary =====
   VIEW_DISCIPLINARY_RECORDS: "VIEW_DISCIPLINARY_RECORDS",
   MANAGE_DISCIPLINARY_ACTIONS: "MANAGE_DISCIPLINARY_ACTIONS",
+
+  // Dashboard Access
+  VIEW_DASHBOARD: "VIEW_DASHBOARD",
+};
+
+export const UserLifecycleState = {
+  PENDING: "PENDING", // Just invited
+  ONBOARDING: "ONBOARDING", // Setting up profile
+  ACTIVE: "ACTIVE", // Fully onboarded
+  OFFBOARDING: "OFFBOARDING", // Leaving process
+  TERMINATED: "TERMINATED", // No longer active
 };
 
 export const OnboardingStatus = {
   NOT_STARTED: "not_started",
   IN_PROGRESS: "in_progress",
   COMPLETED: "completed",
+};
+
+// Update the status enum to match lifecycle states
+export const UserStatus = {
+  PENDING: "pending",
+  ACTIVE: "active",
+  INACTIVE: "inactive",
+  SUSPENDED: "suspended",
+  OFFBOARDING: "offboarding",
+  TERMINATED: "terminated",
+};
+
+export const OffboardingType = {
+  VOLUNTARY_RESIGNATION: "voluntary_resignation",
+  INVOLUNTARY_TERMINATION: "involuntary_termination",
+  RETIREMENT: "retirement",
+  CONTRACT_END: "contract_end",
+};
+
+// Add this enum definition
+export const OffboardingStatus = {
+  NOT_STARTED: "not_started",
+  IN_PROGRESS: "in_progress",
+  PENDING_EXIT: "pending_exit",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
 };
 
 // Schema Definition
@@ -167,8 +204,11 @@ const UserSchema = new Schema(
       },
     ],
     department: {
-      type: String,
-      trim: true,
+      type: Schema.Types.ObjectId,
+      ref: "Department",
+      required: function () {
+        return this.role !== UserRole.SUPER_ADMIN;
+      },
     },
     position: {
       type: String,
@@ -199,15 +239,8 @@ const UserSchema = new Schema(
     },
     status: {
       type: String,
-      enum: [
-        "pending",
-        "active",
-        "inactive",
-        "suspended",
-        "offboarding",
-        "terminated",
-      ],
-      default: "pending",
+      enum: Object.values(UserStatus),
+      default: UserStatus.PENDING,
     },
     emergencyContact: {
       name: {
@@ -269,46 +302,152 @@ const UserSchema = new Schema(
       ref: "User",
       required: false,
     },
-    offboarding: {
-      status: {
+    // Update lifecycle tracking
+    lifecycle: {
+      currentState: {
         type: String,
-        enum: ["pending_exit", "in_progress", "completed"],
-        default: "pending_exit",
+        enum: Object.values(UserLifecycleState),
+        default: UserLifecycleState.PENDING,
       },
-      checklist: {
-        exitInterview: { type: Boolean, default: false },
-        assetsReturned: { type: Boolean, default: false },
-        knowledgeTransfer: { type: Boolean, default: false },
-        accessRevoked: { type: Boolean, default: false },
-        finalSettlement: { type: Boolean, default: false },
+      history: [
+        {
+          state: {
+            type: String,
+            enum: Object.values(UserLifecycleState),
+          },
+          timestamp: Date,
+          updatedBy: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+          },
+          notes: String,
+        },
+      ],
+      onboarding: {
+        status: {
+          type: String,
+          enum: ["NOT_STARTED", "IN_PROGRESS", "COMPLETED"],
+          default: "NOT_STARTED",
+        },
+        startedAt: Date,
+        completedAt: Date,
+        steps: [
+          {
+            name: String,
+            completed: Boolean,
+            completedAt: Date,
+          },
+        ],
       },
-      initiatedAt: Date,
-      initiatedBy: { type: Schema.Types.ObjectId, ref: "User" },
-      completedAt: Date,
-      completedBy: { type: Schema.Types.ObjectId, ref: "User" },
-      progress: { type: Number, default: 0 },
     },
+    // Consolidate invitation fields
+    invitation: {
+      token: String,
+      expiresAt: Date,
+      sentAt: Date,
+      lastResendAt: Date,
+      resendCount: { type: Number, default: 0 },
+    },
+    // Enhanced onboarding tracking
     onboarding: {
       status: {
         type: String,
         enum: Object.values(OnboardingStatus),
         default: OnboardingStatus.NOT_STARTED,
       },
+      supervisor: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+      startedAt: Date,
+      expectedCompletionDate: Date,
+      completedAt: Date,
       tasks: [
         {
           name: { type: String, required: true },
+          description: String,
+          category: {
+            type: String,
+            enum: [
+              "orientation",
+              "documentation",
+              "training",
+              "setup",
+              "compliance",
+            ],
+          },
+          deadline: Date,
           completed: { type: Boolean, default: false },
           completedAt: Date,
+          completedBy: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+          },
+          notes: String,
         },
       ],
       progress: { type: Number, default: 0 },
-      startedAt: Date,
-      completedAt: Date,
+    },
+    // Enhanced offboarding tracking
+    offboarding: {
+      status: {
+        type: String,
+        enum: Object.values(OffboardingStatus),
+        default: OffboardingStatus.NOT_STARTED,
+      },
+      type: {
+        type: String,
+        enum: Object.values(OffboardingType),
+      },
+      reason: String,
+      initiatedAt: Date,
+      initiatedBy: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+      targetExitDate: Date,
+      actualExitDate: Date,
+      checklist: [
+        {
+          task: String,
+          completed: { type: Boolean, default: false },
+          completedAt: Date,
+          completedBy: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+          },
+          notes: String,
+        },
+      ],
+      exitInterview: {
+        completed: { type: Boolean, default: false },
+        conductedBy: {
+          type: Schema.Types.ObjectId,
+          ref: "User",
+        },
+        date: Date,
+        notes: String,
+      },
+      rehireEligible: {
+        status: Boolean,
+        notes: String,
+      },
     },
     salaryGrade: {
       type: Schema.Types.ObjectId,
       ref: "SalaryGrade",
       required: false,
+    },
+    passwordLastChanged: {
+      type: Date,
+      default: Date.now,
+    },
+    passwordAttempts: {
+      type: Number,
+      default: 0,
+    },
+    lastPasswordAttempt: {
+      type: Date,
     },
   },
   {
@@ -362,6 +501,8 @@ UserSchema.pre("save", function (next) {
     switch (this.role) {
       case UserRole.SUPER_ADMIN:
         this.permissions = [
+          // Dashboard Access
+          Permission.VIEW_DASHBOARD,
           // User Management
           Permission.CREATE_ADMIN,
           Permission.EDIT_ADMIN,
@@ -459,6 +600,8 @@ UserSchema.pre("save", function (next) {
 
       case UserRole.ADMIN:
         this.permissions = [
+          // Dashboard Access
+          Permission.VIEW_DASHBOARD,
           // User Management (User-level only)
           Permission.CREATE_USER,
           Permission.EDIT_USER,
@@ -511,6 +654,8 @@ UserSchema.pre("save", function (next) {
 
       case UserRole.USER:
         this.permissions = [
+          // Dashboard Access
+          Permission.VIEW_DASHBOARD,
           Permission.VIEW_PERSONAL_INFO,
           Permission.REQUEST_LEAVE,
           Permission.VIEW_OWN_LEAVE,
@@ -543,5 +688,72 @@ UserSchema.index({ employeeId: 1 }, { unique: true });
 UserSchema.index({ role: 1 });
 UserSchema.index({ department: 1 });
 UserSchema.index({ status: 1 });
+
+// Add lifecycle state management method
+UserSchema.methods.updateLifecycleState = async function (
+  newState,
+  updatedBy,
+  notes
+) {
+  const oldState = this.lifecycle.currentState;
+
+  // Update current state
+  this.lifecycle.currentState = newState;
+
+  // Add to history
+  this.lifecycle.history.push({
+    state: newState,
+    timestamp: new Date(),
+    updatedBy,
+    notes: notes || `State changed from ${oldState} to ${newState}`,
+  });
+
+  // Update status and other fields based on state
+  switch (newState) {
+    case UserLifecycleState.INVITED:
+      this.status = UserStatus.PENDING;
+      this.onboarding.status = OnboardingStatus.NOT_STARTED;
+      break;
+    case UserLifecycleState.REGISTERED:
+      this.isEmailVerified = true;
+      break;
+    case UserLifecycleState.ONBOARDING:
+      this.status = UserStatus.ACTIVE;
+      this.onboarding.status = OnboardingStatus.IN_PROGRESS;
+      if (!this.onboarding.startedAt) {
+        this.onboarding.startedAt = new Date();
+      }
+      break;
+    case UserLifecycleState.ACTIVE:
+      this.status = UserStatus.ACTIVE;
+      this.onboarding.status = OnboardingStatus.COMPLETED;
+      this.onboarding.completedAt = new Date();
+      break;
+    case UserLifecycleState.OFFBOARDING:
+      this.status = UserStatus.OFFBOARDING;
+      break;
+    case UserLifecycleState.TERMINATED:
+      this.status = UserStatus.TERMINATED;
+      break;
+  }
+
+  await this.save();
+  return this;
+};
+
+// Add method to check if user can transition to a state
+UserSchema.methods.canTransitionTo = function (newState) {
+  const validTransitions = {
+    [UserLifecycleState.INVITED]: [],
+    [UserLifecycleState.REGISTERED]: [UserLifecycleState.INVITED],
+    [UserLifecycleState.ONBOARDING]: [UserLifecycleState.REGISTERED],
+    [UserLifecycleState.ACTIVE]: [UserLifecycleState.ONBOARDING],
+    [UserLifecycleState.OFFBOARDING]: [UserLifecycleState.ACTIVE],
+    [UserLifecycleState.TERMINATED]: [UserLifecycleState.OFFBOARDING],
+    [UserLifecycleState.PENDING_REONBOARDING]: [UserLifecycleState.TERMINATED],
+  };
+
+  return validTransitions[newState].includes(this.lifecycle.currentState);
+};
 
 export default mongoose.model("User", UserSchema);

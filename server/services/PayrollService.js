@@ -10,6 +10,7 @@ import { DeductionService } from "./DeductionService.js";
 import { AllowanceService } from "./AllowanceService.js";
 import { BonusService } from "./BonusService.js";
 import { SalaryStructureService } from "./SalaryStructureService.js";
+import DepartmentModel from "../models/Department.js";
 
 const asObjectId = (id) => new Types.ObjectId(id);
 
@@ -18,6 +19,12 @@ export class PayrollService {
     console.log("🔍 Validating employee:", employeeId);
 
     const employee = await UserModel.findById(employeeId).lean();
+    console.log("📋 Employee data:", {
+      id: employee._id,
+      name: `${employee.firstName} ${employee.lastName}`,
+      department: employee.department,
+      departmentType: typeof employee.department,
+    });
 
     if (!employee) {
       throw new ApiError(400, "Employee not found");
@@ -27,20 +34,45 @@ export class PayrollService {
       throw new ApiError(400, "Employee must be assigned to a department");
     }
 
-    // Create department object if it's a string
-    const departmentInfo =
-      typeof employee.department === "string"
-        ? {
-            _id: new Types.ObjectId(),
-            name: employee.department,
-            code: employee.department,
-          }
-        : employee.department;
+    // If department is a string, try to find the department by name
+    if (typeof employee.department === "string") {
+      const departmentData = await DepartmentModel.findOne({
+        name: employee.department,
+        status: "active",
+      });
+      console.log("🔍 Found department by name:", departmentData);
+
+      if (!departmentData) {
+        throw new ApiError(
+          404,
+          `Department "${employee.department}" not found`
+        );
+      }
+
+      return {
+        ...employee,
+        department: departmentData,
+        gradeLevel: employee.gradeLevel?.toString() || "",
+      };
+    }
+
+    // If department is an ObjectId, populate the department data
+    const populatedEmployee = await UserModel.findById(employeeId)
+      .populate({
+        path: "department",
+        select: "name code",
+      })
+      .lean();
+
+    console.log("🔍 Populated employee data:", {
+      id: populatedEmployee._id,
+      name: `${populatedEmployee.firstName} ${populatedEmployee.lastName}`,
+      department: populatedEmployee.department,
+    });
 
     return {
-      ...employee,
-      department: departmentInfo,
-      gradeLevel: employee.gradeLevel?.toString() || "",
+      ...populatedEmployee,
+      gradeLevel: populatedEmployee.gradeLevel?.toString() || "",
     };
   }
 
@@ -88,54 +120,57 @@ export class PayrollService {
   }
 
   static async calculateSalaryComponents(salaryGradeId, employeeId) {
-    console.log("🧮 Calculating salary components for grade:", salaryGradeId);
+    try {
+      console.log("🧮 Calculating salary components for grade:", salaryGradeId);
 
-    const salaryGrade = await SalaryGrade.findById(salaryGradeId);
-    if (!salaryGrade) {
-      throw new ApiError(404, "Salary grade not found");
+      const salaryGrade = await SalaryGrade.findById(salaryGradeId);
+      if (!salaryGrade) {
+        throw new ApiError(404, "Salary grade not found");
+      }
+
+      if (!salaryGrade.basicSalary || salaryGrade.basicSalary <= 0) {
+        throw new ApiError(400, "Invalid basic salary in salary grade");
+      }
+
+      console.log("✅ Salary grade data:", {
+        level: salaryGrade.level,
+        basicSalary: salaryGrade.basicSalary,
+        components: salaryGrade.components?.length || 0,
+      });
+
+      // Get the full salary calculation from SalaryStructureService
+      const salaryCalculation =
+        await SalaryStructureService.calculateTotalSalary(salaryGrade);
+
+      console.log("📊 Salary calculation results:", {
+        basicSalary: salaryCalculation.basicSalary,
+        totalAllowances: salaryCalculation.totalAllowances,
+        totalDeductions: salaryCalculation.totalDeductions,
+        totalBonuses: salaryCalculation.totalBonuses,
+        grossSalary: salaryCalculation.grossSalary,
+        netSalary: salaryCalculation.netSalary,
+        components: salaryCalculation.components.map((c) => ({
+          name: c.name,
+          amount: c.amount,
+        })),
+      });
+
+      return {
+        basicSalary: salaryCalculation.basicSalary,
+        components: salaryCalculation.components,
+        totalAllowances: salaryCalculation.totalAllowances,
+        totalDeductions: salaryCalculation.totalDeductions,
+        totalBonuses: salaryCalculation.totalBonuses,
+        grossSalary: salaryCalculation.grossSalary,
+        netSalary: salaryCalculation.netSalary,
+      };
+    } catch (error) {
+      console.error("❌ Error calculating salary components:", error);
+      throw new ApiError(
+        500,
+        `Failed to calculate salary components: ${error.message}`
+      );
     }
-
-    // Define standard allowances
-    const standardAllowances = [
-      {
-        name: "Housing Allowance",
-        type: "allowance",
-        value: 25,
-        calculationMethod: "percentage",
-        amount: (salaryGrade.basicSalary * 25) / 100,
-        isActive: true,
-      },
-      {
-        name: "Transport Allowance",
-        type: "allowance",
-        value: 60000,
-        calculationMethod: "fixed",
-        amount: 60000,
-        isActive: true,
-      },
-      {
-        name: "Medical Allowance",
-        type: "allowance",
-        value: 40000,
-        calculationMethod: "fixed",
-        amount: 40000,
-        isActive: true,
-      },
-    ];
-
-    // Calculate totals
-    const totalAllowances = standardAllowances.reduce(
-      (sum, a) => sum + a.amount,
-      0
-    );
-
-    return {
-      basicSalary: salaryGrade.basicSalary,
-      components: standardAllowances,
-      additionalAllowances: [],
-      totalAllowances,
-      grossSalary: salaryGrade.basicSalary + totalAllowances,
-    };
   }
 
   static async calculateDeductions(basicSalary, grossSalary) {
@@ -301,36 +336,99 @@ export class PayrollService {
     frequency,
     targetFrequency = PayrollFrequency.MONTHLY
   ) {
-    const monthlyAmount = (() => {
-      switch (frequency) {
-        case PayrollFrequency.YEARLY:
-          return amount / 12;
-        case PayrollFrequency.SEMI_MONTHLY:
-          return amount * 2;
-        case PayrollFrequency.BI_WEEKLY:
-          return amount * 2.167;
-        case PayrollFrequency.WEEKLY:
-          return amount * 4.333;
-        case PayrollFrequency.DAILY:
-          return amount * 21.75;
-        default:
-          return amount;
-      }
-    })();
+    try {
+      console.log("🔄 Adjusting amount by frequency:", {
+        amount,
+        from: frequency,
+        to: targetFrequency,
+      });
 
-    switch (targetFrequency) {
-      case PayrollFrequency.YEARLY:
-        return monthlyAmount * 12;
-      case PayrollFrequency.SEMI_MONTHLY:
-        return monthlyAmount / 2;
-      case PayrollFrequency.BI_WEEKLY:
-        return monthlyAmount / 2.167;
-      case PayrollFrequency.WEEKLY:
-        return monthlyAmount / 4.333;
-      case PayrollFrequency.DAILY:
-        return monthlyAmount / 21.75;
-      default:
-        return monthlyAmount;
+      const monthlyAmount = (() => {
+        switch (frequency) {
+          case PayrollFrequency.YEARLY:
+            return amount / 12;
+          case PayrollFrequency.QUARTERLY:
+            return amount / 3;
+          case PayrollFrequency.BIWEEKLY:
+            return amount * 2.167;
+          case PayrollFrequency.WEEKLY:
+            return amount * 4.333;
+          default:
+            return amount;
+        }
+      })();
+
+      const adjustedAmount = (() => {
+        switch (targetFrequency) {
+          case PayrollFrequency.YEARLY:
+            return monthlyAmount * 12;
+          case PayrollFrequency.QUARTERLY:
+            return monthlyAmount * 3;
+          case PayrollFrequency.BIWEEKLY:
+            return monthlyAmount / 2.167;
+          case PayrollFrequency.WEEKLY:
+            return monthlyAmount / 4.333;
+          default:
+            return monthlyAmount;
+        }
+      })();
+
+      console.log(`✅ Adjusted amount: ₦${adjustedAmount.toLocaleString()}`);
+      return this.roundToKobo(adjustedAmount);
+    } catch (error) {
+      console.error("❌ Error adjusting amount by frequency:", error);
+      throw new ApiError(
+        500,
+        `Failed to adjust amount by frequency: ${error.message}`
+      );
+    }
+  }
+
+  static getPeriodDates(frequency, month, year) {
+    try {
+      console.log("📅 Calculating period dates for:", {
+        frequency,
+        month,
+        year,
+      });
+
+      const startDate = new Date(year, month - 1, 1);
+      let endDate;
+
+      switch (frequency) {
+        case PayrollFrequency.WEEKLY:
+          endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + 6);
+          break;
+        case PayrollFrequency.BIWEEKLY:
+          endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + 13);
+          break;
+        case PayrollFrequency.MONTHLY:
+          endDate = new Date(year, month, 0);
+          break;
+        case PayrollFrequency.QUARTERLY:
+          endDate = new Date(year, month + 2, 0);
+          break;
+        case PayrollFrequency.YEARLY:
+          endDate = new Date(year, 11, 31);
+          break;
+        default:
+          endDate = new Date(year, month, 0);
+      }
+
+      console.log("✅ Period dates calculated:", {
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+      });
+
+      return { startDate, endDate };
+    } catch (error) {
+      console.error("❌ Error calculating period dates:", error);
+      throw new ApiError(
+        500,
+        `Failed to calculate period dates: ${error.message}`
+      );
     }
   }
 
@@ -368,120 +466,265 @@ export class PayrollService {
     return { startDate, endDate };
   }
 
-  static async calculatePayroll(employeeId, salaryGradeId, month, year) {
-    const existingPayroll = await PayrollModel.findOne({
-      employee: employeeId,
-      month,
-      year,
-    });
+  static async calculatePayroll(
+    employeeId,
+    salaryGradeId,
+    month,
+    year,
+    frequency = PayrollFrequency.MONTHLY
+  ) {
+    try {
+      console.log("🧮 Calculating payroll for:", {
+        employeeId,
+        month,
+        year,
+        frequency,
+      });
 
-    if (existingPayroll) {
-      throw new ApiError(
-        400,
-        `Payroll record already exists for employee in ${month}/${year}`
+      // Get employee details using validateAndGetEmployee
+      const employee = await this.validateAndGetEmployee(employeeId);
+      if (!employee.department) {
+        throw new ApiError(400, "Employee must be assigned to a department");
+      }
+
+      // Handle department whether it's a string or ObjectId
+      let departmentData;
+      if (typeof employee.department === "string") {
+        departmentData = await DepartmentModel.findOne({
+          name: employee.department,
+          status: "active",
+        });
+        if (!departmentData) {
+          throw new ApiError(
+            404,
+            `Department "${employee.department}" not found`
+          );
+        }
+      } else {
+        departmentData = await DepartmentModel.findById(employee.department);
+        if (!departmentData) {
+          throw new ApiError(404, "Department not found");
+        }
+      }
+
+      console.log("✅ Department found:", {
+        id: departmentData._id,
+        name: departmentData.name,
+        code: departmentData.code,
+      });
+
+      // Check for existing payroll
+      const existingPayroll = await PayrollModel.findOne({
+        employee: employeeId,
+        month,
+        year,
+        frequency,
+      });
+
+      if (existingPayroll) {
+        throw new ApiError(
+          400,
+          `Payroll record already exists for employee in ${month}/${year} with ${frequency} frequency`
+        );
+      }
+
+      // Get salary grade using SalaryStructureService
+      console.log("\n🔍 Getting salary grade for ID:", salaryGradeId);
+      const salaryGrade = await SalaryStructureService.getSalaryGradeById(
+        salaryGradeId
       );
-    }
+      if (!salaryGrade) {
+        throw new ApiError(404, "Salary grade not found");
+      }
 
-    const salaryGrade = await SalaryStructureService.getSalaryGradeById(
-      salaryGradeId
-    );
-    if (!salaryGrade) {
-      throw new ApiError(404, "Salary grade not found");
-    }
+      console.log("📋 Salary Grade Data:", {
+        id: salaryGrade._id,
+        level: salaryGrade.level,
+        basicSalary: salaryGrade.basicSalary,
+        components: salaryGrade.components,
+        componentsCount: salaryGrade.components?.length || 0,
+      });
 
-    const salaryDetails =
-      SalaryStructureService.calculateTotalSalary(salaryGrade);
-    const grossSalary = this.roundToKobo(salaryDetails.grossSalary);
+      if (!salaryGrade.basicSalary || salaryGrade.basicSalary <= 0) {
+        throw new ApiError(400, "Invalid basic salary in salary grade");
+      }
 
-    const deductionDetails =
-      await DeductionService.calculateStatutoryDeductions(
-        salaryDetails.basicSalary,
-        grossSalary
+      const basicSalary = this.roundToKobo(salaryGrade.basicSalary);
+      console.log("✅ Basic salary:", basicSalary);
+
+      // Get period dates
+      const { startDate, endDate } = this.getPeriodDates(
+        frequency,
+        month,
+        year
       );
 
-    const totalDeductions = this.roundToKobo(
-      deductionDetails.paye + deductionDetails.pension + deductionDetails.nhf
-    );
+      // Process grade-specific components
+      const components = [];
+      let totalAllowances = 0;
 
-    const totalAllowances = this.roundToKobo(salaryDetails.totalAllowances);
+      if (salaryGrade.components && salaryGrade.components.length > 0) {
+        console.log("\n📋 Processing salary grade components:", {
+          totalComponents: salaryGrade.components.length,
+          components: salaryGrade.components.map((c) => ({
+            name: c.name,
+            type: c.type,
+            calculationMethod: c.calculationMethod,
+            value: c.value,
+            isActive: c.isActive,
+          })),
+        });
 
-    // Process components with amounts
-    const gradeAllowances = salaryGrade.components.map((comp) => {
-      const amount =
-        comp.type === "percentage" ||
-        (comp.type === "allowance" && comp.name === "Housing Allowance")
-          ? this.roundToKobo((comp.value / 100) * salaryDetails.basicSalary)
-          : this.roundToKobo(comp.value);
+        salaryGrade.components
+          .filter((comp) => comp.isActive)
+          .forEach((comp) => {
+            console.log(`\n🔍 Processing component: ${comp.name}`);
+            console.log("Component details:", {
+              type: comp.type,
+              calculationMethod: comp.calculationMethod,
+              value: comp.value,
+              isActive: comp.isActive,
+            });
+
+            const amount =
+              comp.calculationMethod === "percentage"
+                ? (basicSalary * comp.value) / 100
+                : comp.value;
+
+            console.log(`Calculated amount: ₦${amount.toLocaleString()}`);
+
+            components.push({
+              name: comp.name,
+              type: comp.type,
+              value: comp.value,
+              calculationMethod: comp.calculationMethod,
+              amount: amount,
+              isActive: true,
+            });
+
+            if (comp.type === "allowance") {
+              totalAllowances += amount;
+            }
+          });
+      }
+
+      // Calculate gross salary first
+      const grossSalary = this.roundToKobo(basicSalary + totalAllowances);
+      console.log("\n💰 Gross Salary Calculation:", {
+        basicSalary,
+        totalAllowances,
+        grossSalary,
+      });
+
+      // Calculate bonuses for the period
+      const bonusDetails = await this.calculateBonuses(
+        employeeId,
+        startDate,
+        endDate
+      );
+
+      // Calculate deductions
+      const deductionDetails =
+        await DeductionService.calculateStatutoryDeductions(
+          basicSalary,
+          grossSalary
+        );
+
+      // Calculate tax rate (PAYE)
+      const taxRate =
+        grossSalary > 0
+          ? Number(((deductionDetails.paye / grossSalary) * 100).toFixed(2))
+          : 0;
+
+      console.log("\n✅ Payroll calculation completed:", {
+        basicSalary,
+        totalAllowances,
+        totalBonuses: bonusDetails.totalBonuses || 0,
+        totalDeductions: deductionDetails.total,
+        grossSalary,
+        netSalary: grossSalary - deductionDetails.total,
+        taxRate,
+      });
 
       return {
-        name: comp.name,
-        type: comp.type,
-        value: comp.value,
-        amount,
+        month,
+        year,
+        employee: employeeId,
+        department: {
+          _id: departmentData._id,
+          name: departmentData.name,
+          code: departmentData.code,
+        },
+        salaryGrade: salaryGradeId,
+        basicSalary,
+        components: components.map((c) => ({
+          name: c.name,
+          type: c.type,
+          value: c.value,
+          amount: c.amount,
+          calculationMethod: c.calculationMethod,
+          isActive: c.isActive,
+        })),
+        earnings: {
+          overtime: { hours: 0, rate: 0, amount: 0 },
+          bonus: bonusDetails.items || [],
+          totalEarnings: grossSalary,
+        },
+        deductions: {
+          tax: {
+            taxableAmount: grossSalary,
+            taxRate: taxRate,
+            amount: this.roundToKobo(deductionDetails.paye),
+          },
+          pension: {
+            pensionableAmount: basicSalary,
+            rate: 8,
+            amount: this.roundToKobo(deductionDetails.pension),
+          },
+          nhf: {
+            pensionableAmount: basicSalary,
+            rate: 2.5,
+            amount: this.roundToKobo(deductionDetails.nhf),
+          },
+          loans: [],
+          others: [],
+          totalDeductions: this.roundToKobo(deductionDetails.total),
+        },
+        totals: {
+          basicSalary,
+          totalAllowances,
+          totalBonuses: bonusDetails.totalBonuses || 0,
+          grossEarnings: grossSalary,
+          totalDeductions: this.roundToKobo(deductionDetails.total),
+          netPay: this.roundToKobo(grossSalary - deductionDetails.total),
+        },
+        allowances: {
+          gradeAllowances: components
+            .filter((c) => c.type === "allowance")
+            .map((c) => ({
+              name: c.name,
+              type: c.type,
+              value: c.value,
+              amount: c.amount,
+              calculationMethod: c.calculationMethod,
+              isActive: c.isActive,
+            })),
+          additionalAllowances: [],
+          totalAllowances,
+        },
+        bonuses: {
+          items: bonusDetails.items || [],
+          totalBonuses: bonusDetails.totalBonuses || 0,
+        },
+        frequency,
+        periodStart: startDate,
+        periodEnd: endDate,
+        status: PAYROLL_STATUS.PENDING,
       };
-    });
-
-    // Get correct period dates
-    const { startDate: periodStart, endDate: periodEnd } = this.getMonthPeriod(
-      month,
-      year
-    );
-
-    return {
-      month,
-      year,
-      employee: employeeId,
-      salaryGrade: salaryGradeId,
-      basicSalary: this.roundToKobo(salaryDetails.basicSalary),
-      components: gradeAllowances,
-      earnings: {
-        overtime: { hours: 0, rate: 0, amount: 0 },
-        bonus: [],
-        totalEarnings: grossSalary,
-      },
-      deductions: {
-        tax: {
-          taxableAmount: grossSalary,
-          taxRate: this.roundToKobo(
-            (deductionDetails.paye / grossSalary) * 100
-          ),
-          amount: this.roundToKobo(deductionDetails.paye),
-        },
-        pension: {
-          pensionableAmount: this.roundToKobo(salaryDetails.basicSalary),
-          rate: 8,
-          amount: this.roundToKobo(deductionDetails.pension),
-        },
-        nhf: {
-          pensionableAmount: this.roundToKobo(salaryDetails.basicSalary),
-          rate: 2.5,
-          amount: this.roundToKobo(deductionDetails.nhf),
-        },
-        loans: [],
-        others: [],
-        totalDeductions,
-      },
-      totals: {
-        basicSalary: this.roundToKobo(salaryDetails.basicSalary),
-        totalAllowances,
-        totalBonuses: 0,
-        grossEarnings: grossSalary,
-        totalDeductions,
-        netPay: this.roundToKobo(grossSalary - totalDeductions),
-      },
-      allowances: {
-        gradeAllowances,
-        additionalAllowances: [],
-        totalAllowances,
-      },
-      bonuses: {
-        items: [],
-        totalBonuses: 0,
-      },
-      frequency: "monthly",
-      periodStart,
-      periodEnd,
-    };
+    } catch (error) {
+      console.error("❌ Error calculating payroll:", error);
+      throw new ApiError(500, `Failed to calculate payroll: ${error.message}`);
+    }
   }
 
   static async getEmployeePayrollHistory(employeeId) {

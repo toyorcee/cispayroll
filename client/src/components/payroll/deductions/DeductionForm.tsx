@@ -8,6 +8,7 @@ import { FormSkeleton } from "./Skeletons";
 interface DeductionFormProps {
   deduction?: Deduction;
   isLoading?: boolean;
+  deductionType: "statutory" | "voluntary";
   onSubmit: (data: Partial<Deduction>) => Promise<void>;
   onCancel: () => void;
 }
@@ -28,6 +29,7 @@ interface FormInputs {
 export const DeductionForm = ({
   deduction,
   isLoading,
+  deductionType,
   onSubmit,
   onCancel,
 }: DeductionFormProps) => {
@@ -75,7 +77,6 @@ export const DeductionForm = ({
     setValue("taxBrackets", newBrackets);
   };
 
-
   const handleSubmitForm = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitting(true);
@@ -86,6 +87,20 @@ export const DeductionForm = ({
     }
   };
 
+  // Determine available calculation methods based on type
+  const getCalculationMethods = () => {
+    if (deductionType === "statutory") {
+      return [
+        { value: CalculationMethod.PROGRESSIVE, label: "Progressive Rate" },
+        { value: CalculationMethod.PERCENTAGE, label: "Percentage Based" },
+      ];
+    }
+    return [
+      { value: CalculationMethod.FIXED, label: "Fixed Amount" },
+      { value: CalculationMethod.PERCENTAGE, label: "Percentage Based" },
+    ];
+  };
+
   if (isLoading) return <FormSkeleton />;
 
   return (
@@ -93,6 +108,13 @@ export const DeductionForm = ({
       onSubmit={handleSubmitForm}
       className="space-y-6 bg-white p-6 rounded-lg shadow"
     >
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-lg font-medium text-gray-900">
+          {isEditing ? "Edit" : "Add"}{" "}
+          {deductionType === "statutory" ? "Statutory" : "Voluntary"} Deduction
+        </h3>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Left Column */}
         <div className="space-y-6">
@@ -104,7 +126,7 @@ export const DeductionForm = ({
               type="text"
               {...register("name", { required: "Name is required" })}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
-              placeholder="Enter deduction name"
+              placeholder={`Enter ${deductionType} deduction name`}
             />
             {errors.name && (
               <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
@@ -129,24 +151,13 @@ export const DeductionForm = ({
             </label>
             <select
               {...register("calculationMethod")}
-              onChange={(e) => {
-                setValue(
-                  "calculationMethod",
-                  e.target.value as CalculationMethod
-                );
-                setShowTaxBrackets(
-                  e.target.value === CalculationMethod.PROGRESSIVE
-                );
-              }}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
             >
-              <option value={CalculationMethod.FIXED}>Fixed Amount</option>
-              <option value={CalculationMethod.PERCENTAGE}>
-                Percentage Based
-              </option>
-              <option value={CalculationMethod.PROGRESSIVE}>
-                Progressive Rate
-              </option>
+              {getCalculationMethods().map((method) => (
+                <option key={method.value} value={method.value}>
+                  {method.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>

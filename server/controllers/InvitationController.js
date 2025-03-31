@@ -1,15 +1,78 @@
 import UserModel from "../models/User.js";
-import bcrypt from "bcryptjs";
 import { handleError, ApiError } from "../utils/errorHandler.js";
 import jwt from "jsonwebtoken";
+import { EmployeeService } from "../services/employeeService.js";
+import { EmailService } from "../services/emailService.js";
+import bcrypt from "bcryptjs";
 import { OnboardingStatus } from "../models/User.js";
 
 export class InvitationController {
+  static async createInvitation(req, res) {
+    try {
+      const { email, role, departmentId } = req.body;
+      const createdBy = req.user.id;
+
+      const { employee } = await EmployeeService.createEmployee(
+        {
+          email,
+          role,
+          department: departmentId,
+          onboarding: {
+            status: "NOT_STARTED",
+            tasks: [
+              {
+                name: "Welcome Meeting",
+                description: "Initial orientation and welcome meeting",
+                category: "orientation",
+                deadline: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days
+              },
+              {
+                name: "Department Introduction",
+                description: "Meet team and understand department workflow",
+                category: "orientation",
+                deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days
+              },
+              {
+                name: "Document Submission",
+                description: "Submit required documents",
+                category: "documentation",
+                deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days
+              },
+            ],
+          },
+        },
+        { _id: createdBy }
+      );
+
+      const invitationToken = jwt.sign(
+        {
+          email,
+          type: "invitation",
+          role,
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: "7d" }
+      );
+
+      await EmailService.sendInvitationEmail(email, invitationToken, role);
+
+      res.status(201).json({
+        success: true,
+        message: "Invitation sent successfully",
+        userId: employee.id,
+      });
+    } catch (error) {
+      console.error("Create invitation error:", error);
+      throw new ApiError(500, "Error creating invitation");
+    }
+  }
+
   static async verifyInvitation(req, res) {
     try {
       const { token } = req.params;
       console.log("Verifying token:", token);
 
+      // Find user by invitationToken directly
       const user = await UserModel.findOne({
         invitationToken: token,
         invitationExpires: { $gt: new Date() },
@@ -45,18 +108,10 @@ export class InvitationController {
 
   static async completeRegistration(req, res) {
     try {
-      const {
-        token,
-        password,
-        confirmPassword,
-        emergencyContact,
-        bankDetails,
-      } = req.body;
+      const { token, password, confirmPassword } = req.body;
+      const emergencyContact = JSON.parse(req.body.emergencyContact);
+      const bankDetails = JSON.parse(req.body.bankDetails);
       const profileImage = req.file?.path;
-
-      // Parse JSON strings
-      const parsedEmergencyContact = JSON.parse(emergencyContact);
-      const parsedBankDetails = JSON.parse(bankDetails);
 
       if (password !== confirmPassword) {
         throw new ApiError(400, "Passwords do not match");
@@ -80,8 +135,8 @@ export class InvitationController {
       user.password = await bcrypt.hash(password, 10);
       user.status = "active";
       user.isEmailVerified = true;
-      user.emergencyContact = parsedEmergencyContact;
-      user.bankDetails = parsedBankDetails;
+      user.emergencyContact = emergencyContact;
+      user.bankDetails = bankDetails;
 
       if (profileImage) {
         user.profileImage = profileImage;
@@ -101,6 +156,7 @@ export class InvitationController {
         startedAt: new Date(),
       };
 
+      // Clear invitation data
       user.invitationToken = undefined;
       user.invitationExpires = undefined;
 

@@ -27,15 +27,15 @@ export const salaryStructureService = {
       const response = await axios.get<{ data: ISalaryGrade[] }>(
         `${BASE_URL}/super-admin/salary-grades`
       );
+
+      // Just return the data directly from backend
       return response.data.data;
     } catch (error: unknown) {
       if (axios.isAxiosError(error) && error.response) {
-        console.error("Failed to fetch salary grades:", error);
         toast.error(
           error.response.data?.message || "Failed to fetch salary grades"
         );
       } else {
-        console.error("An unexpected error occurred:", error);
         toast.error("Failed to fetch salary grades");
       }
       throw error;
@@ -142,33 +142,6 @@ export const salaryStructureService = {
       }
       throw error;
     }
-  },
-
-  calculateTotalSalary: (grade: ISalaryGrade) => {
-    console.log("📊 Calculating total for grade:", grade);
-    const basicSalary = grade.basicSalary;
-    let totalAllowances = 0;
-
-    grade.components.forEach((component) => {
-      console.log("💰 Processing component:", component);
-      if (component.isActive) {
-        const value =
-          component.calculationMethod === "fixed"
-            ? component.value
-            : (basicSalary * component.value) / 100;
-
-        console.log(`${component.name}: ${value}`);
-        totalAllowances += value;
-      }
-    });
-
-    const result = {
-      basicSalary,
-      totalAllowances,
-      grossSalary: basicSalary + totalAllowances,
-    };
-    console.log("🧮 Calculation result:", result);
-    return result;
   },
 
   getSalaryGrade: async (id: string): Promise<ISalaryGrade> => {

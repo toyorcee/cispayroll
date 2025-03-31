@@ -6,10 +6,7 @@ import {
   FaInfoCircle,
   FaTrash,
 } from "react-icons/fa";
-import {
-  Deduction,
-  TaxBracket,
-} from "../../../types/deduction";
+import { Deduction, TaxBracket } from "../../../types/deduction";
 import { TableSkeleton } from "./Skeletons";
 
 interface DeductionsTableProps {
@@ -149,8 +146,8 @@ export const DeductionsTable = ({
 
   return (
     <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center gap-4">
+      <div className="p-3 border-b border-gray-200">
+        <div className="flex items-center gap-3">
           <select
             className="form-select rounded-md border-gray-300 text-sm focus:ring-green-500 focus:border-green-500 bg-green-50 text-green-900 hover:bg-green-100 transition-colors duration-200"
             value={typeFilter}
@@ -180,22 +177,22 @@ export const DeductionsTable = ({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">
                 Name
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                 Type
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                 Calculation Method
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                 Value
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                 Status
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                 Actions
               </th>
             </tr>
@@ -206,7 +203,7 @@ export const DeductionsTable = ({
                 key={deduction._id}
                 className="hover:bg-gray-50 transition-all duration-200"
               >
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 py-3 whitespace-nowrap">
                   <div className="text-sm font-medium text-gray-900">
                     {deduction.name}
                   </div>
@@ -214,13 +211,13 @@ export const DeductionsTable = ({
                     {deduction.description}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
+                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 capitalize">
                   {deduction.type.toLowerCase()}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
+                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 capitalize">
                   {deduction.calculationMethod.toLowerCase()}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 py-3 whitespace-nowrap">
                   <div className="flex items-center justify-start">
                     {deduction.calculationMethod.toLowerCase() ===
                     "progressive" ? (
@@ -248,7 +245,7 @@ export const DeductionsTable = ({
                     )}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 py-3 whitespace-nowrap">
                   <div className="flex items-center space-x-2">
                     <span
                       className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -291,7 +288,7 @@ export const DeductionsTable = ({
                     </button>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                   <button
                     onClick={() => onEdit(deduction)}
                     className="text-green-600 hover:text-green-900 mr-4"

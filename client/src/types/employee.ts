@@ -34,24 +34,19 @@ export interface Task {
 }
 
 export interface Employee {
-  id: string;
   _id: string;
+  id: string;
+  employeeId: string;
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
+  role: string;
   department: string;
   position: string;
   gradeLevel: string;
   workLocation: string;
-  status:
-    | "active"
-    | "pending"
-    | "inactive"
-    | "suspended"
-    | "offboarding"
-    | "terminated";
-  employeeId: string;
+  status: string;
   offboarding?: OffboardingDetails;
   permissions: Permission[];
   progress: number;
@@ -104,7 +99,6 @@ export interface Employee {
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
-  role: UserRole;
   lastWorkingDate: Date;
   initiatedDate: Date;
   reason: string;
@@ -199,33 +193,42 @@ export interface OffboardingEmployee {
   };
 }
 
+export interface EmployeeResponse {
+  success: boolean;
+  data: Employee[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+  };
+}
+
 export interface EmployeeFilters {
   page: number;
   limit: number;
   search?: string;
-  status?: Status;
+  status?: string;
   department?: string;
-  role?: UserRole;
 }
 
-export interface EmployeeDetails extends Employee {
-  profileImage?: string;
+export interface EmployeeDetails {
+  id: string;
+  employeeId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  role: string;
+  position: string;
+  gradeLevel: string;
   workLocation: string;
-  emergencyContact: {
-    name: string;
-    relationship: string;
-    phone: string;
-  };
-  socialLinks?: {
-    linkedin?: string;
-    twitter?: string;
-  };
-  skills?: string[];
-  documents?: {
-    resume?: string;
-    contract?: string;
-    certificates?: string[];
-  };
+  department: string | { name: string; _id: string };
+  status: string;
+  dateJoined: string;
+  lastLogin?: string;
+  profileImage?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateEmployeeData {
@@ -233,11 +236,12 @@ export interface CreateEmployeeData {
   lastName: string;
   email: string;
   phone: string;
+  role: "USER" | "ADMIN";
   position: string;
-  department: string;
   gradeLevel: string;
   workLocation: string;
-  dateJoined: string | Date;
+  dateJoined: string;
+  department: string;
 }
 
 export interface OffboardingChecklist {
@@ -269,13 +273,6 @@ export interface DepartmentBasic {
   code: string;
 }
 
-export interface EmployeeResponse {
-  employees: Employee[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
 export interface DepartmentEmployee {
   _id: string;
   firstName: string;
@@ -296,4 +293,20 @@ export interface DepartmentEmployeeResponse {
   page: number;
   limit: number;
   totalPages: number;
+}
+
+export interface SalaryGrade {
+  _id: string;
+  level: string;
+  basicSalary: number;
+  description: string;
+  components: {
+    name: string;
+    type: string;
+    calculationMethod: string;
+    value: number;
+    isActive: boolean;
+    _id: string;
+  }[];
+  isActive: boolean;
 }

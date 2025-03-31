@@ -4,11 +4,15 @@ import { Status } from "../../types/common";
 interface StatusFilterProps {
   currentStatus: Status | undefined;
   onStatusChange: (status: Status | undefined) => void;
+  className?: string;
+  buttonClassName?: string;
 }
 
 export const StatusFilter = ({
   currentStatus,
   onStatusChange,
+  className = "",
+  buttonClassName = "",
 }: StatusFilterProps) => {
   const statuses: (Status | "all")[] = [
     "all",
@@ -43,7 +47,7 @@ export const StatusFilter = ({
     <motion.div
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex flex-wrap gap-2"
+      className={`flex flex-wrap gap-2 ${className}`}
     >
       {statuses.map((status) => (
         <button
@@ -51,7 +55,7 @@ export const StatusFilter = ({
           onClick={() =>
             onStatusChange(status === "all" ? undefined : (status as Status))
           }
-          className={`px-4 py-2 rounded-lg transition-all duration-300 ${
+          className={`${buttonClassName} transition-all duration-300 ${
             (status === "all" && !currentStatus) || status === currentStatus
               ? getStatusStyle(status)
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"

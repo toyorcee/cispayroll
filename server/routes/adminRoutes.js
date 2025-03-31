@@ -6,6 +6,10 @@ import {
 } from "../middleware/authMiddleware.js";
 import { AdminController } from "../controllers/AdminController.js";
 import { Permission } from "../models/User.js";
+import {
+  validatePayrollCreate,
+  validatePayrollUpdate,
+} from "../middleware/payrollValidation.js";
 
 const router = Router();
 
@@ -13,46 +17,106 @@ const router = Router();
 router.use(requireAuth);
 router.use(requireAdmin);
 
-// Department-specific routes (admins can manage their own department)
+// ===== User Management Routes =====
 router.get(
-  "/department/users",
+  "/users",
   requirePermission([Permission.VIEW_ALL_USERS]),
   AdminController.getDepartmentUsers
 );
 
-router.get(
-  "/department/payroll",
-  requirePermission([Permission.VIEW_DEPARTMENT_PAYROLL]),
-  AdminController.getDepartmentPayroll
-);
-
-// User management within department
 router.post(
-  "/department/users",
-  requirePermission([
-    Permission.CREATE_USER,
-    Permission.MANAGE_DEPARTMENT_USERS,
-  ]),
+  "/users",
+  requirePermission([Permission.CREATE_USER]),
   AdminController.createDepartmentUser
 );
 
 router.put(
-  "/department/users/:id",
-  requirePermission([Permission.EDIT_USER, Permission.MANAGE_DEPARTMENT_USERS]),
+  "/users/:id",
+  requirePermission([Permission.EDIT_USER]),
   AdminController.updateDepartmentUser
 );
 
-// Payroll management within department
+// ===== Payroll Management Routes =====
+router.get(
+  "/payroll",
+  requirePermission([Permission.VIEW_DEPARTMENT_PAYROLL]),
+  AdminController.getDepartmentPayroll
+);
+
 router.post(
-  "/department/payroll",
+  "/payroll",
   requirePermission([Permission.CREATE_PAYROLL]),
+  validatePayrollCreate,
   AdminController.createDepartmentPayroll
 );
 
 router.put(
-  "/department/payroll/:id",
+  "/payroll/:id",
   requirePermission([Permission.EDIT_PAYROLL]),
+  validatePayrollUpdate,
   AdminController.updateDepartmentPayroll
+);
+
+// ===== Salary Structure & Allowances Management Routes =====
+router.get(
+  "/allowances",
+  requirePermission([Permission.VIEW_ALLOWANCES]),
+  AdminController.getDepartmentAllowances
+);
+
+router.post(
+  "/allowances",
+  requirePermission([Permission.CREATE_ALLOWANCES]),
+  AdminController.createDepartmentAllowance
+);
+
+router.get(
+  "/allowances/:id",
+  requirePermission([Permission.VIEW_ALLOWANCES]),
+  AdminController.getAllowanceDetails
+);
+
+router.put(
+  "/allowances/:id",
+  requirePermission([Permission.EDIT_ALLOWANCES]),
+  AdminController.updateDepartmentAllowance
+);
+
+router.patch(
+  "/allowances/:id/approve",
+  requirePermission([Permission.APPROVE_ALLOWANCES]),
+  AdminController.approveAllowance
+);
+
+router.patch(
+  "/allowances/:id/reject",
+  requirePermission([Permission.APPROVE_ALLOWANCES]),
+  AdminController.rejectAllowance
+);
+
+// ===== Deduction Management Routes =====
+router.get(
+  "/deductions",
+  requirePermission([Permission.VIEW_DEDUCTIONS]),
+  AdminController.getDepartmentDeductions
+);
+
+router.get(
+  "/deductions/:id",
+  requirePermission([Permission.VIEW_DEDUCTIONS]),
+  AdminController.getDeductionDetails
+);
+
+router.put(
+  "/deductions/:id",
+  requirePermission([Permission.EDIT_DEDUCTIONS]),
+  AdminController.updateDepartmentDeduction
+);
+
+router.patch(
+  "/deductions/:id/toggle",
+  requirePermission([Permission.EDIT_DEDUCTIONS]),
+  AdminController.toggleDeductionStatus
 );
 
 export default router;

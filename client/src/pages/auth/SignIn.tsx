@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   TbCurrencyDollar,
@@ -11,7 +11,7 @@ import {
   TbCurrencyRubel,
 } from "react-icons/tb";
 import { useAuth } from "../../context/AuthContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 
@@ -43,6 +43,7 @@ const PeopleMaxIcon = () => (
 );
 
 export default function SignIn() {
+  const location = useLocation();
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
@@ -60,6 +61,13 @@ export default function SignIn() {
     TbCurrencyReal,
     TbCurrencyRubel,
   ];
+
+  useEffect(() => {
+    // Show success message if coming from registration
+    if (location.state?.message) {
+      toast.success(location.state.message);
+    }
+  }, [location]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

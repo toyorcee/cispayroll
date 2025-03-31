@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { BaseModal } from "../shared/BaseModal";
 import { Employee } from "../../types/employee";
 import { Status } from "../../types/common";
-// import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import { LoadingSpinner } from "../shared/LoadingSpinner";
 

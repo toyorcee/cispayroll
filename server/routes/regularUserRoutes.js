@@ -2,16 +2,18 @@ import { Router } from "express";
 import {
   requireAuth,
   requirePermission,
+  requireRole,
 } from "../middleware/authMiddleware.js";
 import { RegularUserController } from "../controllers/RegularUserController.js";
-import { Permission } from "../models/User.js";
+import { Permission, UserRole } from "../models/User.js";
 
 const router = Router();
 
-// Apply authentication middleware
+// Apply base middleware
 router.use(requireAuth);
+router.use(requireRole([UserRole.USER]));
 
-// Personal Information
+// ===== Profile Management Routes =====
 router.get(
   "/profile",
   requirePermission([Permission.VIEW_PERSONAL_INFO]),
@@ -20,24 +22,24 @@ router.get(
 
 router.put(
   "/profile",
-  requirePermission([Permission.VIEW_PERSONAL_INFO]),
+  requirePermission([Permission.EDIT_PERSONAL_INFO]),
   RegularUserController.updateOwnProfile
 );
 
-// Payslip
+// ===== Payslip Management Routes =====
 router.get(
-  "/payroll/:payrollId/view",
-  requirePermission([Permission.VIEW_ALL_PAYROLL]),
-  RegularUserController.viewPayslip
-);
-
-router.get(
-  "/payslips/:id",
+  "/payslips",
   requirePermission([Permission.VIEW_OWN_PAYSLIP]),
   RegularUserController.getOwnPayslipById
 );
 
-// Leave Management
+router.get(
+  "/payslips/:payrollId",
+  requirePermission([Permission.VIEW_OWN_PAYSLIP]),
+  RegularUserController.viewPayslip
+);
+
+// ===== Leave Management Routes =====
 router.get(
   "/leave",
   requirePermission([Permission.VIEW_OWN_LEAVE]),
@@ -50,10 +52,42 @@ router.post(
   RegularUserController.createLeaveRequest
 );
 
-router.put(
+router.patch(
   "/leave/:id/cancel",
   requirePermission([Permission.CANCEL_OWN_LEAVE]),
   RegularUserController.cancelLeaveRequest
+);
+
+// ===== Salary Structure & Allowances Management Routes =====
+router.get(
+  "/allowances",
+  requirePermission([Permission.VIEW_OWN_ALLOWANCES]),
+  RegularUserController.getMyAllowances
+);
+
+router.post(
+  "/allowances/request",
+  requirePermission([Permission.REQUEST_ALLOWANCES]),
+  RegularUserController.requestAllowance
+);
+
+router.get(
+  "/allowances/history",
+  requirePermission([Permission.VIEW_OWN_ALLOWANCES]),
+  RegularUserController.getAllowanceHistory
+);
+
+// ===== Deduction Management Routes =====
+router.get(
+  "/deductions",
+  requirePermission([Permission.VIEW_OWN_PAYSLIP]),
+  RegularUserController.getMyDeductions
+);
+
+router.get(
+  "/deductions/:id",
+  requirePermission([Permission.VIEW_OWN_PAYSLIP]),
+  RegularUserController.getDeductionDetails
 );
 
 export default router;

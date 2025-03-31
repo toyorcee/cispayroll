@@ -3,10 +3,10 @@ import { useDropzone } from "react-dropzone";
 import { CircularProgress } from "@mui/material";
 
 interface ImageUploadProps {
-  onImageSelect: (file: File) => void;
+  onImageSelect: (file: File | null) => void;
 }
 
-export const ImageUpload = ({ onImageSelect }: ImageUploadProps) => {
+export const ImageUpload: React.FC<ImageUploadProps> = ({ onImageSelect }) => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -45,7 +45,7 @@ export const ImageUpload = ({ onImageSelect }: ImageUploadProps) => {
     [onImageSelect]
   );
 
-  const { getRootProps, getInputProps} = useDropzone({
+  const { getRootProps, getInputProps } = useDropzone({
     onDrop,
     accept: {
       "image/*": [".jpeg", ".jpg", ".png", ".gif"],

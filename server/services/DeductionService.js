@@ -19,47 +19,126 @@ export class DeductionService {
   // Create statutory deductions (PAYE, Pension, NHF)
   static async createStatutoryDeductions(userId) {
     try {
-      // Create PAYE
-      await Deduction.create({
-        name: "PAYE Tax",
+      console.log(
+        "📝 Creating/Updating statutory deductions for user:",
+        userId
+      );
+
+      // Check for existing deductions
+      const existingDeductions = await Deduction.find({
         type: DeductionType.STATUTORY,
-        description: "Progressive Annual Income Tax",
-        calculationMethod: CalculationMethod.PROGRESSIVE,
-        value: 0, // Not used for PAYE since it uses brackets
-        taxBrackets: this.DEFAULT_TAX_BRACKETS,
-        createdBy: userId,
-        updatedBy: userId,
       });
 
-      // Create Pension
-      await Deduction.create({
-        name: "Pension",
+      const existingNames = existingDeductions.map((d) => d.name);
+      const deductions = {};
+
+      // PAYE
+      if (!existingNames.includes("PAYE Tax")) {
+        deductions.paye = await Deduction.create({
+          name: "PAYE Tax",
+          type: DeductionType.STATUTORY,
+          description: "Progressive Annual Income Tax",
+          calculationMethod: CalculationMethod.PROGRESSIVE,
+          value: 0,
+          taxBrackets: this.DEFAULT_TAX_BRACKETS,
+          createdBy: userId,
+          updatedBy: userId,
+          isActive: true,
+          effectiveDate: new Date(),
+        });
+        console.log("✅ PAYE created");
+      } else {
+        console.log("ℹ️ PAYE already exists");
+      }
+
+      // Pension
+      if (!existingNames.includes("Pension")) {
+        deductions.pension = await Deduction.create({
+          name: "Pension",
+          type: DeductionType.STATUTORY,
+          description: "Employee Pension Contribution",
+          calculationMethod: CalculationMethod.PERCENTAGE,
+          value: 8,
+          createdBy: userId,
+          updatedBy: userId,
+          isActive: true,
+          effectiveDate: new Date(),
+        });
+        console.log("✅ Pension created");
+      } else {
+        console.log("ℹ️ Pension already exists");
+      }
+
+      // NHF
+      if (!existingNames.includes("NHF")) {
+        deductions.nhf = await Deduction.create({
+          name: "NHF",
+          type: DeductionType.STATUTORY,
+          description: "National Housing Fund",
+          calculationMethod: CalculationMethod.PERCENTAGE,
+          value: 2.5,
+          createdBy: userId,
+          updatedBy: userId,
+          isActive: true,
+          effectiveDate: new Date(),
+        });
+        console.log("✅ NHF created");
+      } else {
+        console.log("ℹ️ NHF already exists");
+      }
+
+      // Return all statutory deductions (both existing and newly created)
+      const allStatutoryDeductions = await Deduction.find({
         type: DeductionType.STATUTORY,
-        description: "Employee Pension Contribution",
-        calculationMethod: CalculationMethod.PERCENTAGE,
-        value: 8, // 8% of basic salary
-        createdBy: userId,
-        updatedBy: userId,
       });
 
-      // Create NHF
-      await Deduction.create({
-        name: "NHF",
-        type: DeductionType.STATUTORY,
-        description: "National Housing Fund",
-        calculationMethod: CalculationMethod.PERCENTAGE,
-        value: 2.5, // 2.5% of basic salary
-        createdBy: userId,
-        updatedBy: userId,
-      });
+      return {
+        message: "Statutory deductions setup completed",
+        deductions: allStatutoryDeductions,
+      };
     } catch (error) {
-      throw new ApiError(500, "Failed to create statutory deductions");
+      console.error("❌ Error in createStatutoryDeductions:", error);
+      throw new ApiError(
+        500,
+        `Failed to setup statutory deductions: ${error.message}`
+      );
     }
   }
 
   // Calculate PAYE tax
   static calculatePAYE(grossSalary) {
-    return (grossSalary * 8.09090909090909) / 100; // ₦33,375
+    try {
+      console.log("🧮 Calculating PAYE for salary:", grossSalary);
+
+      let totalTax = 0;
+      let remainingSalary = grossSalary;
+
+      for (const bracket of this.DEFAULT_TAX_BRACKETS) {
+        if (remainingSalary <= 0) break;
+
+        const bracketSize =
+          bracket.min === 0 ? bracket.max : bracket.max - bracket.min + 1;
+
+        const amountInBracket = Math.min(remainingSalary, bracketSize);
+        const tax = (amountInBracket * bracket.rate) / 100;
+
+        console.log(
+          `Bracket ${bracket.min.toLocaleString()} - ${bracket.max.toLocaleString()}:`
+        );
+        console.log(`  Amount taxed: ${amountInBracket.toLocaleString()}`);
+        console.log(`  Rate: ${bracket.rate}%`);
+        console.log(`  Tax: ${tax.toLocaleString()}`);
+
+        totalTax += tax;
+        remainingSalary -= amountInBracket;
+      }
+
+      console.log(`✅ Total PAYE: ${totalTax.toLocaleString()}`);
+      return totalTax;
+    } catch (error) {
+      console.error("❌ Error calculating PAYE:", error);
+      return 0; // Return 0 instead of NaN
+    }
   }
 
   // Calculate pension deduction
@@ -69,33 +148,43 @@ export class DeductionService {
 
   // Calculate NHF deduction
   static calculateNHF(basicSalary) {
-    return (basicSalary * 2.5) / 100; 
+    return (basicSalary * 2.5) / 100;
   }
 
   // Calculate all statutory deductions
   static calculateStatutoryDeductions(basicSalary, grossSalary) {
-    // Calculate PAYE (tax)
-    const monthlyPaye = this.calculatePAYE(grossSalary);
-    console.log("PAYE:", monthlyPaye);
+    try {
+      // Calculate PAYE (tax)
+      const monthlyPaye = this.calculatePAYE(grossSalary);
+      console.log("PAYE:", monthlyPaye);
 
-    // Calculate Pension (8% of basic salary)
-    const pension = this.calculatePension(basicSalary);
-    console.log("Pension:", pension);
+      // Calculate Pension (8% of basic salary)
+      const pension = this.calculatePension(basicSalary);
+      console.log("Pension:", pension);
 
-    // Calculate NHF (2.5% of basic salary)
-    const nhf = this.calculateNHF(basicSalary);
-    console.log("NHF:", nhf);
+      // Calculate NHF (2.5% of basic salary)
+      const nhf = this.calculateNHF(basicSalary);
+      console.log("NHF:", nhf);
 
-    // Calculate total deductions
-    const total = monthlyPaye + pension + nhf;
-    console.log("Calculated Total:", total);
+      // Calculate total deductions
+      const total = monthlyPaye + pension + nhf;
+      console.log("Calculated Total:", total);
 
-    return {
-      paye: monthlyPaye,
-      pension: pension,
-      nhf: nhf,
-      total: total,
-    };
+      return {
+        paye: monthlyPaye,
+        pension: pension,
+        nhf: nhf,
+        total: total,
+      };
+    } catch (error) {
+      console.error("❌ Error calculating statutory deductions:", error);
+      return {
+        paye: 0,
+        pension: 0,
+        nhf: 0,
+        total: 0,
+      };
+    }
   }
 
   // Create a voluntary deduction
@@ -303,6 +392,38 @@ export class DeductionService {
     } catch (error) {
       console.error("❌ Failed to fetch deductions:", error);
       throw new ApiError(500, "Failed to fetch deductions");
+    }
+  }
+
+  static async createCustomStatutoryDeduction(userId, data) {
+    try {
+      console.log("🔄 Service: Creating custom statutory deduction");
+      console.log("👤 User ID:", userId);
+      console.log("📝 Deduction data:", data);
+
+      // Check if deduction with same name exists
+      const existingDeduction = await Deduction.findOne({ name: data.name });
+      if (existingDeduction) {
+        throw new ApiError(400, "A deduction with this name already exists");
+      }
+
+      // Create the statutory deduction
+      const deduction = await Deduction.create({
+        ...data,
+        type: DeductionType.STATUTORY,
+        isActive: true,
+        createdBy: userId,
+        updatedBy: userId,
+      });
+
+      console.log("✅ Service: Custom statutory deduction created:", deduction);
+      return deduction;
+    } catch (error) {
+      console.error("❌ Service Error:", error);
+      throw new ApiError(
+        500,
+        `Failed to create custom statutory deduction: ${error.message}`
+      );
     }
   }
 }

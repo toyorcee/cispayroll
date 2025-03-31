@@ -1,4 +1,4 @@
-import { Types } from "mongoose";
+import mongoose from "mongoose";
 import { EmployeeService } from "../services/employeeService.js";
 import { handleError, ApiError } from "../utils/errorHandler.js";
 import UserModel from "../models/User.js";
@@ -8,61 +8,68 @@ import { LEAVE_STATUS } from "../models/Leave.js";
 import { v4 as uuidv4 } from "uuid";
 import { UserRole } from "../models/User.js";
 import { EmailService } from "../services/emailService.js";
+import DepartmentModel from "../models/Department.js";
 
 export class EmployeeController {
-  // Admin/Super Admin creating an employee
   static async createEmployee(req, res, next) {
+    let employee = null;
     try {
-      console.log("Request body:", req.body); // Log the incoming request body
+      console.log("Request body:", req.body);
 
       const { role = UserRole.USER, ...employeeData } = req.body;
 
       // Validate role creation permissions
       if (role === UserRole.ADMIN && req.user.role !== UserRole.SUPER_ADMIN) {
-        console.log(
-          "Permission denied: Only super admins can create admin accounts"
-        );
         throw new ApiError(403, "Only super admins can create admin accounts");
       }
 
       const creator = {
-        _id: new Types.ObjectId(req.user.id),
+        _id: new mongoose.Types.ObjectId(req.user.id),
         role: req.user.role,
         department: req.user.department
-          ? new Types.ObjectId(req.user.department)
+          ? new mongoose.Types.ObjectId(req.user.department)
           : undefined,
       };
-      console.log("Creator details:", creator); // Log the creator details
 
       // Generate employee ID with dynamic prefix
       const today = new Date();
       const day = today.getDate().toString().padStart(2, "0");
       const month = (today.getMonth() + 1).toString().padStart(2, "0");
-
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-
-      const endOfDay = new Date();
-      endOfDay.setHours(23, 59, 59, 999);
-
-      const todayEmployeesCount = await UserModel.countDocuments({
-        createdAt: { $gte: startOfDay, $lte: endOfDay },
-      });
-      console.log("Today's employee count:", todayEmployeesCount); // Log the count of employees created today
-
-      const sequentialNumber = (todayEmployeesCount + 1)
+      const sequentialNumber = (
+        (await UserModel.countDocuments({
+          createdAt: {
+            $gte: new Date().setHours(0, 0, 0, 0),
+            $lte: new Date().setHours(23, 59, 59, 999),
+          },
+        })) + 1
+      )
         .toString()
         .padStart(3, "0");
+
       const prefix = role === UserRole.ADMIN ? "ADM" : "EMP";
       const employeeId = `${prefix}${day}${month}${sequentialNumber}`;
-      console.log("Generated employee ID:", employeeId); // Log the generated employee ID
 
       // Generate invitation token
       const invitationToken = uuidv4();
-      const invitationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Token expires in 7 days
-      console.log("Generated invitation token:", invitationToken); // Log the invitation token
+      const invitationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-      const employee = new UserModel({
+      // Send the invitation email
+      try {
+        await EmailService.sendInvitationEmail(
+          employeeData.email,
+          invitationToken,
+          role
+        );
+      } catch (emailError) {
+        console.error("Failed to send invitation email:", emailError);
+        throw new ApiError(
+          500,
+          "Failed to send invitation email. Employee not created."
+        );
+      }
+
+      // Create the employee after successful email sending
+      employee = new UserModel({
         ...employeeData,
         employeeId,
         role,
@@ -71,17 +78,11 @@ export class EmployeeController {
         invitationExpires,
         createdBy: creator._id,
       });
-      console.log("Employee data to be saved:", employee); // Log the employee data before saving
 
       await employee.save();
-      console.log("Employee saved successfully"); // Log after saving the employee
+      console.log("Employee saved successfully");
 
-      // Send invitation email
-      console.log("Sending invitation email to:", employee.email); // Log the email being sent
-      await EmailService.sendInvitationEmail(employee.email, invitationToken);
-      console.log("Invitation email sent successfully"); // Log after sending the email
-
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         message: `${
           role === UserRole.ADMIN ? "Admin" : "Employee"
@@ -89,50 +90,14 @@ export class EmployeeController {
         employee,
       });
     } catch (error) {
-      console.error("Error in createEmployee:", error); // Log the error
+      if (employee && employee._id) {
+        await UserModel.findByIdAndDelete(employee._id);
+      }
+      console.error("Error in createEmployee:", error);
       next(error);
     }
   }
-  // static async createEmployee(req, res, next) {
-  //   try {
-  //     const { role = UserRole.USER, ...employeeData } = req.body;
 
-  //     // Validate role creation permissions
-  //     if (role === UserRole.ADMIN && req.user.role !== UserRole.SUPER_ADMIN) {
-  //       throw new ApiError(403, "Only super admins can create admin accounts");
-  //     }
-
-  //     const creator = {
-  //       _id: new Types.ObjectId(req.user.id),
-  //       role: req.user.role,
-  //       department: req.user.department
-  //         ? new Types.ObjectId(req.user.department)
-  //         : undefined,
-  //     };
-
-  //     // Pass the role to the service
-  //     const { employee, invitationToken } =
-  //       await EmployeeService.createEmployee(
-  //         { ...employeeData, role },
-  //         creator
-  //       );
-
-  //     // Customize message based on role
-  //     const message = `${
-  //       role === UserRole.ADMIN ? "Admin" : "Employee"
-  //     } created successfully. Invitation sent.`;
-
-  //     res.status(201).json({
-  //       success: true,
-  //       message,
-  //       employee,
-  //     });
-  //   } catch (error) {
-  //     next(error);
-  //   }
-  // }
-
-  // Employee viewing their own profile
   static async getOwnProfile(req, res, next) {
     try {
       const user = await UserModel.findById(req.user.id)
@@ -152,7 +117,6 @@ export class EmployeeController {
     }
   }
 
-  // Employee updating their own profile
   static async updateOwnProfile(req, res, next) {
     try {
       const protectedFields = [
@@ -187,7 +151,6 @@ export class EmployeeController {
     }
   }
 
-  // Payslip Management
   static async getOwnPayslips(req, res, next) {
     try {
       const payslips = await PayrollModel.find({
@@ -231,7 +194,6 @@ export class EmployeeController {
     }
   }
 
-  // Leave Management
   static async getOwnLeaveRequests(req, res, next) {
     try {
       const leaveRequests = await LeaveModel.find({
@@ -329,6 +291,7 @@ export class EmployeeController {
       next(error);
     }
   }
+
   static async deleteEmployee(req, res, next) {
     try {
       const employee = await EmployeeService.deleteEmployee(req.params.id);
@@ -338,6 +301,78 @@ export class EmployeeController {
       });
     } catch (error) {
       next(error);
+    }
+  }
+
+  static async getDashboardStats(req, res) {
+    try {
+      const userRole = req.user.role;
+      const userDepartment = req.user.department;
+
+      let stats = {
+        employees: {
+          total: 0,
+          active: 0,
+          pending: 0,
+          byRole: {},
+        },
+        departments: {
+          total: 0,
+          hodCount: 0,
+        },
+      };
+
+      let employeeQuery = {};
+      if (userRole === UserRole.ADMIN) {
+        employeeQuery.department = userDepartment;
+        employeeQuery.role = { $ne: UserRole.SUPER_ADMIN };
+      }
+
+      if (userRole === UserRole.SUPER_ADMIN) {
+        stats.employees.byRole.superAdmin = await UserModel.countDocuments({
+          role: UserRole.SUPER_ADMIN,
+        });
+      }
+
+      stats.employees.byRole.admin = await UserModel.countDocuments({
+        role: UserRole.ADMIN,
+        ...(userRole === UserRole.ADMIN ? { department: userDepartment } : {}),
+      });
+
+      stats.employees.byRole.user = await UserModel.countDocuments({
+        role: UserRole.USER,
+        ...(userRole === UserRole.ADMIN ? { department: userDepartment } : {}),
+      });
+
+      stats.employees.active = await UserModel.countDocuments({
+        ...employeeQuery,
+        status: "active",
+      });
+
+      stats.employees.pending = await UserModel.countDocuments({
+        ...employeeQuery,
+        status: "pending",
+      });
+
+      stats.departments.total = await DepartmentModel.countDocuments();
+      stats.departments.hodCount = await UserModel.countDocuments({
+        role: UserRole.ADMIN,
+        position: { $regex: /head|director|hod/i },
+      });
+
+      stats.employees.total = Object.values(stats.employees.byRole).reduce(
+        (a, b) => a + b,
+        0
+      );
+
+      res.status(200).json({
+        success: true,
+        data: stats,
+      });
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
     }
   }
 }

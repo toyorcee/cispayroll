@@ -12,6 +12,14 @@ export const CalculationMethod = {
   PERCENTAGE: "percentage",
 };
 
+export const PayrollFrequency = {
+  WEEKLY: "weekly",
+  BIWEEKLY: "biweekly",
+  MONTHLY: "monthly",
+  QUARTERLY: "quarterly",
+  ANNUAL: "annual",
+};
+
 // Schema for salary components
 const SalaryComponentSchema = new Schema(
   {
@@ -71,7 +79,6 @@ const SalaryGradeSchema = new Schema(
       required: [true, "Basic salary is required"],
       min: [0, "Basic salary cannot be negative"],
     },
-    components: [SalaryComponentSchema],
     description: {
       type: String,
       trim: true,
@@ -90,6 +97,7 @@ const SalaryGradeSchema = new Schema(
       trim: true,
       required: false,
     },
+    components: [SalaryComponentSchema],
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
@@ -107,44 +115,121 @@ const SalaryGradeSchema = new Schema(
 );
 
 // Methods
-SalaryGradeSchema.methods.calculateTotalAllowances = function () {
-  return this.components
-    .filter(
-      (component) =>
-        component.type === ComponentType.ALLOWANCE && component.isActive
-    )
-    .reduce((total, component) => {
-      if (component.calculationMethod === CalculationMethod.FIXED) {
-        return total + component.value;
-      }
-      return total + (this.basicSalary * component.value) / 100;
-    }, 0);
+SalaryGradeSchema.methods.calculateGrossSalary = async function (
+  employeeId,
+  startDate,
+  endDate
+) {
+  // Get all applicable allowances for this employee
+  const Allowance = mongoose.model("Allowance");
+  const allowances = await Allowance.getEmployeeAllowances(
+    employeeId,
+    this._id,
+    this.department,
+    startDate,
+    endDate
+  );
+
+  // Calculate total allowances
+  const totalAllowances = allowances.reduce((total, allowance) => {
+    return total + allowance.calculateValue(this.basicSalary);
+  }, 0);
+
+  return this.basicSalary + totalAllowances;
 };
 
-SalaryGradeSchema.methods.calculateTotalDeductions = function () {
-  return this.components
-    .filter(
-      (component) =>
-        component.type === ComponentType.DEDUCTION && component.isActive
-    )
-    .reduce((total, component) => {
-      if (component.calculationMethod === CalculationMethod.FIXED) {
-        return total + component.value;
-      }
-      return total + (this.basicSalary * component.value) / 100;
-    }, 0);
+SalaryGradeSchema.methods.calculateNetSalary = async function (
+  employeeId,
+  startDate,
+  endDate,
+  deductions
+) {
+  const grossSalary = await this.calculateGrossSalary(
+    employeeId,
+    startDate,
+    endDate
+  );
+
+  // Calculate total deductions
+  const totalDeductions = deductions.reduce((total, deduction) => {
+    if (deduction.calculationMethod === CalculationMethod.FIXED) {
+      return total + deduction.value;
+    }
+    return total + (grossSalary * deduction.value) / 100;
+  }, 0);
+
+  return grossSalary - totalDeductions;
 };
 
-SalaryGradeSchema.methods.calculateNetSalary = function () {
-  const totalAllowances = this.calculateTotalAllowances();
-  const totalDeductions = this.calculateTotalDeductions();
-  return this.basicSalary + totalAllowances - totalDeductions;
+// Static method to get salary details for an employee
+SalaryGradeSchema.statics.getEmployeeSalaryDetails = async function (
+  employeeId,
+  departmentId,
+  startDate,
+  endDate
+) {
+  // Find the employee's salary grade
+  const salaryGrade = await this.findOne({
+    department: departmentId,
+    isActive: true,
+  });
+
+  if (!salaryGrade) {
+    throw new Error("No active salary grade found for this department");
+  }
+
+  // Get all applicable allowances
+  const Allowance = mongoose.model("Allowance");
+  const allowances = await Allowance.getEmployeeAllowances(
+    employeeId,
+    salaryGrade._id,
+    departmentId,
+    startDate,
+    endDate
+  );
+
+  // Calculate gross salary
+  const grossSalary = await salaryGrade.calculateGrossSalary(
+    employeeId,
+    startDate,
+    endDate
+  );
+
+  // Get deductions (you'll need to implement this based on your Deduction model)
+  const Deduction = mongoose.model("Deduction");
+  const deductions = await Deduction.find({
+    employee: employeeId,
+    isActive: true,
+    effectiveDate: { $lte: endDate },
+    $or: [{ expiryDate: null }, { expiryDate: { $gte: startDate } }],
+  });
+
+  // Calculate net salary
+  const netSalary = await salaryGrade.calculateNetSalary(
+    employeeId,
+    startDate,
+    endDate,
+    deductions
+  );
+
+  return {
+    salaryGrade,
+    basicSalary: salaryGrade.basicSalary,
+    allowances,
+    deductions,
+    grossSalary,
+    netSalary,
+    calculationPeriod: {
+      startDate,
+      endDate,
+    },
+  };
 };
 
 // Indexes
 SalaryGradeSchema.index({ level: 1 });
 SalaryGradeSchema.index({ department: 1 });
 SalaryGradeSchema.index({ isActive: 1 });
-SalaryGradeSchema.index({ "components.type": 1 });
+SalaryGradeSchema.index({ "defaultAllowances.name": 1 });
 
 export default mongoose.model("SalaryGrade", SalaryGradeSchema);

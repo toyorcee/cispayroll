@@ -6,20 +6,19 @@ export interface DepartmentBasic {
   employeeCount?: number;
 }
 
-export interface Department extends DepartmentBasic {
-  description: string;
-  location: string;
+export interface Department {
+  _id: string;
+  name: string;
+  code: string;
+  description?: string;
+  location?: string;
   headOfDepartment: {
     _id: string;
     firstName: string;
     lastName: string;
     email: string;
   };
-  adminId: string;
-  adminName: string;
   status: "active" | "inactive";
-  createdAt: Date;
-  updatedAt: Date;
   employeeCounts: {
     total: number;
     admins: number;
@@ -28,11 +27,10 @@ export interface Department extends DepartmentBasic {
 }
 
 export interface DepartmentFormData {
-  id?: string;
   name: string;
   code: string;
-  description: string;
-  location: string;
-  headOfDepartment: string;
-  status: "active" | "inactive";
+  description?: string;
+  location?: string;
+  headOfDepartment?: string;
+  status?: string;
 }

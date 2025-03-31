@@ -1,4 +1,6 @@
 import axios from "axios";
+import { QueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   Employee,
   EmployeeFilters,
@@ -13,14 +15,16 @@ import { Department, DepartmentFormData } from "../types/department";
 import { OnboardingStats } from "../types/chart";
 import { toast } from "react-toastify";
 import { UserRole } from "../types/auth";
+// import { api } from "./api";
+import { DashboardStats } from "../data/dashboardData";
+import { salaryStructureService } from "./salaryStructureService";
 
-const BASE_URL = "https://payrollapi.digitalentshub.net/api";
+const BASE_URL = "http://localhost:5000/api";
 
 // Set default axios config to always include credentials
 axios.defaults.withCredentials = true;
 
-
-interface AdminResponse {
+export interface AdminResponse {
   _id: string;
   firstName: string;
   lastName: string;
@@ -34,16 +38,50 @@ interface AdminResponse {
     | "terminated"
     | "offboarding";
   permissions: string[];
+  department?: {
+    _id: string;
+    name: string;
+    code: string;
+  };
+  position?: string;
 }
 
+interface HODResponse {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  department: {
+    _id: string;
+    name: string;
+    code: string;
+  };
+  position: string;
+}
+
+export const EMPLOYEES_QUERY_KEY = ["employees"] as const;
+
+/**
+ * Service methods for employee-related operations
+ * Note: HODs are fetched from /super-admin/admins and filtered client-side
+ * This is the current working implementation - do not change without testing
+ */
 export const employeeService = {
   // Get employees with filtering and pagination
   getEmployees: async (params: {
     page: number;
     limit: number;
   }): Promise<EmployeeResponse> => {
-    const response = await axios.get("/api/super-admin/users", { params });
+    const response = await axios.get(`${BASE_URL}/super-admin/users`, {
+      params,
+    });
     return response.data;
+  },
+
+  //total users
+  getTotalUsers: async (): Promise<number> => {
+    const response = await axios.get(`${BASE_URL}/super-admin/users`);
+    return response.data.length;
   },
 
   // Get employees for specific department
@@ -59,10 +97,10 @@ export const employeeService = {
 
       const queryParams = new URLSearchParams();
       if (filters.status) queryParams.append("status", filters.status);
-      queryParams.append("page", filters.page.toString());
-      queryParams.append("limit", filters.limit.toString());
+      queryParams.append("page", (filters.page || 1).toString());
+      queryParams.append("limit", (filters.limit || 10).toString());
 
-      const url = `/api/super-admin/departments/${departmentId}/employees?${queryParams}`;
+      const url = `${BASE_URL}/super-admin/departments/${departmentId}/employees?${queryParams}`;
       const response = await axios.get(url);
 
       return response.data.data;
@@ -75,16 +113,19 @@ export const employeeService = {
   // Create new employee
   async createEmployee(employeeData: CreateEmployeeData): Promise<Employee> {
     try {
-      // Format the date without type checking
-      const formattedData = {
-        ...employeeData,
-        dateJoined: new Date(employeeData.dateJoined).toISOString(),
-      };
-
-      const response = await axios.post(
-        `${BASE_URL}/employees/create`,
-        formattedData
-      );
+      // Ensure we're sending the exact structure expected by the API
+      const response = await axios.post(`${BASE_URL}/employees/create`, {
+        firstName: employeeData.firstName,
+        lastName: employeeData.lastName,
+        email: employeeData.email,
+        phone: employeeData.phone,
+        role: employeeData.role,
+        position: employeeData.position,
+        gradeLevel: employeeData.gradeLevel,
+        workLocation: employeeData.workLocation,
+        dateJoined: employeeData.dateJoined,
+        department: employeeData.department,
+      });
       return response.data;
     } catch (error) {
       console.error("Error creating employee:", error);
@@ -93,50 +134,32 @@ export const employeeService = {
   },
 
   // Update employee
-  updateEmployee: async (id: string, employeeData: Partial<Employee>) => {
-    const response = await axios.put(
-      `${BASE_URL}/employees/${id}`,
-      employeeData
-    );
-    return response.data;
+  updateEmployee: async (id: string, data: Partial<Employee>) => {
+    try {
+      const response = await axios.put(
+        `${BASE_URL}/super-admin/users/${id}`,
+        data
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error updating employee:", error);
+      throw error;
+    }
   },
 
   // Delete employee
   deleteEmployee: async (id: string) => {
-    const response = await axios.delete(`${BASE_URL}/employees/${id}`);
+    const response = await axios.delete(`${BASE_URL}/super-admin/users/${id}`);
     return response.data;
   },
 
   // Transfer employee to different department
   transferEmployee: async (id: string, newDepartmentId: string) => {
-    const response = await axios.post(`${BASE_URL}/employees/${id}/transfer`, {
-      departmentId: newDepartmentId,
-    });
+    const response = await axios.post(
+      `${BASE_URL}/super-admin/employees/${id}/transfer`,
+      { departmentId: newDepartmentId }
+    );
     return response.data;
-  },
-
-  getDepartments: async (): Promise<DepartmentBasic[]> => {
-    try {
-      console.log("🔄 Fetching departments from API...");
-      const response = await axios.get<{ data: DepartmentBasic[] }>(
-        `${BASE_URL}/super-admin/departments`
-      );
-
-      // Map the response to include both _id and id
-      const departments = response.data.data.map((dept) => ({
-        ...dept,
-        id: dept._id, // Add id field for frontend compatibility
-      }));
-
-      console.log("✅ Departments fetched:", departments);
-      return departments;
-    } catch (error: unknown) {
-      console.error("❌ Failed to fetch departments:", error);
-      toast.error(
-        (axios.isAxiosError(error) && error.response?.data?.message) || "Failed to fetch departments"
-      );
-      throw error;
-    }
   },
 
   createDepartment: async (data: DepartmentFormData): Promise<Department> => {
@@ -206,7 +229,9 @@ export const employeeService = {
     } catch (error: unknown) {
       console.error("❌ Error fetching onboarding employees:", error);
       if (axios.isAxiosError(error)) {
-        toast.error(error.response?.data?.message || "Failed to fetch employees");
+        toast.error(
+          error.response?.data?.message || "Failed to fetch employees"
+        );
       } else {
         toast.error("Failed to fetch employees");
       }
@@ -295,7 +320,9 @@ export const employeeService = {
     } catch (error: unknown) {
       console.error(
         "❌ Failed to initiate offboarding:",
-        axios.isAxiosError(error) ? error.response?.data || error.message : String(error)
+        axios.isAxiosError(error)
+          ? error.response?.data || error.message
+          : String(error)
       );
       throw error;
     }
@@ -423,7 +450,11 @@ export const employeeService = {
     return response.data;
   },
 
-  processPayroll: async (data: { employeeId: string; amount: number; period: string }) => {
+  processPayroll: async (data: {
+    employeeId: string;
+    amount: number;
+    period: string;
+  }) => {
     const response = await axios.post(
       `${BASE_URL}/super-admin/payroll/process`,
       data
@@ -439,7 +470,10 @@ export const employeeService = {
     return response.data;
   },
 
-  updateAllowance: async (id: string, data: { name: string; amount: number; description?: string }) => {
+  updateAllowance: async (
+    id: string,
+    data: { name: string; amount: number; description?: string }
+  ) => {
     const response = await axios.patch(
       `${BASE_URL}/super-admin/payroll/allowances/${id}`,
       data
@@ -453,7 +487,11 @@ export const employeeService = {
     return response.data;
   },
 
-  createBonus: async (data: { name: string; amount: number; description?: string }) => {
+  createBonus: async (data: {
+    name: string;
+    amount: number;
+    description?: string;
+  }) => {
     const response = await axios.post(
       `${BASE_URL}/super-admin/payroll/bonuses`,
       data
@@ -470,10 +508,18 @@ export const employeeService = {
   },
 
   getAdmins: async (): Promise<AdminResponse[]> => {
-    const response = await axios.get("/api/super-admin/admins", {
-      withCredentials: true,
-    });
+    const response = await axios.get(`${BASE_URL}/super-admin/admins`);
     return response.data.data;
+  },
+
+  getDashboardStats: async (): Promise<DashboardStats> => {
+    try {
+      const response = await axios.get(`${BASE_URL}/employees/dashboard/stats`);
+      return response.data.data;
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+      throw error;
+    }
   },
 
   updateOnboardingStage: async (employeeId: string, stage: string) => {
@@ -482,5 +528,104 @@ export const employeeService = {
       { stage }
     );
     return response.data;
+  },
+
+  // async getPayrollTrends() {
+  //   const response = await api.get("/api/dashboard/payroll-trends");
+  //   return response.data;
+  // },
+
+  // async getDepartmentDistribution() {
+  //   const response = await api.get("/api/dashboard/department-distribution");
+  //   return response.data;
+  // },
+
+  // async getDepartmentPieData() {
+  //   const response = await api.get("/api/dashboard/department-pie");
+  //   return response.data;
+  // },
+
+  getAllEmployees: async (filters?: EmployeeFilters) => {
+    try {
+      console.log("Fetching employees from:", `${BASE_URL}/super-admin/users`);
+      const defaultFilters = {
+        page: 1,
+        limit: 10,
+        ...filters,
+      };
+
+      const response = await axios.get(`${BASE_URL}/super-admin/users`, {
+        params: defaultFilters,
+      });
+      console.log("Employees response:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching employees:", error);
+      throw error;
+    }
+  },
+
+  useGetEmployees: (filters?: EmployeeFilters) => {
+    return useQuery({
+      queryKey: [...EMPLOYEES_QUERY_KEY, filters],
+      queryFn: () => employeeService.getAllEmployees(filters),
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+  },
+
+  // Add a function to get department by ID
+  getDepartmentById: async (departmentId: string): Promise<DepartmentBasic> => {
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/super-admin/departments/${departmentId}`
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Error fetching department:", error);
+      throw error;
+    }
+  },
+
+  useGetAdmins: () => {
+    return useQuery<AdminResponse[]>({
+      queryKey: ["admins"],
+      queryFn: async () => {
+        const response = await axios.get(`${BASE_URL}/super-admin/admins`);
+        // Make sure we always return an array, even if empty
+        return response.data.admins || [];
+      },
+    });
+  },
+
+  /**
+   * Gets Heads of Departments by filtering admins
+   * @returns Promise<HODResponse[]>
+   */
+  getHeadsOfDepartments: async (): Promise<HODResponse[]> => {
+    try {
+      const response = await axios.get(`${BASE_URL}/super-admin/admins`);
+      return response.data.admins.filter((admin: HODResponse) =>
+        admin.position?.toLowerCase().includes("head of")
+      );
+    } catch (error) {
+      console.error("Error fetching HODs:", error);
+      throw error;
+    }
+  },
+
+  useGetHODs: () => {
+    return useQuery<HODResponse[]>({
+      queryKey: ["hods"],
+      queryFn: employeeService.getHeadsOfDepartments,
+    });
+  },
+
+  useGetSalaryGrades: () => {
+    return useQuery({
+      queryKey: ["salaryGrades"],
+      queryFn: salaryStructureService.getAllSalaryGrades,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 30 * 60 * 1000, // 30 minutes
+    });
   },
 };

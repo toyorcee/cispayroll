@@ -1,67 +1,55 @@
 import Joi from "joi";
+import { handleError } from "../utils/errorHandler.js";
 
-// Define Joi validation schema
-const departmentSchema = Joi.object({
-  name: Joi.string().min(2).max(100).required().trim().messages({
-    "string.min": "Department name must be at least 2 characters long",
-    "string.max": "Department name cannot exceed 100 characters",
-    "any.required": "Department name is required",
-  }),
-
-  code: Joi.string()
-    .pattern(/^[A-Z0-9]{2,10}$/)
-    .required()
-    .messages({
-      "string.pattern.base":
-        "Department code must be 2-10 uppercase letters/numbers",
-      "any.required": "Department code is required",
-    }),
-
-  description: Joi.string().min(10).max(500).required().trim().messages({
-    "string.min": "Description must be at least 10 characters long",
-    "string.max": "Description cannot exceed 500 characters",
-    "any.required": "Description is required",
-  }),
-
-  headOfDepartment: Joi.string().required().messages({
-    "any.required": "Head of department is required",
-  }),
-
-  location: Joi.string().min(2).max(100).required().trim().messages({
-    "string.min": "Location must be at least 2 characters long",
-    "string.max": "Location cannot exceed 100 characters",
-    "any.required": "Location is required",
-  }),
-
-  email: Joi.string().email().optional().messages({
-    "string.email": "Please provide a valid email address",
-  }),
-
-  phone: Joi.string()
-    .optional()
-    .pattern(/^\+?[\d\s-]+$/)
-    .messages({
-      "string.pattern.base": "Please provide a valid phone number",
-    }),
+// Separate schema for creation (without HOD requirement)
+const createDepartmentSchema = Joi.object({
+  name: Joi.string().required().trim(),
+  code: Joi.string().required().trim(),
+  description: Joi.string().required().trim(),
+  location: Joi.string().required().trim(),
 });
 
-export const validateDepartment = (req, res, next) => {
-  const { error, value } = departmentSchema.validate(req.body, {
-    abortEarly: false,
-    stripUnknown: true,
-  });
+// Schema for updates (with optional HOD)
+const updateDepartmentSchema = Joi.object({
+  name: Joi.string().trim(),
+  code: Joi.string().trim(),
+  description: Joi.string().trim(),
+  location: Joi.string().trim(),
+  headOfDepartment: Joi.string(), 
+});
 
-  if (error) {
-    const errors = error.details.map((detail) => detail.message);
-    res.status(400).json({
-      success: false,
-      message: "Validation failed",
-      errors,
+export const validateCreateDepartment = (req, res, next) => {
+  try {
+    const { error } = createDepartmentSchema.validate(req.body, {
+      abortEarly: false,
     });
-    return;
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: error.details.map((err) => err.message),
+      });
+    }
+    next();
+  } catch (error) {
+    handleError(error, res);
   }
+};
 
-  // Update the request body with validated and sanitized data
-  req.body = value;
-  next();
+export const validateUpdateDepartment = (req, res, next) => {
+  try {
+    const { error } = updateDepartmentSchema.validate(req.body, {
+      abortEarly: false,
+    });
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: error.details.map((err) => err.message),
+      });
+    }
+    next();
+  } catch (error) {
+    handleError(error, res);
+  }
 };

@@ -8,6 +8,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { traceError } from "./utils/errorHandler.js";
+import multer from "multer";
 
 // Route Imports
 import authRoutes from "./routes/authRoutes.js";
@@ -19,7 +20,9 @@ import employeeRoutes from "./routes/employeeRoutes.js";
 import invitationRoutes from "./routes/invitationRoutes.js";
 import onboardingRoutes from "./routes/onboardingRoutes.js";
 import disciplinaryRoutes from "./routes/disciplinaryRoutes.js";
-import feedbackRoute from "./routes/feedbackRoutes.js"
+import feedbackRoute from "./routes/feedbackRoutes.js";
+import departmentRoutes from "./routes/departmentRoutes.js";
+import passwordRoutes from "./routes/passwordRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -118,6 +121,32 @@ app.use((req, res, next) => {
   next();
 });
 
+// Multer configuration for profile images
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "uploads/profiles/"); // Make sure this directory exists
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, "profile-" + uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type. Only JPEG, PNG and GIF are allowed."));
+    }
+  },
+});
+
 // Route error wrapper
 const routeErrorWrapper = (handler) => {
   return async (req, res, next) => {
@@ -140,8 +169,9 @@ app.use("/api/employees", routeErrorWrapper(employeeRoutes));
 app.use("/api/invitation", routeErrorWrapper(invitationRoutes));
 app.use("/api/onboarding", routeErrorWrapper(onboardingRoutes));
 app.use("/api/disciplinary", routeErrorWrapper(disciplinaryRoutes));
-app.use("/api/feedback", routeErrorWrapper(feedbackRoute))
-
+app.use("/api/feedback", routeErrorWrapper(feedbackRoute));
+app.use("/api/departments", routeErrorWrapper(departmentRoutes));
+app.use("/api/password", routeErrorWrapper(passwordRoutes));
 
 // Enhanced health check
 app.get("/api/health", (_req, res) => {

@@ -1,7 +1,25 @@
-import { useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import Chart from "chart.js/auto";
-import { TooltipItem } from "chart.js";
+import React, { useRef, useEffect } from "react";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import { Line } from "react-chartjs-2";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 // Define proper tooltip types
 // interface ChartTooltipContext {
@@ -24,135 +42,52 @@ interface LineChartProps {
       data: number[];
       borderColor: string;
       backgroundColor: string;
+      tension: number;
     }[];
   };
 }
 
-const LineChart = ({ data }: LineChartProps) => {
-  const chartRef = useRef<HTMLCanvasElement>(null);
-  const chartInstance = useRef<Chart | null>(null);
+const LineChart: React.FC<LineChartProps> = ({ data }) => {
+  const chartRef = useRef<ChartJS<"line">>(null);
 
   useEffect(() => {
-    if (chartRef.current) {
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-      }
-
-      const ctx = chartRef.current.getContext("2d");
-      if (ctx) {
-        chartInstance.current = new Chart(ctx, {
-          type: "line",
-          data: {
-            ...data,
-            datasets: data.datasets.map((dataset) => ({
-              ...dataset,
-              borderWidth: 3,
-              pointRadius: 4,
-              pointHoverRadius: 8,
-              pointBackgroundColor: "white",
-              pointHoverBackgroundColor: dataset.borderColor,
-              pointBorderWidth: 2,
-              pointHoverBorderWidth: 3,
-              tension: 0.4,
-              fill: true,
-            })),
-          },
-          options: {
-            responsive: true,
-            animation: {
-              duration: 2000,
-              easing: "easeInOutQuart",
-            },
-            plugins: {
-              legend: {
-                position: "top" as const,
-                labels: {
-                  font: {
-                    size: 12,
-                    weight: "bold",
-                  },
-                  usePointStyle: true,
-                  pointStyle: "circle",
-                },
-              },
-              tooltip: {
-                backgroundColor: "rgba(0, 0, 0, 0.8)",
-                padding: 12,
-                titleFont: {
-                  size: 14,
-                  weight: "bold",
-                },
-                bodyFont: {
-                  size: 13,
-                },
-                callbacks: {
-                  label: function (tooltipItem: TooltipItem<"line">) {
-                    const value = tooltipItem.raw as number;
-                    return `${
-                      tooltipItem.dataset.label
-                    }: ₦${value.toLocaleString()}`;
-                  },
-                },
-              },
-            },
-            scales: {
-              y: {
-                beginAtZero: true,
-                grid: {
-                  color: "rgba(0, 0, 0, 0.1)",
-                  drawTicks: false,
-                },
-                border: {
-                  display: false,
-                },
-                ticks: {
-                  font: {
-                    size: 12,
-                    weight: "bold",
-                  },
-                },
-              },
-              x: {
-                grid: {
-                  display: false,
-                },
-                border: {
-                  display: false,
-                },
-                ticks: {
-                  font: {
-                    size: 12,
-                    weight: "bold",
-                  },
-                },
-              },
-            },
-          },
-        });
-      }
-    }
-
     return () => {
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
+      if (chartRef.current) {
+        chartRef.current.destroy();
       }
     };
-  }, [data]);
+  }, []);
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: "top" as const,
+      },
+      title: {
+        display: false,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: "rgba(0, 0, 0, 0.1)",
+        },
+      },
+      x: {
+        grid: {
+          display: false,
+        },
+      },
+    },
+  };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -100 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{
-        duration: 0.8,
-        type: "spring",
-        bounce: 0.4,
-        delay: 0.2,
-      }}
-      className="w-full h-[300px] relative"
-    >
-      <canvas ref={chartRef} />
-    </motion.div>
+    <div style={{ height: "300px" }}>
+      <Line ref={chartRef} options={options} data={data} />
+    </div>
   );
 };
 

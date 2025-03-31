@@ -1,5 +1,3 @@
-import { DepartmentBasic } from "./employee";
-
 // Define the possible types as constants
 export type ComponentType = "allowance" | "deduction";
 export type CalculationMethod = "fixed" | "percentage";
@@ -13,6 +11,15 @@ export interface ISalaryComponentInput {
   isActive: boolean;
 }
 
+// Interface for updating a salary grade
+export interface UpdateSalaryGradeInput {
+  level?: string;
+  basicSalary?: number;
+  description?: string;
+  department?: string;
+  components?: ISalaryComponentInput[];
+}
+
 // Interface for creating a new salary grade
 export interface CreateSalaryGradeDTO {
   level: string;
@@ -23,38 +30,45 @@ export interface CreateSalaryGradeDTO {
 }
 
 // Interface for a component in the response
-export interface ISalaryComponent extends ISalaryComponentInput {
+export interface ISalaryComponent {
   _id: string;
-  createdBy: {
-    _id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    fullName: string;
-    id: string;
-  };
-  updatedBy: {
-    _id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    fullName: string;
-    id: string;
-  };
+  name: string;
+  type: "allowance" | "deduction";
+  calculationMethod: "fixed" | "percentage";
+  value: number;
+  isActive: boolean;
+  description?: string;
+  createdBy: string;
+  updatedBy: string;
+}
+
+export interface SalaryComponent {
+  _id: string;
+  name: string;
+  type: "allowance" | "deduction";
+  calculationMethod: "percentage" | "fixed";
+  value: number;
+  isActive: boolean;
 }
 
 export interface ISalaryGrade {
   _id: string;
   level: string;
   basicSalary: number;
-  components: ISalaryComponent[];
-  description?: string;
+  description: string;
   isActive: boolean;
-  department?: DepartmentBasic;
+  department?: {
+    _id: string;
+    name: string;
+  } | null;
+  departmentName?: string;
+  components: ISalaryComponent[];
   createdBy: string;
   updatedBy: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
+  totalAllowances?: number;
+  grossSalary?: number;
 }
 
 export interface SalaryStructure {

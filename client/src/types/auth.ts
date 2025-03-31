@@ -7,6 +7,9 @@ export enum UserRole {
 
 // Define permission types with clear categorization
 export enum Permission {
+  // ===== Dashboard Access =====
+  VIEW_DASHBOARD = "VIEW_DASHBOARD",
+
   // ===== Admin Management (Super Admin Only) =====
   CREATE_ADMIN = "CREATE_ADMIN",
   EDIT_ADMIN = "EDIT_ADMIN",
@@ -68,11 +71,17 @@ export enum Permission {
   MANAGE_DEDUCTIONS = "MANAGE_DEDUCTIONS",
   VIEW_DEDUCTIONS = "VIEW_DEDUCTIONS",
   EDIT_DEDUCTIONS = "EDIT_DEDUCTIONS",
+  VIEW_OWN_DEDUCTIONS = "VIEW_OWN_DEDUCTIONS",
 
   // Allowances
   MANAGE_ALLOWANCES = "MANAGE_ALLOWANCES",
   VIEW_ALLOWANCES = "VIEW_ALLOWANCES",
   EDIT_ALLOWANCES = "EDIT_ALLOWANCES",
+  CREATE_ALLOWANCES = "CREATE_ALLOWANCES",
+  DELETE_ALLOWANCES = "DELETE_ALLOWANCES",
+  APPROVE_ALLOWANCES = "APPROVE_ALLOWANCES",
+  VIEW_OWN_ALLOWANCES = "VIEW_OWN_ALLOWANCES",
+  REQUEST_ALLOWANCES = "REQUEST_ALLOWANCES",
 
   // Bonuses & Overtime
   MANAGE_BONUSES = "MANAGE_BONUSES",
@@ -124,8 +133,17 @@ export interface EmergencyContact {
   phone: string;
 }
 
+export interface Department {
+  _id: string;
+  name: string;
+  code: string;
+  description: string;
+  location: string;
+  status: string;
+}
+
 export interface User {
-  id: string;
+  _id: string;
   employeeId: string;
   firstName: string;
   lastName: string;
@@ -133,23 +151,26 @@ export interface User {
   phone: string;
   role: UserRole;
   permissions: Permission[];
-  department?: string;
+  department: string | Department;
   position: string;
   gradeLevel: string;
   workLocation: string;
   dateJoined: Date;
-  status: "active" | "inactive" | "suspended";
-  emergencyContact: EmergencyContact;
-  bankDetails: BankDetails;
-  profileImage?: string;
-  reportingTo?: {
-    id: string;
+  status: "active" | "inactive";
+  emergencyContact: {
     name: string;
-    position: string;
+    relationship: string;
+    phone: string;
   };
+  bankDetails: {
+    bankName: string;
+    accountNumber: string;
+    accountName: string;
+  };
+  profileImage?: string;
+  reportingTo?: string | User;
   isEmailVerified: boolean;
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
-  managedEmployeeIds?: string[];
 }

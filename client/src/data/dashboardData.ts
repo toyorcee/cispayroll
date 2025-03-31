@@ -42,6 +42,23 @@ export type ActivityStatus =
   | "rejected"
   | "announcement";
 
+export interface DashboardStats {
+  employees: {
+    total: number;
+    active: number;
+    pending: number;
+    byRole: {
+      superAdmin: number;
+      admin: number;
+      user: number;
+    };
+  };
+  departments: {
+    total: number;
+    hodCount: number;
+  };
+}
+
 // Interfaces
 export interface StatItem {
   name: string;
@@ -67,111 +84,116 @@ export interface ActivityItem {
   count?: string;
 }
 
-export const getRoleStats = (role?: UserRole): StatItem[] => {
+export const getRoleStats = (
+  role?: UserRole,
+  stats?: DashboardStats
+): StatItem[] => {
+  if (!stats) return [];
+
   switch (role) {
     case UserRole.SUPER_ADMIN:
       return [
         {
           name: "Total Users",
-          value: "156",
-          subtext: "12 Admins • 144 Users",
+          value: stats.employees.total.toString(),
+          subtext: `${stats.employees.byRole.admin} Admins • ${stats.employees.byRole.user} Users`,
           icon: FaUserShield,
           href: "/settings/users",
           color: "blue",
         },
         {
-          name: "Monthly Payroll",
-          value: "₦152.4M",
-          subtext: "March 2024",
-          icon: FaMoneyBill,
-          href: "/payroll",
+          name: "Departments",
+          value: stats.departments.total.toString(),
+          subtext: `${stats.departments.hodCount} HODs`,
+          icon: FaBuilding,
+          href: "/departments",
           color: "green",
         },
         {
-          name: "System Alerts",
-          value: "3",
-          subtext: "Critical Issues",
-          icon: FaExclamationTriangle,
-          href: "/settings/system",
-          color: "red",
+          name: "Pending Approvals",
+          value: stats.employees.pending.toString(),
+          subtext: "New Employees",
+          icon: FaUserPlus,
+          href: "/employees/pending",
+          color: "yellow",
         },
         {
-          name: "Performance",
-          value: "98.5%",
-          subtext: "System Uptime",
-          icon: FaChartLine,
-          href: "/reports/system",
-          color: "yellow",
+          name: "Active Employees",
+          value: stats.employees.active.toString(),
+          subtext: "Currently Working",
+          icon: FaUsers,
+          href: "/employees",
+          color: "blue",
         },
       ];
     case UserRole.ADMIN:
       return [
         {
           name: "Department Staff",
-          value: "42",
-          subtext: "3 New This Month",
+          value: stats.employees.byRole.user.toString(),
+          subtext: `${stats.employees.pending} Pending`,
           icon: FaUserTie,
           href: "/employees",
           color: "blue",
         },
         {
-          name: "Leave Requests",
-          value: "5",
-          subtext: "Pending Approval",
-          icon: FaCalendar,
-          href: "/employees/leave",
-          color: "yellow",
-        },
-        {
-          name: "Payroll Status",
-          value: "Active",
-          subtext: "Next: March 25",
-          icon: FaFileInvoiceDollar,
-          href: "/payroll",
+          name: "Departments",
+          value: stats.departments.total.toString(),
+          subtext: `${stats.departments.hodCount} HODs`,
+          icon: FaBuilding,
+          href: "/departments",
           color: "green",
         },
         {
-          name: "Tasks",
-          value: "8",
-          subtext: "Due This Week",
-          icon: FaBriefcase,
-          href: "/tasks",
-          color: "red",
+          name: "Pending Approvals",
+          value: stats.employees.pending.toString(),
+          subtext: "New Employees",
+          icon: FaUserPlus,
+          href: "/employees/pending",
+          color: "yellow",
+        },
+        {
+          name: "Active Staff",
+          value: stats.employees.active.toString(),
+          subtext: "Currently Working",
+          icon: FaUsers,
+          href: "/employees",
+          color: "blue",
         },
       ];
     case UserRole.USER:
       return [
         {
-          name: "My Leave Balance",
-          value: "15",
-          subtext: "Days Available",
-          icon: FaCalendar,
-          href: "/my-leave",
-          color: "green",
-        },
-        {
-          name: "Next Payslip",
-          value: "25th",
-          subtext: "March 2024",
-          icon: FaFileAlt,
-          href: "/my-payslips",
+          name: "Total Staff",
+          value: stats.employees.total.toString(),
+          subtext: `${stats.employees.active} Active`,
+          icon: FaUsers,
+          href: "/employees",
           color: "blue",
         },
         {
-          name: "Tasks",
-          value: "3",
-          subtext: "Pending Actions",
-          icon: FaClock,
-          href: "/my-tasks",
+          name: "Departments",
+          value: stats.departments.total.toString(),
+          subtext: `${stats.departments.hodCount} HODs`,
+          icon: FaBuilding,
+          href: "/departments",
+          color: "green",
+        },
+        {
+          name: "Pending Approvals",
+          value: stats.employees.pending.toString(),
+          subtext: "New Employees",
+          icon: FaUserPlus,
+          href: "/employees/pending",
           color: "yellow",
         },
         {
-          name: "Documents",
-          value: "2",
-          subtext: "Need Review",
-          icon: FaFileAlt,
-          href: "/my-documents",
-          color: "red",
+          name: "Active Employees",
+          value: stats.employees.active.toString(),
+          subtext: "Currently Working",
+          icon: FaUsers,
+          href: "/employees",
+          color: "blue",
         },
       ];
     default:

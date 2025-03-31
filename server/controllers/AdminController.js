@@ -6,8 +6,12 @@ import { PermissionChecker } from "../utils/permissionUtils.js";
 import { Types } from "mongoose";
 import { handleError, ApiError } from "../utils/errorHandler.js";
 import { AuthService } from "../services/authService.js";
+import Allowance from "../models/Allowance.js";
+import { AllowanceStatus } from "../models/Allowance.js";
+import Deduction from "../models/Deduction.js";
 
 export class AdminController {
+  // ===== User Management Methods =====
   static async getDepartmentUsers(req, res, next) {
     try {
       const admin = await UserModel.findById(req.user.id);
@@ -33,7 +37,6 @@ export class AdminController {
     }
   }
 
-  // Create a new user in admin's department
   static async createDepartmentUser(req, res, next) {
     try {
       if (!PermissionChecker.hasPermission(req.user, Permission.CREATE_USER)) {
@@ -66,7 +69,6 @@ export class AdminController {
     }
   }
 
-  // Update a user in admin's department
   static async updateDepartmentUser(req, res, next) {
     try {
       if (!PermissionChecker.hasPermission(req.user, Permission.EDIT_USER)) {
@@ -115,7 +117,7 @@ export class AdminController {
     }
   }
 
-  // Get department payroll records
+  // ===== Payroll Management Methods =====
   static async getDepartmentPayroll(req, res, next) {
     try {
       if (
@@ -152,7 +154,6 @@ export class AdminController {
     }
   }
 
-  // Create payroll record for department user
   static async createDepartmentPayroll(req, res, next) {
     try {
       if (
@@ -198,7 +199,6 @@ export class AdminController {
     }
   }
 
-  // Update payroll record for department user
   static async updateDepartmentPayroll(req, res, next) {
     try {
       if (!PermissionChecker.hasPermission(req.user, Permission.EDIT_PAYROLL)) {
@@ -242,6 +242,412 @@ export class AdminController {
         success: true,
         message: "Payroll record updated successfully",
         payroll: updatedPayroll,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  // ===== Salary Structure & Allowances Management =====
+  static async getDepartmentAllowances(req, res) {
+    try {
+      if (
+        !PermissionChecker.hasPermission(req.user, Permission.VIEW_ALLOWANCES)
+      ) {
+        throw new ApiError(403, "Not authorized to view allowances");
+      }
+
+      const allowances = await Allowance.find({
+        department: req.user.department,
+        scope: { $in: ["department", "grade"] },
+      })
+        .populate("department", "name")
+        .populate("salaryGrade", "level basicSalary")
+        .sort({ createdAt: -1 });
+
+      res.status(200).json({
+        success: true,
+        data: allowances,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async createDepartmentAllowance(req, res) {
+    try {
+      if (
+        !PermissionChecker.hasPermission(req.user, Permission.CREATE_ALLOWANCES)
+      ) {
+        throw new ApiError(403, "Not authorized to create allowances");
+      }
+
+      const allowance = await Allowance.create({
+        ...req.body,
+        department: req.user.department,
+        scope: "department",
+        createdBy: req.user._id,
+        updatedBy: req.user._id,
+      });
+
+      res.status(201).json({
+        success: true,
+        data: allowance,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async getAllowanceDetails(req, res) {
+    try {
+      if (
+        !PermissionChecker.hasPermission(req.user, Permission.VIEW_ALLOWANCES)
+      ) {
+        throw new ApiError(403, "Not authorized to view allowance details");
+      }
+
+      const allowance = await Allowance.findOne({
+        _id: req.params.id,
+        department: req.user.department,
+      })
+        .populate("department", "name")
+        .populate("salaryGrade", "level basicSalary")
+        .populate("createdBy", "firstName lastName")
+        .populate("updatedBy", "firstName lastName");
+
+      if (!allowance) {
+        return res.status(404).json({
+          success: false,
+          error: "Allowance not found",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: allowance,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async updateDepartmentAllowance(req, res) {
+    try {
+      if (
+        !PermissionChecker.hasPermission(req.user, Permission.EDIT_ALLOWANCES)
+      ) {
+        throw new ApiError(403, "Not authorized to update allowances");
+      }
+
+      const allowance = await Allowance.findOneAndUpdate(
+        {
+          _id: req.params.id,
+          department: req.user.department,
+          scope: "department",
+        },
+        {
+          ...req.body,
+          updatedBy: req.user._id,
+        },
+        { new: true, runValidators: true }
+      );
+
+      if (!allowance) {
+        return res.status(404).json({
+          success: false,
+          error: "Allowance not found",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: allowance,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async approveAllowance(req, res) {
+    try {
+      if (
+        !PermissionChecker.hasPermission(
+          req.user,
+          Permission.APPROVE_ALLOWANCES
+        )
+      ) {
+        throw new ApiError(403, "Not authorized to approve allowances");
+      }
+
+      const allowance = await Allowance.findOneAndUpdate(
+        {
+          _id: req.params.id,
+          department: req.user.department,
+        },
+        {
+          status: AllowanceStatus.APPROVED,
+          approvedBy: req.user._id,
+          approvedAt: Date.now(),
+          updatedBy: req.user._id,
+        },
+        { new: true, runValidators: true }
+      );
+
+      if (!allowance) {
+        return res.status(404).json({
+          success: false,
+          error: "Allowance not found",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: allowance,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async rejectAllowance(req, res) {
+    try {
+      if (
+        !PermissionChecker.hasPermission(
+          req.user,
+          Permission.APPROVE_ALLOWANCES
+        )
+      ) {
+        throw new ApiError(403, "Not authorized to reject allowances");
+      }
+
+      const { rejectionReason } = req.body;
+
+      const allowance = await Allowance.findOneAndUpdate(
+        {
+          _id: req.params.id,
+          department: req.user.department,
+        },
+        {
+          status: AllowanceStatus.REJECTED,
+          rejectionReason,
+          updatedBy: req.user._id,
+        },
+        { new: true, runValidators: true }
+      );
+
+      if (!allowance) {
+        return res.status(404).json({
+          success: false,
+          error: "Allowance not found",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: allowance,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  // ===== Deduction Management Methods =====
+  static async getDepartmentDeductions(req, res) {
+    try {
+      if (
+        !PermissionChecker.hasPermission(req.user, Permission.VIEW_DEDUCTIONS)
+      ) {
+        throw new ApiError(403, "Not authorized to view deductions");
+      }
+
+      const admin = await UserModel.findById(req.user.id);
+      if (!admin?.department) {
+        throw new ApiError(400, "Admin is not assigned to any department");
+      }
+
+      const deductions = await Deduction.find({
+        department: admin.department,
+        type: "voluntary", // Only show voluntary deductions
+      })
+        .populate("department", "name")
+        .populate("createdBy", "firstName lastName")
+        .populate("updatedBy", "firstName lastName")
+        .sort({ createdAt: -1 });
+
+      res.status(200).json({
+        success: true,
+        data: deductions,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async getDeductionDetails(req, res) {
+    try {
+      if (
+        !PermissionChecker.hasPermission(req.user, Permission.VIEW_DEDUCTIONS)
+      ) {
+        throw new ApiError(403, "Not authorized to view deduction details");
+      }
+
+      const admin = await UserModel.findById(req.user.id);
+      if (!admin?.department) {
+        throw new ApiError(400, "Admin is not assigned to any department");
+      }
+
+      const deduction = await Deduction.findOne({
+        _id: req.params.id,
+        department: admin.department,
+        type: "voluntary", // Only show voluntary deductions
+      })
+        .populate("department", "name")
+        .populate("createdBy", "firstName lastName")
+        .populate("updatedBy", "firstName lastName");
+
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found");
+      }
+
+      res.status(200).json({
+        success: true,
+        data: deduction,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async updateDepartmentDeduction(req, res) {
+    try {
+      if (
+        !PermissionChecker.hasPermission(req.user, Permission.EDIT_DEDUCTIONS)
+      ) {
+        throw new ApiError(403, "Not authorized to update deductions");
+      }
+
+      const admin = await UserModel.findById(req.user.id);
+      if (!admin?.department) {
+        throw new ApiError(400, "Admin is not assigned to any department");
+      }
+
+      const deduction = await Deduction.findOne({
+        _id: req.params.id,
+        department: admin.department,
+        type: "voluntary", // Only allow updating voluntary deductions
+      });
+
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found");
+      }
+
+      // Validate new value if provided
+      if (req.body.value !== undefined) {
+        if (req.body.value < 0) {
+          throw new ApiError(400, "Deduction value cannot be negative");
+        }
+        if (
+          deduction.calculationMethod === "percentage" &&
+          req.body.value > 100
+        ) {
+          throw new ApiError(400, "Percentage deduction cannot exceed 100%");
+        }
+      }
+
+      // Validate dates if provided
+      if (req.body.effectiveDate) {
+        const effectiveDate = new Date(req.body.effectiveDate);
+        if (effectiveDate < new Date()) {
+          throw new ApiError(400, "Effective date cannot be in the past");
+        }
+      }
+
+      if (req.body.expiryDate) {
+        const expiryDate = new Date(req.body.expiryDate);
+        const effectiveDate = req.body.effectiveDate
+          ? new Date(req.body.effectiveDate)
+          : deduction.effectiveDate;
+        if (expiryDate <= effectiveDate) {
+          throw new ApiError(400, "Expiry date must be after effective date");
+        }
+      }
+
+      // Store previous values for history
+      const historyEntry = {
+        previousValue: deduction.value,
+        newValue: req.body.value,
+        updatedBy: req.user.id,
+        updatedAt: new Date(),
+        changes: req.body,
+      };
+
+      const updatedDeduction = await Deduction.findByIdAndUpdate(
+        req.params.id,
+        {
+          ...req.body,
+          updatedBy: req.user.id,
+          $push: { history: historyEntry },
+        },
+        { new: true }
+      ).populate([
+        { path: "department", select: "name" },
+        { path: "updatedBy", select: "firstName lastName" },
+      ]);
+
+      res.status(200).json({
+        success: true,
+        message: "Deduction updated successfully",
+        data: updatedDeduction,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async toggleDeductionStatus(req, res) {
+    try {
+      if (
+        !PermissionChecker.hasPermission(req.user, Permission.EDIT_DEDUCTIONS)
+      ) {
+        throw new ApiError(403, "Not authorized to toggle deduction status");
+      }
+
+      const admin = await UserModel.findById(req.user.id);
+      if (!admin?.department) {
+        throw new ApiError(400, "Admin is not assigned to any department");
+      }
+
+      const deduction = await Deduction.findOne({
+        _id: req.params.id,
+        department: admin.department,
+        type: "voluntary", // Only allow toggling voluntary deductions
+      });
+
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found");
+      }
+
+      deduction.isActive = !deduction.isActive;
+      deduction.updatedBy = req.user.id;
+      await deduction.save();
+
+      res.status(200).json({
+        success: true,
+        message: `Deduction ${
+          deduction.isActive ? "activated" : "deactivated"
+        } successfully`,
+        data: deduction,
       });
     } catch (error) {
       const { statusCode, message } = handleError(error);

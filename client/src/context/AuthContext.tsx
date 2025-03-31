@@ -8,8 +8,12 @@ import {
 import axios from "axios";
 import { User, UserRole, Permission } from "../types/auth";
 import { toast } from "react-toastify";
-import { useQueryClient } from "@tanstack/react-query";
-import { prefetchDepartments } from "../services/departmentService";
+import { useQueryClient, QueryClient } from "@tanstack/react-query";
+import {
+  prefetchDepartments,
+  departmentService,
+  DEPARTMENTS_QUERY_KEY,
+} from "../services/departmentService";
 
 axios.defaults.baseURL =
   import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -37,14 +41,31 @@ export const AuthContext = createContext<AuthContextType | undefined>(
   undefined
 );
 
+// Create and export the queryClient instance
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 30 * 60 * 1000, // 30 minutes (previously called cacheTime)
+    },
+  },
+});
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Just fetch user data directly since we're using cookies
-    fetchUserData();
+    const isCompletingRegistration = window.location.pathname.includes(
+      "/auth/complete-registration"
+    );
+
+    if (!isCompletingRegistration) {
+      fetchUserData();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   const hasRole = (role: UserRole): boolean => {
@@ -62,23 +83,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUserData = async () => {
     try {
       const { data } = await axios.get("/api/auth/me");
-      console.log("🔍 Fetched user data:", data);
-  
       if (data.user) {
         setUser(parseUserData(data.user));
         await prefetchDepartments(queryClient);
       } else {
         setUser(null);
-        toast.error("Session expired. Please log in again.");
       }
     } catch (error: unknown) {
-      console.error("❌ Auth check failed:", axios.isAxiosError(error) ? error.response?.data || error : error);
+      // Only show error toast if not on registration completion page
+      if (!window.location.pathname.includes("/auth/complete-registration")) {
+        console.error(
+          "❌ Auth check failed:",
+          axios.isAxiosError(error) ? error.response?.data || error : error
+        );
+      }
       setUser(null);
     } finally {
       setLoading(false);
     }
   };
-  
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -86,13 +109,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
       });
-      console.log("user data", data)
+      console.log("user data", data);
       if (data.user) {
         setUser(parseUserData(data.user));
         console.log("user set sucessfully");
 
-        // Prefetch departments immediately after successful login
-        await prefetchDepartments(queryClient);
+        // Prefetch departments using updated options
+        await queryClient.prefetchQuery({
+          queryKey: DEPARTMENTS_QUERY_KEY,
+          queryFn: departmentService.getAllDepartments,
+          staleTime: 5 * 60 * 1000, // Optional: override default staleTime
+          gcTime: 30 * 60 * 1000, // Optional: override default gcTime
+        });
       } else {
         throw new Error("No user data received");
       }
@@ -196,7 +224,7 @@ export function useAuth() {
 
 // Helper function to map API response to User type
 const parseUserData = (data: Partial<User>): User => ({
-  id: data.id || "",
+  _id: data._id || "",
   employeeId: data.employeeId || "",
   firstName: data.firstName || "",
   lastName: data.lastName || "",
@@ -205,10 +233,10 @@ const parseUserData = (data: Partial<User>): User => ({
   role: data.role || UserRole.USER,
   permissions: Array.isArray(data.permissions)
     ? data.permissions.filter((p): p is Permission =>
-      Object.values(Permission).includes(p as Permission)
-    )
+        Object.values(Permission).includes(p as Permission)
+      )
     : [],
-  department: data.department,
+  department: data.department || "",
   position: data.position || "",
   gradeLevel: data.gradeLevel || "",
   workLocation: data.workLocation || "",
@@ -225,7 +253,7 @@ const parseUserData = (data: Partial<User>): User => ({
     accountName: "",
   },
   profileImage: data.profileImage,
-  reportingTo: data.reportingTo || undefined,
+  reportingTo: data.reportingTo,
   isEmailVerified: data.isEmailVerified || false,
   lastLogin: data.lastLogin ? new Date(data.lastLogin) : undefined,
   createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),

@@ -17,9 +17,11 @@ import {
 import { AuthSkeleton } from "../../components/skeletons/AuthSkeleton";
 import { ImageUpload } from "../../components/ImageUpload";
 
-axios.defaults.baseURL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-axios.defaults.withCredentials = true;
+// Remove the existing axios defaults and create a new axios instance
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000",
+  withCredentials: true,
+});
 
 interface UserData {
   firstName: string;
@@ -61,6 +63,7 @@ const CompleteRegistration = () => {
       accountName: "",
     },
   });
+  const [isVerifying, setIsVerifying] = useState(true);
 
   const currencies = [
     TbCurrencyDollar,
@@ -74,44 +77,40 @@ const CompleteRegistration = () => {
   ];
 
   useEffect(() => {
-    let mounted = true;
-
     const verifyToken = async () => {
       try {
+        setIsVerifying(true);
         console.log("Verifying token:", token);
-        const response = await axios.get(`/api/invitation/verify/${token}`);
 
-        if (mounted) {
-          if (response.data.success) {
-            setUserData(response.data.userData);
-            toast.success("Invitation verified successfully");
-          } else {
-            throw new Error(response.data.message);
-          }
+        const response = await api.get(`/api/invitation/verify/${token}`);
+        console.log("Verification response:", response.data);
+
+        if (response.data.success) {
+          setUserData(response.data.userData);
+          toast.success("Invitation verified successfully");
+        } else {
+          throw new Error(response.data.message);
         }
       } catch (err) {
-        if (mounted) {
-          console.error("Verification error:", err);
-          const message = axios.isAxiosError(err)
-            ? err.response?.data?.message ||
-              "Invalid or expired invitation link"
-            : "An error occurred";
-          setError(message);
-          toast.error(message);
-        }
+        console.error("Verification error:", err);
+        const message = axios.isAxiosError(err)
+          ? err.response?.data?.message || "Invalid invitation link"
+          : "An error occurred";
+        setError(message);
+        toast.error(message);
       } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        setIsVerifying(false);
+        setLoading(false);
       }
     };
+
     if (token) {
       verifyToken();
+    } else {
+      setError("No invitation token provided");
+      setIsVerifying(false);
+      setLoading(false);
     }
-
-    return () => {
-      mounted = false;
-    };
   }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -126,8 +125,6 @@ const CompleteRegistration = () => {
       formDataToSend.append("token", token!);
       formDataToSend.append("password", password);
       formDataToSend.append("confirmPassword", confirmPassword);
-
-      // Add emergency contact and bank details
       formDataToSend.append(
         "emergencyContact",
         JSON.stringify(formData.emergencyContact)
@@ -141,7 +138,7 @@ const CompleteRegistration = () => {
         formDataToSend.append("profileImage", profileImage);
       }
 
-      const response = await axios.post(
+      const response = await api.post(
         "/api/invitation/complete-registration",
         formDataToSend,
         {
@@ -155,12 +152,12 @@ const CompleteRegistration = () => {
         toast.success("Registration completed successfully!");
         navigate("/auth/signin", {
           state: {
-            message: "Registration completed successfully. Please login.",
+            message:
+              "Registration completed successfully. Please login with your credentials.",
           },
         });
       }
     } catch (err) {
-      console.error("Registration error:", err);
       const message = axios.isAxiosError(err)
         ? err.response?.data?.message || "Failed to complete registration"
         : "An error occurred";
@@ -168,11 +165,11 @@ const CompleteRegistration = () => {
     }
   };
 
-  if (loading) {
-    return <AuthSkeleton />;
+  if (isVerifying) {
+    return <div>Verifying invitation...</div>;
   }
 
-  if (error || !userData) {
+  if (error) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
         <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 -z-20">
@@ -212,9 +209,7 @@ const CompleteRegistration = () => {
             <h2 className="text-2xl font-bold text-red-600 mb-4">
               Registration Error
             </h2>
-            <p className="text-gray-600 mb-6">
-              {error || "Invalid invitation link"}
-            </p>
+            <p className="text-gray-600 mb-6">{error}</p>
             <button
               onClick={() => navigate("/auth/signin")}
               className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
@@ -225,6 +220,10 @@ const CompleteRegistration = () => {
         </div>
       </div>
     );
+  }
+
+  if (loading) {
+    return <AuthSkeleton />;
   }
 
   return (
@@ -302,22 +301,22 @@ const CompleteRegistration = () => {
                   <p className="flex justify-between items-center">
                     <span className="text-white/80">Name:</span>
                     <span className="font-medium">
-                      {userData.firstName} {userData.lastName}
+                      {userData?.firstName} {userData?.lastName}
                     </span>
                   </p>
                   <p className="flex justify-between items-center">
                     <span className="text-white/80">Email:</span>
-                    <span className="font-medium">{userData.email}</span>
+                    <span className="font-medium">{userData?.email}</span>
                   </p>
                   <p className="flex justify-between items-center">
                     <span className="text-white/80">Employee ID:</span>
-                    <span className="font-medium">{userData.employeeId}</span>
+                    <span className="font-medium">{userData?.employeeId}</span>
                   </p>
                   <p className="flex justify-between items-center">
                     <span className="text-white/80">Position:</span>
-                    <span className="font-medium">{userData.position}</span>
+                    <span className="font-medium">{userData?.position}</span>
                   </p>
-                  {userData.department && (
+                  {userData?.department && (
                     <p className="flex justify-between items-center">
                       <span className="text-white/80">Department:</span>
                       <span className="font-medium">{userData.department}</span>

@@ -11,6 +11,7 @@ import {
   FaUserEdit,
 } from "react-icons/fa";
 import moment from "moment";
+import { toast } from "react-toastify";
 
 interface ViewSalaryGradeProps {
   isOpen: boolean;
@@ -24,33 +25,47 @@ export default function ViewSalaryGrade({
   gradeId,
 }: ViewSalaryGradeProps) {
   const [grade, setGrade] = useState<ISalaryGrade | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchGradeDetails = async () => {
+    const fetchGrade = async () => {
       try {
-        setIsLoading(true);
         const data = await salaryStructureService.getSalaryGrade(gradeId);
-        setGrade(data);
+        // Calculate totals here
+        const basicSalary = Number(data.basicSalary);
+        let totalAllowances = 0;
+
+        data.components.forEach((component) => {
+          if (component.isActive && component.type === "allowance") {
+            if (component.calculationMethod === "percentage") {
+              totalAllowances += Math.round(
+                (basicSalary * component.value) / 100
+              );
+            } else {
+              totalAllowances += component.value;
+            }
+          }
+        });
+
+        setGrade({
+          ...data,
+          totalAllowances,
+          grossSalary: basicSalary + totalAllowances,
+        });
       } catch (error) {
-        console.error("Failed to fetch grade details:", error);
+        toast.error("Failed to fetch grade details");
+        onClose(); // Close modal on error
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
     if (isOpen && gradeId) {
-      fetchGradeDetails();
+      fetchGrade();
     }
-  }, [isOpen, gradeId]);
+  }, [isOpen, gradeId, onClose]);
 
-  if (!grade && !isLoading) return null;
-
-  const {
-    basicSalary = 0,
-    totalAllowances = 0,
-    grossSalary = 0,
-  } = grade ? salaryStructureService.calculateTotalSalary(grade) : {};
+  if (!grade && !loading) return null;
 
   return (
     <BaseModal
@@ -62,9 +77,10 @@ export default function ViewSalaryGrade({
       }
       className="overflow-hidden"
     >
-      {isLoading ? (
-        <div className="flex justify-center items-center h-48">
-          <CircularProgress size={32} className="!text-green-600" />
+      {loading ? (
+        <div className="flex flex-col items-center justify-center h-64 space-y-4">
+          <CircularProgress size={40} className="!text-green-600" />
+          <p className="text-gray-500">Loading grade details...</p>
         </div>
       ) : grade ? (
         <div className="max-h-[calc(100vh-200px)] overflow-y-auto pr-2">
@@ -83,13 +99,21 @@ export default function ViewSalaryGrade({
             {/* Salary Summary Cards */}
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: "Basic Salary", value: basicSalary, bg: "gray" },
+                {
+                  label: "Basic Salary",
+                  value: grade.basicSalary || 0,
+                  bg: "gray",
+                },
                 {
                   label: "Total Allowances",
-                  value: totalAllowances,
+                  value: grade.totalAllowances || 0,
                   bg: "blue",
                 },
-                { label: "Gross Salary", value: grossSalary, bg: "green" },
+                {
+                  label: "Gross Salary",
+                  value: grade.grossSalary || 0,
+                  bg: "green",
+                },
               ].map(({ label, value, bg }) => (
                 <div
                   key={label}

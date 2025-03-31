@@ -13,11 +13,13 @@ const DepartmentSchema = new Schema(
       type: String,
       required: [true, "Department name is required"],
       unique: true,
+      trim: true,
     },
     code: {
       type: String,
       required: [true, "Department code is required"],
       unique: true,
+      trim: true,
     },
     description: {
       type: String,
@@ -30,7 +32,7 @@ const DepartmentSchema = new Schema(
     headOfDepartment: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: [true, "Head of department is required"],
+      required: false,
     },
     status: {
       type: String,
@@ -46,7 +48,7 @@ const DepartmentSchema = new Schema(
     updatedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: [true, "Updater is required"],
+      required: false,
     },
   },
   { timestamps: true }

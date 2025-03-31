@@ -2,12 +2,13 @@ import { ApiError } from "../utils/errorHandler.js";
 import { Types } from "mongoose";
 import { PAYROLL_STATUS } from "../models/Payroll.js";
 import mongoose from "mongoose";
+import { PayrollFrequency } from "../models/Payroll.js";
 
 // Keep this simple validation for basic request checking
 export const validatePayrollCreate = (req, res, next) => {
   try {
     console.log("🔍 Validating payroll data:", req.body);
-    const { employee, month, year, salaryGrade } = req.body;
+    const { employee, month, year, salaryGrade, frequency } = req.body;
 
     // Check required fields
     if (!employee || !month || !year || !salaryGrade) {
@@ -31,6 +32,20 @@ export const validatePayrollCreate = (req, res, next) => {
 
     if (!mongoose.Types.ObjectId.isValid(salaryGrade)) {
       throw new ApiError(400, "Invalid salary grade ID");
+    }
+
+    // Validate frequency if provided
+    if (frequency && !Object.values(PayrollFrequency).includes(frequency)) {
+      throw new ApiError(400, "Invalid payroll frequency");
+    }
+
+    // Validate that payroll isn't for past dates
+    const currentDate = new Date();
+    if (
+      year < currentDate.getFullYear() ||
+      (year === currentDate.getFullYear() && month < currentDate.getMonth() + 1)
+    ) {
+      throw new ApiError(400, "Cannot create payroll for past dates");
     }
 
     console.log("✅ Payroll validation passed");

@@ -6,7 +6,6 @@ import {
 } from "../middleware/authMiddleware.js";
 import { SuperAdminController } from "../controllers/SuperAdminController.js";
 import { Permission } from "../models/User.js";
-import { validateDepartment } from "../middleware/departmentMiddleware.js";
 import {
   validatePayrollCreate,
   validatePayrollUpdate,
@@ -81,33 +80,6 @@ router.delete(
   "/users/:id",
   requirePermission([Permission.DELETE_USER]),
   SuperAdminController.deleteUser
-);
-
-// ===== Department Management Routes =====
-router.get(
-  "/departments",
-  requirePermission([Permission.VIEW_ALL_DEPARTMENTS]),
-  SuperAdminController.getAllDepartments
-);
-
-router.post(
-  "/departments",
-  requirePermission([Permission.CREATE_DEPARTMENT]),
-  validateDepartment,
-  SuperAdminController.createDepartment
-);
-
-router.put(
-  "/departments/:id",
-  requirePermission([Permission.EDIT_DEPARTMENT]),
-  validateDepartment,
-  SuperAdminController.updateDepartment
-);
-
-router.delete(
-  "/departments/:id",
-  requirePermission([Permission.DELETE_DEPARTMENT]),
-  SuperAdminController.deleteDepartment
 );
 
 // ===== Payroll Management Routes =====
@@ -226,12 +198,6 @@ router.post(
 );
 
 router.get(
-  "/departments/:departmentId/employees",
-  requirePermission([Permission.VIEW_ALL_USERS]),
-  SuperAdminController.getDepartmentEmployees
-);
-
-router.get(
   "/active-employees",
   requirePermission([Permission.VIEW_ALL_USERS]),
   SuperAdminController.getActiveEmployees
@@ -301,7 +267,7 @@ router.delete(
 
 //Deduction Routes
 router.post(
-  "/deductions/statutory/setup",
+  "/deductions/statutory",
   requirePermission([Permission.MANAGE_DEDUCTIONS]),
   SuperAdminController.setupStatutoryDeductions
 );
@@ -334,6 +300,12 @@ router.delete(
   "/deductions/:id",
   requirePermission([Permission.MANAGE_DEDUCTIONS]),
   SuperAdminController.deleteDeduction
+);
+
+router.post(
+  "/deductions/statutory/custom",
+  requirePermission([Permission.MANAGE_DEDUCTIONS]),
+  SuperAdminController.createCustomStatutoryDeduction
 );
 
 // Allowance Routes
@@ -396,12 +368,6 @@ router.delete(
   "/bonuses/:id",
   requirePermission([Permission.MANAGE_BONUSES]),
   SuperAdminController.deleteBonus
-);
-
-router.get(
-  "/active-employees",
-  requirePermission([Permission.VIEW_ALL_USERS]),
-  SuperAdminController.getActiveEmployees
 );
 
 export default router;

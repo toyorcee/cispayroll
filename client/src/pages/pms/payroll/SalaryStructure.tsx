@@ -1,18 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
 import { FaPlus, FaTrash } from "react-icons/fa";
 import { salaryStructureService } from "../../../services/salaryStructureService";
+import { ISalaryGrade } from "../../../types/salary";
 import { departmentService } from "../../../services/departmentService";
 import TableSkeleton from "../../../components/skeletons/TableSkeleton";
-import { ISalaryGrade } from "../../../types/salary";
 import { DepartmentBasic } from "../../../types/employee";
 import { Permission } from "../../../types/auth";
 import { useAuth } from "../../../context/AuthContext";
 import NewSalaryGrade from "../../../components/modals/NewSalaryGrade";
 import { toast } from "react-toastify";
-// import EditSalaryGrade from "../../../components/modals/EditSalaryGrade";
 import ViewSalaryGrade from "../../../components/modals/ViewSalaryGrade";
 import { ConfirmationModal } from "../../../components/modals/ConfirmationModal";
+import EditSalaryGrade from "../../../components/modals/EditSalaryGrade";
 
 export default function SalaryStructure() {
   const { user, loading: authLoading } = useAuth();
@@ -21,25 +20,42 @@ export default function SalaryStructure() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
-  // const [setIsModalOpen] = useState(false);
-  // const [setEditingGrade] = useState<ISalaryGrade | null>(null);
   const [viewingGradeId, setViewingGradeId] = useState<string | null>(null);
   const [deleteGradeId, setDeleteGradeId] = useState<string | null>(null);
+  const [editingGrade, setEditingGrade] = useState<ISalaryGrade | null>(null);
+  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
 
-  // interface NewSalaryGradeProps {
-  //   isOpen: boolean;
-  //   onClose: () => void;
-  //   onSuccess: () => void;
-  // }
-  
   const fetchSalaryGrades = useCallback(async () => {
     if (authLoading || !user) return;
 
     try {
-      console.log("🔍 Fetching salary grades...");
-      const data = await salaryStructureService.getAllSalaryGrades();
-      console.log("📥 Received salary grades:", data);
-      setSalaryGrades(data);
+      const grades = await salaryStructureService.getAllSalaryGrades();
+
+      // Calculate totals silently without logs
+      const gradesWithTotals = grades.map((grade) => {
+        const basicSalary = Number(grade.basicSalary);
+        let totalAllowances = 0;
+
+        grade.components.forEach((component) => {
+          if (component.isActive && component.type === "allowance") {
+            if (component.calculationMethod === "percentage") {
+              totalAllowances += Math.round(
+                (basicSalary * component.value) / 100
+              );
+            } else {
+              totalAllowances += component.value;
+            }
+          }
+        });
+
+        return {
+          ...grade,
+          totalAllowances,
+          grossSalary: basicSalary + totalAllowances,
+        };
+      });
+
+      setSalaryGrades(gradesWithTotals);
       setError(null);
     } catch (error) {
       console.error("Error fetching salary grades:", error);
@@ -67,12 +83,6 @@ export default function SalaryStructure() {
     fetchDepartments();
   }, []); // Empty dependency array - only runs once on mount
 
-  // const handleSalaryGradeCreated = useCallback(() => {
-  //   setIsModalOpen(false);
-  //   fetchSalaryGrades();
-  //   toast.success("Salary grade created successfully!");
-  // }, [fetchSalaryGrades]);
-
   const canEditSalaryStructure = user?.permissions?.includes(
     Permission.EDIT_SALARY_STRUCTURE
   );
@@ -88,12 +98,25 @@ export default function SalaryStructure() {
           (grade) => grade.department?._id === selectedDepartment
         );
 
+  // Simplify the handlers
+  const handleViewClick = (grade: ISalaryGrade) => {
+    setViewingGradeId(grade._id.toString());
+  };
+
+  const handleAddGrade = () => {
+    setIsNewModalOpen(true);
+  };
+
+  const handleEditClick = (grade: ISalaryGrade) => {
+    setEditingGrade(grade);
+  };
+
   // Update delete handler
   const handleDelete = async (gradeId: string) => {
     try {
       await salaryStructureService.deleteSalaryGrade(gradeId);
-      fetchSalaryGrades(); // Refresh the list
-      toast.success("Salary grade deleted successfully");
+      await fetchSalaryGrades(); // Refresh the list
+      setDeleteGradeId(null);
     } catch (error) {
       console.error("Failed to delete grade:", error);
     }
@@ -151,10 +174,10 @@ export default function SalaryStructure() {
       {canManageSalaryStructure && (
         <div className="flex justify-end">
           <button
-            // onClick={}
+            onClick={handleAddGrade}
             className="inline-flex items-center px-4 py-2 !bg-green-600 !text-white rounded-lg hover:bg-green-700 
                transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg
-               animate-bounce-slow cursor-pointer focus:outline-none focus:ring-0"
+               cursor-pointer focus:outline-none focus:ring-0 disabled:opacity-50"
           >
             <FaPlus className="h-5 w-5 mr-2" />
             Add Grade Level
@@ -170,7 +193,7 @@ export default function SalaryStructure() {
               <select
                 value={selectedDepartment}
                 onChange={(e) => setSelectedDepartment(e.target.value)}
-                className="rounded-md border-gray-300"
+                className="rounded-md border-green-600 py-1.5 pl-3 pr-8 text-sm"
               >
                 <option value="all">All Departments</option>
                 {departments?.map((dept) => (
@@ -208,134 +231,111 @@ export default function SalaryStructure() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredGrades.map((grade) => {
-                const {
-                  basicSalary = 0,
-                  totalAllowances = 0,
-                  grossSalary = 0,
-                } = salaryStructureService.calculateTotalSalary(grade) || {};
-
-                return (
-                  <tr
-                    key={grade._id.toString()}
-                    className="hover:bg-gray-50 transition-all duration-200 
-                             transform hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm md:text-base font-medium text-gray-900">
-                        {grade.level}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm md:text-base text-gray-900">
-                        ₦{basicSalary.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-gray-500">Base Pay</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm md:text-base text-gray-900">
-                        ₦{totalAllowances.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Additional Benefits
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm md:text-base font-medium text-green-600">
-                        ₦{grossSalary.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-gray-500">Total Package</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm md:text-base text-gray-900">
-                        {grade.department?.name || "All Departments"}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {grade.department?.name
-                          ? "Department Specific"
-                          : "Global Grade"}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                      {canEditSalaryStructure && (
-                        <>
-                          <button
-                            onClick={() => {
-                              console.log("🎯 Pre-fetch grade:", {
-                                currentDept: grade.department,
-                                deptId: grade.department?._id,
-                                deptName: grade.department?.name,
-                                fullGrade: grade,
-                              });
-
-                              salaryStructureService
-                                .getSalaryGrade(grade._id.toString())
-                                .then((freshGrade) => {
-                                  console.log("📥 Fresh grade data:", {
-                                    department: freshGrade.department,
-                                    deptId: freshGrade.department?._id,
-                                    deptName: freshGrade.department?.name,
-                                  });
-                                  // setEditingGrade(freshGrade);
-                                });
-                            }}
-                            className="text-xs md:text-sm px-2 py-1 bg-blue-100 text-blue-700 rounded-lg 
-                                     hover:bg-blue-200 transition-all duration-200"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => setDeleteGradeId(grade._id)}
-                            className="text-xs md:text-sm px-2 py-1 bg-red-100 text-red-700 rounded-lg 
-                                     hover:bg-red-200 transition-all duration-200"
-                          >
-                            <FaTrash size={14} />
-                          </button>
-                        </>
-                      )}
-                      <Link
-                        to="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setViewingGradeId(grade._id.toString());
-                        }}
-                        className="text-xs md:text-sm px-2 py-1 bg-green-100 text-green-700 rounded-lg 
-                                 hover:bg-green-200 transition-all duration-200"
-                      >
-                        View
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filteredGrades.map((grade) => (
+                <tr
+                  key={grade._id}
+                  className="hover:bg-gray-50 transition-all duration-200 
+                           transform hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
+                >
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm md:text-base font-medium text-gray-900">
+                      {grade.level}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm md:text-base text-gray-900">
+                      ₦{(grade.basicSalary || 0).toLocaleString()}
+                    </div>
+                    <div className="text-xs text-gray-500">Base Pay</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm md:text-base text-gray-900">
+                      ₦{grade.totalAllowances?.toLocaleString() || "0"}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Additional Benefits
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm md:text-base font-medium text-green-600">
+                      ₦{grade.grossSalary?.toLocaleString() || "0"}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Basic + Allowances
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm md:text-base text-gray-900">
+                      {grade.department?.name || "All Departments"}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {grade.department?.name
+                        ? "Department Specific"
+                        : "Global Grade"}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                    {canEditSalaryStructure && (
+                      <>
+                        <button
+                          onClick={() => handleEditClick(grade)}
+                          className="text-xs md:text-sm px-2 py-1 bg-blue-100 text-blue-700 rounded-lg 
+                                   hover:bg-blue-200 transition-all duration-200"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => setDeleteGradeId(grade._id)}
+                          className="text-xs md:text-sm px-2 py-1 bg-red-100 text-red-700 rounded-lg 
+                                   hover:bg-red-200 transition-all duration-200"
+                        >
+                          <FaTrash size={14} />
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => handleViewClick(grade)}
+                      className="text-xs md:text-sm px-2 py-1 bg-green-100 text-green-700 rounded-lg 
+                               hover:bg-green-200 transition-all duration-200"
+                    >
+                      View
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      <NewSalaryGrade
-        // isOpen={isModalOpen}
-        // onClose={() => setIsModalOpen(false)}
-        // onSuccess={handleSalaryGradeCreated}
-      />
-
-      {/* {editingGrade && (
-        <EditSalaryGrade
-          // isOpen={!!editingGrade}
-          onClose={() => setEditingGrade(null)}
+      {isNewModalOpen && (
+        <NewSalaryGrade
+          isOpen={isNewModalOpen}
+          onClose={() => setIsNewModalOpen(false)}
           onSuccess={() => {
-            fetchSalaryGrades();
-            setEditingGrade(null);
+            setIsNewModalOpen(false);
+            fetchSalaryGrades(); // Refresh the list
           }}
-          grade={editingGrade}
         />
-      )} */}
+      )}
 
       {viewingGradeId && (
         <ViewSalaryGrade
           isOpen={!!viewingGradeId}
           onClose={() => setViewingGradeId(null)}
           gradeId={viewingGradeId}
+        />
+      )}
+
+      {editingGrade && (
+        <EditSalaryGrade
+          isOpen={!!editingGrade}
+          onClose={() => setEditingGrade(null)}
+          onSuccess={() => {
+            setEditingGrade(null);
+            fetchSalaryGrades(); // Refresh the list
+          }}
+          grade={editingGrade}
         />
       )}
 

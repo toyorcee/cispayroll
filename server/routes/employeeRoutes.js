@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { EmployeeController } from "../controllers/employeeController.js";
+import { EmployeeController } from "../controllers/EmployeeController.js";
 import {
   requireAuth,
   requireRole,
@@ -65,7 +65,6 @@ router.put(
   EmployeeController.cancelLeaveRequest
 );
 
-// Add this route after the profile routes
 router.post(
   "/profile/image",
   requirePermission([Permission.VIEW_PERSONAL_INFO]),
@@ -73,5 +72,13 @@ router.post(
   EmployeeController.updateProfileImage
 );
 
-router.delete('/:id', requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]), EmployeeController.deleteEmployee);
+router.delete(
+  "/:id",
+  requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+  EmployeeController.deleteEmployee
+);
+
+// Dashboard stats route - accessible to all roles
+router.get("/dashboard/stats", EmployeeController.getDashboardStats);
+
 export default router;

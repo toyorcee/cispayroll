@@ -2,9 +2,12 @@ import UserModel from "../models/User.js";
 import PayrollModel from "../models/Payroll.js";
 import LeaveModel, { LEAVE_STATUS } from "../models/Leave.js";
 import { handleError, ApiError } from "../utils/errorHandler.js";
+import Allowance from "../models/Allowance.js";
+import { AllowanceStatus } from "../models/Allowance.js";
+import Deduction from "../models/Deduction.js";
 
 export class RegularUserController {
-  // Profile Management
+  // ===== Profile Management Methods =====
   static async getOwnProfile(req, res, next) {
     try {
       const user = await UserModel.findById(req.user.id)
@@ -65,7 +68,7 @@ export class RegularUserController {
     }
   }
 
-  // Payslip Management
+  // ===== Payslip Management Methods =====
   static async viewPayslip(req, res) {
     try {
       console.log("🔍 Fetching payslip details for:", req.params.payrollId);
@@ -173,7 +176,7 @@ export class RegularUserController {
     }
   }
 
-  // Leave Management
+  // ===== Leave Management Methods =====
   static async getOwnLeaveRequests(req, res, next) {
     try {
       const leaveRequests = await LeaveModel.find({
@@ -244,6 +247,134 @@ export class RegularUserController {
         success: true,
         message: "Leave request cancelled successfully",
         leaveRequest,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message,
+      });
+    }
+  }
+
+  // ===== Salary Structure & Allowances Management =====
+  static async getMyAllowances(req, res) {
+    try {
+      const allowances = await Allowance.find({
+        employee: req.user._id,
+        scope: "individual",
+        status: AllowanceStatus.APPROVED,
+        isActive: true,
+      })
+        .populate("salaryGrade", "level basicSalary")
+        .sort({ createdAt: -1 });
+
+      res.status(200).json({
+        success: true,
+        data: allowances,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message,
+      });
+    }
+  }
+
+  static async requestAllowance(req, res) {
+    try {
+      const allowance = await Allowance.create({
+        ...req.body,
+        employee: req.user._id,
+        department: req.user.department,
+        scope: "individual",
+        status: AllowanceStatus.PENDING,
+        createdBy: req.user._id,
+        updatedBy: req.user._id,
+      });
+
+      res.status(201).json({
+        success: true,
+        data: allowance,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message,
+      });
+    }
+  }
+
+  static async getAllowanceHistory(req, res) {
+    try {
+      const allowances = await Allowance.find({
+        employee: req.user._id,
+        scope: "individual",
+      })
+        .populate("salaryGrade", "level basicSalary")
+        .sort({ createdAt: -1 });
+
+      res.status(200).json({
+        success: true,
+        data: allowances,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message,
+      });
+    }
+  }
+
+  // ===== Deduction Management Methods =====
+  static async getMyDeductions(req, res) {
+    try {
+      const deductions = await Deduction.find({
+        employee: req.user._id,
+        isActive: true,
+      })
+        .populate("department", "name")
+        .sort({ createdAt: -1 });
+
+      // Group deductions by type for better organization
+      const groupedDeductions = {
+        statutory: deductions.filter((d) => d.type === "statutory"),
+        voluntary: deductions.filter((d) => d.type === "voluntary"),
+      };
+
+      res.status(200).json({
+        success: true,
+        data: groupedDeductions,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message,
+      });
+    }
+  }
+
+  static async getDeductionDetails(req, res) {
+    try {
+      const deduction = await Deduction.findOne({
+        _id: req.params.id,
+        employee: req.user._id,
+      })
+        .populate("department", "name")
+        .populate("createdBy", "firstName lastName")
+        .populate("updatedBy", "firstName lastName");
+
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found");
+      }
+
+      res.status(200).json({
+        success: true,
+        data: deduction,
       });
     } catch (error) {
       const { statusCode, message } = handleError(error);

@@ -1,16 +1,15 @@
 // middleware/authMiddleware.ts
 import jwt from "jsonwebtoken";
 import UserModel from "../models/User.js";
-import { UserRole, Permission } from "../models/User.js";
+import { UserRole, Permission, UserLifecycleState } from "../models/User.js";
 import { PermissionChecker } from "../utils/permissionUtils.js";
 
-// Update the requireAuth middleware
-export const requireAuth = (req, res, next) => {
+// Update the requireAuth middleware to handle lifecycle states
+export const requireAuth = async (req, res, next) => {
   try {
     const token = req.cookies?.token;
     if (!token) {
-      res.status(401).json({ message: "No token provided" });
-      return;
+      return res.status(401).json({ message: "No token provided" });
     }
 
     const decoded = jwt.verify(
@@ -18,22 +17,60 @@ export const requireAuth = (req, res, next) => {
       process.env.JWT_SECRET || "your-secret-key"
     );
 
-    // Set both id and _id to be the same value
+    // Fetch full user to check lifecycle state
+    const user = await UserModel.findById(decoded.id).select("-password");
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
+
+    // Check user lifecycle state
+    if (user.lifecycle?.currentState === UserLifecycleState.TERMINATED) {
+      return res.status(403).json({
+        message: "Account terminated. Please contact administrator.",
+      });
+    }
+
+    if (user.lifecycle?.currentState === UserLifecycleState.OFFBOARDING) {
+      // Allow only specific routes during offboarding
+      const allowedOffboardingPaths = [
+        "/api/password/update",
+        "/api/users/profile",
+        // Add other allowed paths during offboarding
+      ];
+
+      if (!allowedOffboardingPaths.includes(req.path)) {
+        return res.status(403).json({
+          message: "Limited access during offboarding process",
+        });
+      }
+    }
+
+    // Set user info in request
     req.user = {
-      ...decoded,
-      id: decoded.id,
-      _id: decoded.id, // Use the same ID for both
+      ...user.toObject(),
+      id: user._id,
+      _id: user._id,
     };
 
+    // Add lifecycle state to response headers for client awareness
+    res.set(
+      "X-User-Lifecycle-State",
+      user.lifecycle?.currentState || "UNKNOWN"
+    );
+
     console.log("🔐 Auth middleware user:", {
-      id: decoded.id,
-      _id: decoded.id, // Log both to verify
-      role: decoded.role,
+      id: user._id,
+      role: user.role,
+      lifecycleState: user.lifecycle?.currentState,
     });
 
     next();
   } catch (err) {
-    res.status(401).json({ message: "Invalid or expired token" });
+    console.error("Auth middleware error:", err);
+    return res.status(401).json({
+      message: "Invalid or expired token",
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
   }
 };
 
@@ -162,4 +199,69 @@ export const requireDepartmentAccess = (allowedRoles = [UserRole.ADMIN]) => {
       });
     }
   };
+};
+
+// Add new middleware for password-related routes
+export const requirePasswordChange = async (req, res, next) => {
+  try {
+    const user = await UserModel.findById(req.user.id).select(
+      "passwordLastChanged"
+    );
+
+    // Check if password change is required (e.g., password older than 90 days)
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    if (!user.passwordLastChanged || user.passwordLastChanged < ninetyDaysAgo) {
+      // Allow only password change route
+      if (req.path !== "/api/password/update") {
+        return res.status(403).json({
+          message: "Password change required",
+          requiresPasswordChange: true,
+        });
+      }
+    }
+
+    next();
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Add rate limiting for password attempts
+export const passwordAttemptLimiter = async (req, res, next) => {
+  try {
+    const user = await UserModel.findById(req.user.id).select(
+      "passwordAttempts lastPasswordAttempt"
+    );
+
+    // Reset attempts if last attempt was more than 15 minutes ago
+    if (
+      user.lastPasswordAttempt &&
+      Date.now() - user.lastPasswordAttempt.getTime() > 15 * 60 * 1000
+    ) {
+      user.passwordAttempts = 0;
+    }
+
+    if (user.passwordAttempts >= 5) {
+      return res.status(429).json({
+        message: "Too many password attempts. Please try again later.",
+        nextAttemptAllowed: new Date(
+          user.lastPasswordAttempt.getTime() + 15 * 60 * 1000
+        ),
+      });
+    }
+
+    // Store attempt info in request for later use
+    req.passwordAttemptInfo = {
+      user,
+      incrementAttempt: async () => {
+        user.passwordAttempts = (user.passwordAttempts || 0) + 1;
+        user.lastPasswordAttempt = new Date();
+        await user.save();
+      },
+    };
+
+    next();
+  } catch (err) {
+    next(err);
+  }
 };
