@@ -141,9 +141,9 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       }
 
       // Feedback
-      if (user.permissions.includes(Permission.MANAGE_FEEDBACK)) {
-        availableMenus.push("Feedback");
-      }
+      // if (user.permissions.includes(Permission.MANAGE_FEEDBACK)) {
+      //   availableMenus.push("Feedback");
+      // }
     }
 
     // For User, only show basic menus
@@ -181,9 +181,9 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       }
 
       // Feedback
-      if (user.permissions.includes(Permission.MANAGE_FEEDBACK)) {
-        availableMenus.push("Feedback");
-      }
+      // if (user.permissions.includes(Permission.MANAGE_FEEDBACK)) {
+      //   availableMenus.push("Feedback");
+      // }
     }
 
     return availableMenus;
@@ -310,21 +310,21 @@ export const menuItems: NavigationItem[] = [
         permissions: [Permission.VIEW_OWN_PAYSLIP],
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
       },
-      {
-        name: "My Allowances",
-        href: "/pms/payroll/my-allowances",
-        permissions: [
-          Permission.VIEW_OWN_ALLOWANCES,
-          Permission.REQUEST_ALLOWANCES,
-        ],
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-      },
-      {
-        name: "My Deductions",
-        href: "/pms/payroll/my-deductions",
-        permissions: [Permission.VIEW_OWN_DEDUCTIONS],
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-      },
+      // {
+      //   name: "My Allowances",
+      //   href: "/pms/payroll/my-allowances",
+      //   permissions: [
+      //     Permission.VIEW_OWN_ALLOWANCES,
+      //     Permission.REQUEST_ALLOWANCES,
+      //   ],
+      //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+      // },
+      // {
+      //   name: "My Deductions",
+      //   href: "/pms/payroll/my-deductions",
+      //   permissions: [Permission.VIEW_OWN_DEDUCTIONS],
+      //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+      // },
     ],
   },
   {
@@ -429,47 +429,47 @@ export const menuItems: NavigationItem[] = [
       },
     ],
   },
-  {
-    name: "Disciplinary",
-    href: "/pms/disciplinary",
-    icon: FaGavel,
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    permissions: [
-      Permission.MANAGE_DISCIPLINARY_ACTIONS,
-      Permission.VIEW_DISCIPLINARY_RECORDS,
-    ],
-    requireAllPermissions: false,
-  },
-  {
-    name: "Leave",
-    href: "/pms/leave",
-    icon: DocumentTextIcon,
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-    permissions: [
-      Permission.REQUEST_LEAVE,
-      Permission.VIEW_OWN_LEAVE,
-      Permission.CANCEL_OWN_LEAVE,
-      Permission.APPROVE_LEAVE,
-      Permission.VIEW_TEAM_LEAVE,
-    ],
-    requireAllPermissions: false,
-  },
-  {
-    name: "Profile",
-    href: "/pms/profile",
-    icon: DocumentTextIcon,
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-    permissions: [Permission.VIEW_PERSONAL_INFO],
-    requireAllPermissions: true,
-  },
-  {
-    name: "Feedback",
-    href: "/pms/feedback",
-    icon: DocumentTextIcon,
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-    permissions: [Permission.MANAGE_FEEDBACK],
-    requireAllPermissions: true,
-  },
+  // {
+  //   name: "Disciplinary",
+  //   href: "/pms/disciplinary",
+  //   icon: FaGavel,
+  //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+  //   permissions: [
+  //     Permission.MANAGE_DISCIPLINARY_ACTIONS,
+  //     Permission.VIEW_DISCIPLINARY_RECORDS,
+  //   ],
+  //   requireAllPermissions: false,
+  // },
+  // {
+  //   name: "Leave",
+  //   href: "/pms/leave",
+  //   icon: DocumentTextIcon,
+  //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+  //   permissions: [
+  //     Permission.REQUEST_LEAVE,
+  //     Permission.VIEW_OWN_LEAVE,
+  //     Permission.CANCEL_OWN_LEAVE,
+  //     Permission.APPROVE_LEAVE,
+  //     Permission.VIEW_TEAM_LEAVE,
+  //   ],
+  //   requireAllPermissions: false,
+  // },
+  // {
+  //   name: "Profile",
+  //   href: "/pms/profile",
+  //   icon: DocumentTextIcon,
+  //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+  //   permissions: [Permission.VIEW_PERSONAL_INFO],
+  //   requireAllPermissions: true,
+  // },
+  // {
+  //   name: "Feedback",
+  //   href: "/pms/feedback",
+  //   icon: DocumentTextIcon,
+  //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+  //   permissions: [Permission.MANAGE_FEEDBACK],
+  //   requireAllPermissions: true,
+  // },
 ].map((item) => {
   console.log(`Menu item ${item.name}:`, {
     roles: item.roles,

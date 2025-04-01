@@ -45,9 +45,42 @@ interface LineChartProps {
       tension: number;
     }[];
   };
+  options?: {
+    responsive?: boolean;
+    maintainAspectRatio?: boolean;
+    plugins?: {
+      legend?: {
+        position?: "top" | "bottom" | "left" | "right";
+      };
+      title?: {
+        display?: boolean;
+      };
+      tooltip?: {
+        callbacks?: {
+          label?: (context: any) => string;
+        };
+      };
+    };
+    scales?: {
+      y?: {
+        beginAtZero?: boolean;
+        ticks?: {
+          callback?: (value: any) => string;
+        };
+      };
+      x?: {
+        grid?: {
+          display?: boolean;
+        };
+      };
+    };
+  };
 }
 
-const LineChart: React.FC<LineChartProps> = ({ data }) => {
+const LineChart: React.FC<LineChartProps> = ({
+  data,
+  options: customOptions,
+}) => {
   const chartRef = useRef<ChartJS<"line">>(null);
 
   useEffect(() => {
@@ -58,7 +91,7 @@ const LineChart: React.FC<LineChartProps> = ({ data }) => {
     };
   }, []);
 
-  const options = {
+  const defaultOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -82,6 +115,11 @@ const LineChart: React.FC<LineChartProps> = ({ data }) => {
         },
       },
     },
+  };
+
+  const options = {
+    ...defaultOptions,
+    ...customOptions,
   };
 
   return (

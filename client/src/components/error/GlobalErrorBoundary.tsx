@@ -30,20 +30,41 @@ export class GlobalErrorBoundary extends React.Component<Props, State> {
       return <ErrorFallback error={this.state.error} />;
     }
 
-    if (!this.props.children) {
-      return <RouteErrorFallback />;
-    }
-
     return this.props.children;
   }
 }
 
 function RouteErrorFallback() {
   const error = useRouteError();
+  const navigate = useNavigate();
+
+  // Handle specific error types
+  if (error instanceof Error) {
+    return <ErrorFallback error={error} />;
+  }
+
+  // Handle unknown error types
   return (
-    <ErrorFallback
-      error={error instanceof Error ? error : new Error("Route error occurred")}
-    />
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="min-h-screen flex items-center justify-center bg-gray-50"
+    >
+      <div className="text-center p-8 bg-white rounded-lg shadow-lg">
+        <h2 className="text-2xl font-bold text-red-600 mb-4">
+          Something went wrong
+        </h2>
+        <p className="text-gray-600 mb-6">
+          An unexpected error occurred. Please try again.
+        </p>
+        <button
+          onClick={() => navigate("/dashboard")}
+          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+        >
+          Return to Dashboard
+        </button>
+      </div>
+    </motion.div>
   );
 }
 

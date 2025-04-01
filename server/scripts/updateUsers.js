@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import User from "../models/User.js";
 import dotenv from "dotenv";
 import { CoreStatutoryDeduction } from "../models/Deduction.js";
+import { DeductionOptOutReason } from "../models/User.js";
 
 // Load environment variables
 dotenv.config();
@@ -28,21 +29,21 @@ async function updateDeductionPreferences() {
                 opted: true,
                 optedAt: user.createdAt,
                 optedBy: superAdminId,
-                reason: "MANDATORY",
+                reason: DeductionOptOutReason.OTHER,
                 notes: "Core statutory deduction - Cannot be opted out",
               },
               pension: {
                 opted: true,
                 optedAt: user.createdAt,
                 optedBy: superAdminId,
-                reason: "MANDATORY",
+                reason: DeductionOptOutReason.OTHER,
                 notes: "Core statutory deduction - Cannot be opted out",
               },
               nhf: {
                 opted: true,
                 optedAt: user.createdAt,
                 optedBy: superAdminId,
-                reason: "MANDATORY",
+                reason: DeductionOptOutReason.OTHER,
                 notes: "Core statutory deduction - Cannot be opted out",
               },
             },
@@ -62,15 +63,16 @@ async function updateDeductionPreferences() {
 
     console.log("✨ Update completed successfully!");
   } catch (error) {
-    console.error("❌ Update failed:", error);
-    console.error("Error details:", error.message);
+    console.error("❌ Error updating users:", error);
+    process.exit(1);
   } finally {
+    // Close the MongoDB connection
     await mongoose.disconnect();
     console.log("📝 Database connection closed");
   }
 }
 
-// Connect to MongoDB before running the update
+// Connect to MongoDB and run the update
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {

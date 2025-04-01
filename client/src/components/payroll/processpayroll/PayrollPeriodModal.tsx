@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { BaseModal } from "../../shared/BaseModal";
 import {
   Table,
@@ -18,22 +19,20 @@ import {
   PayrollStatus,
   PeriodPayrollResponse,
   PayrollData,
+  PayrollFilters,
 } from "../../../types/payroll";
 import { generatePayslipPDF } from "../../../utils/pdfGenerator";
 import { toast } from "react-toastify";
 import { payrollService } from "../../../services/payrollService";
 import { mapToPayslip } from "../../../utils/payrollUtils";
 import { PaySlip } from "./PaySlip";
-import { ConfirmationModal } from "../../modals/ConfirmationModal";
 
 interface PayrollPeriodModalProps {
   isOpen: boolean;
   onClose: () => void;
-  data: PeriodPayrollResponse | null;
   onViewPayslip: (employeeId: string) => void;
   onViewHistory: (employeeId: string) => void;
   isLoading?: boolean;
-  onShowPeriodModal?: () => void;
 }
 
 const getChipColor = (status: string) => {
@@ -56,10 +55,12 @@ const getChipColor = (status: string) => {
 };
 
 const mapPayslipDataToComponentFormat = (
-  data: PeriodPayrollResponse["employees"][number]
+  data: PeriodPayrollResponse["data"]
 ): PayrollData => {
+  console.log("Raw payslip data:", data); // Debug log
+
   return {
-    _id: data.id,
+    _id: data.payslipId,
     employee: {
       _id: data.employee.id,
       employeeId: data.employee.employeeId,
@@ -67,75 +68,68 @@ const mapPayslipDataToComponentFormat = (
       lastName: data.employee.name.split(" ")[1] || "",
       fullName: data.employee.name,
     },
+    department: {
+      _id: "default",
+      name: data.employee.department,
+      code: "",
+    },
     allowances: {
-      gradeAllowances: [],
-      additionalAllowances: [],
-      totalAllowances: data.payroll.totalAllowances,
+      gradeAllowances: data.earnings.allowances.gradeAllowances,
+      additionalAllowances: data.earnings.allowances.additionalAllowances,
+      totalAllowances: data.earnings.allowances.totalAllowances,
     },
     earnings: {
-      overtime: {
-        hours: 0,
-        rate: 0,
-        amount: 0,
-      },
-      bonus: [],
-      totalEarnings: data.payroll.basicSalary + data.payroll.totalAllowances,
+      overtime: data.earnings.overtime,
+      bonus: data.earnings.bonus,
+      totalEarnings: data.earnings.totalEarnings,
     },
     deductions: {
-      tax: {
-        taxableAmount: 0,
-        taxRate: 0,
-        amount: 0,
-      },
-      pension: {
-        pensionableAmount: 0,
-        rate: 0,
-        amount: 0,
-      },
-      nhf: {
-        rate: 0,
-        amount: 0,
-      },
-      others: Array.isArray(data.payroll.deductions?.others)
-        ? data.payroll.deductions.others.map(
-            (item: { description: string; amount: number }) => ({
-              name: item.description || "Unknown",
-              amount: item.amount || 0,
-            })
-          )
-        : [],
-      totalDeductions: data.payroll.totalDeductions,
+      tax: data.deductions.tax,
+      pension: data.deductions.pension,
+      nhf: data.deductions.nhf,
+      others: data.deductions.others,
+      totalDeductions: data.deductions.totalDeductions,
     },
     totals: {
-      basicSalary: data.payroll.basicSalary,
-      totalAllowances: data.payroll.totalAllowances,
-      totalBonuses: 0,
-      grossEarnings: data.payroll.basicSalary + data.payroll.totalAllowances,
-      totalDeductions: data.payroll.totalDeductions,
-      netPay: data.payroll.netPay,
+      basicSalary: data.totals.basicSalary,
+      totalAllowances: data.totals.totalAllowances,
+      totalBonuses: data.totals.totalBonuses,
+      grossEarnings: data.totals.grossEarnings,
+      totalDeductions: data.totals.totalDeductions,
+      netPay: data.totals.netPay,
     },
     salaryGrade: {
-      level: data.salaryGrade.level,
-      description: data.salaryGrade.description,
+      level: data.employee.salaryGrade,
+      description: data.employee.department,
     },
-    basicSalary: data.payroll.basicSalary,
-    month: data.payroll.month,
-    year: data.payroll.year,
-
+    basicSalary: data.earnings.basicSalary,
+    month: data.period.month,
+    year: data.period.year,
     status: data.status,
-    createdAt: data.processedAt,
-    periodStart: "",
-    periodEnd: "",
+    createdAt: data.timestamps.createdAt,
+    updatedAt: data.timestamps.updatedAt,
+    periodStart: data.period.startDate,
+    periodEnd: data.period.endDate,
     bonuses: {
-      items: [],
-      totalBonuses: 0,
+      items: data.earnings.bonus,
+      totalBonuses: data.totals.totalBonuses,
     },
-    approvalFlow: [],
-    processedBy: "",
+    approvalFlow: {
+      submittedBy: data.approvalFlow.submittedBy.name,
+      submittedAt: data.approvalFlow.submittedAt,
+      approvedBy: data.approvalFlow.approvedBy.name,
+      approvedAt: data.approvalFlow.approvedAt,
+      rejectedBy: undefined,
+      rejectedAt: undefined,
+      paidBy: undefined,
+      paidAt: undefined,
+      remarks: data.approvalFlow.remarks,
+    },
+    processedBy: data.processedBy.name,
     payment: {
-      bankName: "",
-      accountName: "",
-      accountNumber: "",
+      bankName: data.paymentDetails.bankName,
+      accountName: data.paymentDetails.accountName,
+      accountNumber: data.paymentDetails.accountNumber,
     },
   };
 };
@@ -186,49 +180,112 @@ const PeriodModalSkeleton = () => (
 const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
   isOpen,
   onClose,
-  data,
   onViewPayslip,
   onViewHistory,
   isLoading,
-  onShowPeriodModal,
 }) => {
-  const [page, setPage] = React.useState(0);
-  const [rowsPerPage, setRowsPerPage] = React.useState(5);
-  // const [payslipData, setPayslipData] = React.useState<any>(null);
-  const [showPayslip, setShowPayslip] = React.useState(false);
-  const [selectedPayslip, setSelectedPayslip] = React.useState<ReturnType<
-    typeof mapPayslipDataToComponentFormat
-  > | null>(null);
-  const [loadingPayslipId, setLoadingPayslipId] = React.useState<string | null>(
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [showPayslip, setShowPayslip] = useState(false);
+  const [selectedPayslip, setSelectedPayslip] = useState<PayrollData | null>(
     null
   );
-  const [loadingDeleteId, setLoadingDeleteId] = React.useState<string | null>(
+  const [loadingPayslipId, setLoadingPayslipId] = useState<string | null>(null);
+  const [loadingDeleteId, setLoadingDeleteId] = useState<string | null>(null);
+  const [loadingDownloadId, setLoadingDownloadId] = useState<string | null>(
     null
   );
-  const [loadingDownloadId, setLoadingDownloadId] = React.useState<
-    string | null
-  >(null);
-  const [activeModal, setActiveModal] = React.useState<
-    "period" | "payslip" | "none" | "history"
-  >("period");
-  const [loadingHistoryId, setLoadingHistoryId] = React.useState<string | null>(
-    null
-  );
-  const [showDeleteConfirmation, setShowDeleteConfirmation] =
-    React.useState(false);
-  const [payrollToDelete, setPayrollToDelete] = React.useState<string | null>(
-    null
-  );
+  const [loadingHistoryId, setLoadingHistoryId] = useState<string | null>(null);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [payrollToDelete, setPayrollToDelete] = useState<string | null>(null);
+
+  // Add filters state
+  const [filters, setFilters] = useState<PayrollFilters>({
+    status: "all",
+    department: "all",
+    frequency: "all",
+    dateRange: "last12",
+    page: 1,
+    limit: 5,
+  });
+
+  // Use the same query as ProcessPayroll page
+  const { data: payrollsData, isLoading: isPayrollsLoading } = useQuery({
+    queryKey: ["payrolls", filters],
+    queryFn: () => payrollService.getAllPayrolls(filters),
+  });
+
+  // Calculate summary from filtered payrolls
+  const summary = {
+    totalEmployees: payrollsData?.payrolls?.length || 0,
+    totalNetPay:
+      payrollsData?.payrolls
+        ?.filter(
+          (p: PayrollData) =>
+            p.status === PayrollStatus.APPROVED ||
+            p.status === PayrollStatus.PAID
+        )
+        .reduce(
+          (sum: number, p: PayrollData) => sum + (p.totals.netPay || 0),
+          0
+        ) || 0,
+    totalBasicSalary:
+      payrollsData?.payrolls
+        ?.filter(
+          (p: PayrollData) =>
+            p.status === PayrollStatus.APPROVED ||
+            p.status === PayrollStatus.PAID
+        )
+        .reduce(
+          (sum: number, p: PayrollData) => sum + (p.totals.basicSalary || 0),
+          0
+        ) || 0,
+    totalAllowances:
+      payrollsData?.payrolls
+        ?.filter(
+          (p: PayrollData) =>
+            p.status === PayrollStatus.APPROVED ||
+            p.status === PayrollStatus.PAID
+        )
+        .reduce(
+          (sum: number, p: PayrollData) =>
+            sum + (p.totals.totalAllowances || 0),
+          0
+        ) || 0,
+    totalDeductions:
+      payrollsData?.payrolls
+        ?.filter(
+          (p: PayrollData) =>
+            p.status === PayrollStatus.APPROVED ||
+            p.status === PayrollStatus.PAID
+        )
+        .reduce(
+          (sum: number, p: PayrollData) =>
+            sum + (p.totals.totalDeductions || 0),
+          0
+        ) || 0,
+    statusBreakdown:
+      payrollsData?.payrolls?.reduce(
+        (acc: Record<PayrollStatus, number>, p: PayrollData) => {
+          acc[p.status] = (acc[p.status] || 0) + 1;
+          return acc;
+        },
+        {} as Record<PayrollStatus, number>
+      ) || {},
+  };
 
   const handleChangePage = (_: unknown, newPage: number) => {
-    setPage(newPage);
+    setFilters((prev) => ({ ...prev, page: newPage + 1 }));
   };
 
   const handleChangeRowsPerPage = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
+    setFilters((prev) => ({
+      ...prev,
+      limit: parseInt(event.target.value, 10),
+      page: 1, // Reset to first page when changing rows per page
+    }));
   };
 
   const handleDownloadPDF = async (employeeId: string) => {
@@ -247,17 +304,23 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
     }
   };
 
-  const handleViewPayslip = async (payrollId: string) => {
+  const handleViewPayslip = async (payslipId: string) => {
     try {
-      setLoadingPayslipId(payrollId);
-      onClose();
-      const payslipData = await payrollService.viewPayslip(payrollId);
-      const formattedData = mapPayslipDataToComponentFormat(payslipData);
-      setSelectedPayslip(formattedData);
+      setLoadingPayslipId(payslipId);
+      const response = await payrollService.viewPayslip(payslipId);
+      console.log("Payslip API response:", response); // Debug log
+
+      if (response.success) {
+        const mappedData = mapPayslipDataToComponentFormat(response.data);
+        console.log("Mapped payslip data:", mappedData); // Debug log
+        setSelectedPayslip(mappedData);
       setShowPayslip(true);
+      } else {
+        toast.error(response.message || "Failed to fetch payslip details");
+      }
     } catch (error) {
-      console.error("Failed to view payslip:", error);
-      toast.error("Failed to view payslip");
+      console.error("Error fetching payslip:", error);
+      toast.error("Failed to fetch payslip details");
     } finally {
       setLoadingPayslipId(null);
     }
@@ -266,7 +329,6 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
   const handleClosePayslip = () => {
     setShowPayslip(false);
     setSelectedPayslip(null);
-    setActiveModal("period");
     onClose();
   };
 
@@ -283,22 +345,15 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
       }
 
       setLoadingHistoryId(employeeId);
-      console.log("Viewing history for employee:", employeeId);
-
-      // Close modal after setting loading state
+      // Close the period modal first
       onClose();
-
-      // Call the parent handler
-      await onViewHistory(employeeId);
+      // Then show history
+      onViewHistory(employeeId);
     } catch (error) {
       console.error("Failed to view history:", error);
       toast.error(
         error instanceof Error ? error.message : "Failed to view history"
       );
-      // Reopen the period modal if there's an error
-      if (onShowPeriodModal) {
-        onShowPeriodModal();
-      }
     } finally {
       setLoadingHistoryId(null);
     }
@@ -312,7 +367,7 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
       {/* History Button */}
       <button
         onClick={() => {
-          console.log("Employee ID for history:", employeeId); // Add this log
+          console.log("Employee ID for history:", employeeId);
           handleViewHistory(employeeId);
         }}
         disabled={!employeeId || loadingHistoryId === employeeId}
@@ -324,11 +379,11 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
         {loadingHistoryId === employeeId ? (
           <div className="flex items-center gap-1">
             <CircularProgress
-              size={16}
+              size={14}
               thickness={4}
-              className="!text-gray-500"
+              className="!text-green-500"
             />
-            <span className="text-xs">History</span>
+            <span className="text-xs text-green-500">Loading...</span>
           </div>
         ) : (
           <div className="flex items-center gap-1">
@@ -376,7 +431,7 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
               thickness={4}
               className="!text-purple-500"
             />
-            <span className="text-xs">PDF</span>
+            <span className="text-xs whitespace-nowrap">PDF</span>
           </div>
         ) : (
           <div className="flex items-center gap-1">
@@ -416,40 +471,40 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
     <BaseModal
       isOpen={isOpen}
       onClose={onClose}
-      title={
-        data
-          ? `Payroll Details - ${data.period.monthName} ${data.period.year}`
-          : "Loading Payroll Details..."
-      }
+      title="Payroll Details"
       maxWidth="max-w-7xl"
       className="z-[1000]"
     >
-      {isLoading || !data ? (
+      {showPayslip && selectedPayslip ? (
+        <div className="p-4">
+          <PaySlip data={selectedPayslip} onPrint={handleClosePayslip} />
+        </div>
+      ) : isLoading || isPayrollsLoading ? (
         <PeriodModalSkeleton />
       ) : (
-        <div className="space-y-6">
+        <div className="flex flex-col h-[80vh]">
           {/* Summary Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-gray-50 p-4 rounded-lg">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <div className="bg-gray-50 p-3 rounded-lg">
               <p className="text-sm font-medium text-gray-700">Total Net Pay</p>
-              <p className="text-xl font-semibold text-green-600">
-                ₦{data.summary.totalNetPay.toLocaleString()}
+              <p className="text-lg font-semibold text-green-600">
+                ₦{summary.totalNetPay.toLocaleString()}
               </p>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
+            <div className="bg-gray-50 p-3 rounded-lg">
               <p className="text-sm font-medium text-gray-700">
                 Total Employees
               </p>
-              <p className="text-xl font-semibold text-blue-600">
-                {data.summary.totalEmployees}
+              <p className="text-lg font-semibold text-blue-600">
+                {summary.totalEmployees}
               </p>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
+            <div className="bg-gray-50 p-3 rounded-lg">
               <p className="text-sm font-medium text-gray-700">
                 Status Breakdown
               </p>
-              <div className="flex gap-2 flex-wrap mt-2">
-                {Object.entries(data.summary.statusBreakdown).map(
+              <div className="flex gap-1 flex-wrap mt-1">
+                {Object.entries(summary.statusBreakdown).map(
                   ([status, count]) => (
                     <Chip
                       key={status}
@@ -463,9 +518,10 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
             </div>
           </div>
 
-          {/* Employees Table */}
+          {/* Scrollable Table Area */}
+          <div className="flex-1 overflow-y-auto">
           <TableContainer component={Paper}>
-            <Table>
+              <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
                   <TableCell>Employee</TableCell>
@@ -480,40 +536,40 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
                 </TableRow>
               </TableHead>
               <TableBody>
-                {data.employees
-                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map((row) => (
-                    <TableRow key={row.id}>
+                  {payrollsData?.payrolls.map((row: PayrollData) => (
+                    <TableRow key={row._id} hover>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{row.employee.name}</div>
-                          <div className="text-sm text-gray-500">
+                          <div className="font-medium text-sm">
+                            {row.employee.fullName}
+                          </div>
+                          <div className="text-xs text-gray-500">
                             {row.employee.employeeId}
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{row.department}</TableCell>
+                      <TableCell>{row.department.name}</TableCell>
                       <TableCell>
                         <div>
-                          <div className="font-medium">
+                          <div className="font-medium text-sm">
                             {row.salaryGrade.level}
                           </div>
-                          <div className="text-sm text-gray-500">
+                          <div className="text-xs text-gray-500">
                             {row.salaryGrade.description}
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        ₦{row.payroll.basicSalary.toLocaleString()}
+                        ₦{row.totals.basicSalary.toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        ₦{row.payroll.totalAllowances.toLocaleString()}
+                        ₦{row.totals.totalAllowances.toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        ₦{row.payroll.totalDeductions.toLocaleString()}
+                        ₦{row.totals.totalDeductions.toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        ₦{row.payroll.netPay.toLocaleString()}
+                        ₦{row.totals.netPay.toLocaleString()}
                       </TableCell>
                       <TableCell>
                         <Chip
@@ -522,26 +578,37 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
                           size="small"
                         />
                       </TableCell>
-                      <TableCell className="min-w-[250px]">
+                      <TableCell className="min-w-[200px]">
                         <ActionButtons
-                          employeeId={row.employee.id}
-                          payrollId={row.id}
+                          employeeId={row.employee._id}
+                          payrollId={row._id}
                         />
                       </TableCell>
                     </TableRow>
                   ))}
               </TableBody>
             </Table>
+            </TableContainer>
+          </div>
+
+          {/* Pagination outside scroll area */}
+          <div className="mt-4 border-t pt-4">
             <TablePagination
               rowsPerPageOptions={[5, 10, 25]}
               component="div"
-              count={data.employees.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
+              count={payrollsData?.pagination?.total || 0}
+              rowsPerPage={filters.limit}
+              page={filters.page - 1}
               onPageChange={handleChangePage}
               onRowsPerPageChange={handleChangeRowsPerPage}
+              size="small"
             />
-          </TableContainer>
+          </div>
+        </div>
+      )}
+      {showPayslip && selectedPayslip && (
+        <div className="p-4">
+          <PaySlip data={selectedPayslip} onPrint={handleClosePayslip} />
         </div>
       )}
     </BaseModal>

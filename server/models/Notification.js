@@ -14,10 +14,12 @@ const NotificationSchema = new Schema({
       "PAYROLL_APPROVED",
       "PAYROLL_REJECTED",
       "PAYROLL_CREATED",
+      "PAYROLL_SUBMITTED",
       "PAYSLIP_GENERATED",
       "SALARY_UPDATED",
       "ALLOWANCE_ADDED",
       "DEDUCTION_ADDED",
+      "PAYMENT_PROCESSED",
     ],
   },
   title: {
@@ -61,12 +63,16 @@ NotificationSchema.statics.createPayrollNotification = async function (
     PAYROLL_APPROVED: "Payroll Approved",
     PAYROLL_REJECTED: "Payroll Rejected",
     PAYROLL_CREATED: "New Payroll Created",
+    PAYROLL_SUBMITTED: "Payroll Submitted for Approval",
+    PAYMENT_PROCESSED: "Payment Processed",
   };
 
   const messages = {
     PAYROLL_APPROVED: `Your payroll for ${payrollData.month}/${payrollData.year} has been approved.`,
     PAYROLL_REJECTED: `Your payroll for ${payrollData.month}/${payrollData.year} has been rejected. Reason: ${remarks}`,
     PAYROLL_CREATED: `A new payroll has been created for ${payrollData.month}/${payrollData.year}.`,
+    PAYROLL_SUBMITTED: `Your payroll for ${payrollData.month}/${payrollData.year} has been submitted for approval.`,
+    PAYMENT_PROCESSED: `Your payment for ${payrollData.month}/${payrollData.year} has been processed successfully.`,
   };
 
   return this.create({

@@ -3,9 +3,15 @@ const { Schema } = mongoose;
 
 // Constants
 export const PAYROLL_STATUS = {
-  PENDING: "PENDING",
-  APPROVED: "APPROVED",
-  REJECTED: "REJECTED",
+  DRAFT: "DRAFT", // Initial state when creating payroll
+  PENDING: "PENDING", // Submitted for approval
+  PROCESSING: "PROCESSING", // Being reviewed by admin
+  APPROVED: "APPROVED", // Approved by admin
+  REJECTED: "REJECTED", // Rejected by admin
+  PAID: "PAID", // Payment processed
+  CANCELLED: "CANCELLED", // Cancelled by admin
+  FAILED: "FAILED", // Payment failed
+  ARCHIVED: "ARCHIVED", // Archived after completion
 };
 
 export const PayrollFrequency = {
@@ -154,7 +160,7 @@ const PayrollSchema = new Schema(
     status: {
       type: String,
       enum: Object.values(PAYROLL_STATUS),
-      default: PAYROLL_STATUS.PENDING,
+      default: PAYROLL_STATUS.DRAFT,
       required: [true, "Status is required"],
     },
     approvalFlow: {
@@ -167,8 +173,42 @@ const PayrollSchema = new Schema(
         type: Date,
         required: [true, "Submission date is required"],
       },
-      approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
+      processingStartedBy: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+      processingStartedAt: Date,
+      approvedBy: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
       approvedAt: Date,
+      rejectedBy: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+      rejectedAt: Date,
+      cancelledBy: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+      cancelledAt: Date,
+      paidBy: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+      paidAt: Date,
+      failedBy: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+      failedAt: Date,
+      archivedBy: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+      archivedAt: Date,
+      remarks: String,
     },
     payment: {
       bankName: { type: String, required: [true, "Bank name is required"] },

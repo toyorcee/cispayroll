@@ -83,33 +83,54 @@ router.delete(
 );
 
 // ===== Payroll Management Routes =====
-router.post(
+// Get all payrolls with filters
+router.get(
   "/payroll",
-  requirePermission([Permission.CREATE_PAYROLL]),
-  validatePayrollCreate,
-  SuperAdminController.createPayroll
+  requirePermission([Permission.VIEW_ALL_PAYROLL]),
+  SuperAdminController.getAllPayrolls
 );
 
+// Get payroll periods
 router.get(
   "/payroll/periods",
   requirePermission([Permission.VIEW_ALL_PAYROLL]),
   SuperAdminController.getPayrollPeriods
 );
 
+// Get payroll stats
 router.get(
   "/payroll/stats",
   requirePermission([Permission.VIEW_PAYROLL_STATS]),
   SuperAdminController.getPayrollStats
 );
 
+// Get pending payrolls
 router.get(
   "/payroll/pending",
   requirePermission([Permission.VIEW_ALL_PAYROLL]),
   SuperAdminController.getPendingPayrolls
 );
 
-//Get all payrolls
-router.get("/payroll", SuperAdminController.getAllPayrolls);
+// Get filtered payrolls
+router.get(
+  "/payroll/filtered",
+  requirePermission([Permission.VIEW_ALL_PAYROLL]),
+  SuperAdminController.getFilteredPayrolls
+);
+
+// View payslip
+router.get(
+  "/payroll/:payrollId/view",
+  requirePermission([Permission.VIEW_OWN_PAYSLIP]),
+  SuperAdminController.viewPayslip
+);
+
+// Send payslip email
+router.post(
+  "/payroll/:payrollId/email",
+  requirePermission([Permission.VIEW_OWN_PAYSLIP]),
+  SuperAdminController.sendPayslipEmail
+);
 
 router.get(
   "/payroll/:id",
@@ -117,12 +138,95 @@ router.get(
   SuperAdminController.getPayrollById
 );
 
-router.delete(
+// Update payroll (only allowed for DRAFT status)
+router.patch(
   "/payroll/:id",
-  requirePermission([Permission.DELETE_PAYROLL]),
-  SuperAdminController.deletePayroll
+  requirePermission([Permission.CREATE_PAYROLL]),
+  validatePayrollUpdate,
+  SuperAdminController.updatePayroll
 );
 
+// Create new payroll (DRAFT status)
+router.post(
+  "/payroll",
+  requirePermission([Permission.CREATE_PAYROLL]),
+  validatePayrollCreate,
+  SuperAdminController.createPayroll
+);
+
+// Submit payroll for approval (DRAFT -> PENDING)
+router.patch(
+  "/payroll/:id/submit",
+  requirePermission([Permission.CREATE_PAYROLL]),
+  SuperAdminController.submitPayroll
+);
+
+// Start processing payroll (PENDING -> PROCESSING)
+router.patch(
+  "/payroll/:id/process",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  SuperAdminController.updatePayrollStatus
+);
+
+// Approve payroll (PROCESSING/PENDING -> APPROVED)
+router.patch(
+  "/payroll/:id/approve",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  validatePayrollApproval,
+  SuperAdminController.approvePayroll
+);
+
+// Reject payroll (PROCESSING/PENDING -> REJECTED)
+router.patch(
+  "/payroll/:id/reject",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  validatePayrollRejection,
+  SuperAdminController.rejectPayroll
+);
+
+// Mark payroll as paid (APPROVED -> PAID)
+router.patch(
+  "/payroll/:id/mark-paid",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  SuperAdminController.updatePayrollStatus
+);
+
+// Process payment for approved payroll
+router.post(
+  "/payroll/:id/process-payment",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  SuperAdminController.processPayment
+);
+
+// Mark payroll as failed (PAID -> FAILED)
+router.patch(
+  "/payroll/:id/mark-failed",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  SuperAdminController.updatePayrollStatus
+);
+
+// Cancel payroll (Any status -> CANCELLED)
+router.patch(
+  "/payroll/:id/cancel",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  SuperAdminController.updatePayrollStatus
+);
+
+// Archive payroll (PAID -> ARCHIVED)
+router.patch(
+  "/payroll/:id/archive",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  SuperAdminController.updatePayrollStatus
+);
+
+// Get period payroll
+router.get(
+  "/payroll/period/:month/:year",
+  requirePermission([Permission.VIEW_ALL_PAYROLL]),
+  SuperAdminController.getPeriodPayroll
+);
+
+// Get employee payroll history
 router.get(
   "/payroll/employee/:employeeId/history",
   requirePermission([Permission.VIEW_ALL_PAYROLL]),
@@ -130,34 +234,11 @@ router.get(
   SuperAdminController.getEmployeePayrollHistory
 );
 
-router.get(
-  "/payroll/period/:month/:year",
-  requirePermission([Permission.VIEW_ALL_PAYROLL]),
-  SuperAdminController.getPeriodPayroll
-);
-
-router.get(
-  "/payroll/filtered",
-  requirePermission([Permission.VIEW_ALL_PAYROLL]),
-  SuperAdminController.getFilteredPayrolls
-);
-
-router.get(
-  "/payroll/:payrollId/view",
-  requirePermission([Permission.VIEW_ALL_PAYROLL]),
-  SuperAdminController.viewPayslip
-);
-
-router.patch(
-  "/payroll/:id/approve",
-  requirePermission([Permission.APPROVE_PAYROLL]),
-  SuperAdminController.approvePayroll
-);
-
-router.patch(
-  "/payroll/:id/reject",
-  requirePermission([Permission.APPROVE_PAYROLL]),
-  SuperAdminController.rejectPayroll
+// Delete payroll (only allowed for DRAFT status)
+router.delete(
+  "/payroll/:id",
+  requirePermission([Permission.DELETE_PAYROLL]),
+  SuperAdminController.deletePayroll
 );
 
 // Employee Management Routes
@@ -415,6 +496,58 @@ router.delete(
   "/bonuses/:id",
   requirePermission([Permission.MANAGE_BONUSES]),
   SuperAdminController.deleteBonus
+);
+
+// ===== Payment Management Routes =====
+// Payment Processing
+router.post(
+  "/payroll/:id/process-payment",
+  requirePermission([Permission.PROCESS_PAYMENT]),
+  SuperAdminController.processPayment
+);
+
+router.patch(
+  "/payroll/:id/mark-paid",
+  requirePermission([Permission.PROCESS_PAYMENT]),
+  SuperAdminController.updatePayrollStatus
+);
+
+router.patch(
+  "/payroll/:id/mark-failed",
+  requirePermission([Permission.MARK_PAYMENT_FAILED]),
+  SuperAdminController.updatePayrollStatus
+);
+
+// Payment History
+router.get(
+  "/payroll/:id/payment-history",
+  requirePermission([Permission.VIEW_PAYMENT_HISTORY]),
+  SuperAdminController.getPaymentHistory
+);
+
+// Payment Methods Management
+router.get(
+  "/payment-methods",
+  requirePermission([Permission.MANAGE_PAYMENT_METHODS]),
+  SuperAdminController.getPaymentMethods
+);
+
+router.post(
+  "/payment-methods",
+  requirePermission([Permission.MANAGE_PAYMENT_METHODS]),
+  SuperAdminController.createPaymentMethod
+);
+
+router.patch(
+  "/payment-methods/:id",
+  requirePermission([Permission.MANAGE_PAYMENT_METHODS]),
+  SuperAdminController.updatePaymentMethod
+);
+
+router.delete(
+  "/payment-methods/:id",
+  requirePermission([Permission.MANAGE_PAYMENT_METHODS]),
+  SuperAdminController.deletePaymentMethod
 );
 
 export default router;

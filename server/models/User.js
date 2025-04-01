@@ -38,6 +38,15 @@ export const Permission = {
   APPROVE_PAYROLL: "APPROVE_PAYROLL",
   GENERATE_PAYSLIP: "GENERATE_PAYSLIP",
   VIEW_REPORTS: "VIEW_REPORTS",
+  PROCESS_PAYMENT: "PROCESS_PAYMENT",
+  MARK_PAYMENT_FAILED: "MARK_PAYMENT_FAILED",
+  VIEW_PAYMENT_HISTORY: "VIEW_PAYMENT_HISTORY",
+  MANAGE_PAYMENT_METHODS: "MANAGE_PAYMENT_METHODS",
+
+  // New specific payslip permissions
+  VIEW_ALL_PAYSLIPS: "VIEW_ALL_PAYSLIPS", // Super admin only
+  VIEW_DEPARTMENT_PAYSLIPS: "VIEW_DEPARTMENT_PAYSLIPS", // Department admins
+  VIEW_OWN_PAYSLIP: "VIEW_OWN_PAYSLIP", // Regular users
 
   // ===== Leave Management =====
   APPROVE_LEAVE: "APPROVE_LEAVE",
@@ -49,7 +58,6 @@ export const Permission = {
   REQUEST_LEAVE: "REQUEST_LEAVE",
   VIEW_OWN_LEAVE: "VIEW_OWN_LEAVE",
   CANCEL_OWN_LEAVE: "CANCEL_OWN_LEAVE",
-  VIEW_OWN_PAYSLIP: "VIEW_OWN_PAYSLIP",
 
   // Employee Lifecycle Management
   MANAGE_ONBOARDING: "MANAGE_ONBOARDING",
@@ -676,6 +684,13 @@ UserSchema.pre("save", function (next) {
           Permission.APPROVE_PAYROLL,
           Permission.GENERATE_PAYSLIP,
           Permission.VIEW_REPORTS,
+          Permission.VIEW_ALL_PAYSLIPS,
+          Permission.VIEW_DEPARTMENT_PAYSLIPS,
+          Permission.VIEW_OWN_PAYSLIP,
+          Permission.PROCESS_PAYMENT,
+          Permission.MARK_PAYMENT_FAILED,
+          Permission.VIEW_PAYMENT_HISTORY,
+          Permission.MANAGE_PAYMENT_METHODS,
 
           // Leave Management
           Permission.APPROVE_LEAVE,
@@ -770,6 +785,11 @@ UserSchema.pre("save", function (next) {
           Permission.VIEW_DEPARTMENT_PAYROLL,
           Permission.GENERATE_PAYSLIP,
           Permission.VIEW_REPORTS,
+          Permission.VIEW_DEPARTMENT_PAYSLIPS,
+          Permission.PROCESS_PAYMENT,
+          Permission.MARK_PAYMENT_FAILED,
+          Permission.VIEW_PAYMENT_HISTORY,
+          Permission.MANAGE_PAYMENT_METHODS,
 
           // Leave Management
           Permission.APPROVE_LEAVE,

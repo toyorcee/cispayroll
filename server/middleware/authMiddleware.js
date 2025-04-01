@@ -46,11 +46,7 @@ export const requireAuth = async (req, res, next) => {
     }
 
     // Set user info in request
-    req.user = {
-      ...user.toObject(),
-      id: user._id,
-      _id: user._id,
-    };
+    req.user = user;
 
     // Add lifecycle state to response headers for client awareness
     res.set(

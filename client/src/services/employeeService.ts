@@ -100,12 +100,26 @@ export const employeeService = {
       queryParams.append("page", (filters.page || 1).toString());
       queryParams.append("limit", (filters.limit || 10).toString());
 
-      const url = `${BASE_URL}/super-admin/departments/${departmentId}/employees?${queryParams}`;
+      const url = `${BASE_URL}/departments/${departmentId}/employees?${queryParams}`;
       const response = await axios.get(url);
 
-      return response.data.data;
+      // Return the data array from the response
+      return {
+        employees: response.data.data || [],
+        total: response.data.total || 0,
+        page: response.data.page || 1,
+        limit: response.data.limit || 10,
+        totalPages: response.data.totalPages || 1,
+      };
     } catch (error) {
       console.error("❌ Service: Error in getDepartmentEmployees:", error);
+      if (axios.isAxiosError(error)) {
+        console.error("Error details:", {
+          status: error.response?.status,
+          data: error.response?.data,
+          url: error.config?.url,
+        });
+      }
       throw error;
     }
   },

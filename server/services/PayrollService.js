@@ -599,6 +599,7 @@ export class PayrollService {
         month,
         year,
         frequency,
+        status: { $ne: PAYROLL_STATUS.DRAFT },
       });
 
       if (existingPayroll) {
@@ -945,5 +946,65 @@ export class PayrollService {
     }
 
     return true;
+  }
+
+  static async createPayroll(payrollData) {
+    try {
+      console.log("🔍 Validating payroll data:", payrollData);
+
+      // Validate required fields
+      if (!payrollData.employee || !payrollData.month || !payrollData.year) {
+        throw new ApiError(400, "Missing required fields");
+      }
+
+      // Validate payroll data
+      const validationResult = await this.validatePayrollData(payrollData);
+      if (!validationResult.isValid) {
+        throw new ApiError(400, validationResult.error);
+      }
+
+      // Calculate payroll
+      const calculatedPayroll = await this.calculatePayroll(
+        payrollData.employee,
+        payrollData.month,
+        payrollData.year,
+        payrollData.frequency
+      );
+
+      // Check if payroll already exists
+      const existingPayroll = await PayrollModel.findOne({
+        employee: payrollData.employee,
+        month: payrollData.month,
+        year: payrollData.year,
+      });
+
+      if (existingPayroll) {
+        // Update existing payroll
+        console.log("📝 Updating existing payroll");
+        const updatedPayroll = await PayrollModel.findByIdAndUpdate(
+          existingPayroll._id,
+          {
+            ...calculatedPayroll,
+            status: PAYROLL_STATUS.DRAFT,
+            updatedAt: new Date(),
+          },
+          { new: true }
+        );
+        return updatedPayroll;
+      }
+
+      // Create new payroll
+      console.log("📝 Creating new payroll");
+      const payroll = new PayrollModel({
+        ...calculatedPayroll,
+        status: PAYROLL_STATUS.DRAFT,
+      });
+
+      await payroll.save();
+      return payroll;
+    } catch (error) {
+      console.error("❌ Error in createPayroll:", error);
+      throw new ApiError(500, `Failed to create payroll: ${error.message}`);
+    }
   }
 }

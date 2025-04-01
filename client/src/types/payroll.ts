@@ -1,5 +1,6 @@
 // Enums
 export enum PayrollStatus {
+  DRAFT = "DRAFT",
   PENDING = "PENDING",
   PROCESSING = "PROCESSING",
   APPROVED = "APPROVED",
@@ -300,6 +301,39 @@ export interface PayrollStats {
 
 export interface PayrollData {
   _id: string;
+  employee: {
+    _id: string;
+    employeeId: string;
+    firstName: string;
+    lastName: string;
+    fullName: string;
+  };
+  department: {
+    _id: string;
+    name: string;
+    code: string;
+  };
+  salaryGrade: {
+    level: string;
+    description: string;
+  };
+  month: number;
+  year: number;
+  status: PayrollStatus;
+  allowances: {
+    gradeAllowances: Array<{
+      name: string;
+      type: string;
+      value: number;
+      amount: number;
+      _id: string;
+    }>;
+    additionalAllowances: Array<{
+      name: string;
+      amount: number;
+    }>;
+    totalAllowances: number;
+  };
   earnings: {
     overtime: {
       hours: number;
@@ -342,38 +376,23 @@ export interface PayrollData {
     totalDeductions: number;
     netPay: number;
   };
-  employee: {
-    _id: string;
-    employeeId: string;
-    firstName: string;
-    lastName: string;
-    fullName: string;
+  approvalFlow: {
+    submittedBy?: string;
+    submittedAt?: string;
+    approvedBy?: string;
+    approvedAt?: string;
+    rejectedBy?: string;
+    rejectedAt?: string;
+    paidBy?: string;
+    paidAt?: string;
+    remarks?: string;
   };
-  allowances: {
-    gradeAllowances: Array<{
-      name: string;
-      type: string;
-      value: number;
-      amount: number;
-      _id: string;
-    }>;
-    additionalAllowances: Array<{
-      name: string;
-      amount: number;
-    }>;
-    totalAllowances: number;
-  };
-  salaryGrade: {
-    level: string;
-    description: string;
-  };
-  basicSalary: number;
-  month: number;
-  year: number;
-  status: string;
   createdAt: string;
+  updatedAt: string;
+  processedDate?: string;
   periodStart: string;
   periodEnd: string;
+  basicSalary: number;
   bonuses: {
     items: Array<{
       type: string;
@@ -382,18 +401,8 @@ export interface PayrollData {
     }>;
     totalBonuses: number;
   };
-  approvalFlow?: Array<{
-    step: string;
-    approver: string;
-    status: string;
-    date?: string;
-  }>;
   processedBy?: string;
-  payment?: {
-    bankName: string;
-    accountName: string;
-    accountNumber: string;
-  };
+  payment: IBankDetails;
 }
 
 export interface PayrollCalculationRequest {
@@ -401,70 +410,214 @@ export interface PayrollCalculationRequest {
   salaryGrade: string;
   month: number;
   year: number;
+  frequency?: PayrollFrequency;
 }
 
 export interface PeriodPayrollResponse {
-  period: {
-    month: number;
-    year: number;
-    monthName: string;
-  };
-  employees: Array<{
-    id: string;
+  success: boolean;
+  message: string;
+  data: {
+    payslipId: string;
     employee: {
       id: string;
       name: string;
       employeeId: string;
+      department: string;
+      salaryGrade: string;
     };
-    department: string;
-    salaryGrade: {
-      level: string;
-      description: string;
+    paymentDetails: {
+      bankName: string;
+      accountNumber: string;
+      accountName: string;
     };
-    payroll: {
+    period: {
+      month: number;
+      year: number;
+      startDate: string;
+      endDate: string;
+      frequency: string;
+    };
+    earnings: {
+      basicSalary: number;
+      overtime: {
+        hours: number;
+        rate: number;
+        amount: number;
+      };
+      bonus: any[];
+      allowances: {
+        gradeAllowances: Array<{
+          name: string;
+          type: string;
+          value: number;
+          amount: number;
+          _id: string;
+        }>;
+        additionalAllowances: any[];
+        totalAllowances: number;
+      };
+      totalEarnings: number;
+    };
+    deductions: {
+      tax: {
+        taxableAmount: number;
+        taxRate: number;
+        amount: number;
+      };
+      pension: {
+        pensionableAmount: number;
+        rate: number;
+        amount: number;
+      };
+      nhf: {
+        pensionableAmount: number;
+        rate: number;
+        amount: number;
+      };
+      loans: any[];
+      others: any[];
+      totalDeductions: number;
+    };
+    totals: {
       basicSalary: number;
       totalAllowances: number;
+      totalBonuses: number;
+      grossEarnings: number;
       totalDeductions: number;
       netPay: number;
-      month: number; // Add this
-      year: number; // Add this
-      deductions?: {
-        others?: Array<{
-          description: string;
-          amount: number;
-        }>;
-      };
     };
+    components: Array<{
+      name: string;
+      type: string;
+      value: number;
+      amount: number;
+      _id: string;
+    }>;
     status: PayrollStatus;
-    processedAt: string;
-  }>;
-  summary: {
-    totalEmployees: number;
-    totalNetPay: number;
-    totalBasicSalary: number;
-    totalAllowances: number;
-    totalDeductions: number;
-    statusBreakdown: Record<PayrollStatus, number>;
+    approvalFlow: {
+      submittedBy: {
+        id: string;
+        name: string;
+      };
+      submittedAt: string;
+      approvedBy: {
+        id: string;
+        name: string;
+      };
+      approvedAt: string;
+      remarks: string;
+    };
+    processedBy: {
+      id: string;
+      name: string;
+    };
+    createdBy: {
+      id: string;
+      name: string;
+    };
+    updatedBy: {
+      id: string;
+      name: string;
+    };
+    timestamps: {
+      createdAt: string;
+      updatedAt: string;
+    };
   };
 }
 
 export interface Payslip {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  month: number;
-  year: number;
-  basicSalary: number;
-  allowances: Array<{
-    type: string;
-    amount: number;
-  }>;
-  deductions: Array<{
-    type: string;
-    amount: number;
-  }>;
-  netPay: number;
-  status: PayrollStatus;
-  paymentDate: Date;
-  createdAt: string;
+  payslipId: string;
+  employee: {
+    name: string;
+    employeeId: string;
+    department: string;
+    salaryGrade: string;
+  };
+  paymentDetails: {
+    bankName: string;
+    accountNumber: string;
+    accountName: string;
+  };
+  period: {
+    startDate: string;
+    endDate: string;
+    frequency: string;
+  };
+  status: string;
+  earnings: {
+    basicSalary: number;
+    allowances: {
+      gradeAllowances: Array<{
+        name: string;
+        type: string;
+        value: number;
+        amount: number;
+      }>;
+      totalAllowances: number;
+    };
+    overtime: {
+      hours: number;
+      rate: number;
+      amount: number;
+    };
+  };
+  deductions: {
+    tax: {
+      taxRate: number;
+      amount: number;
+    };
+    pension: {
+      rate: number;
+      amount: number;
+    };
+    nhf: {
+      rate: number;
+      amount: number;
+    };
+    totalDeductions: number;
+  };
+  totals: {
+    grossEarnings: number;
+    netPay: number;
+  };
+  approvalFlow: {
+    submittedBy: {
+      name: string;
+    };
+    submittedAt: string;
+    approvedBy: {
+      name: string;
+    };
+    approvedAt: string;
+    remarks: string;
+  };
+  timestamps: {
+    createdAt: string;
+  };
+}
+
+export interface PayrollFilters {
+  dateRange?: string;
+  department?: string;
+  frequency?: string;
+  status?: string;
+  month?: number;
+  year?: number;
+  employee?: string;
+  page: number;
+  limit: number;
+}
+
+export interface LineChartDataset {
+  label: string;
+  data: number[];
+  borderColor: string;
+  backgroundColor: string;
+  tension: number;
+}
+
+export interface LineChartData {
+  labels: string[];
+  datasets: LineChartDataset[];
 }

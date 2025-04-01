@@ -37,6 +37,9 @@ import ComingSoonPage from "../pages/Coming/ComingSoonPage";
 import FeedbackManagemnet from "../pages/feedback/FeedbackManagement";
 import MyPayslipsPage from "../pages/pms/payroll/MyPayslips";
 import UserProfile from "../pages/pms/profile/UserProfile";
+import { RouteErrorFallback } from "../components/error/RouteErrorFallback";
+import { ErrorBoundary } from "react-error-boundary";
+import { ErrorFallback } from "../components/error/ErrorFallback";
 
 export interface RouteConfig {
   path: string;
@@ -71,7 +74,13 @@ function LazyRoute({
   return (
     <Suspense fallback={getSkeleton(skeletonType)}>
       <GlobalErrorBoundary>
-        {Component ? <Component /> : element}
+        {Component ? (
+          <ErrorBoundary FallbackComponent={ErrorFallback}>
+            <Component />
+          </ErrorBoundary>
+        ) : (
+          element
+        )}
       </GlobalErrorBoundary>
     </Suspense>
   );
@@ -203,25 +212,25 @@ export const routes: RouteConfig[] = [
         requireAllPermissions: true,
         element: <MyPayslipsPage />,
       },
-      {
-        path: "my-allowances",
-        label: "My Allowances",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-        permissions: [
-          Permission.VIEW_OWN_ALLOWANCES,
-          Permission.REQUEST_ALLOWANCES,
-        ],
-        requireAllPermissions: true,
-        element: <AllowanceManagement />,
-      },
-      {
-        path: "my-deductions",
-        label: "My Deductions",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-        permissions: [Permission.VIEW_OWN_DEDUCTIONS],
-        requireAllPermissions: true,
-        element: <Deductions />,
-      },
+      // {
+      //   path: "my-allowances",
+      //   label: "My Allowances",
+      //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+      //   permissions: [
+      //     Permission.VIEW_OWN_ALLOWANCES,
+      //     Permission.REQUEST_ALLOWANCES,
+      //   ],
+      //   requireAllPermissions: true,
+      //   element: <AllowanceManagement />,
+      // },
+      // {
+      //   path: "my-deductions",
+      //   label: "My Deductions",
+      //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+      //   permissions: [Permission.VIEW_OWN_DEDUCTIONS],
+      //   requireAllPermissions: true,
+      //   element: <Deductions />,
+      // },
     ],
   },
   {
@@ -349,17 +358,17 @@ export const routes: RouteConfig[] = [
       },
     ],
   },
-  {
-    path: "disciplinary",
-    label: "Disciplinary",
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    permissions: [
-      Permission.MANAGE_DISCIPLINARY_ACTIONS,
-      Permission.VIEW_DISCIPLINARY_RECORDS,
-    ],
-    requireAllPermissions: false,
-    element: <Disciplinary />,
-  },
+  // {
+  //   path: "disciplinary",
+  //   label: "Disciplinary",
+  //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+  //   permissions: [
+  //     Permission.MANAGE_DISCIPLINARY_ACTIONS,
+  //     Permission.VIEW_DISCIPLINARY_RECORDS,
+  //   ],
+  //   requireAllPermissions: false,
+  //   element: <Disciplinary />,
+  // },
   {
     path: "leave",
     label: "Leave",
@@ -404,6 +413,7 @@ export const router = createBrowserRouter([
         </NavigationProvider>
       </SkeletonProvider>
     ),
+    errorElement: <RouteErrorFallback />,
     children: [
       {
         path: "/auth",

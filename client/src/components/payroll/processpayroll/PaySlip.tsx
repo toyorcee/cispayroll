@@ -1,116 +1,14 @@
 import React from "react";
 import { PayrollBranding } from "../../shared/PayrollBranding";
-
-export interface PayrollData {
-  _id: string;
-  earnings: {
-    overtime: {
-      hours: number;
-      rate: number;
-      amount: number;
-    };
-    bonus: Array<{
-      type: string;
-      description: string;
-      amount: number;
-    }>;
-    totalEarnings: number;
-  };
-  deductions: {
-    tax: {
-      taxableAmount: number;
-      taxRate: number;
-      amount: number;
-    };
-    pension: {
-      pensionableAmount: number;
-      rate: number;
-      amount: number;
-    };
-    nhf: {
-      rate: number;
-      amount: number;
-    };
-    others: Array<{
-      name: string;
-      amount: number;
-    }>;
-    totalDeductions: number;
-  };
-  totals: {
-    basicSalary: number;
-    totalAllowances: number;
-    totalBonuses: number;
-    grossEarnings: number;
-    totalDeductions: number;
-    netPay: number;
-  };
-  employee: {
-    _id: string;
-    employeeId: string;
-    firstName: string;
-    lastName: string;
-    fullName: string;
-  };
-  allowances: {
-    gradeAllowances: Array<{
-      name: string;
-      type: string;
-      value: number;
-      amount: number;
-      _id: string;
-    }>;
-    additionalAllowances: Array<{
-      name: string;
-      amount: number;
-    }>;
-    totalAllowances: number;
-  };
-  salaryGrade: {
-    level: string;
-    description: string;
-  };
-  basicSalary: number;
-  month: number;
-  year: number;
-  status: string;
-  createdAt: string;
-  periodStart: string;
-  periodEnd: string;
-
-  // Add the bonuses property
-  bonuses: {
-    items: Array<{
-      type: string;
-      description: string;
-      amount: number;
-    }>;
-    totalBonuses: number;
-  };
-
-  // Optional properties
-  approvalFlow?: Array<{
-    step: string;
-    approver: string;
-    status: string;
-    date?: string;
-  }>;
-  processedBy?: string;
-
-  // Payment information
-  payment?: {
-    bankName: string;
-    accountName: string;
-    accountNumber: string;
-  };
-}
+import { PayrollData } from "../../../types/payroll";
 
 interface PaySlipProps {
   data: PayrollData;
   onPrint?: () => void;
 }
 
-const formatAmount = (amount: number) => {
+const formatAmount = (amount: number | undefined | null) => {
+  if (amount === undefined || amount === null) return "₦0.00";
   return new Intl.NumberFormat("en-NG", {
     style: "currency",
     currency: "NGN",
@@ -123,6 +21,13 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
       window.print();
     }, 100);
   };
+
+  // Add null checks for all numeric values
+  const basicSalary = data.basicSalary || 0;
+  const totalAllowances = data.allowances?.totalAllowances || 0;
+  const totalBonuses = data.bonuses?.totalBonuses || 0;
+  const totalDeductions = data.deductions?.totalDeductions || 0;
+  const netPay = data.totals?.netPay || 0;
 
   return (
     <div className="payslip-container bg-white print:shadow-none print:p-0 print:w-full print:max-w-none">
@@ -150,18 +55,18 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
         <div>
           <h3 className="font-semibold">Employee Information</h3>
           <div className="mt-2 space-y-1 text-sm">
-            <p>Name: {data.employee.fullName}</p>
-            <p>Employee ID: {data.employee.employeeId}</p>
-            <p>Grade: {data.salaryGrade.level}</p>
-            <p>Department: {data.salaryGrade.description}</p>
+            <p>Name: {data.employee?.fullName || "N/A"}</p>
+            <p>Employee ID: {data.employee?.employeeId || "N/A"}</p>
+            <p>Grade: {data.salaryGrade?.level || "N/A"}</p>
+            <p>Department: {data.salaryGrade?.description || "N/A"}</p>
           </div>
         </div>
         <div className="justify-self-end">
           <h3 className="font-semibold">Payment Information</h3>
           <div className="mt-2 space-y-1 text-sm text-right">
-            <p>Bank: {data.payment?.bankName}</p>
+            <p>Bank: {data.payment?.bankName || "N/A"}</p>
             <p>Account Name: {data.payment?.accountName || "N/A"}</p>
-            <p>Account Number: {data.payment?.accountNumber}</p>
+            <p>Account Number: {data.payment?.accountNumber || "N/A"}</p>
           </div>
         </div>
       </div>
@@ -175,12 +80,12 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
           <tbody className="print:text-black">
             <tr className="border-t">
               <td className="py-2">Basic Salary</td>
-              <td className="text-right">{formatAmount(data.basicSalary)}</td>
+              <td className="text-right">{formatAmount(basicSalary)}</td>
             </tr>
 
             {/* Allowances */}
-            {data.allowances.gradeAllowances.map((allowance) => (
-              <tr key={allowance._id}>
+            {data.allowances?.gradeAllowances?.map((allowance, index) => (
+              <tr key={index}>
                 <td className="py-2">
                   {allowance.name}
                   {allowance.type === "percentage"
@@ -192,7 +97,7 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
             ))}
 
             {/* Overtime if any */}
-            {data.earnings.overtime.amount > 0 && (
+            {data.earnings?.overtime?.amount > 0 && (
               <tr>
                 <td className="py-2">
                   Overtime ({data.earnings.overtime.hours} hrs @{" "}
@@ -207,7 +112,7 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
             <tr className="border-t font-semibold">
               <td className="py-2">Total Earnings</td>
               <td className="text-right">
-                {formatAmount(data.earnings.totalEarnings)}
+                {formatAmount(basicSalary + totalAllowances)}
               </td>
             </tr>
           </tbody>
@@ -223,29 +128,32 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
           <tbody className="print:text-black">
             <tr className="border-t">
               <td className="py-2">
-                PAYE Tax ({data.deductions.tax.taxRate.toFixed(2)}%)
+                PAYE Tax ({data.deductions?.tax?.taxRate?.toFixed(2) || "0.00"}
+                %)
               </td>
               <td className="text-right">
-                {formatAmount(data.deductions.tax.amount)}
+                {formatAmount(data.deductions?.tax?.amount)}
               </td>
             </tr>
             <tr>
               <td className="py-2">
-                Pension ({data.deductions.pension.rate}%)
+                Pension ({data.deductions?.pension?.rate || "0.00"}%)
               </td>
               <td className="text-right">
-                {formatAmount(data.deductions.pension.amount)}
+                {formatAmount(data.deductions?.pension?.amount)}
               </td>
             </tr>
             <tr>
-              <td className="py-2">Nhf ({data.deductions.nhf.rate}%)</td>
+              <td className="py-2">
+                Nhf ({data.deductions?.nhf?.rate || "0.00"}%)
+              </td>
               <td className="text-right">
-                {formatAmount(data.deductions.nhf.amount)}
+                {formatAmount(data.deductions?.nhf?.amount)}
               </td>
             </tr>
 
             {/* Other deductions if any */}
-            {data.deductions.others.map((deduction, index) => (
+            {data.deductions?.others?.map((deduction, index) => (
               <tr key={index}>
                 <td className="py-2">{deduction.name}</td>
                 <td className="text-right">{formatAmount(deduction.amount)}</td>
@@ -254,20 +162,18 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
 
             <tr className="border-t font-semibold">
               <td className="py-2">Total Deductions</td>
-              <td className="text-right">
-                {formatAmount(data.deductions.totalDeductions)}
-              </td>
+              <td className="text-right">{formatAmount(totalDeductions)}</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      {/* Net Pay - Remove print background but keep text color */}
+      {/* Net Pay */}
       <div className="bg-gray-100 p-4 rounded-lg mt-6 print:bg-transparent print:border print:border-green-200">
         <div className="grid grid-cols-2 gap-4 text-lg font-bold">
           <div className="print:text-green-600">Net Pay</div>
           <div className="text-right text-green-600 print:text-green-600">
-            {formatAmount(data.totals.netPay)}
+            {formatAmount(netPay)}
           </div>
         </div>
       </div>

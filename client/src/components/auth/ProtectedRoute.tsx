@@ -97,32 +97,32 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       }
     }
 
-    // Disciplinary Routes
-    if (path.startsWith("/pms/disciplinary")) {
-      const disciplinaryPermissions = [
-        Permission.MANAGE_DISCIPLINARY_ACTIONS,
-        Permission.VIEW_DISCIPLINARY_RECORDS,
-      ];
-      if (!disciplinaryPermissions.some((p) => user.permissions?.includes(p))) {
-        toast.error("Access denied: No disciplinary management permissions");
-        return <Navigate to="/pms/dashboard" replace />;
-      }
-    }
+    // // Disciplinary Routes
+    // if (path.startsWith("/pms/disciplinary")) {
+    //   const disciplinaryPermissions = [
+    //     Permission.MANAGE_DISCIPLINARY_ACTIONS,
+    //     Permission.VIEW_DISCIPLINARY_RECORDS,
+    //   ];
+    //   if (!disciplinaryPermissions.some((p) => user.permissions?.includes(p))) {
+    //     toast.error("Access denied: No disciplinary management permissions");
+    //     return <Navigate to="/pms/dashboard" replace />;
+    //   }
+    // }
 
     // Leave Management Routes
-    if (path.startsWith("/pms/leave")) {
-      const leavePermissions = [
-        Permission.APPROVE_LEAVE,
-        Permission.VIEW_TEAM_LEAVE,
-        Permission.REQUEST_LEAVE,
-        Permission.VIEW_OWN_LEAVE,
-        Permission.CANCEL_OWN_LEAVE,
-      ];
-      if (!leavePermissions.some((p) => user.permissions?.includes(p))) {
-        toast.error("Access denied: No leave management permissions");
-        return <Navigate to="/pms/dashboard" replace />;
-      }
-    }
+    // if (path.startsWith("/pms/leave")) {
+    //   const leavePermissions = [
+    //     Permission.APPROVE_LEAVE,
+    //     Permission.VIEW_TEAM_LEAVE,
+    //     Permission.REQUEST_LEAVE,
+    //     Permission.VIEW_OWN_LEAVE,
+    //     Permission.CANCEL_OWN_LEAVE,
+    //   ];
+    //   if (!leavePermissions.some((p) => user.permissions?.includes(p))) {
+    //     toast.error("Access denied: No leave management permissions");
+    //     return <Navigate to="/pms/dashboard" replace />;
+    //   }
+    // }
   }
 
   // User Routes
@@ -141,34 +141,34 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       }
     }
 
-    // Leave Management
-    if (path.startsWith("/pms/leave")) {
-      const leavePermissions = [
-        Permission.REQUEST_LEAVE,
-        Permission.VIEW_OWN_LEAVE,
-        Permission.CANCEL_OWN_LEAVE,
-      ];
-      if (!leavePermissions.some((p) => user.permissions?.includes(p))) {
-        toast.error("Access denied: No leave management access");
-        return <Navigate to="/pms/dashboard" replace />;
-      }
-    }
+    // // Leave Management
+    // if (path.startsWith("/pms/leave")) {
+    //   const leavePermissions = [
+    //     Permission.REQUEST_LEAVE,
+    //     Permission.VIEW_OWN_LEAVE,
+    //     Permission.CANCEL_OWN_LEAVE,
+    //   ];
+    //   if (!leavePermissions.some((p) => user.permissions?.includes(p))) {
+    //     toast.error("Access denied: No leave management access");
+    //     return <Navigate to="/pms/dashboard" replace />;
+    //   }
+    // }
 
-    // Profile
-    if (path.startsWith("/pms/profile")) {
-      if (!user.permissions?.includes(Permission.VIEW_PERSONAL_INFO)) {
-        toast.error("Access denied: Cannot view profile");
-        return <Navigate to="/pms/dashboard" replace />;
-      }
-    }
+    // // Profile
+    // if (path.startsWith("/pms/profile")) {
+    //   if (!user.permissions?.includes(Permission.VIEW_PERSONAL_INFO)) {
+    //     toast.error("Access denied: Cannot view profile");
+    //     return <Navigate to="/pms/dashboard" replace />;
+    //   }
+    // }
 
     // Feedback
-    if (path.startsWith("/pms/feedback")) {
-      if (!user.permissions?.includes(Permission.MANAGE_FEEDBACK)) {
-        toast.error("Access denied: Cannot access feedback");
-        return <Navigate to="/pms/dashboard" replace />;
-      }
-    }
+    // if (path.startsWith("/pms/feedback")) {
+    //   if (!user.permissions?.includes(Permission.MANAGE_FEEDBACK)) {
+    //     toast.error("Access denied: Cannot access feedback");
+    //     return <Navigate to="/pms/dashboard" replace />;
+    //   }
+    // }
   }
 
   // General permission-based access check

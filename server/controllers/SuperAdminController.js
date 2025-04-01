@@ -21,8 +21,15 @@ import Allowance from "../models/Allowance.js";
 import Notification from "../models/Notification.js";
 import { DepartmentService } from "../services/departmentService.js";
 import { DeductionType, DeductionScope } from "../models/Deduction.js";
+import Payment from "../models/Payment.js";
+import PaymentMethod from "../models/PaymentMethod.js";
+import Audit from "../models/Audit.js";
+import { AuditAction, AuditEntity } from "../models/Audit.js";
+import { PaymentStatus } from "../models/Payment.js";
+import generatePayslipPDF from "../utils/pdfGenerator.js";
+import { EmailService } from "../services/emailService.js";
+import Payroll from "../models/Payroll.js";
 
-// Helper function for converting string IDs to ObjectId
 const asObjectId = (id) => new Types.ObjectId(id);
 
 export class SuperAdminController {
@@ -575,10 +582,11 @@ export class SuperAdminController {
           submittedBy: req.user.id,
           submittedAt: new Date(),
         },
+        status: PAYROLL_STATUS.DRAFT,
         payment: {
-          bankName: "Bank Details Required",
-          accountNumber: "Bank Details Required",
-          accountName: "Bank Details Required",
+          bankName: "Pending",
+          accountNumber: "Pending",
+          accountName: "Pending",
         },
       };
 
@@ -661,6 +669,7 @@ export class SuperAdminController {
         department,
         dateRange,
         frequency = "monthly",
+        employee,
       } = req.query;
 
       let query = {};
@@ -670,12 +679,23 @@ export class SuperAdminController {
         query.month = parseInt(month);
         query.year = parseInt(year);
       } else if (dateRange) {
-        // Handle date range filtering
-        const [startDate, endDate] = dateRange.split(",");
-        query.createdAt = {
-          $gte: new Date(startDate),
-          $lte: new Date(endDate),
-        };
+        // Handle special date range cases
+        if (dateRange === "last12") {
+          const endDate = new Date();
+          const startDate = new Date();
+          startDate.setMonth(startDate.getMonth() - 12);
+          query.createdAt = {
+            $gte: startDate,
+            $lte: endDate,
+          };
+        } else {
+          // Handle comma-separated date range
+          const [startDate, endDate] = dateRange.split(",");
+          query.createdAt = {
+            $gte: new Date(startDate),
+            $lte: new Date(endDate),
+          };
+        }
       }
 
       // Status filtering
@@ -686,6 +706,16 @@ export class SuperAdminController {
       // Department filtering
       if (department && department !== "all") {
         query.department = department;
+      }
+
+      // Employee filtering
+      if (employee && employee !== "all") {
+        query.employee = employee;
+      }
+
+      // Frequency filtering
+      if (frequency && frequency !== "all") {
+        query.frequency = frequency;
       }
 
       // Get paginated results
@@ -705,6 +735,84 @@ export class SuperAdminController {
 
       const total = await PayrollModel.countDocuments(query);
 
+      // Calculate frequency-based totals
+      const frequencyTotals = await PayrollModel.aggregate([
+        {
+          $match: {
+            ...query,
+            status: { $ne: PAYROLL_STATUS.DRAFT },
+          },
+        },
+        {
+          $group: {
+            _id: "$frequency",
+            totalNetPay: { $sum: "$totals.netPay" },
+            totalGrossPay: { $sum: "$totals.grossEarnings" },
+            totalDeductions: { $sum: "$totals.totalDeductions" },
+            count: { $sum: 1 },
+            paidCount: {
+              $sum: { $cond: [{ $eq: ["$status", "PAID"] }, 1, 0] },
+            },
+            approvedCount: {
+              $sum: { $cond: [{ $eq: ["$status", "APPROVED"] }, 1, 0] },
+            },
+            pendingCount: {
+              $sum: { $cond: [{ $eq: ["$status", "PENDING"] }, 1, 0] },
+            },
+          },
+        },
+      ]);
+
+      // Calculate status breakdown
+      const statusBreakdown = await PayrollModel.aggregate([
+        {
+          $match: {
+            ...query,
+            status: { $ne: PAYROLL_STATUS.DRAFT },
+          },
+        },
+        {
+          $group: {
+            _id: "$status",
+            count: { $sum: 1 },
+            totalNetPay: { $sum: "$totals.netPay" },
+          },
+        },
+      ]);
+
+      // Calculate department breakdown
+      const departmentBreakdown = await PayrollModel.aggregate([
+        {
+          $match: {
+            ...query,
+            status: { $ne: PAYROLL_STATUS.DRAFT },
+          },
+        },
+        {
+          $group: {
+            _id: "$department",
+            count: { $sum: 1 },
+            totalNetPay: { $sum: "$totals.netPay" },
+          },
+        },
+        {
+          $lookup: {
+            from: "departments",
+            localField: "_id",
+            foreignField: "_id",
+            as: "departmentInfo",
+          },
+        },
+        { $unwind: "$departmentInfo" },
+        {
+          $project: {
+            departmentName: "$departmentInfo.name",
+            count: 1,
+            totalNetPay: 1,
+          },
+        },
+      ]);
+
       res.status(200).json({
         success: true,
         data: {
@@ -713,6 +821,11 @@ export class SuperAdminController {
             total,
             page,
             pages: Math.ceil(total / limit),
+          },
+          summary: {
+            frequencyTotals,
+            statusBreakdown,
+            departmentBreakdown,
           },
         },
       });
@@ -852,41 +965,88 @@ export class SuperAdminController {
 
   static async getPayrollById(req, res) {
     try {
-      console.log("Fetching payroll by ID:", req.params.id);
-
-      const payroll = await PayrollModel.findById(req.params.id).populate([
-        {
-          path: "employee",
-          select: "firstName lastName employeeId bankDetails",
-        },
-        { path: "department", select: "name code" },
-        { path: "salaryGrade", select: "level description" },
-        { path: "processedBy", select: "firstName lastName" },
-        { path: "createdBy", select: "firstName lastName" },
-        { path: "approvalFlow.submittedBy", select: "firstName lastName" },
-        { path: "approvalFlow.approvedBy", select: "firstName lastName" },
-      ]);
+      const { id } = req.params;
+      const payroll = await PayrollModel.findById(id)
+        .populate(
+          "employee",
+          "firstName lastName employeeId position gradeLevel"
+        )
+        .populate("salaryGrade", "level basicSalary allowances deductions");
 
       if (!payroll) {
-        throw new ApiError(404, "Payroll record not found");
+        return res.status(404).json({
+          success: false,
+          message: "Payroll not found",
+        });
       }
 
-      // Generate a unique payslip ID using the populated employee data
-      const payslipId = `PS${payroll.month}${payroll.year}${payroll.employee.employeeId}`;
+      // Only allow access to DRAFT payrolls
+      if (payroll.status !== "DRAFT") {
+        return res.status(403).json({
+          success: false,
+          message: "Only draft payrolls can be edited",
+          status: payroll.status,
+        });
+      }
 
-      console.log("Found payroll record:", payroll._id);
-
-      res.status(200).json({
+      res.json({
         success: true,
-        data: {
-          ...payroll.toObject(),
-          payslipId,
-        },
+        data: payroll,
       });
     } catch (error) {
-      console.error("Error fetching payroll by ID:", error);
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
+      console.error("Error fetching payroll:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error fetching payroll",
+      });
+    }
+  }
+
+  static async updatePayroll(req, res) {
+    try {
+      const { id } = req.params;
+      const { month, year, employee, salaryGrade } = req.body;
+
+      // Find the payroll
+      const payroll = await PayrollModel.findById(id);
+
+      if (!payroll) {
+        return res.status(404).json({
+          success: false,
+          message: "Payroll not found",
+        });
+      }
+
+      // Only allow updates to DRAFT payrolls
+      if (payroll.status !== "DRAFT") {
+        return res.status(403).json({
+          success: false,
+          message: "Only draft payrolls can be edited",
+          status: payroll.status,
+        });
+      }
+
+      // Update the payroll
+      payroll.month = month;
+      payroll.year = year;
+      payroll.employee = employee;
+      payroll.salaryGrade = salaryGrade;
+      payroll.processedDate = new Date(year, month - 1);
+
+      // Recalculate payroll
+      const updatedPayroll = await payroll.save();
+
+      res.json({
+        success: true,
+        message: "Payroll updated successfully",
+        data: updatedPayroll,
+      });
+    } catch (error) {
+      console.error("Error updating payroll:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error updating payroll",
+      });
     }
   }
 
@@ -918,7 +1078,7 @@ export class SuperAdminController {
 
       res.status(200).json({
         success: true,
-        data: periods,
+        data: periods || [], // Ensure we always return an array
       });
     } catch (error) {
       const { statusCode, message } = handleError(error);
@@ -939,6 +1099,7 @@ export class SuperAdminController {
           $match: {
             month: month,
             year: year,
+            status: { $in: ["PAID", "APPROVED"] }, // Only count PAID and APPROVED payrolls
           },
         },
         {
@@ -980,7 +1141,6 @@ export class SuperAdminController {
         },
       });
     } catch (error) {
-      console.error("Error fetching payroll stats:", error);
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
     }
@@ -1089,15 +1249,21 @@ export class SuperAdminController {
   static async viewPayslip(req, res) {
     try {
       console.log("🔍 Fetching payslip details for:", req.params.payrollId);
+      const user = req.user;
 
       const payroll = await PayrollModel.findById(req.params.payrollId)
         .populate([
           {
             path: "employee",
-            select: "firstName lastName employeeId bankDetails",
+            select: "firstName lastName employeeId bankDetails department",
           },
           { path: "department", select: "name code" },
           { path: "salaryGrade", select: "level description" },
+          { path: "processedBy", select: "firstName lastName" },
+          { path: "createdBy", select: "firstName lastName" },
+          { path: "updatedBy", select: "firstName lastName" },
+          { path: "approvalFlow.submittedBy", select: "firstName lastName" },
+          { path: "approvalFlow.approvedBy", select: "firstName lastName" },
         ])
         .lean();
 
@@ -1108,6 +1274,38 @@ export class SuperAdminController {
       // Add null check for employee
       if (!payroll.employee) {
         throw new ApiError(404, "Employee details not found");
+      }
+
+      // Check permissions based on user role and department
+      if (user.role === UserRole.SUPER_ADMIN) {
+        // Super admin can view all payslips
+        if (!user.hasPermission(Permission.VIEW_OWN_PAYSLIP)) {
+          throw new ApiError(403, "You don't have permission to view payslips");
+        }
+      } else if (user.role === UserRole.ADMIN) {
+        // Admin can only view payslips of their department
+        if (!user.hasPermission(Permission.VIEW_DEPARTMENT_PAYSLIPS)) {
+          throw new ApiError(
+            403,
+            "You don't have permission to view department payslips"
+          );
+        }
+        if (
+          payroll.employee.department.toString() !== user.department.toString()
+        ) {
+          throw new ApiError(
+            403,
+            "You can only view payslips of employees in your department"
+          );
+        }
+      } else {
+        // Regular users can only view their own payslips
+        if (!user.hasPermission(Permission.VIEW_OWN_PAYSLIP)) {
+          throw new ApiError(403, "You don't have permission to view payslips");
+        }
+        if (payroll.employee._id.toString() !== user._id.toString()) {
+          throw new ApiError(403, "You can only view your own payslip");
+        }
       }
 
       // Format the response with detailed payslip information
@@ -1130,11 +1328,15 @@ export class SuperAdminController {
         period: {
           month: payroll.month,
           year: payroll.year,
+          startDate: payroll.periodStart,
+          endDate: payroll.periodEnd,
+          frequency: payroll.frequency,
         },
         earnings: {
           basicSalary: payroll.basicSalary,
+          overtime: payroll.earnings.overtime,
+          bonus: payroll.earnings.bonus,
           allowances: payroll.allowances,
-          bonuses: payroll.bonuses,
           totalEarnings: payroll.totals.grossEarnings,
         },
         deductions: {
@@ -1145,19 +1347,62 @@ export class SuperAdminController {
           others: payroll.deductions.others,
           totalDeductions: payroll.totals.totalDeductions,
         },
-        summary: {
+        totals: {
+          basicSalary: payroll.totals.basicSalary,
+          totalAllowances: payroll.totals.totalAllowances,
+          totalBonuses: payroll.totals.totalBonuses,
           grossEarnings: payroll.totals.grossEarnings,
           totalDeductions: payroll.totals.totalDeductions,
           netPay: payroll.totals.netPay,
         },
+        components: payroll.components,
         status: payroll.status,
-        processedAt: payroll.createdAt,
+        approvalFlow: {
+          submittedBy: payroll.approvalFlow.submittedBy
+            ? {
+                id: payroll.approvalFlow.submittedBy._id,
+                name: `${payroll.approvalFlow.submittedBy.firstName} ${payroll.approvalFlow.submittedBy.lastName}`,
+                role: payroll.approvalFlow.submittedBy.role,
+              }
+            : null,
+          submittedAt: payroll.approvalFlow.submittedAt,
+          approvedBy: payroll.approvalFlow.approvedBy
+            ? {
+                id: payroll.approvalFlow.approvedBy._id,
+                name: `${payroll.approvalFlow.approvedBy.firstName} ${payroll.approvalFlow.approvedBy.lastName}`,
+                role: payroll.approvalFlow.approvedBy.role,
+              }
+            : null,
+          approvedAt: payroll.approvalFlow.approvedAt,
+          remarks: payroll.approvalFlow.remarks || null,
+        },
+        processedBy: {
+          id: payroll.processedBy._id,
+          name: `${payroll.processedBy.firstName} ${payroll.processedBy.lastName}`,
+          role: payroll.processedBy.role,
+        },
+        createdBy: {
+          id: payroll.createdBy._id,
+          name: `${payroll.createdBy.firstName} ${payroll.createdBy.lastName}`,
+          role: payroll.createdBy.role,
+        },
+        updatedBy: {
+          id: payroll.updatedBy._id,
+          name: `${payroll.updatedBy.firstName} ${payroll.updatedBy.lastName}`,
+          role: payroll.updatedBy.role,
+        },
+        timestamps: {
+          createdAt: payroll.createdAt,
+          updatedAt: payroll.updatedAt,
+        },
+        comments: payroll.comments,
       };
 
       console.log("✅ Payslip details retrieved successfully");
 
       res.status(200).json({
         success: true,
+        message: "Payslip details retrieved successfully",
         data: payslipData,
       });
     } catch (error) {
@@ -1201,45 +1446,332 @@ export class SuperAdminController {
 
   static async getFilteredPayrolls(req, res) {
     try {
-      const query = buildPayrollQuery(req.query);
-      const payrolls = await PayrollModel.find(query)
-        .populate("employee", "employeeId firstName lastName fullName")
+      console.log("🔍 Fetching filtered payrolls");
+      const { month, year, status, department } = req.query;
+
+      // Build filter object
+      const filter = {};
+
+      // Add month filter if provided
+      if (month) {
+        filter.month = parseInt(month);
+      }
+
+      // Add year filter if provided
+      if (year) {
+        filter.year = parseInt(year);
+      }
+
+      // Add status filter if provided
+      if (status) {
+        filter.status = status;
+      }
+
+      // Handle department filter
+      if (department) {
+        // First find the department by name
+        const departmentDoc = await DepartmentModel.findOne({
+          name: { $regex: new RegExp(department, "i") },
+        });
+
+        if (!departmentDoc) {
+          throw new ApiError(404, `Department "${department}" not found`);
+        }
+
+        filter.department = departmentDoc._id;
+      }
+
+      // Get payrolls with filters
+      const payrolls = await PayrollModel.find(filter)
+        .populate("employee", "firstName lastName employeeId")
+        .populate("department", "name code")
+        .populate("salaryGrade", "level description")
         .sort({ createdAt: -1 });
 
-      // Get counts by status
-      const statusCounts = await PayrollModel.aggregate([
-        { $match: query },
-        {
-          $group: {
-            _id: "$status",
-            count: { $sum: 1 },
-          },
-        },
-      ]);
-
-      // Convert to object for easier access
-      const counts = {
-        PENDING: 0,
-        APPROVED: 0,
-        REJECTED: 0,
-        total: payrolls.length,
-      };
-
-      statusCounts.forEach(({ _id, count }) => {
-        counts[_id] = count;
-      });
+      console.log(`✅ Found ${payrolls.length} payrolls matching filters`);
 
       res.status(200).json({
         success: true,
-        counts, // Now includes status breakdown
-        payrolls,
+        data: payrolls,
+        count: payrolls.length,
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: "Failed to get payrolls",
-        error: error.message,
+      console.error("❌ Error fetching filtered payrolls:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async approvePayroll(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { remarks } = req.body;
+
+      // Check if user has permission to approve payroll
+      if (!req.user.hasPermission(Permission.APPROVE_PAYROLL)) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have permission to approve payrolls",
+        });
+      }
+
+      const payroll = await PayrollModel.findById(id);
+      if (!payroll) {
+        return res.status(404).json({
+          success: false,
+          message: "Payroll not found",
+        });
+      }
+
+      // Check if payroll is in valid state for approval
+      if (
+        ![PAYROLL_STATUS.PENDING, PAYROLL_STATUS.PROCESSING].includes(
+          payroll.status
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot approve payroll in ${payroll.status} status`,
+        });
+      }
+
+      // Update payroll status and approval details
+      payroll.status = PAYROLL_STATUS.APPROVED;
+      payroll.approvalFlow = {
+        ...payroll.approvalFlow,
+        approvedBy: req.user._id,
+        approvedAt: new Date(),
+        remarks: remarks || "Payroll approved",
+      };
+
+      // Save the changes
+      await payroll.save();
+
+      // Create notification
+      await Notification.createPayrollNotification(
+        payroll.employee,
+        "PAYROLL_APPROVED",
+        payroll,
+        remarks
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Payroll approved successfully",
+        data: payroll,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async rejectPayroll(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { remarks } = req.body;
+
+      // Check if user has permission to reject payroll
+      if (!req.user.hasPermission(Permission.APPROVE_PAYROLL)) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have permission to reject payrolls",
+        });
+      }
+
+      if (!remarks) {
+        return res.status(400).json({
+          success: false,
+          message: "Remarks are required for rejection",
+        });
+      }
+
+      const payroll = await PayrollModel.findById(id);
+      if (!payroll) {
+        return res.status(404).json({
+          success: false,
+          message: "Payroll not found",
+        });
+      }
+
+      // Check if payroll is in valid state for rejection
+      if (
+        ![PAYROLL_STATUS.PENDING, PAYROLL_STATUS.PROCESSING].includes(
+          payroll.status
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot reject payroll in ${payroll.status} status`,
+        });
+      }
+
+      // Update payroll status and rejection details
+      payroll.status = PAYROLL_STATUS.REJECTED;
+      payroll.approvalFlow = {
+        ...payroll.approvalFlow,
+        rejectedBy: req.user._id,
+        rejectedAt: new Date(),
+        remarks,
+      };
+
+      // Save the changes
+      await payroll.save();
+
+      // Create notification
+      await Notification.createPayrollNotification(
+        payroll.employee,
+        "PAYROLL_REJECTED",
+        payroll,
+        remarks
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Payroll rejected successfully",
+        data: payroll,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updatePayrollStatus(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { status, remarks } = req.body;
+      const user = req.user;
+
+      // Validate status transition
+      const payroll = await PayrollModel.findById(id);
+      if (!payroll) {
+        return res.status(404).json({
+          success: false,
+          message: "Payroll not found",
+        });
+      }
+
+      // Check if user has permission to update payroll status
+      if (!user.hasPermission(Permission.APPROVE_PAYROLL)) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have permission to update payroll status",
+        });
+      }
+
+      // Update payroll status
+      payroll.status = status;
+      if (remarks) payroll.remarks = remarks;
+      await payroll.save();
+
+      // Create audit log
+      await Audit.create({
+        user: user._id,
+        action: "UPDATE_PAYROLL_STATUS",
+        details: {
+          payrollId: id,
+          oldStatus: payroll.status,
+          newStatus: status,
+          remarks,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: "Payroll status updated successfully",
+        data: payroll,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async processPayment(req, res, next) {
+    try {
+      const { id } = req.params;
+      const user = req.user;
+
+      // Find the payroll
+      const payroll = await PayrollModel.findById(id);
+      if (!payroll) {
+        return res.status(404).json({
+          success: false,
+          message: "Payroll not found",
+        });
+      }
+
+      // Check if user has permission to process payments
+      if (!user.hasPermission(Permission.APPROVE_PAYROLL)) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have permission to process payments",
+        });
+      }
+
+      // Validate payroll status
+      if (payroll.status !== PAYROLL_STATUS.APPROVED) {
+        return res.status(400).json({
+          success: false,
+          message: "Only approved payrolls can be processed for payment",
+        });
+      }
+
+      // Update payroll status to PAID
+      payroll.status = PAYROLL_STATUS.PAID;
+      payroll.approvalFlow = {
+        ...payroll.approvalFlow,
+        paidBy: user._id,
+        paidAt: new Date(),
+        remarks: "Payment processed successfully",
+      };
+      await payroll.save();
+
+      // Create payment record
+      await Payment.create({
+        payrollId: payroll._id,
+        employeeId: payroll.employee,
+        amount: payroll.totals.netPay,
+        status: "COMPLETED",
+        processedBy: user._id,
+        processedAt: new Date(),
+        paymentMethod: "BANK_TRANSFER",
+        reference: `PAY-${Date.now()}`,
+        bankDetails: payroll.payment,
+      });
+
+      // Create audit log
+      await Audit.create({
+        user: user._id,
+        action: AuditAction.PROCESS,
+        entity: AuditEntity.PAYROLL,
+        entityId: payroll._id,
+        performedBy: user._id,
+        details: {
+          previousStatus: payroll.status,
+          newStatus: PAYROLL_STATUS.PAID,
+          amount: payroll.totals.netPay,
+        },
+      });
+
+      // Create notification for employee
+      await Notification.createPayrollNotification(
+        payroll.employee,
+        "PAYMENT_PROCESSED",
+        payroll,
+        "Your payment has been processed successfully"
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Payment processed successfully",
+        data: {
+          payrollId: payroll._id,
+          amount: payroll.totals.netPay,
+          status: payroll.status,
+          paymentDate: payroll.approvalFlow.paidAt,
+        },
+      });
+    } catch (error) {
+      next(error);
     }
   }
 
@@ -2447,129 +2979,6 @@ export class SuperAdminController {
     }
   }
 
-  static async approvePayroll(req, res, next) {
-    try {
-      const { id } = req.params;
-      const { remarks } = req.body;
-
-      const payroll = await PayrollModel.findById(id);
-      if (!payroll) {
-        return res.status(404).json({
-          success: false,
-          message: "Payroll not found",
-        });
-      }
-
-      // Check if payroll is already approved or rejected
-      if (payroll.status === PAYROLL_STATUS.APPROVED) {
-        return res.status(400).json({
-          success: false,
-          message: "Payroll is already approved",
-        });
-      }
-
-      if (payroll.status === PAYROLL_STATUS.REJECTED) {
-        return res.status(400).json({
-          success: false,
-          message: "Cannot approve a rejected payroll",
-        });
-      }
-
-      // Update payroll status and approval details
-      payroll.status = PAYROLL_STATUS.APPROVED;
-      payroll.approvalFlow = {
-        ...payroll.approvalFlow,
-        approvedBy: req.user._id,
-        approvedAt: new Date(),
-        remarks: remarks || "",
-      };
-
-      // Save the changes
-      await payroll.save();
-
-      // Create notification for the employee
-      await Notification.createPayrollNotification(
-        payroll.employee,
-        "PAYROLL_APPROVED",
-        payroll,
-        remarks
-      );
-
-      res.status(200).json({
-        success: true,
-        message: "Payroll approved successfully",
-        data: payroll,
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async rejectPayroll(req, res, next) {
-    try {
-      const { id } = req.params;
-      const { remarks } = req.body;
-
-      if (!remarks?.trim()) {
-        return res.status(400).json({
-          success: false,
-          message: "Remarks are required when rejecting a payroll",
-        });
-      }
-
-      const payroll = await PayrollModel.findById(id);
-      if (!payroll) {
-        return res.status(404).json({
-          success: false,
-          message: "Payroll not found",
-        });
-      }
-
-      // Check if payroll is already approved or rejected
-      if (payroll.status === PAYROLL_STATUS.APPROVED) {
-        return res.status(400).json({
-          success: false,
-          message: "Cannot reject an approved payroll",
-        });
-      }
-
-      if (payroll.status === PAYROLL_STATUS.REJECTED) {
-        return res.status(400).json({
-          success: false,
-          message: "Payroll is already rejected",
-        });
-      }
-
-      // Update payroll status and rejection details
-      payroll.status = PAYROLL_STATUS.REJECTED;
-      payroll.approvalFlow = {
-        ...payroll.approvalFlow,
-        rejectedBy: req.user._id,
-        rejectedAt: new Date(),
-        remarks,
-      };
-
-      // Save the changes
-      await payroll.save();
-
-      // Create notification for the employee
-      await Notification.createPayrollNotification(
-        payroll.employee,
-        "PAYROLL_REJECTED",
-        payroll,
-        remarks
-      );
-
-      res.status(200).json({
-        success: true,
-        message: "Payroll rejected successfully",
-        data: payroll,
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-
   // Allowance Management Methods
   static async getAllAllowances(req, res) {
     try {
@@ -2979,6 +3388,466 @@ export class SuperAdminController {
       console.error("❌ Error creating deduction:", error); // Debug log
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async submitPayroll(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { remarks } = req.body;
+
+      // Check if user has permission to submit payroll
+      if (!req.user.hasPermission(Permission.CREATE_PAYROLL)) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have permission to submit payrolls",
+        });
+      }
+
+      const payroll = await PayrollModel.findById(id);
+      if (!payroll) {
+        return res.status(404).json({
+          success: false,
+          message: "Payroll not found",
+        });
+      }
+
+      // Check if payroll is in DRAFT status
+      if (payroll.status !== PAYROLL_STATUS.DRAFT) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot submit payroll in ${payroll.status} status`,
+        });
+      }
+
+      // Update payroll status and submission details
+      payroll.status = PAYROLL_STATUS.PENDING;
+      payroll.approvalFlow = {
+        ...payroll.approvalFlow,
+        submittedBy: req.user._id,
+        submittedAt: new Date(),
+        remarks: remarks || "Payroll submitted for approval",
+      };
+
+      // Save the changes
+      await payroll.save();
+
+      // Get the department admin who needs to approve the payroll
+      const departmentAdmin = await UserModel.findOne({
+        role: UserRole.ADMIN,
+        department: payroll.department,
+        permissions: Permission.APPROVE_PAYROLL,
+      });
+
+      // Get all super admins
+      const superAdmins = await UserModel.find({
+        role: UserRole.SUPER_ADMIN,
+        permissions: Permission.APPROVE_PAYROLL,
+      });
+
+      // Create notifications for department admin if found
+      if (departmentAdmin) {
+        await Notification.createPayrollNotification(
+          departmentAdmin._id,
+          "PAYROLL_SUBMITTED",
+          payroll,
+          remarks
+        );
+      }
+
+      // Create notifications for all super admins
+      for (const superAdmin of superAdmins) {
+        await Notification.createPayrollNotification(
+          superAdmin._id,
+          "PAYROLL_SUBMITTED",
+          payroll,
+          remarks
+        );
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Payroll submitted successfully",
+        data: payroll,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ===== Payment Management Controllers =====
+  static async getPaymentHistory(req, res) {
+    try {
+      const { payrollId } = req.params;
+      const payments = await Payment.find({ payrollId })
+        .populate("employeeId", "firstName lastName employeeId")
+        .populate("processedBy", "firstName lastName")
+        .sort({ processedAt: -1 });
+
+      // Create audit log
+      await Audit.create({
+        user: req.user._id,
+        action: AuditAction.VIEW,
+        entity: AuditEntity.PAYMENT,
+        entityId: payrollId,
+        details: {
+          payrollId,
+          paymentCount: payments.length,
+        },
+      });
+
+      res.status(200).json({
+        success: true,
+        data: payments,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getPaymentMethods(req, res) {
+    try {
+      const paymentMethods = await PaymentMethod.find()
+        .populate("createdBy", "firstName lastName")
+        .populate("updatedBy", "firstName lastName")
+        .sort({ name: 1 });
+
+      // Create audit log
+      await Audit.create({
+        user: req.user._id,
+        action: AuditAction.VIEW,
+        entity: AuditEntity.PAYMENT_METHOD,
+        details: {
+          methodCount: paymentMethods.length,
+        },
+      });
+
+      res.status(200).json({
+        success: true,
+        data: paymentMethods,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async createPaymentMethod(req, res) {
+    try {
+      const paymentMethod = await PaymentMethod.create({
+        ...req.body,
+        createdBy: req.user._id,
+        updatedBy: req.user._id,
+      });
+
+      // Create audit log
+      await Audit.create({
+        user: req.user._id,
+        action: AuditAction.CREATE,
+        entity: AuditEntity.PAYMENT_METHOD,
+        entityId: paymentMethod._id,
+        details: {
+          name: paymentMethod.name,
+          type: paymentMethod.type,
+        },
+      });
+
+      res.status(201).json({
+        success: true,
+        message: "Payment method created successfully",
+        data: paymentMethod,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updatePaymentMethod(req, res) {
+    try {
+      const paymentMethod = await PaymentMethod.findByIdAndUpdate(
+        req.params.id,
+        {
+          ...req.body,
+          updatedBy: req.user._id,
+        },
+        { new: true }
+      );
+
+      if (!paymentMethod) {
+        throw new ApiError(404, "Payment method not found");
+      }
+
+      // Create audit log
+      await Audit.create({
+        user: req.user._id,
+        action: AuditAction.UPDATE,
+        entity: AuditEntity.PAYMENT_METHOD,
+        entityId: paymentMethod._id,
+        details: {
+          name: paymentMethod.name,
+          type: paymentMethod.type,
+          changes: req.body,
+        },
+      });
+
+      res.status(200).json({
+        success: true,
+        message: "Payment method updated successfully",
+        data: paymentMethod,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async deletePaymentMethod(req, res) {
+    try {
+      const paymentMethod = await PaymentMethod.findById(req.params.id);
+
+      if (!paymentMethod) {
+        throw new ApiError(404, "Payment method not found");
+      }
+
+      // Check if payment method is in use
+      const inUse = await Payment.exists({ paymentMethod: paymentMethod.type });
+      if (inUse) {
+        throw new ApiError(400, "Cannot delete payment method that is in use");
+      }
+
+      await PaymentMethod.findByIdAndDelete(req.params.id);
+
+      // Create audit log
+      await Audit.create({
+        user: req.user._id,
+        action: AuditAction.DELETE,
+        entity: AuditEntity.PAYMENT_METHOD,
+        entityId: req.params.id,
+        details: {
+          name: paymentMethod.name,
+          type: paymentMethod.type,
+        },
+      });
+
+      res.status(200).json({
+        success: true,
+        message: "Payment method deleted successfully",
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async markPaymentFailed(req, res) {
+    try {
+      const { payrollId } = req.params;
+      const payroll = await PayrollModel.findById(payrollId);
+
+      if (!payroll) {
+        throw new ApiError(404, "Payroll not found");
+      }
+
+      // Update payroll status
+      payroll.status = PAYROLL_STATUS.FAILED;
+      await payroll.save();
+
+      // Create payment record with failed status
+      await Payment.create({
+        payrollId,
+        employeeId: payroll.employee,
+        amount: payroll.totals.netPay,
+        status: PaymentStatus.FAILED,
+        paymentMethod: req.body.paymentMethod,
+        reference: `PAY-FAIL-${Date.now()}`,
+        processedBy: req.user._id,
+        processedAt: new Date(),
+        notes: req.body.notes,
+      });
+
+      // Create audit log
+      await Audit.create({
+        user: req.user._id,
+        action: AuditAction.PROCESS,
+        entity: AuditEntity.PAYMENT,
+        entityId: payrollId,
+        details: {
+          status: PaymentStatus.FAILED,
+          notes: req.body.notes,
+        },
+      });
+
+      res.status(200).json({
+        success: true,
+        message: "Payment marked as failed successfully",
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async cancelPayment(req, res) {
+    try {
+      const { payrollId } = req.params;
+      const payroll = await PayrollModel.findById(payrollId);
+
+      if (!payroll) {
+        throw new ApiError(404, "Payroll not found");
+      }
+
+      // Update payroll status
+      payroll.status = PAYROLL_STATUS.CANCELLED;
+      await payroll.save();
+
+      // Create payment record with cancelled status
+      await Payment.create({
+        payrollId,
+        employeeId: payroll.employee,
+        amount: payroll.totals.netPay,
+        status: PaymentStatus.CANCELLED,
+        paymentMethod: req.body.paymentMethod,
+        reference: `PAY-CANCEL-${Date.now()}`,
+        processedBy: req.user._id,
+        processedAt: new Date(),
+        notes: req.body.notes,
+      });
+
+      // Create audit log
+      await Audit.create({
+        user: req.user._id,
+        action: AuditAction.PROCESS,
+        entity: AuditEntity.PAYMENT,
+        entityId: payrollId,
+        details: {
+          status: PaymentStatus.CANCELLED,
+          notes: req.body.notes,
+        },
+      });
+
+      res.status(200).json({
+        success: true,
+        message: "Payment cancelled successfully",
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async archivePayment(req, res) {
+    try {
+      const { payrollId } = req.params;
+      const payroll = await PayrollModel.findById(payrollId);
+
+      if (!payroll) {
+        throw new ApiError(404, "Payroll not found");
+      }
+
+      // Update payroll status
+      payroll.status = PAYROLL_STATUS.ARCHIVED;
+      await payroll.save();
+
+      // Create audit log
+      await Audit.create({
+        user: req.user._id,
+        action: AuditAction.PROCESS,
+        entity: AuditEntity.PAYMENT,
+        entityId: payrollId,
+        details: {
+          status: PAYROLL_STATUS.ARCHIVED,
+        },
+      });
+
+      res.status(200).json({
+        success: true,
+        message: "Payment archived successfully",
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async sendPayslipEmail(req, res) {
+    try {
+      const { payslipId } = req.params;
+
+      // Find payroll by payslipId and populate necessary fields
+      const payroll = await Payroll.findOne({ payslipId })
+        .populate("employee")
+        .populate("department")
+        .populate("salaryGrade")
+        .populate({
+          path: "approvalFlow",
+          populate: ["submittedBy", "approvedBy"],
+        });
+
+      if (!payroll) {
+        throw new ApiError(404, "Payslip not found");
+      }
+
+      // Prepare data for PDF generation
+      const pdfData = {
+        employee: payroll.employee,
+        month: payroll.month,
+        year: payroll.year,
+        basicSalary: payroll.basicSalary,
+        earnings: {
+          basicSalary: payroll.basicSalary,
+          overtime: payroll.earnings.overtime,
+          bonus: payroll.earnings.bonus,
+          totalEarnings: payroll.earnings.totalEarnings,
+        },
+        deductions: {
+          tax: payroll.deductions.tax,
+          pension: payroll.deductions.pension,
+          nhf: payroll.deductions.nhf,
+          loans: payroll.deductions.loans,
+          others: payroll.deductions.others,
+          totalDeductions: payroll.deductions.totalDeductions,
+        },
+        totals: {
+          grossEarnings: payroll.totals.grossEarnings,
+          totalDeductions: payroll.totals.totalDeductions,
+          netPay: payroll.totals.netPay,
+        },
+        paymentDetails: {
+          status: payroll.status,
+          paymentDate: payroll.approvalFlow.paidAt || new Date(),
+        },
+      };
+
+      // Generate PDF
+      const pdfDoc = await generatePayslipPDF(pdfData);
+      const pdfBuffer = await pdfDoc.output("arraybuffer");
+
+      // Create email service instance
+      const emailService = new EmailService();
+
+      // Send email
+      await emailService.sendPayslipEmail(
+        payroll.employee.email,
+        pdfData,
+        pdfBuffer
+      );
+
+      // Update payroll record to mark email as sent
+      await Payroll.findOneAndUpdate(
+        { payslipId },
+        {
+          $set: {
+            emailSent: true,
+            emailSentAt: new Date(),
+          },
+        }
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Payslip email sent successfully",
+      });
+    } catch (error) {
+      console.error("Error sending payslip email:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message: message || "Failed to send payslip email",
+      });
     }
   }
 }

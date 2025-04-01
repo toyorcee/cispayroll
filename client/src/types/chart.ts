@@ -23,13 +23,14 @@ export interface LineDataset {
   data: number[];
   borderColor: string;
   backgroundColor: string;
+  tension?: number;
 }
 
 export interface BarDataset {
   label: string;
   data: number[];
-  backgroundColor: string[];
-  borderColor: string[];
+  backgroundColor: string | string[];
+  borderColor: string | string[];
   borderWidth: number;
 }
 
@@ -46,8 +47,8 @@ export interface BarChartData {
 export interface ChartDataset {
   label: string;
   data: number[];
-  borderColor?: string;
-  backgroundColor?: string | string[];
+  borderColor: string;
+  backgroundColor: string;
   tension?: number;
   fill?: boolean;
   borderWidth?: number;

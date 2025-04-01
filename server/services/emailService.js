@@ -652,4 +652,265 @@ export class EmailService {
     `;
     return this.getBaseEmailTemplate(content);
   }
+
+  async sendPayslipEmail(to, payslipData, pdfBuffer) {
+    try {
+      const {
+        employee,
+        month,
+        year,
+        basicSalary,
+        earnings,
+        deductions,
+        totals,
+      } = payslipData;
+
+      // Convert ArrayBuffer to Buffer if needed
+      const pdfContent = Buffer.from(pdfBuffer);
+
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Payslip for ${month} ${year}</title>
+          <style>
+            body {
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              margin: 0;
+              padding: 0;
+              background-color: #f4f4f4;
+            }
+            .container {
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+              background-color: #ffffff;
+            }
+            .header {
+              text-align: center;
+              padding: 20px 0;
+              background-color: #1a237e;
+              color: white;
+              border-radius: 5px 5px 0 0;
+            }
+            .header img {
+              max-width: 150px;
+              height: auto;
+              margin-bottom: 10px;
+            }
+            .content {
+              padding: 20px;
+              background-color: #ffffff;
+              border-radius: 0 0 5px 5px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .greeting {
+              font-size: 18px;
+              margin-bottom: 20px;
+              color: #1a237e;
+            }
+            .payslip-details {
+              background-color: #f8f9fa;
+              padding: 15px;
+              border-radius: 5px;
+              margin-bottom: 20px;
+            }
+            .payslip-details p {
+              margin: 5px 0;
+            }
+            .summary {
+              margin: 20px 0;
+            }
+            .summary-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 15px 0;
+            }
+            .summary-table th, .summary-table td {
+              padding: 10px;
+              text-align: left;
+              border-bottom: 1px solid #ddd;
+            }
+            .summary-table th {
+              background-color: #f8f9fa;
+              color: #1a237e;
+            }
+            .earnings {
+              color: #2e7d32;
+            }
+            .deductions {
+              color: #c62828;
+            }
+            .net-pay {
+              font-size: 18px;
+              font-weight: bold;
+              color: #1a237e;
+              text-align: right;
+              margin-top: 20px;
+              padding: 10px;
+              background-color: #e8eaf6;
+              border-radius: 5px;
+            }
+            .footer {
+              text-align: center;
+              padding: 20px;
+              color: #666;
+              font-size: 12px;
+              margin-top: 20px;
+              border-top: 1px solid #eee;
+            }
+            .footer p {
+              margin: 5px 0;
+            }
+            .contact-info {
+              color: #1a237e;
+              font-weight: bold;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <img src="https://neovarsity.com/assets/images/logo.png" alt="Neovarsity Logo">
+              <h2>Payslip for ${month} ${year}</h2>
+            </div>
+            
+            <div class="content">
+              <div class="greeting">
+                Dear ${employee?.firstName} ${employee?.lastName},
+              </div>
+              
+              <div class="payslip-details">
+                <p><strong>Employee ID:</strong> ${employee?.employeeId}</p>
+                <p><strong>Department:</strong> ${
+                  employee?.department?.name || "N/A"
+                }</p>
+                <p><strong>Position:</strong> ${employee?.position || "N/A"}</p>
+                <p><strong>Period:</strong> ${month} ${year}</p>
+              </div>
+              
+              <div class="summary">
+                <h3>Salary Summary</h3>
+                <table class="summary-table">
+                  <tr>
+                    <th>Description</th>
+                    <th>Amount</th>
+                  </tr>
+                  <tr>
+                    <td>Basic Salary</td>
+                    <td class="earnings">₦${basicSalary.toFixed(2)}</td>
+                  </tr>
+                  ${
+                    earnings?.overtime?.amount > 0
+                      ? `
+                    <tr>
+                      <td>Overtime (${earnings.overtime.hours}hrs)</td>
+                      <td class="earnings">₦${earnings.overtime.amount.toFixed(
+                        2
+                      )}</td>
+                    </tr>
+                  `
+                      : ""
+                  }
+                  ${
+                    earnings?.bonus
+                      ?.map(
+                        (bonus) => `
+                    <tr>
+                      <td>${bonus.description}</td>
+                      <td class="earnings">₦${bonus.amount.toFixed(2)}</td>
+                    </tr>
+                  `
+                      )
+                      .join("") || ""
+                  }
+                  <tr>
+                    <td>PAYE Tax</td>
+                    <td class="deductions">-₦${deductions?.tax?.amount.toFixed(
+                      2
+                    )}</td>
+                  </tr>
+                  <tr>
+                    <td>Pension</td>
+                    <td class="deductions">-₦${deductions?.pension?.amount.toFixed(
+                      2
+                    )}</td>
+                  </tr>
+                  <tr>
+                    <td>NHF</td>
+                    <td class="deductions">-₦${deductions?.nhf?.amount.toFixed(
+                      2
+                    )}</td>
+                  </tr>
+                  ${
+                    deductions?.loans
+                      ?.map(
+                        (loan) => `
+                    <tr>
+                      <td>${loan.description}</td>
+                      <td class="deductions">-₦${loan.amount.toFixed(2)}</td>
+                    </tr>
+                  `
+                      )
+                      .join("") || ""
+                  }
+                  ${
+                    deductions?.others
+                      ?.map(
+                        (deduction) => `
+                    <tr>
+                      <td>${deduction.description}</td>
+                      <td class="deductions">-₦${deduction.amount.toFixed(
+                        2
+                      )}</td>
+                    </tr>
+                  `
+                      )
+                      .join("") || ""
+                  }
+                </table>
+                
+                <div class="net-pay">
+                  Net Pay: ₦${totals?.netPay.toFixed(2)}
+                </div>
+              </div>
+            </div>
+            
+            <div class="footer">
+              <p>This is an automated message. Please do not reply to this email.</p>
+              <p>For any queries, please contact:</p>
+              <p class="contact-info">HR Department</p>
+              <p>Email: hr@neovarsity.com</p>
+              <p>Phone: +91 1234567890</p>
+              <p>© ${new Date().getFullYear()} Neovarsity. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const mailOptions = {
+        from: process.env.EMAIL_FROM,
+        to,
+        subject: `Your Payslip for ${month} ${year}`,
+        html,
+        attachments: [
+          {
+            filename: `payslip_${month}_${year}.pdf`,
+            content: pdfContent,
+          },
+        ],
+      };
+
+      await this.sendEmail(mailOptions);
+      return true;
+    } catch (error) {
+      console.error("Error sending payslip email:", error);
+      throw new ApiError(500, "Failed to send payslip email");
+    }
+  }
 }
