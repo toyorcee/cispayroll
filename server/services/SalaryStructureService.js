@@ -324,7 +324,15 @@ export class SalaryStructureService {
         totalBonuses: 0,
         grossSalary,
         netSalary: grossSalary,
-        components: salaryGrade.components,
+        components: salaryGrade.components.map((component) => ({
+          ...component.toObject(),
+          amount:
+            component.type === "allowance"
+              ? component.calculationMethod === "fixed"
+                ? Number(component.value)
+                : Math.round((basicSalary * Number(component.value)) / 100)
+              : 0,
+        })),
         allowances: {
           gradeAllowances,
           additionalAllowances: [],

@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from "react";
-import { toast } from "react-toastify";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { FaPlus } from "react-icons/fa";
 import { deductionService } from "../../../services/deductionService";
 import {
   Deduction,
-  CreateVoluntaryDeductionInput,
+  CreateDeductionInput,
+  UpdateDeductionInput,
 } from "../../../types/deduction";
 import { DeductionsTable } from "../../../components/payroll/deductions/DeductionsTable";
 import { DeductionForm } from "../../../components/payroll/deductions/DeductionForm";
@@ -30,25 +30,35 @@ export default function Deductions() {
   const [deductionType, setDeductionType] = useState<"statutory" | "voluntary">(
     "voluntary"
   );
+  const [filterStatus, setFilterStatus] = useState<
+    "all" | "active" | "inactive" | "custom"
+  >("all");
+
+  const filteredDeductions = useMemo(() => {
+    let filtered =
+      deductionType === "statutory"
+        ? deductions.statutory
+        : deductions.voluntary;
+
+    if (filterStatus === "active") {
+      filtered = filtered.filter((d) => d.isActive);
+    } else if (filterStatus === "inactive") {
+      filtered = filtered.filter((d) => !d.isActive);
+    } else if (filterStatus === "custom") {
+      filtered = filtered.filter((d) => d.isCustom);
+    }
+
+    return filtered;
+  }, [deductions, deductionType, filterStatus]);
 
   const fetchDeductions = async () => {
     try {
       setIsInitialLoading(true);
-      console.log("🔄 Fetching deductions...");
       const deductionsData = await deductionService.getAllDeductions();
-      console.log("📦 Received deductions:", deductionsData);
-
-      if (!deductionsData.statutory || !deductionsData.voluntary) {
-        console.warn("⚠️ Unexpected data structure:", deductionsData);
-        toast.error("Received unexpected data format from server");
-        return;
-      }
-
       setDeductions(deductionsData);
-      console.log("✅ Updated deductions state:", deductionsData);
     } catch (error) {
       console.error("❌ Error fetching deductions:", error);
-      toast.error("Failed to fetch deductions");
+      setDeductions({ statutory: [], voluntary: [] });
     } finally {
       setIsInitialLoading(false);
     }
@@ -69,12 +79,23 @@ export default function Deductions() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleUpdate = async (id: string, data: Partial<Deduction>) => {
+  const handleUpdate = async (
+    id: string,
+    data: Omit<UpdateDeductionInput, "type">
+  ) => {
     try {
-      await deductionService.updateDeduction(id, data);
+      setIsLoading(true);
+      await deductionService.updateDeduction(id, {
+        ...data,
+        type: deductionType,
+      } as UpdateDeductionInput);
       await fetchDeductions();
-    } catch {
-      toast.error("Failed to update deduction");
+      setShowAddForm(false);
+      setEditingDeduction(undefined);
+    } catch (error) {
+      console.error("Error updating deduction:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -96,7 +117,6 @@ export default function Deductions() {
     try {
       await deductionService.deleteDeduction(id);
       await fetchDeductions();
-      toast.success("Deduction deleted successfully");
     } catch (error) {
       console.error("Error deleting deduction:", error);
     }
@@ -107,23 +127,27 @@ export default function Deductions() {
     setShowAddForm(true);
   };
 
-  const handleCreateDeduction = async (data: CreateVoluntaryDeductionInput) => {
+  const handleCreateDeduction = async (data: CreateDeductionInput) => {
     try {
       setIsLoading(true);
-      await deductionService.createDeduction(deductionType, data);
+      if (deductionType === "statutory") {
+        await deductionService.createCustomStatutoryDeduction(data);
+      } else {
+        await deductionService.createVoluntaryDeduction(data);
+      }
       await fetchDeductions();
       setShowAddForm(false);
     } catch (error) {
-      console.error("Create deduction failed:", error);
+      console.error("Error creating deduction:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="md:flex md:items-center md:justify-between">
-        <div className="relative" ref={menuRef}>
+    <div className="container mx-auto px-4 py-8 space-y-8">
+      <div className="flex justify-between items-center">
+        <div className="relative">
           <button
             onClick={() => setShowTypeMenu(!showTypeMenu)}
             className="inline-flex items-center px-4 py-2 border border-transparent 
@@ -153,27 +177,25 @@ export default function Deductions() {
               <div className="py-1" role="menu">
                 <button
                   onClick={() => {
-                    setEditingDeduction(undefined);
-                    setShowAddForm(true);
                     setDeductionType("statutory");
+                    setShowAddForm(true);
                     setShowTypeMenu(false);
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   role="menuitem"
                 >
-                  Statutory Deduction
+                  Add Statutory Deduction
                 </button>
                 <button
                   onClick={() => {
-                    setEditingDeduction(undefined);
-                    setShowAddForm(true);
                     setDeductionType("voluntary");
+                    setShowAddForm(true);
                     setShowTypeMenu(false);
                   }}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   role="menuitem"
                 >
-                  Voluntary Deduction
+                  Add Voluntary Deduction
                 </button>
               </div>
             </div>
@@ -181,17 +203,15 @@ export default function Deductions() {
         </div>
       </div>
 
-      <div className="bg-white shadow-sm rounded-lg">
-        <div className="p-6">
-          <DeductionsTable
-            deductions={deductions}
-            isLoading={isInitialLoading}
-            isUpdating={isLoading}
-            onEdit={handleEdit}
-            onToggleStatus={handleToggleStatus}
-            onDelete={handleDelete}
-          />
-        </div>
+      <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+        <DeductionsTable
+          deductions={deductions}
+          isLoading={isInitialLoading}
+          isUpdating={isLoading}
+          onEdit={handleEdit}
+          onToggleStatus={handleToggleStatus}
+          onDelete={handleDelete}
+        />
       </div>
 
       {showAddForm && (
@@ -216,14 +236,13 @@ export default function Deductions() {
               deductionType={deductionType}
               onSubmit={async (data) => {
                 if (editingDeduction) {
-                  await handleUpdate(editingDeduction._id, data);
-                } else {
-                  await handleCreateDeduction(
-                    data as CreateVoluntaryDeductionInput
+                  await handleUpdate(
+                    editingDeduction._id,
+                    data as Omit<UpdateDeductionInput, "type">
                   );
+                } else {
+                  await handleCreateDeduction(data as CreateDeductionInput);
                 }
-                setShowAddForm(false);
-                setEditingDeduction(undefined);
               }}
               onCancel={() => {
                 setShowAddForm(false);

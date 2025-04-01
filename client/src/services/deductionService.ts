@@ -34,19 +34,25 @@ export const deductionService = {
       const response = await axios.get<DeductionsResponse>(
         `${BASE_URL}/super-admin/deductions`
       );
+
+      if (!response.data || !response.data.data) {
+        console.error("Invalid response structure:", response);
+        return { statutory: [], voluntary: [] };
+      }
+
       return response.data.data;
     } catch (error: any) {
       console.error("Failed to fetch deductions:", error);
       toast.error(
         error.response?.data?.message || "Failed to fetch deductions"
       );
-      return { statutory: [], voluntary: [] };
+      throw error; // Throw error so component can handle loading states
     }
   },
 
   setupStatutoryDeductions: async (): Promise<void> => {
     try {
-      await axios.post(`${BASE_URL}/super-admin/deductions/statutory/setup`);
+      await axios.post(`${BASE_URL}/super-admin/deductions/statutory`);
       toast.success("Statutory deductions set up successfully");
     } catch (error: any) {
       console.error("Failed to setup statutory deductions:", error);
@@ -57,43 +63,48 @@ export const deductionService = {
     }
   },
 
-  createDeduction: async (
-    type: "statutory" | "voluntary",
-    data: CreateVoluntaryDeductionInput
-  ): Promise<Deduction> => {
+  createCustomStatutoryDeduction: async (data: any) => {
     try {
-      const endpoint =
-        type === "statutory"
-          ? `${BASE_URL}/super-admin/deductions/statutory`
-          : `${BASE_URL}/super-admin/deductions/voluntary`;
-
-      const response = await axios.post<{ message: string; data: Deduction }>(
-        endpoint,
+      const response = await axios.post(
+        `${BASE_URL}/super-admin/deductions/statutory/custom`,
         data
       );
-
-      toast.success(response.data.message);
-      return response.data.data;
+      toast.success("Custom statutory deduction created successfully");
+      return response.data;
     } catch (error: any) {
-      console.error(`❌ Failed to create ${type} deduction:`, error);
+      console.error("Failed to create custom statutory deduction:", error);
       toast.error(
-        error.response?.data?.message || `Failed to create ${type} deduction`
+        error.response?.data?.message || "Failed to create deduction"
       );
       throw error;
     }
   },
 
-  updateDeduction: async (
-    id: string,
-    data: UpdateDeductionInput
-  ): Promise<Deduction> => {
+  createVoluntaryDeduction: async (data: any) => {
     try {
-      const response = await axios.patch(
+      const response = await axios.post(
+        `${BASE_URL}/super-admin/deductions/voluntary`,
+        data
+      );
+      toast.success("Voluntary deduction created successfully");
+      return response.data;
+    } catch (error: any) {
+      console.error("Failed to create voluntary deduction:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to create deduction"
+      );
+      throw error;
+    }
+  },
+
+  updateDeduction: async (id: string, data: UpdateDeductionInput) => {
+    try {
+      const response = await axios.put(
         `${BASE_URL}/super-admin/deductions/${id}`,
         data
       );
       toast.success("Deduction updated successfully");
-      return response.data.data;
+      return response.data;
     } catch (error: any) {
       console.error("Failed to update deduction:", error);
       toast.error(
@@ -122,9 +133,10 @@ export const deductionService = {
     }
   },
 
-  deleteDeduction: async (id: string): Promise<void> => {
+  deleteDeduction: async (id: string) => {
     try {
       await axios.delete(`${BASE_URL}/super-admin/deductions/${id}`);
+      toast.success("Deduction deleted successfully");
     } catch (error: any) {
       console.error("Failed to delete deduction:", error);
       toast.error(

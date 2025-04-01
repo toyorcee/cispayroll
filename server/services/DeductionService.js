@@ -2,8 +2,12 @@ import { Types } from "mongoose";
 import Deduction, {
   DeductionType,
   CalculationMethod,
+  AssignmentAction,
 } from "../models/Deduction.js";
 import { ApiError } from "../utils/errorHandler.js";
+import Department from "../models/Department.js";
+import { DeductionScope } from "../models/Deduction.js";
+import User from "../models/User.js";
 
 export class DeductionService {
   // Standard PAYE tax brackets for Nigeria
@@ -209,6 +213,7 @@ export class DeductionService {
         value: data.value,
         effectiveDate: data.effectiveDate || new Date(),
         isActive: true,
+        isCustom: data.isCustom || false,
         createdBy: userId,
         updatedBy: userId,
       };
@@ -379,8 +384,12 @@ export class DeductionService {
       const deductions = await Deduction.find();
 
       const result = {
-        statutory: deductions.filter((d) => d.type === DeductionType.STATUTORY),
-        voluntary: deductions.filter((d) => d.type === DeductionType.VOLUNTARY),
+        statutory: deductions.filter(
+          (d) => d.type.toLowerCase() === DeductionType.STATUTORY.toLowerCase()
+        ),
+        voluntary: deductions.filter(
+          (d) => d.type.toLowerCase() === DeductionType.VOLUNTARY.toLowerCase()
+        ),
       };
 
       console.log("✅ Deductions fetched:", {
@@ -424,6 +433,673 @@ export class DeductionService {
         500,
         `Failed to create custom statutory deduction: ${error.message}`
       );
+    }
+  }
+
+  /**
+   * Calculate all deductions for an employee's payroll
+   * @param {Object} params
+   * @param {number} params.basicSalary - Employee's basic salary
+   * @param {number} params.grossSalary - Employee's gross salary
+   * @param {string} params.employeeId - Employee's ID
+   * @param {string} params.departmentId - Employee's department ID
+   * @returns {Promise<Object>} Calculated deductions
+   */
+  static async calculateAllDeductions({
+    basicSalary,
+    grossSalary,
+    employeeId,
+    departmentId,
+  }) {
+    try {
+      console.log("🧮 Calculating deductions for employee:", employeeId);
+
+      // First, get the user with their deduction preferences
+      const user = await User.findById(employeeId);
+      if (!user) {
+        throw new ApiError(404, "Employee not found");
+      }
+
+      // Get all active deductions
+      const activeDeductions = await Deduction.find({
+        isActive: true,
+        $or: [
+          { scope: DeductionScope.COMPANY_WIDE },
+          {
+            scope: DeductionScope.DEPARTMENT,
+            department: departmentId,
+          },
+          {
+            scope: DeductionScope.INDIVIDUAL,
+            assignedEmployees: employeeId,
+          },
+        ],
+      });
+
+      // Separate deductions by type
+      const statutoryDeductions = activeDeductions.filter(
+        (d) => d.type === DeductionType.STATUTORY
+      );
+      const voluntaryDeductions = activeDeductions.filter(
+        (d) => d.type === DeductionType.VOLUNTARY
+      );
+
+      // Calculate statutory deductions based on opt-in status and mandatory flag
+      const statutory = await this.processStatutoryDeductions(
+        statutoryDeductions,
+        basicSalary,
+        grossSalary,
+        user.deductionPreferences.statutory
+      );
+
+      // Calculate voluntary deductions based on assignments
+      const voluntary = await this.processVoluntaryDeductions(
+        voluntaryDeductions,
+        basicSalary,
+        user.deductionPreferences.voluntary
+      );
+
+      // Calculate total deductions
+      const totalStatutory = Object.values(statutory).reduce(
+        (sum, deduction) => sum + deduction.amount,
+        0
+      );
+      const totalVoluntary = Object.values(voluntary).reduce(
+        (sum, deduction) => sum + deduction.amount,
+        0
+      );
+
+      return {
+        statutory,
+        voluntary,
+        totals: {
+          statutory: totalStatutory,
+          voluntary: totalVoluntary,
+          total: totalStatutory + totalVoluntary,
+        },
+      };
+    } catch (error) {
+      console.error("❌ Error calculating deductions:", error);
+      throw new ApiError(500, "Failed to calculate deductions");
+    }
+  }
+
+  /**
+   * Process statutory deductions
+   * @private
+   */
+  static async processStatutoryDeductions(
+    deductions,
+    basicSalary,
+    grossSalary,
+    userStatutoryPreferences
+  ) {
+    const result = {};
+
+    for (const deduction of deductions) {
+      if (!deduction.isActive) continue;
+
+      // Handle mandatory statutory deductions (PAYE, Pension, NHF)
+      if (deduction.isMandatory) {
+        const amount = this.calculateStatutoryDeduction(
+          basicSalary,
+          grossSalary,
+          deduction
+        );
+        result[deduction.name] = {
+          amount,
+          category: deduction.category,
+          calculationMethod: deduction.calculationMethod,
+          status: "active",
+          type: "mandatory",
+          isMandatory: true,
+          isCustom: false,
+        };
+        continue;
+      }
+
+      // Handle custom statutory deductions
+      if (deduction.isCustom) {
+        // Check if user has opted into this custom statutory deduction
+        const isOptedIn = userStatutoryPreferences.customStatutory.some(
+          (d) => d.deduction.toString() === deduction._id.toString() && d.opted
+        );
+
+        if (!isOptedIn) {
+          result[deduction.name] = {
+            amount: 0,
+            category: deduction.category,
+            calculationMethod: deduction.calculationMethod,
+            status: "opted-out",
+            type: "custom",
+            isMandatory: false,
+            isCustom: true,
+            optedOutAt: userStatutoryPreferences.customStatutory.find(
+              (d) => d.deduction.toString() === deduction._id.toString()
+            )?.optedAt,
+            reason: userStatutoryPreferences.customStatutory.find(
+              (d) => d.deduction.toString() === deduction._id.toString()
+            )?.reason,
+          };
+          continue;
+        }
+
+        const amount = this.calculateStatutoryDeduction(
+          basicSalary,
+          grossSalary,
+          deduction
+        );
+        result[deduction.name] = {
+          amount,
+          category: deduction.category,
+          calculationMethod: deduction.calculationMethod,
+          status: "active",
+          type: "custom",
+          isMandatory: false,
+          isCustom: true,
+        };
+        continue;
+      }
+
+      // Handle standard non-mandatory statutory deductions
+      const isOptedIn = userStatutoryPreferences.customStatutory.some(
+        (d) => d.deduction.toString() === deduction._id.toString() && d.opted
+      );
+
+      if (!isOptedIn) {
+        result[deduction.name] = {
+          amount: 0,
+          category: deduction.category,
+          calculationMethod: deduction.calculationMethod,
+          status: "opted-out",
+          type: "standard",
+          isMandatory: false,
+          isCustom: false,
+        };
+        continue;
+      }
+
+      const amount = this.calculateStatutoryDeduction(
+        basicSalary,
+        grossSalary,
+        deduction
+      );
+      result[deduction.name] = {
+        amount,
+        category: deduction.category,
+        calculationMethod: deduction.calculationMethod,
+        status: "active",
+        type: "standard",
+        isMandatory: false,
+        isCustom: false,
+      };
+    }
+
+    return result;
+  }
+
+  /**
+   * Calculate statutory deduction amount
+   * @private
+   */
+  static calculateStatutoryDeduction(basicSalary, grossSalary, deduction) {
+    switch (deduction.calculationMethod) {
+      case CalculationMethod.PERCENTAGE:
+        return (grossSalary * deduction.value) / 100;
+      case CalculationMethod.PROGRESSIVE:
+        return this.calculateProgressiveTax(grossSalary, deduction.taxBrackets);
+      case CalculationMethod.FIXED:
+        return deduction.value;
+      default:
+        return 0;
+    }
+  }
+
+  /**
+   * Calculate progressive tax based on tax brackets
+   * @private
+   */
+  static calculateProgressiveTax(amount, taxBrackets) {
+    let totalTax = 0;
+    let remainingAmount = amount;
+
+    for (const bracket of taxBrackets) {
+      if (remainingAmount <= 0) break;
+
+      const taxableInThisBracket = bracket.max
+        ? Math.min(remainingAmount, bracket.max - bracket.min)
+        : remainingAmount;
+
+      if (taxableInThisBracket > 0) {
+        totalTax += (taxableInThisBracket * bracket.rate) / 100;
+        remainingAmount -= taxableInThisBracket;
+      }
+    }
+
+    return totalTax;
+  }
+
+  /**
+   * Process voluntary deductions
+   * @private
+   */
+  static async processVoluntaryDeductions(
+    deductions,
+    basicSalary,
+    userVoluntaryPreferences
+  ) {
+    const result = {};
+
+    // Process standard voluntary deductions
+    for (const deduction of deductions) {
+      if (!deduction.isActive) continue;
+
+      // Check if this deduction is in user's voluntary preferences
+      const isStandard = userVoluntaryPreferences.standardVoluntary.some(
+        (d) => d.deduction.toString() === deduction._id.toString() && d.opted
+      );
+
+      const isCustom = userVoluntaryPreferences.customVoluntary.some(
+        (d) => d.deduction.toString() === deduction._id.toString() && d.opted
+      );
+
+      if (!isStandard && !isCustom) continue;
+
+      const amount = this.calculateVoluntaryDeduction(basicSalary, deduction);
+      result[deduction.name] = {
+        amount,
+        category: deduction.category,
+        calculationMethod: deduction.calculationMethod,
+        status: "active",
+        type: isStandard ? "standard" : "custom",
+        isMandatory: false,
+      };
+    }
+
+    return result;
+  }
+
+  /**
+   * Calculate voluntary deduction amount
+   * @private
+   */
+  static calculateVoluntaryDeduction(basicSalary, deduction) {
+    switch (deduction.calculationMethod) {
+      case CalculationMethod.PERCENTAGE:
+        return (basicSalary * deduction.value) / 100;
+      case CalculationMethod.FIXED:
+        return deduction.value;
+      default:
+        return 0;
+    }
+  }
+
+  /**
+   * Assign voluntary deduction to employee
+   */
+  static async assignDeductionToEmployee(deductionId, employeeId, assignedBy) {
+    try {
+      const deduction = await Deduction.findById(deductionId);
+
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found");
+      }
+
+      if (deduction.type !== DeductionType.VOLUNTARY) {
+        throw new ApiError(400, "Only voluntary deductions can be assigned");
+      }
+
+      if (!deduction.isActive) {
+        throw new ApiError(400, "Cannot assign inactive deduction");
+      }
+
+      if (deduction.assignedEmployees.includes(employeeId)) {
+        throw new ApiError(400, "Deduction already assigned to employee");
+      }
+
+      deduction.assignedEmployees.push(employeeId);
+
+      // Add to history
+      deduction.assignmentHistory.push({
+        employee: employeeId,
+        action: AssignmentAction.ASSIGNED,
+        date: new Date(),
+        by: assignedBy,
+      });
+
+      deduction.updatedBy = assignedBy;
+      await deduction.save();
+
+      return deduction;
+    } catch (error) {
+      throw new ApiError(500, `Failed to assign deduction: ${error.message}`);
+    }
+  }
+
+  /**
+   * Remove voluntary deduction from employee
+   */
+  static async removeDeductionFromEmployee(
+    deductionId,
+    employeeId,
+    removedBy,
+    reason = ""
+  ) {
+    try {
+      const deduction = await Deduction.findById(deductionId);
+
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found");
+      }
+
+      if (deduction.type !== DeductionType.VOLUNTARY) {
+        throw new ApiError(400, "Only voluntary deductions can be removed");
+      }
+
+      deduction.assignedEmployees = deduction.assignedEmployees.filter(
+        (id) => id.toString() !== employeeId
+      );
+
+      // Add to history
+      deduction.assignmentHistory.push({
+        employee: employeeId,
+        action: AssignmentAction.REMOVED,
+        date: new Date(),
+        by: removedBy,
+        reason,
+      });
+
+      deduction.updatedBy = removedBy;
+      await deduction.save();
+
+      return deduction;
+    } catch (error) {
+      throw new ApiError(500, `Failed to remove deduction: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create department-specific deduction
+   * @param {string} userId - Admin/SuperAdmin ID creating the deduction
+   * @param {string} departmentId - Department ID
+   * @param {Object} data - Deduction data
+   */
+  static async createDepartmentDeduction(userId, departmentId, data) {
+    try {
+      console.log("🔄 Creating department-specific deduction");
+      console.log("📝 Department:", departmentId);
+
+      // Validate department exists (assuming Department model exists)
+      const department = await Department.findById(departmentId);
+      if (!department) {
+        throw new ApiError(404, "Department not found");
+      }
+
+      // Create deduction with department scope
+      const deductionData = {
+        ...data,
+        scope: DeductionScope.DEPARTMENT,
+        department: departmentId,
+        type: data.type || DeductionType.STATUTORY, // Can be statutory or voluntary
+        isActive: true,
+        createdBy: userId,
+        updatedBy: userId,
+        effectiveDate: data.effectiveDate || new Date(),
+      };
+
+      const deduction = await Deduction.create(deductionData);
+      console.log("✅ Department deduction created:", deduction.name);
+
+      return deduction;
+    } catch (error) {
+      console.error("❌ Error creating department deduction:", error);
+      throw new ApiError(
+        500,
+        `Failed to create department deduction: ${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Get deductions for a specific department
+   * @param {string} departmentId
+   * @returns {Promise<Object>} Department deductions
+   */
+  static async getDepartmentDeductions(departmentId) {
+    try {
+      const deductions = await Deduction.find({
+        $or: [
+          { scope: DeductionScope.COMPANY_WIDE },
+          {
+            scope: DeductionScope.DEPARTMENT,
+            department: departmentId,
+          },
+        ],
+        isActive: true,
+      });
+
+      return {
+        statutory: deductions.filter((d) => d.type === DeductionType.STATUTORY),
+        voluntary: deductions.filter((d) => d.type === DeductionType.VOLUNTARY),
+        departmentSpecific: deductions.filter(
+          (d) => d.scope === DeductionScope.DEPARTMENT
+        ),
+      };
+    } catch (error) {
+      throw new ApiError(
+        500,
+        `Failed to fetch department deductions: ${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Calculate department-specific deductions
+   * @param {Object} params
+   * @param {number} params.basicSalary
+   * @param {number} params.grossSalary
+   * @param {string} params.departmentId
+   */
+  static async calculateDepartmentDeductions({
+    basicSalary,
+    grossSalary,
+    departmentId,
+  }) {
+    try {
+      // Get active department deductions
+      const departmentDeductions = await Deduction.find({
+        scope: DeductionScope.DEPARTMENT,
+        department: departmentId,
+        isActive: true,
+      });
+
+      const result = {};
+
+      for (const deduction of departmentDeductions) {
+        let amount = 0;
+
+        // Calculate based on method
+        switch (deduction.calculationMethod) {
+          case CalculationMethod.FIXED:
+            amount = deduction.value;
+            break;
+
+          case CalculationMethod.PERCENTAGE:
+            const base = deduction.useGrossSalary ? grossSalary : basicSalary;
+            amount = (base * deduction.value) / 100;
+            break;
+
+          case CalculationMethod.PROGRESSIVE:
+            amount = this.calculateProgressiveDeduction(
+              grossSalary,
+              deduction.taxBrackets
+            );
+            break;
+        }
+
+        result[deduction.name] = {
+          amount,
+          type: deduction.type,
+          category: deduction.category,
+          calculationMethod: deduction.calculationMethod,
+        };
+      }
+
+      return result;
+    } catch (error) {
+      throw new ApiError(
+        500,
+        `Failed to calculate department deductions: ${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Assign voluntary deduction to multiple employees
+   * @param {string} deductionId - Deduction ID
+   * @param {Array} employeeIds - Array of employee IDs
+   * @param {string} assignedBy - Assigned by user ID
+   * @returns {Promise<Object>} Result of the operation
+   */
+  static async assignDeductionToMultipleEmployees(
+    deductionId,
+    employeeIds,
+    assignedBy
+  ) {
+    try {
+      console.log("🔄 Assigning deduction to multiple employees:", {
+        deductionId,
+        employeeCount: employeeIds.length,
+      });
+
+      const deduction = await Deduction.findById(deductionId);
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found");
+      }
+
+      if (deduction.type !== DeductionType.VOLUNTARY) {
+        throw new ApiError(400, "Only voluntary deductions can be assigned");
+      }
+
+      if (!deduction.isActive) {
+        throw new ApiError(400, "Cannot assign inactive deduction");
+      }
+
+      // Filter out already assigned employees
+      const newEmployeeIds = employeeIds.filter(
+        (id) => !deduction.assignedEmployees.includes(id)
+      );
+
+      if (newEmployeeIds.length === 0) {
+        return {
+          message: "All employees are already assigned to this deduction",
+          deduction,
+        };
+      }
+
+      // Add to assigned employees
+      deduction.assignedEmployees.push(...newEmployeeIds);
+
+      // Add to assignment history
+      const historyEntries = newEmployeeIds.map((employeeId) => ({
+        employee: employeeId,
+        action: AssignmentAction.ASSIGNED,
+        date: new Date(),
+        by: assignedBy,
+      }));
+
+      deduction.assignmentHistory.push(...historyEntries);
+      deduction.updatedBy = assignedBy;
+
+      await deduction.save();
+
+      console.log("✅ Batch assignment completed:", {
+        totalAssigned: newEmployeeIds.length,
+        deductionName: deduction.name,
+      });
+
+      return {
+        message: `Successfully assigned deduction to ${newEmployeeIds.length} employees`,
+        deduction,
+      };
+    } catch (error) {
+      console.error("❌ Batch assignment failed:", error);
+      throw new ApiError(500, `Failed to assign deduction: ${error.message}`);
+    }
+  }
+
+  /**
+   * Remove voluntary deduction from multiple employees
+   * @param {string} deductionId - Deduction ID
+   * @param {Array} employeeIds - Array of employee IDs
+   * @param {string} removedBy - Removed by user ID
+   * @param {string} reason - Optional reason for removal
+   * @returns {Promise<Object>} Result of the operation
+   */
+  static async removeDeductionFromMultipleEmployees(
+    deductionId,
+    employeeIds,
+    removedBy,
+    reason = ""
+  ) {
+    try {
+      console.log("🔄 Removing deduction from multiple employees:", {
+        deductionId,
+        employeeCount: employeeIds.length,
+      });
+
+      const deduction = await Deduction.findById(deductionId);
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found");
+      }
+
+      if (deduction.type !== DeductionType.VOLUNTARY) {
+        throw new ApiError(400, "Only voluntary deductions can be removed");
+      }
+
+      // Filter employees who actually have the deduction
+      const employeesToRemove = employeeIds.filter((id) =>
+        deduction.assignedEmployees.includes(id)
+      );
+
+      if (employeesToRemove.length === 0) {
+        return {
+          message: "None of the specified employees have this deduction",
+          deduction,
+        };
+      }
+
+      // Remove from assigned employees
+      deduction.assignedEmployees = deduction.assignedEmployees.filter(
+        (id) => !employeesToRemove.includes(id.toString())
+      );
+
+      // Add to assignment history
+      const historyEntries = employeesToRemove.map((employeeId) => ({
+        employee: employeeId,
+        action: AssignmentAction.REMOVED,
+        date: new Date(),
+        by: removedBy,
+        reason,
+      }));
+
+      deduction.assignmentHistory.push(...historyEntries);
+      deduction.updatedBy = removedBy;
+
+      await deduction.save();
+
+      console.log("✅ Batch removal completed:", {
+        totalRemoved: employeesToRemove.length,
+        deductionName: deduction.name,
+      });
+
+      return {
+        message: `Successfully removed deduction from ${employeesToRemove.length} employees`,
+        deduction,
+      };
+    } catch (error) {
+      console.error("❌ Batch removal failed:", error);
+      throw new ApiError(500, `Failed to remove deduction: ${error.message}`);
     }
   }
 }

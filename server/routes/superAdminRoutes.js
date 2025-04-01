@@ -265,7 +265,8 @@ router.delete(
   SuperAdminController.deleteSalaryGrade
 );
 
-//Deduction Routes
+// Group all deduction-related routes together
+// ===== Deduction Management Routes =====
 router.post(
   "/deductions/statutory",
   requirePermission([Permission.MANAGE_DEDUCTIONS]),
@@ -284,6 +285,38 @@ router.post(
   SuperAdminController.createVoluntaryDeduction
 );
 
+router.post(
+  "/deductions/statutory/custom",
+  requirePermission([Permission.MANAGE_DEDUCTIONS]),
+  SuperAdminController.createCustomStatutoryDeduction
+);
+
+router.post(
+  "/deductions/statutory/department",
+  requirePermission([Permission.MANAGE_DEDUCTIONS]),
+  SuperAdminController.createDepartmentStatutoryDeduction
+);
+
+// Employee-specific deduction routes
+router.post(
+  "/deductions/:deductionId/assign/:employeeId",
+  requirePermission([Permission.MANAGE_DEDUCTIONS]),
+  SuperAdminController.assignDeductionToEmployee
+);
+
+router.delete(
+  "/deductions/:deductionId/employees/:employeeId",
+  requirePermission([Permission.MANAGE_DEDUCTIONS]),
+  SuperAdminController.removeDeductionFromEmployee
+);
+
+router.get(
+  "/employees/:employeeId/deductions",
+  requirePermission([Permission.VIEW_DEDUCTIONS]),
+  SuperAdminController.getEmployeeDeductions
+);
+
+// General deduction management routes
 router.patch(
   "/deductions/:id",
   requirePermission([Permission.EDIT_DEDUCTIONS]),
@@ -302,10 +335,24 @@ router.delete(
   SuperAdminController.deleteDeduction
 );
 
+// Batch operations
 router.post(
-  "/deductions/statutory/custom",
+  "/deductions/:deductionId/assign-batch",
   requirePermission([Permission.MANAGE_DEDUCTIONS]),
-  SuperAdminController.createCustomStatutoryDeduction
+  SuperAdminController.assignDeductionToMultipleEmployees
+);
+
+router.delete(
+  "/deductions/:deductionId/remove-batch",
+  requirePermission([Permission.MANAGE_DEDUCTIONS]),
+  SuperAdminController.removeDeductionFromMultipleEmployees
+);
+
+// Assignment history
+router.get(
+  "/deductions/:deductionId/history",
+  requirePermission([Permission.VIEW_DEDUCTIONS]),
+  SuperAdminController.getDeductionAssignmentHistory
 );
 
 // Allowance Routes

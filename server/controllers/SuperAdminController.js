@@ -20,7 +20,7 @@ import { BonusService } from "../services/BonusService.js";
 import Allowance from "../models/Allowance.js";
 import Notification from "../models/Notification.js";
 import { DepartmentService } from "../services/departmentService.js";
-import { DeductionType } from "../models/Deduction.js";
+import { DeductionType, DeductionScope } from "../models/Deduction.js";
 
 // Helper function for converting string IDs to ObjectId
 const asObjectId = (id) => new Types.ObjectId(id);
@@ -731,11 +731,17 @@ export class SuperAdminController {
       const { employeeId } = req.params;
       console.log("🔍 Fetching payroll history for employee:", employeeId);
 
+      // Add this debug log
+      console.log("Looking for employee in UserModel with ID:", employeeId);
+
       // Get employee with populated fields
       const employee = await UserModel.findById(employeeId).populate([
         { path: "department", select: "name code" },
         { path: "salaryGrade", select: "level description" },
       ]);
+
+      // Add this debug log
+      console.log("Found employee:", employee);
 
       if (!employee) {
         return res.status(404).json({
@@ -744,9 +750,9 @@ export class SuperAdminController {
         });
       }
 
-      // Get payroll history
+      // Get payroll history - modify this part
       const payrollHistory = await PayrollModel.find({
-        employee: asObjectId(employeeId),
+        employee: employeeId, // Changed from asObjectId(employeeId)
       })
         .populate([
           {
@@ -764,6 +770,9 @@ export class SuperAdminController {
         ])
         .sort({ year: -1, month: -1 })
         .lean();
+
+      // Add this debug log
+      console.log("Found payroll history:", payrollHistory);
 
       // Calculate summary
       const approvedPayrolls = payrollHistory.filter(
@@ -1094,6 +1103,11 @@ export class SuperAdminController {
 
       if (!payroll) {
         throw new ApiError(404, "Payroll record not found");
+      }
+
+      // Add null check for employee
+      if (!payroll.employee) {
+        throw new ApiError(404, "Employee details not found");
       }
 
       // Format the response with detailed payslip information
@@ -1987,6 +2001,7 @@ export class SuperAdminController {
           : new Date(),
         category: req.body.category || "general",
         isActive: true,
+        isCustom: req.body.isCustom || false, // Added this line
         createdBy: userId,
         updatedBy: userId,
       };
@@ -2176,9 +2191,13 @@ export class SuperAdminController {
         throw new ApiError(404, "Deduction not found");
       }
 
-      // Don't allow deleting statutory deductions
-      if (deduction.type === DeductionType.STATUTORY) {
-        throw new ApiError(400, "Cannot delete statutory deductions");
+      // Allow super admin to delete any deduction, including statutory
+      const isSuperAdmin = req.user.role === UserRole.SUPER_ADMIN;
+      if (deduction.type === DeductionType.STATUTORY && !isSuperAdmin) {
+        throw new ApiError(
+          400,
+          "Only super admin can delete statutory deductions"
+        );
       }
 
       // Actually delete the deduction instead of just archiving
@@ -2741,52 +2760,12 @@ export class SuperAdminController {
   // Add this new method for custom statutory deductions
   static async createCustomStatutoryDeduction(req, res) {
     try {
-      console.log("📝 Creating custom statutory deduction");
-
-      // Validate required fields
-      if (
-        !req.body.name ||
-        !req.body.calculationMethod ||
-        req.body.value === undefined
-      ) {
-        throw new ApiError(
-          400,
-          "Missing required fields: name, calculationMethod, value"
-        );
-      }
-
-      // Validate deduction value
-      if (req.body.value < 0) {
-        throw new ApiError(400, "Deduction value cannot be negative");
-      }
-
-      if (req.body.calculationMethod === "percentage" && req.body.value > 100) {
-        throw new ApiError(400, "Percentage deduction cannot exceed 100%");
-      }
-
-      const userId = asObjectId(req.user.id);
-      const deductionData = {
-        name: req.body.name,
-        type: DeductionType.STATUTORY, // Set type as statutory
-        description: req.body.description,
-        calculationMethod: req.body.calculationMethod,
-        value: req.body.value,
-        effectiveDate: req.body.effectiveDate
-          ? new Date(req.body.effectiveDate)
-          : new Date(), // Use provided date or today
-        isActive: true,
-        createdBy: userId,
-        updatedBy: userId,
-      };
+      const userId = req.user.id; // Changed from req.user.userId
+      const deductionData = req.body;
 
       const deduction = await DeductionService.createCustomStatutoryDeduction(
         userId,
         deductionData
-      );
-
-      console.log(
-        "✅ Custom statutory deduction created successfully:",
-        deduction
       );
 
       res.status(201).json({
@@ -2796,6 +2775,208 @@ export class SuperAdminController {
       });
     } catch (error) {
       console.error("❌ Error creating custom statutory deduction:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  // Add this method to the SuperAdminController class
+  static async createDepartmentStatutoryDeduction(req, res) {
+    try {
+      const { userId } = req.user;
+      const { departmentId, ...deductionData } = req.body;
+
+      if (!departmentId) {
+        throw new ApiError(400, "Department ID is required");
+      }
+
+      const deduction = await DeductionService.createDepartmentDeduction(
+        userId,
+        departmentId,
+        {
+          ...deductionData,
+          type: "statutory",
+        }
+      );
+
+      res.status(201).json({
+        success: true,
+        message: "Department statutory deduction created successfully",
+        data: deduction,
+      });
+    } catch (error) {
+      console.error("❌ Error creating department statutory deduction:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async assignDeductionToEmployee(req, res) {
+    try {
+      const { deductionId, employeeId } = req.params;
+
+      const deduction = await DeductionService.assignDeductionToEmployee(
+        deductionId,
+        employeeId,
+        req.user._id // Pass the assigner's ID
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Deduction assigned successfully",
+        data: deduction,
+      });
+    } catch (error) {
+      throw new ApiError(error.statusCode || 500, error.message);
+    }
+  }
+
+  static async removeDeductionFromEmployee(req, res) {
+    try {
+      const { deductionId, employeeId } = req.params;
+      const { reason } = req.body; // Add reason support
+
+      const deduction = await DeductionService.removeDeductionFromEmployee(
+        deductionId,
+        employeeId,
+        req.user._id,
+        reason
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Deduction removed successfully",
+        data: deduction,
+      });
+    } catch (error) {
+      throw new ApiError(error.statusCode || 500, error.message);
+    }
+  }
+
+  static async getEmployeeDeductions(req, res) {
+    try {
+      const { employeeId } = req.params;
+
+      const deductions = await DeductionService.getEmployeeDeductions(
+        employeeId
+      );
+
+      res.status(200).json({
+        success: true,
+        data: deductions,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async assignDeductionToMultipleEmployees(req, res) {
+    try {
+      const { deductionId } = req.params;
+      const { employeeIds } = req.body;
+
+      console.log("🔄 Processing batch deduction assignment");
+
+      if (!employeeIds || !Array.isArray(employeeIds)) {
+        throw new ApiError(400, "Employee IDs array is required");
+      }
+
+      const result = await DeductionService.assignDeductionToMultipleEmployees(
+        deductionId,
+        employeeIds,
+        req.user._id
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.deduction,
+      });
+    } catch (error) {
+      console.error("❌ Batch assignment failed:", error);
+      throw new ApiError(error.statusCode || 500, error.message);
+    }
+  }
+
+  static async removeDeductionFromMultipleEmployees(req, res) {
+    try {
+      const { deductionId } = req.params;
+      const { employeeIds, reason } = req.body;
+
+      console.log("🔄 Processing batch deduction removal");
+
+      if (!employeeIds || !Array.isArray(employeeIds)) {
+        throw new ApiError(400, "Employee IDs array is required");
+      }
+
+      const result =
+        await DeductionService.removeDeductionFromMultipleEmployees(
+          deductionId,
+          employeeIds,
+          req.user._id,
+          reason
+        );
+
+      return res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.deduction,
+      });
+    } catch (error) {
+      console.error("❌ Batch removal failed:", error);
+      throw new ApiError(error.statusCode || 500, error.message);
+    }
+  }
+
+  static async getDeductionAssignmentHistory(req, res) {
+    try {
+      const { deductionId } = req.params;
+
+      const deduction = await Deduction.findById(deductionId)
+        .populate({
+          path: "assignmentHistory.employee",
+          select: "firstName lastName employeeId",
+        })
+        .populate({
+          path: "assignmentHistory.by",
+          select: "firstName lastName",
+        });
+
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found");
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: deduction.assignmentHistory,
+      });
+    } catch (error) {
+      throw new ApiError(error.statusCode || 500, error.message);
+    }
+  }
+
+  static async createDeduction(req, res) {
+    try {
+      console.log("📝 Creating deduction:", req.body); // Debug log
+
+      const deduction = new Deduction({
+        ...req.body,
+        createdBy: req.user._id,
+        updatedBy: req.user._id,
+        isActive: true,
+      });
+
+      await deduction.save();
+      console.log("✅ Deduction created successfully"); // Debug log
+
+      res.status(201).json({
+        success: true,
+        message: "Deduction created successfully",
+        data: deduction,
+      });
+    } catch (error) {
+      console.error("❌ Error creating deduction:", error); // Debug log
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
     }

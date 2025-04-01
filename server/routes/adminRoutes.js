@@ -95,10 +95,57 @@ router.patch(
 );
 
 // ===== Deduction Management Routes =====
+// Department-specific deduction routes
+router.post(
+  "/department/deductions",
+  requirePermission([Permission.MANAGE_DEPARTMENT_DEDUCTIONS]),
+  AdminController.createDepartmentDeduction
+);
+
 router.get(
-  "/deductions",
-  requirePermission([Permission.VIEW_DEDUCTIONS]),
+  "/department/deductions",
+  requirePermission([Permission.VIEW_DEPARTMENT_DEDUCTIONS]),
   AdminController.getDepartmentDeductions
+);
+
+// Fix: Add employee deductions route
+router.get(
+  "/department/employees/:employeeId/deductions",
+  requirePermission([Permission.VIEW_DEPARTMENT_DEDUCTIONS]),
+  AdminController.getDepartmentEmployeeDeductions
+);
+
+// Fix: Individual assignment routes
+router.post(
+  "/department/deductions/:deductionId/assign/:employeeId",
+  requirePermission([Permission.MANAGE_DEPARTMENT_DEDUCTIONS]),
+  AdminController.assignDepartmentDeductionToEmployee
+);
+
+router.delete(
+  "/department/deductions/:deductionId/employees/:employeeId",
+  requirePermission([Permission.MANAGE_DEPARTMENT_DEDUCTIONS]),
+  AdminController.removeDeductionFromEmployee
+);
+
+// Fix: Batch operations routes
+router.post(
+  "/department/deductions/:deductionId/assign-batch",
+  requirePermission([Permission.MANAGE_DEPARTMENT_DEDUCTIONS]),
+  AdminController.assignDepartmentDeductionToMultipleEmployees
+);
+
+router.post(
+  "/department/deductions/:deductionId/remove-batch",
+  requirePermission([Permission.MANAGE_DEPARTMENT_DEDUCTIONS]),
+  AdminController.removeDepartmentDeductionFromMultipleEmployees
+);
+
+// Fix: History and details routes
+router.get(
+  "/department/deductions/:deductionId/history",
+  requirePermission([Permission.VIEW_DEPARTMENT_DEDUCTIONS]),
+  AdminController.getDepartmentDeductionHistory
 );
 
 router.get(
@@ -108,13 +155,13 @@ router.get(
 );
 
 router.put(
-  "/deductions/:id",
+  "/department/deductions/:id",
   requirePermission([Permission.EDIT_DEDUCTIONS]),
   AdminController.updateDepartmentDeduction
 );
 
 router.patch(
-  "/deductions/:id/toggle",
+  "/department/deductions/:id/toggle",
   requirePermission([Permission.EDIT_DEDUCTIONS]),
   AdminController.toggleDeductionStatus
 );

@@ -87,11 +87,16 @@ export const DeductionsTable = ({
   onToggleStatus,
   onDelete,
 }: DeductionsTableProps) => {
+  console.log("=== DEDUCTIONS TABLE DEBUGGING ===");
+  console.log("Received deductions:", deductions);
+  console.log("Statutory deductions:", deductions.statutory);
+  console.log("Voluntary deductions:", deductions.voluntary);
+
   const [typeFilter, setTypeFilter] = useState<
     "all" | "statutory" | "voluntary"
   >("all");
   const [statusFilter, setStatusFilter] = useState<
-    "both" | "active" | "inactive"
+    "both" | "active" | "inactive" | "custom"
   >("both");
   const [selectedBrackets, setSelectedBrackets] = useState<TaxBracket[] | null>(
     null
@@ -105,7 +110,16 @@ export const DeductionsTable = ({
     id: null,
   });
 
-  console.log("Received deductions:", deductions);
+  console.log("Raw deductions prop:", deductions);
+  console.log("Type of deductions:", typeof deductions);
+  console.log("Is Array?", Array.isArray(deductions));
+
+  // Combine statutory and voluntary deductions into a single array
+  const allDeductions = [
+    ...(deductions.statutory || []),
+    ...(deductions.voluntary || []),
+  ];
+  console.log("Combined deductions:", allDeductions);
 
   const handleDelete = async (id: string) => {
     setDeleteConfirm({ show: true, id });
@@ -129,19 +143,26 @@ export const DeductionsTable = ({
 
   if (isLoading) return <TableSkeleton />;
 
-  const allDeductions = [...deductions.statutory, ...deductions.voluntary];
   const filteredDeductions = allDeductions.filter((d) => {
     // Type filter
     if (typeFilter !== "all" && d.type.toLowerCase() !== typeFilter) {
       return false;
     }
-    // Status filter
-    if (statusFilter !== "both") {
-      return statusFilter === "active" ? d.isActive : !d.isActive;
+    // Status and Custom filter
+    if (statusFilter === "active") {
+      return d.isActive;
+    } else if (statusFilter === "inactive") {
+      return !d.isActive;
+    } else if (statusFilter === "custom") {
+      return d.isCustom === true;
     }
     return true;
   });
+  console.log("Filtered deductions:", filteredDeductions);
+  console.log("Current type filter:", typeFilter);
 
+  console.log("All deductions:", deductions);
+  console.log("Type filter:", typeFilter);
   console.log("Filtered deductions:", filteredDeductions);
 
   return (
@@ -155,7 +176,7 @@ export const DeductionsTable = ({
               setTypeFilter(e.target.value as "all" | "statutory" | "voluntary")
             }
           >
-            <option value="all">All Deductions</option>
+            <option value="all">All Types</option>
             <option value="statutory">Statutory</option>
             <option value="voluntary">Voluntary</option>
           </select>
@@ -164,12 +185,15 @@ export const DeductionsTable = ({
             className="form-select rounded-md border-gray-300 text-sm focus:ring-green-500 focus:border-green-500 bg-green-50 text-green-900 hover:bg-green-100 transition-colors duration-200"
             value={statusFilter}
             onChange={(e) =>
-              setStatusFilter(e.target.value as "both" | "active" | "inactive")
+              setStatusFilter(
+                e.target.value as "both" | "active" | "inactive" | "custom"
+              )
             }
           >
             <option value="both">All Status</option>
             <option value="active">Active Only</option>
             <option value="inactive">Inactive Only</option>
+            <option value="custom">Custom Only</option>
           </select>
         </div>
       </div>
@@ -203,26 +227,26 @@ export const DeductionsTable = ({
                 key={deduction._id}
                 className="hover:bg-gray-50 transition-all duration-200"
               >
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">
+                <td className="px-4 py-3">
+                  <div className="text-sm font-medium text-gray-900 break-words">
                     {deduction.name}
                   </div>
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-gray-500 break-words">
                     {deduction.description}
                   </div>
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 capitalize">
+                <td className="px-4 py-3 text-sm text-gray-500 capitalize break-words">
                   {deduction.type.toLowerCase()}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 capitalize">
+                <td className="px-4 py-3 text-sm text-gray-500 capitalize break-words">
                   {deduction.calculationMethod.toLowerCase()}
                 </td>
-                <td className="px-4 py-3 whitespace-nowrap">
+                <td className="px-4 py-3 break-words">
                   <div className="flex items-center justify-start">
                     {deduction.calculationMethod.toLowerCase() ===
                     "progressive" ? (
                       <div className="flex items-center space-x-2">
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-gray-900 break-words">
                           Progressive Tax
                         </span>
                         <button
@@ -236,7 +260,7 @@ export const DeductionsTable = ({
                         </button>
                       </div>
                     ) : (
-                      <span className="text-gray-900">
+                      <span className="text-gray-900 break-words">
                         {deduction.calculationMethod.toLowerCase() ===
                         "percentage"
                           ? `${deduction.value}%`

@@ -270,16 +270,32 @@ export const payrollService = {
   // Get Employee Payroll History
   getEmployeePayrollHistory: async (employeeId: string) => {
     try {
+      if (!employeeId) {
+        throw new Error("Employee ID is required");
+      }
+
+      console.log("Fetching history for employee:", employeeId);
       const response = await axios.get(
         `${BASE_URL}/payroll/employee/${employeeId}/history`
       );
-      if (!response.data.success) {
-        throw new Error("Failed to fetch employee payroll history");
+
+      // Add better error handling
+      if (!response.data) {
+        throw new Error("No data received from server");
       }
-      console.log("response history", response);
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to fetch employee payroll history"
+        );
+      }
+
+      // Log the response for debugging
+      console.log("Employee history response:", response.data);
       return response.data.data;
     } catch (error) {
       console.error("Error fetching employee payroll history:", error);
+      // Don't show toast here, let component handle it
       throw error;
     }
   },

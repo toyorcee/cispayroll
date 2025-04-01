@@ -23,6 +23,7 @@ import disciplinaryRoutes from "./routes/disciplinaryRoutes.js";
 import feedbackRoute from "./routes/feedbackRoutes.js";
 import departmentRoutes from "./routes/departmentRoutes.js";
 import passwordRoutes from "./routes/passwordRoutes.js";
+import deductionRoutes from "./routes/deductionRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -172,6 +173,7 @@ app.use("/api/disciplinary", routeErrorWrapper(disciplinaryRoutes));
 app.use("/api/feedback", routeErrorWrapper(feedbackRoute));
 app.use("/api/departments", routeErrorWrapper(departmentRoutes));
 app.use("/api/password", routeErrorWrapper(passwordRoutes));
+app.use("/api/deductions", routeErrorWrapper(deductionRoutes));
 
 // Enhanced health check
 app.get("/api/health", (_req, res) => {

@@ -9,6 +9,8 @@ import { AuthService } from "../services/authService.js";
 import Allowance from "../models/Allowance.js";
 import { AllowanceStatus } from "../models/Allowance.js";
 import Deduction from "../models/Deduction.js";
+import { DeductionService } from "../services/DeductionService.js";
+import { DeductionType, DeductionScope } from "../models/Deduction.js";
 
 export class AdminController {
   // ===== User Management Methods =====
@@ -460,31 +462,27 @@ export class AdminController {
   }
 
   // ===== Deduction Management Methods =====
-  static async getDepartmentDeductions(req, res) {
+  // Department Deductions
+  static async createDepartmentDeduction(req, res) {
     try {
-      if (
-        !PermissionChecker.hasPermission(req.user, Permission.VIEW_DEDUCTIONS)
-      ) {
-        throw new ApiError(403, "Not authorized to view deductions");
-      }
+      const adminDepartmentId = req.user.department;
+      const deductionData = {
+        ...req.body,
+        department: adminDepartmentId,
+        scope: DeductionScope.DEPARTMENT,
+        createdBy: req.user._id,
+      };
 
-      const admin = await UserModel.findById(req.user.id);
-      if (!admin?.department) {
-        throw new ApiError(400, "Admin is not assigned to any department");
-      }
+      const deduction = await DeductionService.createDepartmentDeduction(
+        req.user._id,
+        adminDepartmentId,
+        deductionData
+      );
 
-      const deductions = await Deduction.find({
-        department: admin.department,
-        type: "voluntary", // Only show voluntary deductions
-      })
-        .populate("department", "name")
-        .populate("createdBy", "firstName lastName")
-        .populate("updatedBy", "firstName lastName")
-        .sort({ createdAt: -1 });
-
-      res.status(200).json({
+      res.status(201).json({
         success: true,
-        data: deductions,
+        message: "Department deduction created successfully",
+        data: deduction,
       });
     } catch (error) {
       const { statusCode, message } = handleError(error);
@@ -492,35 +490,16 @@ export class AdminController {
     }
   }
 
-  static async getDeductionDetails(req, res) {
+  static async getDepartmentDeductions(req, res) {
     try {
-      if (
-        !PermissionChecker.hasPermission(req.user, Permission.VIEW_DEDUCTIONS)
-      ) {
-        throw new ApiError(403, "Not authorized to view deduction details");
-      }
-
-      const admin = await UserModel.findById(req.user.id);
-      if (!admin?.department) {
-        throw new ApiError(400, "Admin is not assigned to any department");
-      }
-
-      const deduction = await Deduction.findOne({
-        _id: req.params.id,
-        department: admin.department,
-        type: "voluntary", // Only show voluntary deductions
-      })
-        .populate("department", "name")
-        .populate("createdBy", "firstName lastName")
-        .populate("updatedBy", "firstName lastName");
-
-      if (!deduction) {
-        throw new ApiError(404, "Deduction not found");
-      }
+      const adminDepartmentId = req.user.department;
+      const deductions = await DeductionService.getDepartmentDeductions(
+        adminDepartmentId
+      );
 
       res.status(200).json({
         success: true,
-        data: deduction,
+        data: deductions,
       });
     } catch (error) {
       const { statusCode, message } = handleError(error);
@@ -615,6 +594,198 @@ export class AdminController {
     }
   }
 
+  // Employee Deduction Assignment
+  static async assignDepartmentDeductionToEmployee(req, res) {
+    try {
+      const { deductionId, employeeId } = req.params;
+      const adminDepartmentId = req.user.department;
+
+      // Verify employee belongs to admin's department
+      const employee = await UserModel.findOne({
+        _id: employeeId,
+        department: adminDepartmentId,
+      });
+
+      if (!employee) {
+        throw new ApiError(
+          403,
+          "Cannot assign deduction to employee from different department"
+        );
+      }
+
+      const deduction = await DeductionService.assignDeductionToEmployee(
+        deductionId,
+        employeeId,
+        req.user._id
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Deduction assigned successfully",
+        data: deduction,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async assignDepartmentDeductionToMultipleEmployees(req, res) {
+    try {
+      const { deductionId } = req.params;
+      const { employeeIds } = req.body;
+      const adminDepartmentId = req.user.department;
+
+      // Verify all employees belong to admin's department
+      const departmentEmployees = await UserModel.find({
+        _id: { $in: employeeIds },
+        department: adminDepartmentId,
+      });
+
+      if (departmentEmployees.length !== employeeIds.length) {
+        throw new ApiError(
+          403,
+          "Some employees do not belong to your department"
+        );
+      }
+
+      const result = await DeductionService.assignDeductionToMultipleEmployees(
+        deductionId,
+        employeeIds,
+        req.user._id
+      );
+
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: result.deduction,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async removeDeductionFromEmployee(req, res) {
+    try {
+      const admin = await UserModel.findById(req.user.id).populate(
+        "department"
+      );
+      if (!admin.department) {
+        throw new ApiError(400, "Admin must be assigned to a department");
+      }
+
+      const { deductionId, employeeId } = req.params;
+
+      // Verify the employee belongs to admin's department
+      const employee = await UserModel.findOne({
+        _id: employeeId,
+        department: admin.department._id,
+      });
+
+      if (!employee) {
+        throw new ApiError(404, "Employee not found in your department");
+      }
+
+      // Verify the deduction belongs to admin's department
+      const deduction = await Deduction.findOne({
+        _id: deductionId,
+        department: admin.department._id,
+      });
+
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found in your department");
+      }
+
+      const result = await DeductionService.removeDeductionFromEmployee(
+        deductionId,
+        employeeId,
+        req.user.id
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Deduction removed successfully",
+        data: result,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async getDepartmentEmployeeDeductions(req, res) {
+    try {
+      const admin = await UserModel.findById(req.user.id).populate(
+        "department"
+      );
+      if (!admin.department) {
+        throw new ApiError(400, "Admin must be assigned to a department");
+      }
+
+      const { employeeId } = req.params;
+
+      // Verify employee belongs to admin's department
+      const employee = await UserModel.findOne({
+        _id: employeeId,
+        department: admin.department._id,
+      });
+
+      if (!employee) {
+        throw new ApiError(404, "Employee not found in your department");
+      }
+
+      const deductions = await DeductionService.getEmployeeDeductions(
+        employeeId
+      );
+
+      res.status(200).json({
+        success: true,
+        data: deductions,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  // General Deduction Management
+  static async getDeductionDetails(req, res) {
+    try {
+      if (
+        !PermissionChecker.hasPermission(req.user, Permission.VIEW_DEDUCTIONS)
+      ) {
+        throw new ApiError(403, "Not authorized to view deduction details");
+      }
+
+      const admin = await UserModel.findById(req.user.id);
+      if (!admin?.department) {
+        throw new ApiError(400, "Admin is not assigned to any department");
+      }
+
+      const deduction = await Deduction.findOne({
+        _id: req.params.id,
+        department: admin.department,
+        type: "voluntary", // Only show voluntary deductions
+      })
+        .populate("department", "name")
+        .populate("createdBy", "firstName lastName")
+        .populate("updatedBy", "firstName lastName");
+
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found");
+      }
+
+      res.status(200).json({
+        success: true,
+        data: deduction,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
   static async toggleDeductionStatus(req, res) {
     try {
       if (
@@ -648,6 +819,95 @@ export class AdminController {
           deduction.isActive ? "activated" : "deactivated"
         } successfully`,
         data: deduction,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async removeDepartmentDeductionFromMultipleEmployees(req, res) {
+    try {
+      const { deductionId } = req.params;
+      const { employeeIds, reason } = req.body;
+      const adminDepartmentId = req.user.department;
+
+      if (!employeeIds || !Array.isArray(employeeIds)) {
+        throw new ApiError(400, "Employee IDs array is required");
+      }
+
+      // Verify all employees belong to admin's department
+      const departmentEmployees = await UserModel.find({
+        _id: { $in: employeeIds },
+        department: adminDepartmentId,
+      });
+
+      if (departmentEmployees.length !== employeeIds.length) {
+        throw new ApiError(
+          403,
+          "Some employees do not belong to your department"
+        );
+      }
+
+      // Verify the deduction belongs to admin's department
+      const deduction = await Deduction.findOne({
+        _id: deductionId,
+        department: adminDepartmentId,
+      });
+
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found in your department");
+      }
+
+      const result =
+        await DeductionService.removeDeductionFromMultipleEmployees(
+          deductionId,
+          employeeIds,
+          req.user._id,
+          reason
+        );
+
+      res.status(200).json({
+        success: true,
+        message: "Deductions removed successfully",
+        data: result,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async getDepartmentDeductionHistory(req, res) {
+    try {
+      const { deductionId } = req.params;
+      const adminDepartmentId = req.user.department;
+
+      // Verify the deduction belongs to admin's department
+      const deduction = await Deduction.findOne({
+        _id: deductionId,
+        department: adminDepartmentId,
+      }).populate({
+        path: "assignmentHistory",
+        populate: [
+          {
+            path: "employee",
+            select: "firstName lastName employeeId",
+          },
+          {
+            path: "by",
+            select: "firstName lastName",
+          },
+        ],
+      });
+
+      if (!deduction) {
+        throw new ApiError(404, "Deduction not found in your department");
+      }
+
+      res.status(200).json({
+        success: true,
+        data: deduction.assignmentHistory,
       });
     } catch (error) {
       const { statusCode, message } = handleError(error);

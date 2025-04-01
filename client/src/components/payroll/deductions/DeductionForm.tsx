@@ -1,8 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { FaSave, FaTimes } from "react-icons/fa";
 import { ImSpinner8 } from "react-icons/im";
-import { Deduction, CalculationMethod } from "../../../types/deduction";
+import {
+  Deduction,
+  CalculationMethod,
+  DeductionCategory,
+  DeductionScope,
+  DeductionApplicability,
+  TaxBracket,
+} from "../../../types/deduction";
 import { FormSkeleton } from "./Skeletons";
 
 interface DeductionFormProps {
@@ -19,12 +26,77 @@ interface FormInputs {
   calculationMethod: CalculationMethod;
   value: number;
   effectiveDate: Date;
-  taxBrackets?: {
-    min: number;
-    max: number | null;
-    rate: number;
-  }[];
+  taxBrackets?: TaxBracket[];
+  category: DeductionCategory;
+  scope: DeductionScope;
+  applicability: DeductionApplicability;
+  isCustom: boolean;
 }
+
+// Add these constants at the top of the file after imports
+const STATUTORY_CATEGORIES = [
+  { value: "tax", label: "Tax" },
+  { value: "pension", label: "Pension" },
+  { value: "housing", label: "Housing" },
+  { value: "general", label: "General" },
+];
+
+const VOLUNTARY_CATEGORIES = [
+  { value: "loan", label: "Loan Repayment" },
+  { value: "insurance", label: "Insurance" },
+  { value: "association", label: "Association Dues" },
+  { value: "savings", label: "Savings" },
+  { value: "miscellaneous", label: "Miscellaneous" },
+];
+
+// First, create a helper function to get the value field label and validation
+const getValueFieldConfig = (
+  deductionType: string,
+  calculationMethod: string
+) => {
+  switch (calculationMethod) {
+    case CalculationMethod.FIXED:
+      return {
+        label: "Fixed Amount",
+        suffix: "NGN",
+        placeholder: "Enter fixed amount",
+        step: "1",
+        validation: {
+          required: "Amount is required",
+          min: { value: 0, message: "Amount cannot be negative" },
+          max: { value: 1000000000, message: "Amount is too large" },
+        },
+      };
+    case CalculationMethod.PERCENTAGE:
+      return {
+        label: "Percentage Value",
+        suffix: "%",
+        placeholder: "Enter percentage (e.g., 1.5)",
+        step: "0.01",
+        validation: {
+          required: "Percentage is required",
+          min: { value: 0, message: "Percentage cannot be negative" },
+          max: { value: 100, message: "Percentage cannot exceed 100%" },
+        },
+      };
+    case CalculationMethod.PROGRESSIVE:
+      return {
+        label: "Progressive Rate",
+        suffix: "",
+        placeholder: "Configure tax brackets below",
+        step: "0.01",
+        validation: {},
+      };
+    default:
+      return {
+        label: "Value",
+        suffix: "",
+        placeholder: "Enter value",
+        step: "1",
+        validation: { required: "Value is required" },
+      };
+  }
+};
 
 export const DeductionForm = ({
   deduction,
@@ -38,13 +110,10 @@ export const DeductionForm = ({
   const [showTaxBrackets, setShowTaxBrackets] = useState(
     deduction?.calculationMethod === CalculationMethod.PROGRESSIVE
   );
-  const [calculationMethod] = useState(
-    deduction?.calculationMethod || CalculationMethod.FIXED
-  );
 
   const {
     register,
-    // handleSubmit,
+    handleSubmit,
     formState: { errors },
     watch,
     setValue,
@@ -57,8 +126,16 @@ export const DeductionForm = ({
       value: deduction?.value || 0,
       effectiveDate: deduction?.effectiveDate || new Date(),
       taxBrackets: deduction?.taxBrackets || [{ min: 0, max: null, rate: 0 }],
+      category: deduction?.category || DeductionCategory.GENERAL,
+      scope: deduction?.scope || DeductionScope.COMPANY_WIDE,
+      applicability:
+        deduction?.applicability || DeductionApplicability.INDIVIDUAL,
+      isCustom: deduction?.isCustom || false,
     },
   });
+
+  // Watch calculationMethod here
+  const calculationMethod = watch("calculationMethod");
 
   const taxBrackets = watch("taxBrackets");
 
@@ -81,9 +158,25 @@ export const DeductionForm = ({
     e.preventDefault();
     setSubmitting(true);
     try {
-      await onSubmit(watch());
+      const formData = watch();
+
+      // Format the data properly
+      const formattedData = {
+        ...formData,
+        // Parse value based on calculation method
+        value:
+          formData.calculationMethod === CalculationMethod.PERCENTAGE
+            ? parseFloat(formData.value.toString())
+            : Math.round(formData.value),
+        // Use current date if effectiveDate is empty
+        effectiveDate: formData.effectiveDate || new Date(),
+      };
+
+      await onSubmit(formattedData);
     } catch (error) {
       console.error("Form submission failed:", error);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -100,6 +193,12 @@ export const DeductionForm = ({
       { value: CalculationMethod.PERCENTAGE, label: "Percentage Based" },
     ];
   };
+
+  useEffect(() => {
+    setValue("value", 0);
+
+    setShowTaxBrackets(calculationMethod === CalculationMethod.PROGRESSIVE);
+  }, [calculationMethod, setValue]);
 
   if (isLoading) return <FormSkeleton />;
 
@@ -167,10 +266,14 @@ export const DeductionForm = ({
           {calculationMethod !== CalculationMethod.PROGRESSIVE && (
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Value{" "}
-                {calculationMethod === CalculationMethod.FIXED
-                  ? "(NGN)"
-                  : "(%)"}
+                {calculationMethod === CalculationMethod.PERCENTAGE
+                  ? "Percentage Value"
+                  : "Fixed Amount"}
+                <span className="ml-1 text-xs text-gray-500">
+                  {calculationMethod === CalculationMethod.PERCENTAGE
+                    ? "(0-100%)"
+                    : "(NGN)"}
+                </span>
               </label>
               <div className="mt-1 relative rounded-md shadow-sm">
                 <input
@@ -182,7 +285,13 @@ export const DeductionForm = ({
                   }
                   {...register("value", {
                     required: "Value is required",
-                    min: { value: 0, message: "Value must be positive" },
+                    min: {
+                      value: 0,
+                      message:
+                        calculationMethod === CalculationMethod.PERCENTAGE
+                          ? "Percentage cannot be negative"
+                          : "Amount cannot be negative",
+                    },
                     max: {
                       value:
                         calculationMethod === CalculationMethod.PERCENTAGE
@@ -194,10 +303,12 @@ export const DeductionForm = ({
                           : "Amount is too large",
                     },
                   })}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
+                  className={`block w-full rounded-md border-gray-300 shadow-sm 
+                    focus:border-green-500 focus:ring-green-500 sm:text-sm
+                    ${errors.value ? "border-red-300" : ""}`}
                   placeholder={
                     calculationMethod === CalculationMethod.PERCENTAGE
-                      ? "Enter percentage"
+                      ? "Enter percentage (e.g., 1.5)"
                       : "Enter amount"
                   }
                 />
@@ -218,6 +329,9 @@ export const DeductionForm = ({
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Effective Date
+              <span className="ml-1 text-xs text-gray-500">
+                (Leave empty for today's date)
+              </span>
             </label>
             <input
               type="date"
@@ -289,6 +403,84 @@ export const DeductionForm = ({
           ))}
         </div>
       )}
+
+      {/* Add new fields after the calculation method */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label
+            htmlFor="category"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Category
+          </label>
+          <select
+            id="category"
+            {...register("category", { required: "Category is required" })}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
+          >
+            <option value="">Select a category</option>
+            {(deductionType === "statutory"
+              ? STATUTORY_CATEGORIES
+              : VOLUNTARY_CATEGORIES
+            ).map((category) => (
+              <option key={category.value} value={category.value}>
+                {category.label}
+              </option>
+            ))}
+          </select>
+          {errors.category && (
+            <p className="mt-1 text-sm text-red-600">
+              {errors.category.message}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Scope
+          </label>
+          <select
+            {...register("scope")}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
+          >
+            {Object.values(DeductionScope).map((scope) => (
+              <option key={scope} value={scope}>
+                {scope
+                  .split("_")
+                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                  .join(" ")}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Applicability
+          </label>
+          <select
+            {...register("applicability")}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"
+          >
+            {Object.values(DeductionApplicability).map((applicability) => (
+              <option key={applicability} value={applicability}>
+                {applicability.charAt(0).toUpperCase() + applicability.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            {...register("isCustom")}
+            className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+          />
+          <label className="ml-2 block text-sm text-gray-900">
+            Custom Deduction
+          </label>
+        </div>
+      </div>
 
       {/* Action Buttons - Full Width */}
       <div className="flex justify-end space-x-3 border-t pt-6">

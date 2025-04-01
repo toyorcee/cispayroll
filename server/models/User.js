@@ -110,6 +110,10 @@ export const Permission = {
 
   // Dashboard Access
   VIEW_DASHBOARD: "VIEW_DASHBOARD",
+
+  // New permissions
+  MANAGE_DEPARTMENT_DEDUCTIONS: "MANAGE_DEPARTMENT_DEDUCTIONS",
+  VIEW_DEPARTMENT_DEDUCTIONS: "VIEW_DEPARTMENT_DEDUCTIONS",
 };
 
 export const UserLifecycleState = {
@@ -150,6 +154,14 @@ export const OffboardingStatus = {
   PENDING_EXIT: "pending_exit",
   COMPLETED: "completed",
   CANCELLED: "cancelled",
+};
+
+// Add new enum for deduction opt-out reasons
+export const DeductionOptOutReason = {
+  PERSONAL_CHOICE: "personal_choice",
+  ALTERNATIVE_PLAN: "alternative_plan",
+  TEMPORARY_SUSPENSION: "temporary_suspension",
+  OTHER: "other",
 };
 
 // Schema Definition
@@ -449,6 +461,142 @@ const UserSchema = new Schema(
     lastPasswordAttempt: {
       type: Date,
     },
+    deductionPreferences: {
+      statutory: {
+        // Default statutory deductions
+        defaultStatutory: {
+          "paye tax": {
+            opted: { type: Boolean, default: true },
+            optedAt: Date,
+            optedBy: { type: Schema.Types.ObjectId, ref: "User" },
+            reason: {
+              type: String,
+              enum: Object.values(DeductionOptOutReason),
+            },
+            notes: String,
+          },
+          pension: {
+            opted: { type: Boolean, default: true },
+            optedAt: Date,
+            optedBy: { type: Schema.Types.ObjectId, ref: "User" },
+            reason: {
+              type: String,
+              enum: Object.values(DeductionOptOutReason),
+            },
+            notes: String,
+          },
+          nhf: {
+            opted: { type: Boolean, default: true },
+            optedAt: Date,
+            optedBy: { type: Schema.Types.ObjectId, ref: "User" },
+            reason: {
+              type: String,
+              enum: Object.values(DeductionOptOutReason),
+            },
+            notes: String,
+          },
+        },
+
+        customStatutory: [
+          {
+            deduction: {
+              type: Schema.Types.ObjectId,
+              ref: "Deduction",
+              required: true,
+            },
+            opted: { type: Boolean, default: false },
+            optedAt: Date,
+            optedBy: { type: Schema.Types.ObjectId, ref: "User" },
+            approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
+            approvedAt: Date,
+            reason: {
+              type: String,
+              enum: Object.values(DeductionOptOutReason),
+            },
+            notes: String,
+          },
+        ],
+      },
+
+      voluntary: {
+        standardVoluntary: [
+          {
+            deduction: {
+              type: Schema.Types.ObjectId,
+              ref: "Deduction",
+              required: true,
+            },
+            opted: { type: Boolean, default: false },
+            startDate: { type: Date, required: true },
+            endDate: Date,
+            optedAt: Date,
+            optedBy: { type: Schema.Types.ObjectId, ref: "User" },
+            approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
+            approvedAt: Date,
+            amount: Number,
+            percentage: Number,
+            notes: String,
+          },
+        ],
+
+        // Custom voluntary deductions
+        customVoluntary: [
+          {
+            deduction: {
+              type: Schema.Types.ObjectId,
+              ref: "Deduction",
+              required: true,
+            },
+            opted: { type: Boolean, default: false },
+            startDate: { type: Date, required: true },
+            endDate: Date,
+            optedAt: Date,
+            optedBy: { type: Schema.Types.ObjectId, ref: "User" },
+            approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
+            approvedAt: Date,
+            amount: Number,
+            percentage: Number,
+            notes: String,
+          },
+        ],
+      },
+    },
+    personalAllowances: [
+      {
+        allowance: {
+          type: Schema.Types.ObjectId,
+          ref: "Allowance",
+        },
+        assignedAt: Date,
+        assignedBy: {
+          type: Schema.Types.ObjectId,
+          ref: "User",
+        },
+        status: {
+          type: String,
+          enum: ["PENDING", "APPROVED", "REJECTED"],
+          default: "PENDING",
+        },
+      },
+    ],
+    personalBonuses: [
+      {
+        bonus: {
+          type: Schema.Types.ObjectId,
+          ref: "Bonus",
+        },
+        assignedAt: Date,
+        assignedBy: {
+          type: Schema.Types.ObjectId,
+          ref: "User",
+        },
+        status: {
+          type: String,
+          enum: ["PENDING", "APPROVED", "REJECTED"],
+          default: "PENDING",
+        },
+      },
+    ],
   },
   {
     timestamps: true,
@@ -595,6 +743,10 @@ UserSchema.pre("save", function (next) {
 
           Permission.VIEW_DISCIPLINARY_RECORDS,
           Permission.MANAGE_DISCIPLINARY_ACTIONS,
+
+          // New permissions
+          Permission.MANAGE_DEPARTMENT_DEDUCTIONS,
+          Permission.VIEW_DEPARTMENT_DEDUCTIONS,
         ];
         break;
 
@@ -649,6 +801,10 @@ UserSchema.pre("save", function (next) {
           // Deductions Management
           Permission.VIEW_DEDUCTIONS,
           Permission.EDIT_DEDUCTIONS,
+
+          // New permissions
+          Permission.MANAGE_DEPARTMENT_DEDUCTIONS,
+          Permission.VIEW_DEPARTMENT_DEDUCTIONS,
         ];
         break;
 
@@ -664,6 +820,10 @@ UserSchema.pre("save", function (next) {
           Permission.VIEW_OWN_ALLOWANCES,
           Permission.REQUEST_ALLOWANCES,
           Permission.VIEW_OWN_DEDUCTIONS,
+
+          // New permissions
+          Permission.MANAGE_DEPARTMENT_DEDUCTIONS,
+          Permission.VIEW_DEPARTMENT_DEDUCTIONS,
         ];
         break;
     }
@@ -754,6 +914,72 @@ UserSchema.methods.canTransitionTo = function (newState) {
   };
 
   return validTransitions[newState].includes(this.lifecycle.currentState);
+};
+
+// Add method to check if user can manage deductions
+UserSchema.methods.canManageDeductions = function () {
+  return (
+    this.role === "SUPER_ADMIN" ||
+    (this.role === "ADMIN" &&
+      this.permissions.includes("MANAGE_DEPARTMENT_DEDUCTIONS"))
+  );
+};
+
+// Add method to check if user can view deductions
+UserSchema.methods.canViewDeductions = function () {
+  return (
+    this.role === "SUPER_ADMIN" ||
+    this.permissions.includes("VIEW_DEDUCTIONS") ||
+    this.permissions.includes("VIEW_DEPARTMENT_DEDUCTIONS")
+  );
+};
+
+// Add helper methods for deduction management
+UserSchema.methods.hasDeduction = function (deductionId) {
+  const allDeductions = [
+    ...this.deductionPreferences.statutory.customStatutory,
+    ...this.deductionPreferences.voluntary.standardVoluntary,
+    ...this.deductionPreferences.voluntary.customVoluntary,
+  ];
+  return allDeductions.some(
+    (d) => d.deduction.toString() === deductionId.toString()
+  );
+};
+
+UserSchema.methods.isOptedIntoDeduction = function (deductionId) {
+  const allDeductions = [
+    ...this.deductionPreferences.statutory.customStatutory,
+    ...this.deductionPreferences.voluntary.standardVoluntary,
+    ...this.deductionPreferences.voluntary.customVoluntary,
+  ];
+  const deduction = allDeductions.find(
+    (d) => d.deduction.toString() === deductionId.toString()
+  );
+  return deduction ? deduction.opted : false;
+};
+
+UserSchema.methods.getActiveDeductions = function () {
+  const now = new Date();
+  return {
+    statutory: {
+      default: {
+        pension:
+          this.deductionPreferences.statutory.defaultStatutory.pension.opted,
+        nhf: this.deductionPreferences.statutory.defaultStatutory.nhf.opted,
+      },
+      custom: this.deductionPreferences.statutory.customStatutory.filter(
+        (d) => d.opted
+      ),
+    },
+    voluntary: {
+      standard: this.deductionPreferences.voluntary.standardVoluntary.filter(
+        (d) => d.opted && d.startDate <= now && (!d.endDate || d.endDate >= now)
+      ),
+      custom: this.deductionPreferences.voluntary.customVoluntary.filter(
+        (d) => d.opted && d.startDate <= now && (!d.endDate || d.endDate >= now)
+      ),
+    },
+  };
 };
 
 export default mongoose.model("User", UserSchema);

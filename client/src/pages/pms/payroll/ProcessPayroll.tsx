@@ -183,9 +183,7 @@ export default function ProcessPayroll() {
     queryFn: () => payrollService.getPayrollPeriods(),
   });
 
-  const {
-    isLoading: isStatsLoading,
-  } = useQuery<PayrollStats>({
+  const { isLoading: isStatsLoading } = useQuery<PayrollStats>({
     queryKey: ["payrollStats"],
     queryFn: () => payrollService.getPayrollStats(),
   });
@@ -199,7 +197,6 @@ export default function ProcessPayroll() {
     )
     .reduce((sum, period) => sum + (period.totalNetSalary || 0), 0);
 
-
   // Calculate employees to process (only PENDING payrolls)
   const employeesToProcess = periodsData
     .filter((period) => period.status === PayrollStatus.PENDING)
@@ -210,28 +207,25 @@ export default function ProcessPayroll() {
     (period) => period.status === PayrollStatus.PENDING
   ).length;
 
-
   // Fixed filtered periods
   const filteredPeriods =
     selectedStatus === "all"
       ? periodsData
       : periodsData.filter((period) => period.status === selectedStatus);
 
-
   const handleViewPeriodDetails = async (period: PayrollPeriod) => {
     try {
-      // Show the modal first with loading state
       setShowPeriodModal(true);
-      setSelectedPeriodData(null); // This will trigger the skeleton
+      setSelectedPeriodData(null); // Show loading state
 
-      // Then fetch the data
       const periodData = await payrollService.getPeriodPayroll(
         period.month,
         period.year
       );
       setSelectedPeriodData(periodData);
-    } catch {
-      toast.error("Failed to fetch period payroll data");
+    } catch (error) {
+      console.error("Failed to fetch period details:", error);
+      toast.error("Failed to fetch period details");
       setShowPeriodModal(false);
     }
   };
@@ -289,16 +283,22 @@ export default function ProcessPayroll() {
 
   const EmptyState = () => (
     <tr>
-      <td colSpan={6} className="px-6 py-12 text-center">
-        <div className="flex flex-col items-center justify-center space-y-3">
-          <FaMoneyBill className="h-12 w-12 text-gray-300" />
-          <div className="text-gray-500 text-lg font-medium">
-            No Payroll Data
+      <td colSpan={6} className="h-[calc(100vh-300px)]">
+        <div className="flex h-full w-full items-center justify-center">
+          <div className="flex flex-col items-center justify-center space-y-6 p-10 rounded-xl bg-green-50/50 ml-56">
+            <div className="p-5 rounded-full bg-green-100">
+              <FaMoneyBill className="h-14 w-14 text-green-600" />
+            </div>
+            <div className="text-center space-y-3">
+              <h3 className="text-2xl font-semibold text-green-600">
+                No Payroll Data
+              </h3>
+              <p className="text-gray-600 text-base max-w-sm leading-relaxed">
+                Start by clicking "Run New Payroll" to begin processing payroll
+                for this period
+              </p>
+            </div>
           </div>
-          <p className="text-gray-400 text-sm max-w-sm">
-            Start by clicking "Run New Payroll" to begin processing payroll for
-            this period
-          </p>
         </div>
       </td>
     </tr>

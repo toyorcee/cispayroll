@@ -78,16 +78,22 @@ router.get(
 );
 
 // ===== Deduction Management Routes =====
-router.get(
-  "/deductions",
-  requirePermission([Permission.VIEW_OWN_PAYSLIP]),
-  RegularUserController.getMyDeductions
-);
+// router.get(
+//   "/deductions",
+//   requirePermission([Permission.VIEW_OWN_PAYSLIP]),
+//   RegularUserController.getMyDeductions
+// );
 
 router.get(
   "/deductions/:id",
   requirePermission([Permission.VIEW_OWN_PAYSLIP]),
   RegularUserController.getDeductionDetails
+);
+
+router.get(
+  "/deductions",
+  requirePermission([Permission.VIEW_OWN_DEDUCTIONS]),
+  RegularUserController.getMyDeductions
 );
 
 export default router;

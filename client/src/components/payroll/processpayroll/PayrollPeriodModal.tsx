@@ -97,10 +97,12 @@ const mapPayslipDataToComponentFormat = (
         amount: 0,
       },
       others: Array.isArray(data.payroll.deductions?.others)
-        ? data.payroll.deductions.others.map((item: { description: string; amount: number }) => ({
-            name: item.description || "Unknown",
-            amount: item.amount || 0,
-          }))
+        ? data.payroll.deductions.others.map(
+            (item: { description: string; amount: number }) => ({
+              name: item.description || "Unknown",
+              amount: item.amount || 0,
+            })
+          )
         : [],
       totalDeductions: data.payroll.totalDeductions,
     },
@@ -119,7 +121,7 @@ const mapPayslipDataToComponentFormat = (
     basicSalary: data.payroll.basicSalary,
     month: data.payroll.month,
     year: data.payroll.year,
-    
+
     status: data.status,
     createdAt: data.processedAt,
     periodStart: "",
@@ -185,7 +187,7 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
   isOpen,
   onClose,
   data,
-  // onViewPayslip,
+  onViewPayslip,
   onViewHistory,
   isLoading,
   onShowPeriodModal,
@@ -276,12 +278,27 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
 
   const handleViewHistory = async (employeeId: string) => {
     try {
+      if (!employeeId) {
+        throw new Error("Employee ID is missing");
+      }
+
       setLoadingHistoryId(employeeId);
+      console.log("Viewing history for employee:", employeeId);
+
+      // Close modal after setting loading state
       onClose();
+
+      // Call the parent handler
       await onViewHistory(employeeId);
     } catch (error) {
       console.error("Failed to view history:", error);
-      toast.error("Failed to view history");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to view history"
+      );
+      // Reopen the period modal if there's an error
+      if (onShowPeriodModal) {
+        onShowPeriodModal();
+      }
     } finally {
       setLoadingHistoryId(null);
     }
@@ -292,11 +309,16 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
     payrollId,
   }) => (
     <div className="flex items-center space-x-1">
-      {/* History Button - Fixed loading state */}
+      {/* History Button */}
       <button
-        onClick={() => handleViewHistory(employeeId)}
-        disabled={loadingHistoryId === employeeId}
-        className="text-gray-600 hover:text-gray-800 p-1.5 rounded hover:bg-gray-50 transition-colors duration-200 flex items-center gap-1 min-w-[70px] justify-center disabled:opacity-50"
+        onClick={() => {
+          console.log("Employee ID for history:", employeeId); // Add this log
+          handleViewHistory(employeeId);
+        }}
+        disabled={!employeeId || loadingHistoryId === employeeId}
+        className="text-gray-600 hover:text-gray-800 p-1.5 rounded hover:bg-gray-50 
+                   transition-colors duration-200 flex items-center gap-1 min-w-[70px] 
+                   justify-center disabled:opacity-50"
         title="View payment history"
       >
         {loadingHistoryId === employeeId ? (
@@ -391,214 +413,138 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
   );
 
   return (
-    <>
-      {/* Period Modal */}
-      {activeModal === "period" && (
-        <BaseModal
-          isOpen={isOpen}
-          onClose={onClose}
-          title={
-            data
-              ? `Payroll Details - ${data.period.monthName} ${data.period.year}`
-              : "Loading Payroll Details..."
-          }
-          maxWidth="max-w-7xl"
-          className="z-[1000]"
-        >
-          {isLoading || !data ? (
-            <PeriodModalSkeleton />
-          ) : (
-            <div className="space-y-6">
-              {/* Summary Statistics */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm font-medium text-gray-700">
-                    Total Net Pay
-                  </p>
-                  <p className="text-xl font-semibold text-green-600">
-                    ₦{data.summary.totalNetPay.toLocaleString()}
-                  </p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm font-medium text-gray-700">
-                    Total Employees
-                  </p>
-                  <p className="text-xl font-semibold text-blue-600">
-                    {data.summary.totalEmployees}
-                  </p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm font-medium text-gray-700">
-                    Status Breakdown
-                  </p>
-                  <div className="flex gap-2 flex-wrap mt-2">
-                    {Object.entries(data.summary.statusBreakdown).map(
-                      ([status, count]) => (
-                        <Chip
-                          key={status}
-                          label={`${status}: ${count}`}
-                          size="small"
-                          color={getChipColor(status)}
-                        />
-                      )
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Employees Table */}
-              <TableContainer component={Paper}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Employee</TableCell>
-                      <TableCell>Department</TableCell>
-                      <TableCell>Grade Level</TableCell>
-                      <TableCell>Basic Salary</TableCell>
-                      <TableCell>Allowances</TableCell>
-                      <TableCell>Deductions</TableCell>
-                      <TableCell>Net Pay</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {data.employees
-                      .slice(
-                        page * rowsPerPage,
-                        page * rowsPerPage + rowsPerPage
-                      )
-                      .map((row) => (
-                        <TableRow key={row.id}>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">
-                                {row.employee.name}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                {row.employee.employeeId}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>{row.department}</TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">
-                                {row.salaryGrade.level}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                {row.salaryGrade.description}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            ₦{row.payroll.basicSalary.toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            ₦{row.payroll.totalAllowances.toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            ₦{row.payroll.totalDeductions.toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            ₦{row.payroll.netPay.toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={row.status}
-                              color={getChipColor(row.status)}
-                              size="small"
-                            />
-                          </TableCell>
-                          <TableCell className="min-w-[250px]">
-                            <ActionButtons
-                              employeeId={row.employee.id}
-                              payrollId={row.id}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-                <TablePagination
-                  rowsPerPageOptions={[5, 10, 25]}
-                  component="div"
-                  count={data.employees.length}
-                  rowsPerPage={rowsPerPage}
-                  page={page}
-                  onPageChange={handleChangePage}
-                  onRowsPerPageChange={handleChangeRowsPerPage}
-                />
-              </TableContainer>
+    <BaseModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={
+        data
+          ? `Payroll Details - ${data.period.monthName} ${data.period.year}`
+          : "Loading Payroll Details..."
+      }
+      maxWidth="max-w-7xl"
+      className="z-[1000]"
+    >
+      {isLoading || !data ? (
+        <PeriodModalSkeleton />
+      ) : (
+        <div className="space-y-6">
+          {/* Summary Statistics */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm font-medium text-gray-700">Total Net Pay</p>
+              <p className="text-xl font-semibold text-green-600">
+                ₦{data.summary.totalNetPay.toLocaleString()}
+              </p>
             </div>
-          )}
-        </BaseModal>
-      )}
-
-      {/* PaySlip Modal Overlay */}
-      {showPayslip && selectedPayslip && (
-        <div className="fixed inset-0 bg-black/50 z-[100] overflow-y-auto">
-          <div className="min-h-screen pt-20 pb-10">
-            <div className="w-[210mm] lg:ml-[400px] mx-auto bg-white rounded-lg shadow-xl">
-              <div className="bg-green-600 px-6 py-4 flex justify-between items-center rounded-t-lg">
-                <h2 className="text-xl font-semibold text-white">
-                  Payslip Details
-                </h2>
-                <button
-                  onClick={() => {
-                    handleClosePayslip();
-                  }}
-                  className="px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 flex items-center gap-2 transition-colors"
-                >
-                  <span>Close</span>
-                </button>
-              </div>
-
-              <div className="px-8 py-6">
-                <PaySlip
-                  data={selectedPayslip}
-                  onPrint={() => window.print()}
-                />
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm font-medium text-gray-700">
+                Total Employees
+              </p>
+              <p className="text-xl font-semibold text-blue-600">
+                {data.summary.totalEmployees}
+              </p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm font-medium text-gray-700">
+                Status Breakdown
+              </p>
+              <div className="flex gap-2 flex-wrap mt-2">
+                {Object.entries(data.summary.statusBreakdown).map(
+                  ([status, count]) => (
+                    <Chip
+                      key={status}
+                      label={`${status}: ${count}`}
+                      size="small"
+                      color={getChipColor(status)}
+                    />
+                  )
+                )}
               </div>
             </div>
           </div>
+
+          {/* Employees Table */}
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Employee</TableCell>
+                  <TableCell>Department</TableCell>
+                  <TableCell>Grade Level</TableCell>
+                  <TableCell>Basic Salary</TableCell>
+                  <TableCell>Allowances</TableCell>
+                  <TableCell>Deductions</TableCell>
+                  <TableCell>Net Pay</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data.employees
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{row.employee.name}</div>
+                          <div className="text-sm text-gray-500">
+                            {row.employee.employeeId}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{row.department}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">
+                            {row.salaryGrade.level}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {row.salaryGrade.description}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        ₦{row.payroll.basicSalary.toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        ₦{row.payroll.totalAllowances.toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        ₦{row.payroll.totalDeductions.toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        ₦{row.payroll.netPay.toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={row.status}
+                          color={getChipColor(row.status)}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell className="min-w-[250px]">
+                        <ActionButtons
+                          employeeId={row.employee.id}
+                          payrollId={row.id}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25]}
+              component="div"
+              count={data.employees.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+            />
+          </TableContainer>
         </div>
       )}
-
-      {/* Delete Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={showDeleteConfirmation}
-        onClose={() => {
-          setShowDeleteConfirmation(false);
-          setPayrollToDelete(null);
-          setLoadingDeleteId(null);
-          if (onShowPeriodModal) onShowPeriodModal();
-        }}
-        onConfirm={async () => {
-          if (!payrollToDelete) return;
-          try {
-            setLoadingDeleteId(payrollToDelete);
-            await payrollService.deletePayroll(payrollToDelete);
-            toast.success("Payroll deleted successfully");
-            setShowDeleteConfirmation(false);
-            if (onShowPeriodModal) onShowPeriodModal();
-          } catch (error) {
-            console.error("Failed to delete payroll:", error);
-            toast.error("Failed to delete payroll");
-            if (onShowPeriodModal) onShowPeriodModal();
-          } finally {
-            setLoadingDeleteId(null);
-            setPayrollToDelete(null);
-          }
-        }}
-        title="Delete Payroll Record"
-        message={`Are you sure you want to delete this payroll record? This action cannot be undone.`}
-        confirmText={
-          loadingDeleteId === payrollToDelete ? "Deleting..." : "Delete"
-        }
-        cancelText="Cancel"
-      />
-    </>
+    </BaseModal>
   );
 };
 
