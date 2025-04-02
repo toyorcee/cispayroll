@@ -109,7 +109,7 @@ app.use(responseLogger);
 app.use(
   cors({
     credentials: true,
-    origin: process.env.CLIENT_URL || "https://payroll.digitalentshub.net",
+    origin: process.env.CLIENT_URL || "http://payroll.cistechlab.com",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
@@ -257,7 +257,7 @@ const startServer = async () => {
 🚀 Server is running!
 📡 Port: ${PORT}
 🌍 Environment: ${process.env.NODE_ENV}
-🔗 Client URL: ${process.env.CLIENT_URL || "https://payroll.digitalentshub.net"}
+🔗 Client URL: ${process.env.CLIENT_URL || "http://payroll.cistechlab.com"}
       `);
     });
   } catch (error) {
