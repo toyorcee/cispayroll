@@ -35,6 +35,10 @@ interface AuthContextType {
   hasAnyPermission: (permissions: Permission[]) => boolean;
   hasAllPermissions: (permissions: Permission[]) => boolean;
   hasRole: (role: UserRole) => boolean;
+  refreshUser: () => Promise<void>;
+  isSuperAdmin: () => boolean;
+  isAdmin: () => boolean;
+  isUser: () => boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
@@ -69,7 +73,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const hasRole = (role: UserRole): boolean => {
-
     if (!user) return false;
     if (user.role === UserRole.SUPER_ADMIN) return true;
     if (user.role === UserRole.ADMIN && role === UserRole.USER) return true;
@@ -112,8 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await queryClient.prefetchQuery({
           queryKey: DEPARTMENTS_QUERY_KEY,
           queryFn: departmentService.getAllDepartments,
-          staleTime: 5 * 60 * 1000, // Optional: override default staleTime
-          gcTime: 30 * 60 * 1000, // Optional: override default gcTime
+          staleTime: 5 * 60 * 1000,
+          gcTime: 30 * 60 * 1000,
         });
       } else {
         throw new Error("No user data received");
@@ -166,7 +169,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const hasPermission = (permission: Permission): boolean => {
-
     if (!user) return false;
     return user.permissions.includes(permission);
   };
@@ -185,6 +187,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const refreshUser = async () => {
+    try {
+      await fetchUserData();
+    } catch (error) {
+      console.error("Failed to refresh user data:", error);
+      toast.error("Failed to refresh user data");
+    }
+  };
+
+  const isSuperAdmin = (): boolean => {
+    return user?.role === UserRole.SUPER_ADMIN;
+  };
+
+  const isAdmin = (): boolean => {
+    return user?.role === UserRole.ADMIN;
+  };
+
+  const isUser = (): boolean => {
+    return user?.role === UserRole.USER;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -198,6 +221,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         hasAnyPermission,
         hasAllPermissions,
         hasRole,
+        refreshUser,
+        isSuperAdmin,
+        isAdmin,
+        isUser,
       }}
     >
       {children}

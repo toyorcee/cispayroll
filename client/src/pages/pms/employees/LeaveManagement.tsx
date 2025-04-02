@@ -42,7 +42,7 @@ const LeaveManagement: React.FC = () => {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([
     {
       id: "1",
-      employeeName: "John Doe",
+      employeeName: "Toyosi Olaniyan",
       leaveType: "Annual Leave",
       startDate: new Date("2024-04-15"),
       endDate: new Date("2024-04-20"),

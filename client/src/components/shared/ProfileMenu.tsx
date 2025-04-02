@@ -91,10 +91,27 @@ export function ProfileMenu({
                      variant === "sidebar" ? "w-full" : ""
                    }`}
       >
-        <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center">
-          <span className="text-sm font-medium text-green-600">
-            {getInitials()}
-          </span>
+        <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center overflow-hidden">
+          {user?.profileImage ? (
+            <img
+              src={user.profileImage}
+              alt={getFullName()}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // If image fails to load, show initials
+                const target = e.target as HTMLImageElement;
+                target.style.display = "none";
+                const fallback = document.createElement("span");
+                fallback.className = "text-sm font-medium text-green-600";
+                fallback.textContent = getInitials();
+                target.parentElement?.appendChild(fallback);
+              }}
+            />
+          ) : (
+            <span className="text-sm font-medium text-green-600">
+              {getInitials()}
+            </span>
+          )}
         </div>
         <div className={variant === "sidebar" ? "block" : "hidden sm:block"}>
           <p className="text-sm font-medium text-gray-700 text-left">

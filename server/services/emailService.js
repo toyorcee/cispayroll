@@ -884,9 +884,9 @@ export class EmailService {
               <p>This is an automated message. Please do not reply to this email.</p>
               <p>For any queries, please contact:</p>
               <p class="contact-info">HR Department</p>
-              <p>Email: hr@neovarsity.com</p>
+              <p>Email: hr@centuryinfosystems.com</p>
               <p>Phone: +91 1234567890</p>
-              <p>© ${new Date().getFullYear()} Neovarsity. All rights reserved.</p>
+              <p>© ${new Date().getFullYear()} Century Information Systems. All rights reserved.</p>
             </div>
           </div>
         </body>

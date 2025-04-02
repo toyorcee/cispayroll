@@ -104,37 +104,37 @@ export default function BonusManagement() {
             Pending Approval
           </h3>
           <p className="mt-2 text-3xl font-semibold text-yellow-600">0</p>
-        </div>
+            </div>
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-sm font-medium text-gray-500">
             Approved Bonuses
-          </h3>
+              </h3>
           <p className="mt-2 text-3xl font-semibold text-green-600">0</p>
-        </div>
+            </div>
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-sm font-medium text-gray-500">Total Amount</h3>
           <p className="mt-2 text-3xl font-semibold text-purple-600">₦0</p>
-        </div>
+          </div>
       </div>
 
       {/* Action Bar */}
       <div className="bg-white p-4 rounded-lg shadow">
         <div className="flex justify-between items-center">
-          <div className="flex space-x-4">
-            <select
+            <div className="flex space-x-4">
+              <select
               className="rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-            >
-              <option value="all">All Types</option>
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+              >
+                <option value="all">All Types</option>
               {Object.entries(BonusType).map(([key, value]) => (
                 <option key={key} value={value}>
                   {key.replace(/_/g, " ")}
                 </option>
               ))}
-            </select>
+              </select>
           </div>
-          <button
+              <button
             onClick={() => {
               setEditingBonus(undefined);
               setShowAddForm(true);
@@ -146,9 +146,9 @@ export default function BonusManagement() {
           >
             <FaPlus className="mr-2 -ml-1 h-4 w-4" />
             Add Bonus
-          </button>
-        </div>
-      </div>
+              </button>
+            </div>
+          </div>
 
       {/* Main Content */}
       <div className="bg-white shadow-sm rounded-lg">
@@ -186,7 +186,7 @@ export default function BonusManagement() {
                     <td colSpan={7} className="px-6 py-4 text-center">
                       <div className="text-gray-500 text-sm">
                         No bonuses found. Click "Add Bonus" to create one.
-                      </div>
+        </div>
                     </td>
                   </tr>
                 ) : (
@@ -194,7 +194,7 @@ export default function BonusManagement() {
                     <tr key={bonus._id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
-                          {bonus.employee}
+                    {bonus.employee}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -215,21 +215,21 @@ export default function BonusManagement() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
                           {new Date(bonus.paymentDate).toLocaleDateString()}
-                        </div>
+                </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span
+                <span
                           className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
                             ${
-                              bonus.approvalStatus === "approved"
-                                ? "bg-green-100 text-green-800"
-                                : bonus.approvalStatus === "pending"
-                                ? "bg-yellow-100 text-yellow-800"
+                    bonus.approvalStatus === "approved"
+                      ? "bg-green-100 text-green-800"
+                      : bonus.approvalStatus === "pending"
+                      ? "bg-yellow-100 text-yellow-800"
                                 : "bg-red-100 text-red-800"
-                            }`}
-                        >
-                          {bonus.approvalStatus}
-                        </span>
+                  }`}
+                >
+                  {bonus.approvalStatus}
+                </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
@@ -263,7 +263,7 @@ export default function BonusManagement() {
             </table>
           </div>
         </div>
-      </div>
+              </div>
 
       {/* Modal Form */}
       {showAddForm && (
@@ -426,6 +426,6 @@ export default function BonusManagement() {
           </div>
         </div>
       )}
-    </div>
+      </div>
   );
 }

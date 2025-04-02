@@ -14,6 +14,71 @@ import { DeductionType, DeductionScope } from "../models/Deduction.js";
 
 export class AdminController {
   // ===== User Management Methods =====
+  static async getAllEmployees(req, res, next) {
+    try {
+      if (
+        !PermissionChecker.hasPermission(req.user, Permission.VIEW_ALL_USERS)
+      ) {
+        throw new ApiError(403, "Not authorized to view all employees");
+      }
+
+      const { page = 1, limit = 10, search, status, department } = req.query;
+      const query = { role: UserRole.USER };
+
+      // Add search filter if provided
+      if (search) {
+        query.$or = [
+          { firstName: { $regex: search, $options: "i" } },
+          { lastName: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+          { employeeId: { $regex: search, $options: "i" } },
+        ];
+      }
+
+      // Add status filter if provided
+      if (status) {
+        query.status = status;
+      }
+
+      // Add department filter if provided
+      if (department) {
+        query.department = department;
+      }
+
+      // Calculate skip value for pagination
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const limitValue = parseInt(limit);
+
+      // Get total count for pagination
+      const totalUsers = await UserModel.countDocuments(query);
+
+      // Get paginated users
+      const users = await UserModel.find(query)
+        .select("-password")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitValue)
+        .populate([
+          { path: "department", select: "name" },
+          { path: "salaryGrade", select: "level basicSalary" },
+        ]);
+
+      // Calculate total pages
+      const totalPages = Math.ceil(totalUsers / limitValue);
+
+      res.status(200).json({
+        success: true,
+        users,
+        totalPages,
+        totalUsers,
+        currentPage: parseInt(page),
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
   static async getDepartmentUsers(req, res, next) {
     try {
       const admin = await UserModel.findById(req.user.id);

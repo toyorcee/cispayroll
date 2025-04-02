@@ -641,4 +641,86 @@ export const employeeService = {
       gcTime: 30 * 60 * 1000, // 30 minutes
     });
   },
+
+  // ===== Admin-specific Operations =====
+  /**
+   * Admin-specific service methods for employee operations
+   * These methods use the /admin endpoints instead of /super-admin
+   */
+  adminService: {
+    // Get all employees with filtering and pagination
+    getAllEmployees: async (filters?: EmployeeFilters) => {
+      try {
+        console.log(
+          "Fetching employees from admin endpoint:",
+          `${BASE_URL}/admin/employees`
+        );
+        const defaultFilters = {
+          page: 1,
+          limit: 10,
+          ...filters,
+        };
+
+        const response = await axios.get(`${BASE_URL}/admin/employees`, {
+          params: defaultFilters,
+        });
+        console.log("Admin employees response:", response.data);
+        return response.data;
+      } catch (error) {
+        console.error("Error fetching employees from admin endpoint:", error);
+        throw error;
+      }
+    },
+
+    // Get employees for specific department
+    getDepartmentEmployees: async (
+      departmentId: string,
+      filters: EmployeeFilters
+    ): Promise<DepartmentEmployeeResponse> => {
+      try {
+        console.log("🔄 Admin Service: Starting getDepartmentEmployees", {
+          departmentId,
+          filters,
+        });
+
+        const queryParams = new URLSearchParams();
+        if (filters.status) queryParams.append("status", filters.status);
+        queryParams.append("page", (filters.page || 1).toString());
+        queryParams.append("limit", (filters.limit || 10).toString());
+
+        const url = `${BASE_URL}/admin/departments/${departmentId}/employees?${queryParams}`;
+        const response = await axios.get(url);
+
+        return {
+          employees: response.data.data || [],
+          total: response.data.total || 0,
+          page: response.data.page || 1,
+          limit: response.data.limit || 10,
+          totalPages: response.data.totalPages || 1,
+        };
+      } catch (error) {
+        console.error(
+          "❌ Admin Service: Error in getDepartmentEmployees:",
+          error
+        );
+        if (axios.isAxiosError(error)) {
+          console.error("Error details:", {
+            status: error.response?.status,
+            data: error.response?.data,
+            url: error.config?.url,
+          });
+        }
+        throw error;
+      }
+    },
+
+    // React Query hook for admin employees
+    useGetEmployees: (filters?: EmployeeFilters) => {
+      return useQuery({
+        queryKey: ["admin", "employees", filters],
+        queryFn: () => employeeService.adminService.getAllEmployees(filters),
+        staleTime: 5 * 60 * 1000, // 5 minutes
+      });
+    },
+  },
 };

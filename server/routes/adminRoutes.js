@@ -19,6 +19,12 @@ router.use(requireAdmin);
 
 // ===== User Management Routes =====
 router.get(
+  "/employees",
+  requirePermission([Permission.VIEW_ALL_USERS]),
+  AdminController.getAllEmployees
+);
+
+router.get(
   "/users",
   requirePermission([Permission.VIEW_ALL_USERS]),
   AdminController.getDepartmentUsers
