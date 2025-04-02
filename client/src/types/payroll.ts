@@ -543,6 +543,8 @@ export interface Payslip {
     startDate: string;
     endDate: string;
     frequency: string;
+    year: number;
+    month: number;
   };
   status: string;
   earnings: {
@@ -575,6 +577,10 @@ export interface Payslip {
       rate: number;
       amount: number;
     };
+    others: Array<{
+      name: string;
+      amount: number;
+    }>;
     totalDeductions: number;
   };
   totals: {
