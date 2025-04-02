@@ -78,10 +78,10 @@ const useOnboardingData = () => {
 
   const fetchData = useCallback(
     async (page = 1, filters: OnboardingFilters = {}) => {
-      setIsLoading(true);
-      try {
-        const deps = await departmentService.getAllDepartments();
-        setDepartments(deps);
+    setIsLoading(true);
+    try {
+      const deps = await departmentService.getAllDepartments();
+      setDepartments(deps);
 
         const response = await onboardingService.getOnboardingEmployees({
           page,
@@ -126,17 +126,17 @@ const useOnboardingData = () => {
             return acc;
           }, {} as Record<string, number>),
         });
-        setError(null);
-      } catch (error: unknown) {
-        if (error instanceof Error) {
-          setError(error.message || "Failed to load data");
-        } else {
-          setError("An unknown error occurred");
-        }
-        setOnboardingEmployees([]);
-      } finally {
-        setIsLoading(false);
+      setError(null);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setError(error.message || "Failed to load data");
+      } else {
+        setError("An unknown error occurred");
       }
+      setOnboardingEmployees([]);
+    } finally {
+      setIsLoading(false);
+    }
     },
     []
   );
@@ -240,19 +240,19 @@ export default function Onboarding() {
       try {
         const response = await employeeService.getAdmins();
         if (response && Array.isArray(response)) {
-          const transformedAdmins = response.map((admin) => ({
-            _id: admin._id,
-            id: admin._id,
-            firstName: admin.firstName,
-            lastName: admin.lastName,
-            email: admin.email,
-            role: admin.role || UserRole.ADMIN,
-            status: admin.status || "active",
-            permissions: (admin.permissions || []).map(
-              (perm) => perm as Permission
-            ),
-          }));
-          setAdmins(transformedAdmins as AdminUser[]);
+        const transformedAdmins = response.map((admin) => ({
+          _id: admin._id,
+          id: admin._id,
+          firstName: admin.firstName,
+          lastName: admin.lastName,
+          email: admin.email,
+          role: admin.role || UserRole.ADMIN,
+          status: admin.status || "active",
+          permissions: (admin.permissions || []).map(
+            (perm) => perm as Permission
+          ),
+        }));
+        setAdmins(transformedAdmins as AdminUser[]);
         } else {
           setAdmins([]);
         }
@@ -277,7 +277,7 @@ export default function Onboarding() {
   const getFilteredEmployees = () => {
     const filtered =
       filters.status === "all"
-        ? onboardingEmployees
+          ? onboardingEmployees
         : onboardingEmployees.filter(
             (emp) => emp.onboarding?.status === filters.status
           );
@@ -285,19 +285,19 @@ export default function Onboarding() {
     return filtered;
   };
 
-  const handleCreateEmployee = async (e: React.FormEvent) => {
-    e.preventDefault();
+const handleCreateEmployee = async (e: React.FormEvent) => {
+  e.preventDefault();
     try {
       await employeeService.createEmployee(formData);
       toast.success("Employee created successfully");
-      setShowCreateModal(false);
+    setShowCreateModal(false);
       fetchData();
     } catch (error) {
       if (error instanceof AxiosError) {
         toast.error(
           error.response?.data?.message || "Failed to create employee"
         );
-      } else {
+    } else {
         toast.error("An unexpected error occurred");
       }
     }
@@ -374,7 +374,7 @@ export default function Onboarding() {
               ...emp,
               onboarding: {
                 ...emp.onboarding,
-                status: nextStage,
+              status: nextStage,
               },
               progress: calculateProgress(nextStage),
             };
@@ -498,23 +498,23 @@ export default function Onboarding() {
                   handleFilterChange({ ...filters, search: e.target.value })
                 }
               />
-              <select
+            <select
                 value={filters.status}
                 onChange={(e) =>
                   handleFilterChange({ ...filters, status: e.target.value })
                 }
-                className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium
+              className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium
                        text-gray-700 hover:border-sky-500 focus:outline-none focus:ring-2 
                        focus:ring-sky-500 focus:border-transparent transition-all duration-200"
-              >
-                <option value="all">All Stages</option>
-                <option value="not_started">Not Started</option>
-                <option value="contract_stage">Contract Stage</option>
-                <option value="documentation_stage">Documentation Stage</option>
-                <option value="it_setup_stage">IT Setup Stage</option>
-                <option value="training_stage">Training Stage</option>
-                <option value="completed">Completed</option>
-              </select>
+            >
+              <option value="all">All Stages</option>
+              <option value="not_started">Not Started</option>
+              <option value="contract_stage">Contract Stage</option>
+              <option value="documentation_stage">Documentation Stage</option>
+              <option value="it_setup_stage">IT Setup Stage</option>
+              <option value="training_stage">Training Stage</option>
+              <option value="completed">Completed</option>
+            </select>
               <select
                 value={filters.department}
                 onChange={(e) =>

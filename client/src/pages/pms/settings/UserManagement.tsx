@@ -313,7 +313,7 @@ export default function UserManagement() {
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
                     required
                   >
-                    <option value={UserRole.ADMIN}>Department Admin</option>
+                      <option value={UserRole.ADMIN}>Department Admin</option>
                     <option value={UserRole.USER}>Regular User</option>
                   </select>
                 </div>
@@ -358,15 +358,15 @@ export default function UserManagement() {
   return (
     <div className="p-6 space-y-6">
       {/* Add User Button */}
-      <div className="flex justify-end mb-4">
-        <button
-          onClick={() => setShowAddUser(true)}
-          className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-        >
-          <FaPlus className="mr-2" />
-          Add New User
-        </button>
-      </div>
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={() => setShowAddUser(true)}
+            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+          >
+            <FaPlus className="mr-2" />
+            Add New User
+          </button>
+        </div>
 
       {/* Users Table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
@@ -426,20 +426,20 @@ export default function UserManagement() {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex justify-end space-x-2">
-                    <button
+                    <div className="flex justify-end space-x-2">
+                      <button
                       onClick={() => handleEditUser(user._id)}
-                      className="text-green-600 hover:text-green-900"
-                    >
-                      <FaPencilAlt />
-                    </button>
-                    <button
+                        className="text-green-600 hover:text-green-900"
+                      >
+                        <FaPencilAlt />
+                      </button>
+                      <button
                       onClick={() => handleDeleteUser(user._id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      <FaTrash />
-                    </button>
-                  </div>
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
                 </td>
               </tr>
             ))}

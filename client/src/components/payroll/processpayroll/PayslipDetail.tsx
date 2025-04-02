@@ -37,7 +37,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
   const handleDownload = async () => {
     try {
       setLoading((prev) => ({ ...prev, download: true }));
-      await generatePayslipPDF(payslip);
+    await generatePayslipPDF(payslip);
       toast.success("Payslip downloaded successfully!");
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -65,9 +65,9 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
         setPayslip((prev) => {
           if (!prev) return null;
           return {
-            ...prev,
-            emailSent: true,
-            emailSentAt: new Date(),
+          ...prev,
+          emailSent: true,
+          emailSentAt: new Date(),
           } as Payslip;
         });
       }
