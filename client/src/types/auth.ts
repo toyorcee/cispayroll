@@ -119,6 +119,18 @@ export enum Permission {
   MANAGE_FEEDBACK = "MANAGE_FEEDBACK",
   SUBMIT_FEEDBACK = "SUBMIT_FEEDBACK",
   APPROVE_FEEDBACK = "APPROVE_FEEDBACK",
+
+  // Settings Management
+  MANAGE_DEPARTMENT_SETTINGS = "MANAGE_DEPARTMENT_SETTINGS",
+  MANAGE_SYSTEM_SETTINGS = "MANAGE_SYSTEM_SETTINGS",
+  MANAGE_USER_SETTINGS = "MANAGE_USER_SETTINGS",
+  MANAGE_PAYROLL_SETTINGS = "MANAGE_PAYROLL_SETTINGS",
+  MANAGE_LEAVE_SETTINGS = "MANAGE_LEAVE_SETTINGS",
+  MANAGE_DOCUMENT_SETTINGS = "MANAGE_DOCUMENT_SETTINGS",
+  MANAGE_NOTIFICATION_SETTINGS = "MANAGE_NOTIFICATION_SETTINGS",
+  MANAGE_INTEGRATION_SETTINGS = "MANAGE_INTEGRATION_SETTINGS",
+  MANAGE_TAX_SETTINGS = "MANAGE_TAX_SETTINGS",
+  MANAGE_COMPLIANCE_SETTINGS = "MANAGE_COMPLIANCE_SETTINGS",
 }
 
 export interface BankDetails {
@@ -136,10 +148,10 @@ export interface EmergencyContact {
 export interface Department {
   _id: string;
   name: string;
-  code: string;
-  description: string;
-  location: string;
-  status: string;
+  description?: string;
+  head?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface User {
@@ -156,7 +168,7 @@ export interface User {
   gradeLevel: string;
   workLocation: string;
   dateJoined: Date;
-  status: "active" | "inactive";
+  status: string;
   emergencyContact: {
     name: string;
     relationship: string;
@@ -168,7 +180,7 @@ export interface User {
     accountName: string;
   };
   profileImage?: string;
-  reportingTo?: string | User;
+  reportingTo?: string;
   isEmailVerified: boolean;
   lastLogin?: Date;
   createdAt: Date;

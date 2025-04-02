@@ -116,7 +116,7 @@ export function ProfileMenu({
             } mt-2 bg-white rounded-lg shadow-lg py-1 z-50`}
           >
             <Link
-              to="/dashboard/profile"
+              to="/pms/profile"
               className="w-full flex items-center gap-2 px-4 py-2 text-sm !text-gray-700 hover:!bg-green-50 hover:!text-green-600
                        transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg
                        cursor-pointer focus:outline-none focus:ring-0"
@@ -126,7 +126,7 @@ export function ProfileMenu({
             </Link>
 
             <Link
-              to="/dashboard/settings"
+              to="/pms/settings"
               className="w-full flex items-center gap-2 px-4 py-2 text-sm !text-gray-700 hover:!bg-green-50 hover:!text-green-600
                        transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg
                        cursor-pointer focus:outline-none focus:ring-0"

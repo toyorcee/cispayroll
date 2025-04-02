@@ -42,6 +42,33 @@ interface UserData {
   };
 }
 
+const PeopleMaxIcon = () => (
+  <svg
+    width="32"
+    height="32"
+    viewBox="0 0 512 512"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className="h-8 w-8"
+  >
+    <rect
+      width="512"
+      height="512"
+      rx="100"
+      fill="currentColor"
+      className="text-green-600"
+    />
+    <path
+      d="M156 256C156 238.327 170.327 224 188 224H324C341.673 224 356 238.327 356 256V352C356 369.673 341.673 384 324 384H188C170.327 384 156 369.673 156 352V256Z"
+      fill="white"
+    />
+    <path
+      d="M256 128C282.51 128 304 149.49 304 176C304 202.51 282.51 224 256 224C229.49 224 208 202.51 208 176C208 149.49 229.49 128 256 128Z"
+      fill="white"
+    />
+  </svg>
+);
+
 const CompleteRegistration = () => {
   const { token } = useParams();
   const navigate = useNavigate();
@@ -277,8 +304,9 @@ const CompleteRegistration = () => {
               to="/"
               className="inline-flex justify-center items-center gap-2"
             >
-              <FaMoneyCheckAlt className="h-8 w-8 text-green-600" />
-              <span className="text-2xl font-bold text-gray-900">PAYROLL</span>
+              {/* <FaMoneyCheckAlt className="h-8 w-8 text-green-600" /> */}
+              <PeopleMaxIcon />
+              <span className="text-2xl font-bold text-gray-900">PMS</span>
             </Link>
 
             <h2 className="mt-4 text-2xl font-bold tracking-tight text-gray-900">

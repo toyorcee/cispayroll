@@ -9,6 +9,13 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { traceError } from "./utils/errorHandler.js";
 import multer from "multer";
+import fs from "fs";
+
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(process.cwd(), "uploads", "profiles");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
 // Route Imports
 import authRoutes from "./routes/authRoutes.js";
@@ -189,6 +196,17 @@ app.get("/api/health", (_req, res) => {
   res.json(health);
 });
 
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+app.get(
+  "/uploads/profiles/:filename",
+  (req, res, next) => {
+    res.setHeader("Cache-Control", "public, max-age=31536000");
+    next();
+  },
+  express.static(path.join(__dirname, "uploads/profiles"))
+);
+
 // Enhanced error handler
 app.use((err, req, res, next) => {
   const error = traceError(
@@ -218,13 +236,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Not Found Handler
+// 404 handler should be last
 app.use((_req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
-
-// Serve uploaded files
-app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 // Your test route for development
 if (process.env.NODE_ENV === "development") {

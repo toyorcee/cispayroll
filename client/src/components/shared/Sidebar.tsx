@@ -10,6 +10,8 @@ import {
   CogIcon,
   ArrowRightOnRectangleIcon,
   UserPlusIcon,
+  CalendarIcon,
+  UserCircleIcon,
 } from "@heroicons/react/24/outline";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaTimes } from "react-icons/fa";
@@ -22,7 +24,6 @@ import {
   NavigationSubItem,
   IconType,
 } from "../../types/navigation";
-// import { FaUsers, FaUserPlus, FaUserMinus } from "react-icons/fa";
 import { FaGavel } from "react-icons/fa6";
 
 // Updated icon mapping to include all sections
@@ -32,6 +33,8 @@ const iconMap: Record<string, IconType> = {
   Payroll: CurrencyDollarIcon,
   Reports: DocumentTextIcon,
   Settings: CogIcon,
+  Profile: UserCircleIcon,
+  "Leave Management": CalendarIcon,
   Disciplinary: FaGavel,
   Feedback: DocumentTextIcon,
   "My Profile": UserPlusIcon,
@@ -57,7 +60,7 @@ export function Sidebar() {
 
     if (activeMainItem) {
       setActiveMenuText(activeMainItem.name);
-    } else if (location.pathname === "/dashboard") {
+    } else if (location.pathname === "/pms/dashboard") {
       setActiveMenuText("Dashboard");
     }
   }, [location.pathname, setActiveMenuText]);
@@ -71,8 +74,11 @@ export function Sidebar() {
   }, [location.pathname, setIsSidebarOpen]);
 
   const filteredNavigation = menuItems.filter((item: NavigationItem) => {
-    // Super Admin sees everything
+    // Super Admin sees everything except personal views
     if (hasRole(UserRole.SUPER_ADMIN)) {
+      if (item.name === "My Allowances" || item.name === "My Deductions") {
+        return false;
+      }
       return true;
     }
 
@@ -93,8 +99,14 @@ export function Sidebar() {
     if (!subItems) return [];
 
     return subItems.filter((subItem: NavigationSubItem) => {
-      // Super Admin sees all subitems
+      // Super Admin sees all subitems except personal views
       if (hasRole(UserRole.SUPER_ADMIN)) {
+        if (
+          subItem.name === "My Allowances" ||
+          subItem.name === "My Deductions"
+        ) {
+          return false;
+        }
         return true;
       }
 
@@ -121,68 +133,6 @@ export function Sidebar() {
     }
   };
 
-  // Updated employee items with proper permission checks
-  // Removed unused employeeItems to resolve the error
-
-  // Removed unused filteredEmployeeItems to resolve the error
-
-  // const payrollItems = [
-  //   {
-  //     name: "Salary Structure",
-  //     path: "/dashboard/payroll/structure",
-  //     icon: CurrencyDollarIcon,
-  //     permissions: [Permission.VIEW_SALARY_STRUCTURE],
-  //     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-  //   },
-  //   {
-  //     name: "Allowances",
-  //     path: "/dashboard/payroll/allowances",
-  //     icon: CurrencyDollarIcon,
-  //     permissions: [Permission.VIEW_ALLOWANCES, Permission.MANAGE_ALLOWANCES],
-  //     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-  //   },
-  //   {
-  //     name: "Bonuses",
-  //     path: "/dashboard/payroll/bonuses",
-  //     icon: CurrencyDollarIcon,
-  //     permissions: [Permission.VIEW_BONUSES, Permission.MANAGE_BONUSES],
-  //     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-  //   },
-  //   {
-  //     name: "Deductions",
-  //     path: "/dashboard/payroll/deductions",
-  //     icon: CurrencyDollarIcon,
-  //     permissions: [Permission.VIEW_DEDUCTIONS, Permission.MANAGE_DEDUCTIONS],
-  //     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-  //   },
-  //   {
-  //     name: "Process Payroll",
-  //     path: "/dashboard/payroll/process",
-  //     icon: CurrencyDollarIcon,
-  //     permissions: [Permission.CREATE_PAYROLL, Permission.EDIT_PAYROLL],
-  //     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-  //   },
-  // ];
-
-  // const filteredPayrollItems = payrollItems.filter((item) => {
-  //   // Super Admin sees everything
-  //   if (hasRole(UserRole.SUPER_ADMIN)) {
-  //     return true;
-  //   }
-
-  //   // Check roles
-  //   if (item.roles && !item.roles.some((role) => hasRole(role))) {
-  //     return false;
-  //   }
-
-  //   // Check permissions
-  //   if (item.permissions) {
-  //     return item.permissions.some((permission) => hasPermission(permission));
-  //   }
-
-  //   return true;
-  // });
-
   // Close sidebar handler
   const handleCloseSidebar = () => {
     setIsSidebarOpen(false);
@@ -206,11 +156,11 @@ export function Sidebar() {
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         } fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 h-[calc(100vh-4rem)] top-16`}
       >
-        {/* Close button */}
-        <div className="lg:hidden absolute right-2 top-2 p-2">
+        {/* Close button for mobile */}
+        <div className="lg:hidden absolute right-2 top-2">
           <button
             onClick={handleCloseSidebar}
-            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
             aria-label="Close sidebar"
           >
             <FaTimes className="w-5 h-5" />
@@ -234,8 +184,8 @@ export function Sidebar() {
                     to={item.href}
                     className={`nav-link group flex items-center px-3 py-3 lg:py-2 text-sm font-medium rounded-md transition-all duration-150 ${
                       location.pathname === item.href
-                        ? "active bg-green-50"
-                        : "hover:bg-green-50/50"
+                        ? "active bg-green-50 text-green-700"
+                        : "hover:bg-green-50/50 text-gray-700 hover:text-green-700"
                     }`}
                     onClick={(e) => handleItemClick(e, item)}
                   >
@@ -273,8 +223,8 @@ export function Sidebar() {
                                   to={subItem.href}
                                   className={`nav-link block px-3 py-2 text-sm font-medium rounded-md transition-all duration-150 ${
                                     location.pathname === subItem.href
-                                      ? "active bg-green-50"
-                                      : "hover:bg-green-50/50"
+                                      ? "active bg-green-50 text-green-700"
+                                      : "hover:bg-green-50/50 text-gray-700 hover:text-green-700"
                                   }`}
                                 >
                                   <span className="text-current">
@@ -291,29 +241,6 @@ export function Sidebar() {
                 </div>
               );
             })}
-            {/* {openSubmenu === "Payroll" && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
-                className="pl-8 mt-2 space-y-1"
-              >
-                {filteredPayrollItems.map((item) => (
-                  <Link
-                    key={item.name}
-                    to={item.path}
-                    className={`nav-link block px-3 py-2 text-sm font-medium rounded-md transition-all duration-150 ${
-                      location.pathname === item.path
-                        ? "active bg-green-50"
-                        : "hover:bg-green-50/50"
-                    }`}
-                  >
-                    <span className="text-current">{item.name}</span>
-                  </Link>
-                ))}
-              </motion.div>
-            )} */}
           </div>
           <div className="p-4 border-t border-gray-200 bg-gray-50/50">
             <ProfileMenu variant="sidebar" />

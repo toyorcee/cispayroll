@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="light">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
@@ -13,26 +13,38 @@
       content="Personnel Management System - Nigeria's Premier Personnel Management System"
     />
     <meta name="theme-color" content="#16a34a" />
-    <meta
-      property="og:title"
-      content="Payroll | Personnel Management System"
-    />
+    <meta property="og:title" content="Payroll | Personnel Management System" />
     <meta
       property="og:description"
       content="Nigeria's Premier Personnel Management System"
     />
     <meta property="og:image" content="/android-chrome-512x512.png" />
-    <title>Payroll | Personnel Management System</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300..800&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+    <title>Personnel Management System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300..800&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
     <style>
       body {
-       
-        font-family: 'Montserrat', sans-serif;
-        
+        font-family: "Montserrat", sans-serif;
       }
     </style>
+    <script>
+      // Initialize dark mode
+      if (
+        localStorage.theme === "dark" ||
+        (!("theme" in localStorage) &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches)
+      ) {
+        document.documentElement.classList.remove("light");
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+        document.documentElement.classList.add("light");
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

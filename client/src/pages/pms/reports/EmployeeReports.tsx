@@ -12,7 +12,7 @@ export default function EmployeeReports() {
     <div className="space-y-6">
       <div className="flex justify-end">
         <Link
-          to="/dashboard/reports/audit/generate"
+          to="/pms/reports/employee/generate"
           className="inline-flex items-center px-4 py-2 !bg-green-600 !text-white rounded-lg hover:bg-green-700 
                    transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg
                    animate-bounce-slow cursor-pointer focus:outline-none focus:ring-0"

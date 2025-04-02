@@ -69,10 +69,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const hasRole = (role: UserRole): boolean => {
-    // console.log("=== DEBUG: hasRole ===");
-    // console.log("Checking role:", role);
-    // console.log("User role:", user?.role);
-    // console.log("Is SUPER_ADMIN?", user?.role === UserRole.SUPER_ADMIN);
 
     if (!user) return false;
     if (user.role === UserRole.SUPER_ADMIN) return true;
@@ -109,10 +105,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
       });
-      console.log("user data", data);
       if (data.user) {
         setUser(parseUserData(data.user));
-        console.log("user set sucessfully");
 
         // Prefetch departments using updated options
         await queryClient.prefetchQuery({
@@ -172,9 +166,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const hasPermission = (permission: Permission): boolean => {
-    console.log("=== DEBUG: hasPermission ===");
-    console.log("Checking permission:", permission);
-    console.log("User permissions:", user?.permissions);
 
     if (!user) return false;
     return user.permissions.includes(permission);

@@ -9,6 +9,8 @@ import { v4 as uuidv4 } from "uuid";
 import { UserRole } from "../models/User.js";
 import { EmailService } from "../services/emailService.js";
 import DepartmentModel from "../models/Department.js";
+import path from "path";
+import fs from "fs";
 
 export class EmployeeController {
   static async createEmployee(req, res, next) {
@@ -268,6 +270,21 @@ export class EmployeeController {
         throw new ApiError(400, "No image file provided");
       }
 
+      // Get the current user to check for existing profile image
+      const currentUser = await UserModel.findById(req.user.id);
+      if (!currentUser) {
+        throw new ApiError(404, "Employee not found");
+      }
+
+      // Delete old profile image if it exists
+      if (currentUser.profileImage) {
+        const oldImagePath = path.join(process.cwd(), currentUser.profileImage);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+
+      // Update user with new profile image path
       const user = await UserModel.findByIdAndUpdate(
         req.user.id,
         {
@@ -288,6 +305,13 @@ export class EmployeeController {
         profileImage: user.profileImage,
       });
     } catch (error) {
+      // If there's an error and a file was uploaded, delete it
+      if (req.file) {
+        const filePath = path.join(process.cwd(), req.file.path);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
       next(error);
     }
   }

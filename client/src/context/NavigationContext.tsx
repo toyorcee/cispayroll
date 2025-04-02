@@ -10,7 +10,6 @@ import {
   DocumentTextIcon,
   CogIcon,
 } from "@heroicons/react/24/outline";
-import { FaGavel } from "react-icons/fa6";
 
 type NavigationContextType = {
   activeMenuText: string;
@@ -49,8 +48,6 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
         "Payroll",
         "Reports",
         "Settings",
-        "Disciplinary",
-        "Leave",
         "Profile",
         "Feedback",
       ];
@@ -80,14 +77,14 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
           [
             Permission.VIEW_ALL_PAYROLL,
             Permission.VIEW_DEPARTMENT_PAYROLL,
-            Permission.CREATE_PAYROLL,
-            Permission.EDIT_PAYROLL,
-            Permission.VIEW_SALARY_STRUCTURE,
-            Permission.EDIT_SALARY_STRUCTURE,
+            Permission.VIEW_OWN_PAYSLIP,
             Permission.VIEW_ALLOWANCES,
             Permission.EDIT_ALLOWANCES,
             Permission.VIEW_DEDUCTIONS,
             Permission.EDIT_DEDUCTIONS,
+            Permission.VIEW_OWN_ALLOWANCES,
+            Permission.REQUEST_ALLOWANCES,
+            Permission.VIEW_OWN_DEDUCTIONS,
           ].includes(p)
         )
       ) {
@@ -108,42 +105,15 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
         availableMenus.push("Reports");
       }
 
-      // Disciplinary
-      if (
-        user.permissions.some((p) =>
-          [
-            Permission.MANAGE_DISCIPLINARY_ACTIONS,
-            Permission.VIEW_DISCIPLINARY_RECORDS,
-          ].includes(p)
-        )
-      ) {
-        availableMenus.push("Disciplinary");
-      }
-
-      // Leave Management
-      if (
-        user.permissions.some((p) =>
-          [
-            Permission.APPROVE_LEAVE,
-            Permission.VIEW_TEAM_LEAVE,
-            Permission.REQUEST_LEAVE,
-            Permission.VIEW_OWN_LEAVE,
-            Permission.CANCEL_OWN_LEAVE,
-          ].includes(p)
-        )
-      ) {
-        availableMenus.push("Leave");
-      }
-
       // Profile
       if (user.permissions.includes(Permission.VIEW_PERSONAL_INFO)) {
         availableMenus.push("Profile");
       }
 
       // Feedback
-      // if (user.permissions.includes(Permission.MANAGE_FEEDBACK)) {
-      //   availableMenus.push("Feedback");
-      // }
+      if (user.permissions.includes(Permission.MANAGE_FEEDBACK)) {
+        availableMenus.push("Feedback");
+      }
     }
 
     // For User, only show basic menus
@@ -162,28 +132,15 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
         availableMenus.push("Payroll");
       }
 
-      // Leave Management
-      if (
-        user.permissions.some((p) =>
-          [
-            Permission.REQUEST_LEAVE,
-            Permission.VIEW_OWN_LEAVE,
-            Permission.CANCEL_OWN_LEAVE,
-          ].includes(p)
-        )
-      ) {
-        availableMenus.push("Leave");
-      }
-
       // Profile
       if (user.permissions.includes(Permission.VIEW_PERSONAL_INFO)) {
         availableMenus.push("Profile");
       }
 
       // Feedback
-      // if (user.permissions.includes(Permission.MANAGE_FEEDBACK)) {
-      //   availableMenus.push("Feedback");
-      // }
+      if (user.permissions.includes(Permission.MANAGE_FEEDBACK)) {
+        availableMenus.push("Feedback");
+      }
     }
 
     return availableMenus;
@@ -263,6 +220,9 @@ export const menuItems: NavigationItem[] = [
       Permission.VIEW_ALL_PAYROLL,
       Permission.VIEW_DEPARTMENT_PAYROLL,
       Permission.VIEW_OWN_PAYSLIP,
+      Permission.VIEW_ALLOWANCES,
+      Permission.EDIT_ALLOWANCES,
+      Permission.VIEW_DEDUCTIONS,
       Permission.VIEW_OWN_ALLOWANCES,
       Permission.REQUEST_ALLOWANCES,
       Permission.VIEW_OWN_DEDUCTIONS,
@@ -310,21 +270,21 @@ export const menuItems: NavigationItem[] = [
         permissions: [Permission.VIEW_OWN_PAYSLIP],
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
       },
-      // {
-      //   name: "My Allowances",
-      //   href: "/pms/payroll/my-allowances",
-      //   permissions: [
-      //     Permission.VIEW_OWN_ALLOWANCES,
-      //     Permission.REQUEST_ALLOWANCES,
-      //   ],
-      //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-      // },
-      // {
-      //   name: "My Deductions",
-      //   href: "/pms/payroll/my-deductions",
-      //   permissions: [Permission.VIEW_OWN_DEDUCTIONS],
-      //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-      // },
+      {
+        name: "My Allowances",
+        href: "/pms/payroll/my-allowances",
+        permissions: [
+          Permission.VIEW_OWN_ALLOWANCES,
+          Permission.REQUEST_ALLOWANCES,
+        ],
+        roles: [UserRole.ADMIN, UserRole.USER],
+      },
+      {
+        name: "My Deductions",
+        href: "/pms/payroll/my-deductions",
+        permissions: [Permission.VIEW_OWN_DEDUCTIONS],
+        roles: [UserRole.ADMIN, UserRole.USER],
+      },
     ],
   },
   {
@@ -365,67 +325,82 @@ export const menuItems: NavigationItem[] = [
   },
   {
     name: "Settings",
-    href: "/pms/settings/general",
+    href: "/pms/settings",
     icon: CogIcon,
-    roles: [UserRole.SUPER_ADMIN],
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
     permissions: [
-      Permission.MANAGE_SYSTEM,
-      Permission.MANAGE_COMPANY_PROFILE,
-      Permission.MANAGE_TAX_CONFIG,
-      Permission.MANAGE_COMPLIANCE,
-      Permission.MANAGE_NOTIFICATIONS,
-      Permission.MANAGE_INTEGRATIONS,
+      Permission.MANAGE_SYSTEM_SETTINGS,
+      Permission.MANAGE_DEPARTMENT_SETTINGS,
+      Permission.MANAGE_USER_SETTINGS,
+      Permission.MANAGE_NOTIFICATION_SETTINGS,
     ],
     requireAllPermissions: false,
     subItems: [
       {
         name: "General Settings",
-        href: "/pms/settings/general",
-        permissions: [Permission.MANAGE_SYSTEM],
+        href: "/pms/settings",
+        roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_SYSTEM_SETTINGS],
       },
       {
         name: "Company Profile",
         href: "/pms/settings/company",
+        roles: [UserRole.SUPER_ADMIN],
         permissions: [Permission.MANAGE_COMPANY_PROFILE],
       },
       {
         name: "Department Management",
         href: "/pms/settings/departments",
-        permissions: [
-          Permission.CREATE_DEPARTMENT,
-          Permission.EDIT_DEPARTMENT,
-          Permission.DELETE_DEPARTMENT,
-          Permission.VIEW_ALL_DEPARTMENTS,
-        ],
-      },
-      {
-        name: "Tax Configuration",
-        href: "/pms/settings/tax",
-        permissions: [Permission.MANAGE_TAX_CONFIG],
-      },
-      {
-        name: "Compliance",
-        href: "/pms/settings/compliance",
-        permissions: [Permission.MANAGE_COMPLIANCE],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.MANAGE_DEPARTMENT_SETTINGS],
       },
       {
         name: "User Management",
         href: "/pms/settings/users",
-        permissions: [
-          Permission.CREATE_USER,
-          Permission.EDIT_USER,
-          Permission.VIEW_ALL_USERS,
-        ],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.MANAGE_USER_SETTINGS],
       },
       {
-        name: "Notifications",
+        name: "Payroll Settings",
+        href: "/pms/settings/payroll",
+        roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_PAYROLL_SETTINGS],
+      },
+      {
+        name: "Leave Settings",
+        href: "/pms/settings/leave",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.MANAGE_LEAVE_SETTINGS],
+      },
+      {
+        name: "Document Settings",
+        href: "/pms/settings/documents",
+        roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_DOCUMENT_SETTINGS],
+      },
+      {
+        name: "Notification Settings",
         href: "/pms/settings/notifications",
-        permissions: [Permission.MANAGE_NOTIFICATIONS],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.MANAGE_NOTIFICATION_SETTINGS],
       },
       {
-        name: "Integrations",
+        name: "Integration Settings",
         href: "/pms/settings/integrations",
-        permissions: [Permission.MANAGE_INTEGRATIONS],
+        roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_INTEGRATION_SETTINGS],
+      },
+      {
+        name: "Tax Settings",
+        href: "/pms/settings/tax",
+        roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_TAX_SETTINGS],
+      },
+      {
+        name: "Compliance Settings",
+        href: "/pms/settings/compliance",
+        roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_COMPLIANCE_SETTINGS],
       },
     ],
   },
@@ -471,10 +446,6 @@ export const menuItems: NavigationItem[] = [
   //   requireAllPermissions: true,
   // },
 ].map((item) => {
-  console.log(`Menu item ${item.name}:`, {
-    roles: item.roles,
-    permissions: item.permissions,
-  });
   return item;
 });
 

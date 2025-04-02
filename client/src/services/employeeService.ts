@@ -1,5 +1,4 @@
 import axios from "axios";
-import { QueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import {
   Employee,

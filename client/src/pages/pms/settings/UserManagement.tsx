@@ -1,18 +1,71 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { FaUser, FaPlus, FaPencilAlt, FaTrash, FaTimes } from "react-icons/fa";
-import { useAuth } from "../../../context/AuthContext";
-import axios from "axios";
-import { User, UserRole, Permission } from "../../../types/auth";
-import { toast } from "react-toastify";
-import { CircularProgress } from "@mui/material";
-// import { roles, userStats } from "../../../data/settings";
+import { UserRole, Permission } from "../../../types/auth";
+
+interface User {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: UserRole;
+  department: string;
+  status: "active" | "inactive" | "suspended";
+  position: string;
+  employeeId: string;
+}
+
+// Demo data
+const users: User[] = [
+  {
+    _id: "1",
+    firstName: "John",
+    lastName: "Doe",
+    email: "john.doe@example.com",
+    role: UserRole.ADMIN,
+    department: "Engineering",
+    status: "active",
+    position: "Senior Engineer",
+    employeeId: "EMP001",
+  },
+  {
+    _id: "2",
+    firstName: "Jane",
+    lastName: "Smith",
+    email: "jane.smith@example.com",
+    role: UserRole.USER,
+    department: "Human Resources",
+    status: "active",
+    position: "HR Manager",
+    employeeId: "EMP002",
+  },
+  {
+    _id: "3",
+    firstName: "Mike",
+    lastName: "Johnson",
+    email: "mike.j@example.com",
+    role: UserRole.USER,
+    department: "Finance",
+    status: "inactive",
+    position: "Accountant",
+    employeeId: "EMP003",
+  },
+  {
+    _id: "4",
+    firstName: "Sarah",
+    lastName: "Williams",
+    email: "sarah.w@example.com",
+    role: UserRole.USER,
+    department: "Marketing",
+    status: "suspended",
+    position: "Marketing Manager",
+    employeeId: "EMP004",
+  },
+];
 
 export default function UserManagement() {
-  const { user: currentUser } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [usersList, setUsersList] = useState<User[]>(users);
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUser, setNewUser] = useState({
     firstName: "",
@@ -21,155 +74,95 @@ export default function UserManagement() {
     password: "",
     employeeId: "",
     role: UserRole.USER,
-    permissions: [] as Permission[],
     department: "",
     position: "",
-    phone: "",
-    workLocation: "",
-    gradeLevel: "",
     status: "active" as "active" | "inactive" | "suspended",
   });
-
-  // Add debug logging
-  // useEffect(() => {
-  //   console.log("Current User:", currentUser);
-  //   console.log(
-  //     "Has MANAGE_USERS permission:",
-  //     currentUser?.permissions?.includes("MANAGE_USERS")
-  //   );
-  //   console.log("Role:", currentUser?.role);
-  // }, [currentUser]);
-
-  // Debug the users data
-  useEffect(() => {
-    console.log("Users array:", users);
-  }, [users]);
-
-  // Fetch users
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
-    try {
-      console.log("Fetching users...");
-      const response = await axios.get("/api/admin/users");
-      console.log("Users API response:", response.data);
-      setUsers(response.data.users);
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        console.error("Error fetching users:", error);
-        toast.error(error.response?.data?.message || "Failed to fetch users");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAddUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await axios.post("/api/admin/users/create", newUser);
-      toast.success("User created successfully");
-      setShowAddUser(false);
-      setNewUser({
-        ...newUser,
-        firstName: "",
-        lastName: "",
-        email: "",
-        password: "",
-        employeeId: "",
-        role: UserRole.USER,
-        permissions: [],
-        department: "",
-        position: "",
-        phone: "",
-        workLocation: "",
-        gradeLevel: "",
-        status: "active",
-      });
-      fetchUsers();
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        toast.error(error.response?.data?.message || "Failed to create user");
-      } else {
-        toast.error("An unexpected error occurred");
-      }
-    }
-  };
-
-  const handleEditUser = async (userId: string) => {
-    try {
-      const response = await axios.put(`/api/admin/users/${userId}`, {
-        // Add updated user data here
-      });
-      console.log("User updated:", response.data);
-      toast.success("User updated successfully", {
-        style: { backgroundColor: "#10B981", color: "white" },
-      });
-      fetchUsers();
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        toast.error(error.response?.data?.message || "Failed to update user");
-      } else {
-        toast.error("An unexpected error occurred");
-      }
-    }
-  };
-
-  const handleDeleteUser = async (userId: string) => {
-    if (window.confirm("Are you sure you want to delete this user?")) {
-      try {
-        await axios.delete(`/api/admin/users/${userId}`);
-        toast.success("User deleted successfully", {
-          style: { backgroundColor: "#10B981", color: "white" },
-        });
-        fetchUsers();
-      } catch (error: unknown) {
-        if (axios.isAxiosError(error)) {
-          toast.error(error.response?.data?.message || "Failed to delete user");
-        } else {
-          toast.error("An unexpected error occurred");
-        }
-      }
-    }
-  };
-
-  // Update the permission check
-  const canManageUsers = currentUser?.permissions?.includes(
-    Permission.MANAGE_BONUSES
-  );
 
   // Function to get default permissions based on role
   const getDefaultPermissions = (role: UserRole): Permission[] => {
     switch (role) {
       case UserRole.ADMIN:
         return [
-          Permission.MANAGE_BONUSES,
-          Permission.MANAGE_BONUSES,
-          Permission.VIEW_REPORTS,
+          Permission.VIEW_DASHBOARD,
+          Permission.VIEW_ALL_USERS,
+          Permission.MANAGE_DEPARTMENT_USERS,
+          Permission.MANAGE_ONBOARDING,
+          Permission.MANAGE_OFFBOARDING,
           Permission.APPROVE_LEAVE,
           Permission.VIEW_PERSONAL_INFO,
+          Permission.MANAGE_DEPARTMENT_SETTINGS,
+          Permission.MANAGE_USER_SETTINGS,
+          Permission.MANAGE_LEAVE_SETTINGS,
+          Permission.MANAGE_NOTIFICATION_SETTINGS,
+          Permission.VIEW_REPORTS,
+          Permission.VIEW_PAYROLL_REPORTS,
+          Permission.VIEW_EMPLOYEE_REPORTS,
+          Permission.VIEW_TAX_REPORTS,
+          Permission.VIEW_ALL_PAYROLL,
+          Permission.VIEW_DEPARTMENT_PAYROLL,
+          Permission.VIEW_SALARY_STRUCTURE,
+          Permission.VIEW_ALLOWANCES,
+          Permission.VIEW_DEDUCTIONS,
+          Permission.VIEW_BONUSES,
+          Permission.VIEW_OWN_PAYSLIP,
+          Permission.VIEW_OWN_ALLOWANCES,
+          Permission.VIEW_OWN_DEDUCTIONS,
+          Permission.REQUEST_ALLOWANCES,
+          Permission.REQUEST_LEAVE,
+          Permission.VIEW_OWN_LEAVE,
+          Permission.CANCEL_OWN_LEAVE,
+          Permission.VIEW_TEAM_LEAVE,
+          Permission.MANAGE_FEEDBACK,
         ];
       case UserRole.USER:
         return [
+          Permission.VIEW_DASHBOARD,
           Permission.VIEW_PERSONAL_INFO,
           Permission.REQUEST_LEAVE,
           Permission.VIEW_OWN_LEAVE,
+          Permission.CANCEL_OWN_LEAVE,
+          Permission.VIEW_OWN_PAYSLIP,
+          Permission.VIEW_OWN_ALLOWANCES,
+          Permission.VIEW_OWN_DEDUCTIONS,
+          Permission.REQUEST_ALLOWANCES,
+          Permission.MANAGE_FEEDBACK,
         ];
       default:
         return [];
     }
   };
 
-  // Update role change handler to include permissions
-  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newRole = e.target.value as UserRole;
-    setNewUser({
+  const handleAddUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newUserWithId: User = {
       ...newUser,
-      role: newRole,
-      permissions: getDefaultPermissions(newRole),
+      _id: (usersList.length + 1).toString(),
+    };
+    setUsersList([...usersList, newUserWithId]);
+    setShowAddUser(false);
+    setNewUser({
+      firstName: "",
+      lastName: "",
+      email: "",
+      password: "",
+      employeeId: "",
+      role: UserRole.USER,
+      department: "",
+      position: "",
+      status: "active",
     });
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    if (window.confirm("Are you sure you want to delete this user?")) {
+      setUsersList(usersList.filter((user) => user._id !== userId));
+    }
+  };
+
+  const handleEditUser = (userId: string) => {
+    // Implement edit functionality
+    console.log("Edit user:", userId);
   };
 
   // Add departments array
@@ -182,14 +175,6 @@ export default function UserManagement() {
     "Sales",
     "Research & Development",
   ];
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <CircularProgress style={{ color: "#10B981" }} />
-      </div>
-    );
-  }
 
   const AddUserForm = () => (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
@@ -313,13 +298,16 @@ export default function UserManagement() {
                   </label>
                   <select
                     value={newUser.role}
-                    onChange={handleRoleChange}
+                    onChange={(e) =>
+                      setNewUser({
+                        ...newUser,
+                        role: e.target.value as UserRole,
+                      })
+                    }
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
                     required
                   >
-                    {currentUser?.role === UserRole.SUPER_ADMIN && (
-                      <option value={UserRole.ADMIN}>Department Admin</option>
-                    )}
+                    <option value={UserRole.ADMIN}>Department Admin</option>
                     <option value={UserRole.USER}>Regular User</option>
                   </select>
                 </div>
@@ -363,38 +351,16 @@ export default function UserManagement() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Add User Button - Always visible for SUPER_ADMIN and ADMIN */}
-      {canManageUsers && (
-        <div className="flex justify-end mb-4">
-          <button
-            onClick={() => setShowAddUser(true)}
-            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-          >
-            <FaPlus className="mr-2" />
-            Add New User
-          </button>
-        </div>
-      )}
-
-      {/* Stats Section */}
-      {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-medium text-gray-900">Total Users</h3>
-          <p className="text-2xl font-bold text-green-600">{userStats.total}</p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-medium text-gray-900">Active Users</h3>
-          <p className="text-2xl font-bold text-green-600">
-            {userStats.active}
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="text-lg font-medium text-gray-900">Pending Users</h3>
-          <p className="text-2xl font-bold text-green-600">
-            {userStats.pending}
-          </p>
-        </div>
-      </div> */}
+      {/* Add User Button */}
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => setShowAddUser(true)}
+          className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+        >
+          <FaPlus className="mr-2" />
+          Add New User
+        </button>
+      </div>
 
       {/* Users Table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
@@ -419,8 +385,8 @@ export default function UserManagement() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {users.map((user) => (
-              <tr key={user.id} className="hover:bg-gray-50">
+            {usersList.map((user) => (
+              <tr key={user._id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div className="h-10 w-10 flex-shrink-0">
@@ -445,65 +411,35 @@ export default function UserManagement() {
                     className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                       user.status === "active"
                         ? "bg-green-100 text-green-800"
-                        : "bg-gray-100 text-gray-800"
+                        : user.status === "inactive"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-yellow-100 text-yellow-800"
                     }`}
                   >
                     {user.status}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  {canManageUsers && (
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        onClick={() => handleEditUser(user.id)}
-                        className="text-green-600 hover:text-green-900"
-                      >
-                        <FaPencilAlt />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <FaTrash />
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex justify-end space-x-2">
+                    <button
+                      onClick={() => handleEditUser(user._id)}
+                      className="text-green-600 hover:text-green-900"
+                    >
+                      <FaPencilAlt />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteUser(user._id)}
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      <FaTrash />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-
-      {/* Role Management Section */}
-      {/* <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">
-          Role Management
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {roles.map((role) => (
-            <div
-              key={role.name}
-              className="border rounded-lg p-4 hover:shadow-lg transition-shadow duration-200"
-            >
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {role.name}
-              </h3>
-              <ul className="space-y-2">
-                {role.permissions.map((permission) => (
-                  <li
-                    key={permission}
-                    className="text-sm text-gray-600 flex items-center"
-                  >
-                    <span className="h-1.5 w-1.5 bg-green-500 rounded-full mr-2" />
-                    {permission}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </div> */}
 
       {showAddUser && <AddUserForm />}
     </div>

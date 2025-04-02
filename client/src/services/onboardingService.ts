@@ -4,16 +4,60 @@ import { toast } from "react-toastify";
 
 const BASE_URL = "http://localhost:5000/api";
 
+export interface OnboardingFilters {
+  page?: number;
+  limit?: number;
+  status?: string;
+  department?: string;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}
+
+export interface OnboardingResponse {
+  success: boolean;
+  data: OnboardingEmployee[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  stats: {
+    total: number;
+    byStatus: Record<string, number>;
+    departments: string[];
+  };
+}
+
 export const onboardingService = {
-  // Get all employees in onboarding
-  getOnboardingEmployees: async (): Promise<OnboardingEmployee[]> => {
+  // Get all employees in onboarding with pagination and filtering
+  getOnboardingEmployees: async (
+    filters?: OnboardingFilters
+  ): Promise<OnboardingResponse> => {
     try {
-      const response = await axios.get(`${BASE_URL}/onboarding`);
-      return response.data.data;
+      const response = await axios.get(`${BASE_URL}/onboarding`, {
+        params: filters,
+      });
+      return response.data;
     } catch (error: any) {
       console.error("Failed to fetch onboarding employees:", error);
       toast.error(error.response?.data?.message || "Failed to fetch employees");
-      return [];
+      return {
+        success: false,
+        data: [],
+        pagination: {
+          total: 0,
+          page: 1,
+          limit: 10,
+          totalPages: 0,
+        },
+        stats: {
+          total: 0,
+          byStatus: {},
+          departments: [],
+        },
+      };
     }
   },
 

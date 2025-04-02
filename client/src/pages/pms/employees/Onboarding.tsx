@@ -23,6 +23,11 @@ import { Pagination } from "@mui/material";
 import { Grid } from "@mui/material";
 import CreateAdminModal from "../../../components/modals/CreateAdminModal";
 import { departmentService } from "../../../services/departmentService";
+import {
+  onboardingService,
+  OnboardingFilters,
+  OnboardingResponse,
+} from "../../../services/onboardingService";
 
 // Update the AdminUser interface to match User type exactly
 interface AdminUser {
@@ -42,7 +47,18 @@ interface AdminUser {
   permissions: Permission[];
 }
 
-// Modify the custom hook to properly handle the User type
+interface EmployeeFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  position: string;
+  gradeLevel: string;
+  workLocation: string;
+  dateJoined: string;
+  department: string;
+}
+
 const useOnboardingData = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [onboardingEmployees, setOnboardingEmployees] = useState<
@@ -50,37 +66,80 @@ const useOnboardingData = () => {
   >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 10,
+    totalPages: 0,
+  });
+  const [stats, setStats] = useState({
+    total: 0,
+    byStatus: {} as Record<string, number>,
+    departments: [] as string[],
+  });
   const { user } = useAuth() as { user: User | null };
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const deps = await departmentService.getAllDepartments();
-      setDepartments(deps);
+  const fetchData = useCallback(
+    async (page = 1, filters: OnboardingFilters = {}) => {
+      setIsLoading(true);
+      try {
+        const deps = await departmentService.getAllDepartments();
+        setDepartments(deps);
 
-      const response = await employeeService.getOnboardingEmployees();
+        const response = await onboardingService.getOnboardingEmployees({
+          page,
+          limit: 10,
+          ...filters,
+        });
 
-      const filteredEmps =
-        user?.role !== UserRole.SUPER_ADMIN && user?.department
-          ? response.filter((emp) => emp.department === user.department)
-          : response;
+        // Filter out super admins and only show employees in onboarding process
+        const filteredEmployees = response.data.filter((emp) => {
+          return (
+            emp.role !== "SUPER_ADMIN" &&
+            emp.onboarding.status !== "completed" &&
+            emp.status !== "offboarding"
+          );
+        });
 
-      setOnboardingEmployees(filteredEmps);
-      setError(null);
-    } catch (error: unknown) {
-      console.error("❌ Error in fetchData:", error);
+        console.log(
+          "Filtered Onboarding Employees:",
+          filteredEmployees.map((emp) => ({
+            id: emp._id,
+            name: `${emp.firstName} ${emp.lastName}`,
+            role: emp.role,
+            status: emp.onboarding.status,
+            department: emp.department.name,
+          }))
+        );
 
-      if (error instanceof Error) {
-        setError(error.message || "Failed to load data");
-      } else {
-        setError("An unknown error occurred");
+        setOnboardingEmployees(filteredEmployees);
+        setPagination({
+          ...response.pagination,
+          total: filteredEmployees.length,
+          totalPages: Math.ceil(filteredEmployees.length / 10),
+        });
+        setStats({
+          ...response.stats,
+          total: filteredEmployees.length,
+          byStatus: filteredEmployees.reduce((acc, emp) => {
+            acc[emp.onboarding.status] = (acc[emp.onboarding.status] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>),
+        });
+        setError(null);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          setError(error.message || "Failed to load data");
+        } else {
+          setError("An unknown error occurred");
+        }
+        setOnboardingEmployees([]);
+      } finally {
+        setIsLoading(false);
       }
-
-      setOnboardingEmployees([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user]);
+    },
+    []
+  );
 
   useEffect(() => {
     fetchData();
@@ -95,6 +154,8 @@ const useOnboardingData = () => {
     error,
     fetchData,
     user,
+    pagination,
+    stats,
   };
 };
 
@@ -114,12 +175,18 @@ export default function Onboarding() {
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showDepartmentModal, setShowDepartmentModal] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [formData, setFormData] = useState({
+  const [filters, setFilters] = useState<OnboardingFilters>({
+    status: "",
+    department: "",
+    search: "",
+  });
+
+  const [formData, setFormData] = useState<CreateEmployeeData>({
     firstName: "",
     lastName: "",
     email: "",
     phone: "",
+    role: "USER",
     position: "",
     gradeLevel: "",
     workLocation: "",
@@ -136,6 +203,8 @@ export default function Onboarding() {
     error,
     fetchData,
     user,
+    pagination,
+    stats,
   } = useOnboardingData();
 
   const [page, setPage] = useState(1);
@@ -149,21 +218,26 @@ export default function Onboarding() {
     const fetchAdmins = async () => {
       try {
         const response = await employeeService.getAdmins();
-        const transformedAdmins = response.map((admin) => ({
-          _id: admin._id,
-          id: admin._id,
-          firstName: admin.firstName,
-          lastName: admin.lastName,
-          email: admin.email,
-          role: admin.role || UserRole.ADMIN,
-          status: admin.status || "active",
-          permissions: (admin.permissions || []).map(
-            (perm) => perm as Permission
-          ),
-        }));
-        setAdmins(transformedAdmins as AdminUser[]);
+        if (response && Array.isArray(response)) {
+          const transformedAdmins = response.map((admin) => ({
+            _id: admin._id,
+            id: admin._id,
+            firstName: admin.firstName,
+            lastName: admin.lastName,
+            email: admin.email,
+            role: admin.role || UserRole.ADMIN,
+            status: admin.status || "active",
+            permissions: (admin.permissions || []).map(
+              (perm) => perm as Permission
+            ),
+          }));
+          setAdmins(transformedAdmins as AdminUser[]);
+        } else {
+          setAdmins([]);
+        }
       } catch (error) {
         console.error("Failed to fetch admins:", error);
+        setAdmins([]);
       }
     };
 
@@ -193,96 +267,40 @@ export default function Onboarding() {
 
   // Define all your handler functions here
   const getFilteredEmployees = () => {
-    console.log("🔍 Filtering employees:", {
-      total: onboardingEmployees.length,
-      filterStatus,
-      currentFilter:
-        filterStatus === "all"
-          ? onboardingEmployees
-          : onboardingEmployees.filter((emp) => emp.status === filterStatus),
-    });
+    const filtered =
+      filters.status === "all"
+        ? onboardingEmployees
+        : onboardingEmployees.filter(
+            (emp) => emp.onboarding.status === filters.status
+          );
 
-    if (filterStatus === "all") return onboardingEmployees;
-    return onboardingEmployees.filter(
-      (employee) => employee.status === filterStatus
-    );
+    return filtered;
   };
 
-const handleCreateEmployee = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setIsCreating(true);
-
-  try {
-    // Validate department selection
-    if (!formData.department && user?.role === UserRole.SUPER_ADMIN) {
-      toast.error("Please select a department");
-      setIsCreating(false);
-      return;
-    }
-
-    // Ensure department is always a string
-    const departmentValue =
-      user?.role === UserRole.SUPER_ADMIN
-        ? formData.department
-        : user?.department ?? "";
-
-    // Validate department value
-    if (!departmentValue) {
-      toast.error("Department is required");
-      setIsCreating(false);
-      return;
-    }
-
-    const employeeData: CreateEmployeeData = {
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      email: formData.email,
-      phone: formData.phone,
-      position: formData.position,
-      gradeLevel: formData.gradeLevel,
-      workLocation: formData.workLocation,
-      dateJoined: new Date(formData.dateJoined),
-      department: departmentValue,
-    };
-
-    // Just create the employee - don't add to onboarding list yet
-    await employeeService.createEmployee(employeeData);
-
-    setShowCreateModal(false);
-
-    // Reset form
-    setFormData({
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      position: "",
-      gradeLevel: "",
-      workLocation: "",
-      dateJoined: new Date().toISOString().split("T")[0],
-      department: "",
-    });
-
-    toast.success("Employee invitation sent successfully");
-  } catch (error: unknown) {
-    console.error("Error creating employee:", error);
-
-    if (error instanceof AxiosError && error.response?.data?.message) {
-      toast.error(error.response.data.message);
-    } else if (error instanceof Error) {
-      toast.error(error.message || "Failed to create employee");
-    } else {
-      toast.error("An unknown error occurred");
-    }
-  } finally {
-    setIsCreating(false);
-  }
-};
-
-  const handleDepartmentSave = async (formData: DepartmentFormData) => {
+  const handleCreateEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
-      if (formData.id) {
-        await departmentService.updateDepartment(formData.id, formData);
+      await employeeService.createEmployee(formData);
+      toast.success("Employee created successfully");
+      setShowCreateModal(false);
+      fetchData();
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        toast.error(
+          error.response?.data?.message || "Failed to create employee"
+        );
+      } else {
+        toast.error("An unexpected error occurred");
+      }
+    }
+  };
+
+  const handleDepartmentSave = async (
+    formData: DepartmentFormData & { _id?: string }
+  ) => {
+    try {
+      if (formData._id) {
+        await departmentService.updateDepartment(formData._id, formData);
       } else {
         await departmentService.createDepartment(formData);
       }
@@ -291,7 +309,7 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
       const response = await departmentService.getAllDepartments();
       setDepartments(response);
       toast.success(
-        formData.id ? "Department updated!" : "Department created!"
+        formData._id ? "Department updated!" : "Department created!"
       );
     } catch (error) {
       toast.error("Failed to save department");
@@ -299,21 +317,40 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
     }
   };
 
-  const handleDepartmentDelete = async (id: string) => {
+  const handleDepartmentDelete = async (department: Department) => {
     try {
-      await employeeService.deleteDepartment(id);
-      // Refresh departments
-      const response = await employeeService.getDepartments();
-      setDepartments(response as Department[]);
-      toast.success("Department deleted successfully!");
+      await departmentService.deleteDepartment(department._id);
+      toast.success("Department deleted successfully");
+      setShowDepartmentModal(false);
+      fetchData();
     } catch (error) {
-      toast.error("Failed to delete department");
-      throw error;
+      if (error instanceof AxiosError) {
+        toast.error(
+          error.response?.data?.message || "Failed to delete department"
+        );
+      } else {
+        toast.error("An unexpected error occurred");
+      }
     }
   };
 
-  const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
-    setPage(value);
+  const handlePageChange = (
+    event: React.ChangeEvent<unknown>,
+    value: number
+  ) => {
+    fetchData(value, filters);
+  };
+
+  const handleFilterChange = (newFilters: OnboardingFilters) => {
+    setFilters(newFilters);
+    fetchData(1, newFilters);
+  };
+
+  const handleFilterClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    const newFilters = { ...filters };
+    setFilters(newFilters);
+    fetchData(1, newFilters);
   };
 
   const handleDeleteEmployee = async (employeeId: string) => {
@@ -421,6 +458,46 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
     }
   };
 
+  const handleDepartmentSelect = (department: Department) => {
+    setFormData((prev) => ({ ...prev, department: department._id }));
+  };
+
+  const handleDepartmentUpdate = async (department: Department) => {
+    try {
+      await departmentService.updateDepartment(department._id, {
+        name: department.name,
+        code: department.code,
+        description: department.description,
+        location: department.location,
+        headOfDepartment: department.headOfDepartment._id,
+        status: department.status,
+      });
+      toast.success("Department updated successfully");
+      setShowDepartmentModal(false);
+      fetchData();
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        toast.error(
+          error.response?.data?.message || "Failed to update department"
+        );
+      } else {
+        toast.error("An unexpected error occurred");
+      }
+    }
+  };
+
+  // Add this function to handle task completion
+  const handleTaskComplete = async (employeeId: string, taskName: string) => {
+    try {
+      await onboardingService.completeTask(employeeId, taskName);
+      toast.success("Task completed successfully");
+      fetchData(); // Refresh the data
+    } catch (error) {
+      console.error("Error completing task:", error);
+      toast.error("Failed to complete task");
+    }
+  };
+
   // Now you can safely use conditional rendering
   if (isLoading) {
     return (
@@ -442,7 +519,7 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
             <p className="text-sm">{error}</p>
           </div>
           <button
-            onClick={fetchData}
+            onClick={() => fetchData(1, filters)}
             className="text-sky-500 hover:text-sky-600 font-medium"
           >
             Try again
@@ -497,26 +574,76 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
             <h2 className="text-xl font-semibold text-gray-800">
               Onboarding Employees
             </h2>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium
-                       text-gray-700 hover:border-sky-500 focus:outline-none focus:ring-2 
-                       focus:ring-sky-500 focus:border-transparent transition-all duration-200"
-            >
-              <option value="all">All Stages</option>
-              <option value="not_started">Not Started</option>
-              <option value="contract_stage">Contract Stage</option>
-              <option value="documentation_stage">Documentation Stage</option>
-              <option value="it_setup_stage">IT Setup Stage</option>
-              <option value="training_stage">Training Stage</option>
-              <option value="completed">Completed</option>
-            </select>
+            <div className="flex space-x-4">
+              <input
+                type="text"
+                placeholder="Search employees..."
+                className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium
+                         text-gray-700 hover:border-sky-500 focus:outline-none focus:ring-2 
+                         focus:ring-sky-500 focus:border-transparent transition-all duration-200"
+                value={filters.search}
+                onChange={(e) =>
+                  handleFilterChange({ ...filters, search: e.target.value })
+                }
+              />
+              <select
+                value={filters.status}
+                onChange={(e) =>
+                  handleFilterChange({ ...filters, status: e.target.value })
+                }
+                className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium
+                         text-gray-700 hover:border-sky-500 focus:outline-none focus:ring-2 
+                         focus:ring-sky-500 focus:border-transparent transition-all duration-200"
+              >
+                <option value="all">All Stages</option>
+                <option value="not_started">Not Started</option>
+                <option value="contract_stage">Contract Stage</option>
+                <option value="documentation_stage">Documentation Stage</option>
+                <option value="it_setup_stage">IT Setup Stage</option>
+                <option value="training_stage">Training Stage</option>
+                <option value="completed">Completed</option>
+              </select>
+              <select
+                value={filters.department}
+                onChange={(e) =>
+                  handleFilterChange({ ...filters, department: e.target.value })
+                }
+                className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium
+                         text-gray-700 hover:border-sky-500 focus:outline-none focus:ring-2 
+                         focus:ring-sky-500 focus:border-transparent transition-all duration-200"
+              >
+                <option value="">All Departments</option>
+                {departments.map((dept) => (
+                  <option key={dept._id} value={dept._id}>
+                    {dept.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
+          {/* Stats Section */}
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="bg-sky-50 p-4 rounded-lg">
+              <h3 className="text-sm font-medium text-sky-700">
+                Total Employees
+              </h3>
+              <p className="text-2xl font-bold text-sky-600">{stats.total}</p>
+            </div>
+            {Object.entries(stats.byStatus).map(([status, count]) => (
+              <div key={status} className="bg-sky-50 p-4 rounded-lg">
+                <h3 className="text-sm font-medium text-sky-700">
+                  {status.replace(/_/g, " ").toUpperCase()}
+                </h3>
+                <p className="text-2xl font-bold text-sky-600">{count}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Employee Cards Grid */}
           <Grid container spacing={3}>
             {displayedEmployees.map((employee) => (
-              <Grid item xs={12} sm={6} lg={4} key={employee.id}>
+              <Grid item xs={12} sm={6} lg={4} key={employee._id}>
                 <div className="bg-white rounded-lg shadow p-6 relative">
                   {/* User Info Section */}
                   <div className="flex items-center space-x-4">
@@ -528,18 +655,10 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 truncate">
-                        {`${employee.firstName} ${employee.lastName}`.length >
-                        17
-                          ? `${employee.firstName} ${employee.lastName}`.slice(
-                              0,
-                              17
-                            ) + "..."
-                          : `${employee.firstName} ${employee.lastName}`}
+                        {`${employee.firstName} ${employee.lastName}`}
                       </h3>
                       <p className="text-sm text-gray-500 truncate">
-                        {employee.position.length > 25
-                          ? employee.position.slice(0, 25) + "..."
-                          : employee.position}
+                        {employee.position}
                       </p>
                     </div>
                   </div>
@@ -548,11 +667,13 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
                   <div className="mt-4 space-y-2">
                     <p className="text-sm text-gray-600">
                       <span className="font-medium">Department:</span>{" "}
-                      {employee.department}
+                      {employee.department.name}
                     </p>
                     <p className="text-sm text-gray-600">
-                      <span className="font-medium">Start Date:</span>{" "}
-                      {new Date(employee.startDate).toLocaleDateString()}
+                      <span className="font-medium">Status:</span>{" "}
+                      {employee.onboarding.status
+                        .replace(/_/g, " ")
+                        .toUpperCase()}
                     </p>
 
                     {/* Progress Bar */}
@@ -560,27 +681,34 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
                       <div className="h-2 bg-gray-200 rounded">
                         <div
                           className="h-2 bg-indigo-600 rounded"
-                          style={{ width: `${employee.progress || 0}%` }}
+                          style={{
+                            width: `${calculateProgress(
+                              employee.onboarding.status
+                            )}%`,
+                          }}
                         />
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        Onboarding Progress: {employee.progress || 0}%
+                        Onboarding Progress:{" "}
+                        {calculateProgress(employee.onboarding.status)}%
                       </p>
                       <p className="text-xs text-gray-600 mt-1">
                         Current Stage:{" "}
-                        {employee.status.replace(/_/g, " ").toUpperCase()}
+                        {employee.onboarding.status
+                          .replace(/_/g, " ")
+                          .toUpperCase()}
                       </p>
                     </div>
 
                     {/* Action Buttons */}
                     <div className="mt-4 pt-3 border-t border-gray-100 space-y-2">
-                      {/* Only show the Update Stage button if not completed */}
-                      {employee.status !== ONBOARDING_STAGES.COMPLETED && (
+                      {employee.onboarding.status !==
+                        ONBOARDING_STAGES.COMPLETED && (
                         <button
                           onClick={() =>
                             handleUpdateOnboardingStage(
-                              employee.id,
-                              employee.status
+                              employee._id,
+                              employee.onboarding.status
                             )
                           }
                           className="w-full flex items-center justify-center space-x-2 px-4 py-2 
@@ -594,9 +722,8 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
                         </button>
                       )}
 
-                      {/* Existing offboarding button */}
                       <button
-                        onClick={() => handleInitiateOffboarding(employee.id)}
+                        onClick={() => handleInitiateOffboarding(employee._id)}
                         className="w-full flex items-center justify-center space-x-2 px-4 py-2 
                                  bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 
                                  hover:to-red-700 text-white rounded-lg transition-all duration-200 
@@ -608,19 +735,6 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
                         </span>
                       </button>
                     </div>
-                    {/* Add a delete button for each employee */}
-                    <div className="mt-4">
-                      <button
-                        onClick={() => handleDeleteEmployee(employee.id)}
-                        className="w-full flex items-center justify-center space-x-2 px-4 py-2 
-                                 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 
-                                 hover:to-red-700 text-white rounded-lg transition-all duration-200 
-                                 transform hover:scale-[1.02]"
-                      >
-                        <FaTimes className="text-lg" />
-                        <span className="font-medium">Delete Employee</span>
-                      </button>
-                    </div>
                   </div>
                 </div>
               </Grid>
@@ -629,9 +743,9 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
 
           <div className="mt-6 flex justify-center">
             <Pagination
-              count={Math.ceil(getFilteredEmployees().length / itemsPerPage)}
-              page={page}
-              onChange={(event, page) => handlePageChange(event, page)}
+              count={pagination.totalPages}
+              page={pagination.page}
+              onChange={handlePageChange}
               color="primary"
               size="large"
             />
@@ -825,7 +939,7 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
                     >
                       <option value="">Select Department</option>
                       {departments.map((dept) => (
-                        <option key={dept.id} value={dept.id}>
+                        <option key={dept._id} value={dept._id}>
                           {dept.name}
                         </option>
                       ))}
@@ -874,11 +988,13 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
       <DepartmentModal
         isOpen={showDepartmentModal}
         onClose={() => setShowDepartmentModal(false)}
-        onSave={handleDepartmentSave}
-        onDelete={handleDepartmentDelete}
         departments={departments}
-        isLoading={isLoading}
         admins={admins}
+        isLoading={isLoading}
+        onSuccess={async () => {
+          const response = await departmentService.getAllDepartments();
+          setDepartments(response);
+        }}
       />
     </motion.div>
   );

@@ -122,6 +122,19 @@ export const Permission = {
   // New permissions
   MANAGE_DEPARTMENT_DEDUCTIONS: "MANAGE_DEPARTMENT_DEDUCTIONS",
   VIEW_DEPARTMENT_DEDUCTIONS: "VIEW_DEPARTMENT_DEDUCTIONS",
+
+  // Settings Management
+  MANAGE_COMPANY_PROFILE: "MANAGE_COMPANY_PROFILE",
+  MANAGE_DEPARTMENT_SETTINGS: "MANAGE_DEPARTMENT_SETTINGS",
+  MANAGE_SYSTEM_SETTINGS: "MANAGE_SYSTEM_SETTINGS",
+  MANAGE_USER_SETTINGS: "MANAGE_USER_SETTINGS",
+  MANAGE_PAYROLL_SETTINGS: "MANAGE_PAYROLL_SETTINGS",
+  MANAGE_LEAVE_SETTINGS: "MANAGE_LEAVE_SETTINGS",
+  MANAGE_DOCUMENT_SETTINGS: "MANAGE_DOCUMENT_SETTINGS",
+  MANAGE_NOTIFICATION_SETTINGS: "MANAGE_NOTIFICATION_SETTINGS",
+  MANAGE_INTEGRATION_SETTINGS: "MANAGE_INTEGRATION_SETTINGS",
+  MANAGE_TAX_SETTINGS: "MANAGE_TAX_SETTINGS",
+  MANAGE_COMPLIANCE_SETTINGS: "MANAGE_COMPLIANCE_SETTINGS",
 };
 
 export const UserLifecycleState = {
@@ -302,7 +315,15 @@ const UserSchema = new Schema(
         },
       },
     },
-    profileImage: String,
+    profileImage: {
+      type: String,
+      default: null,
+      get: function (value) {
+        if (!value) return null;
+        if (value.startsWith("http")) return value;
+        return `${process.env.BASE_URL || ""}${value}`;
+      },
+    },
     reportingTo: {
       type: Schema.Types.ObjectId,
       ref: "User",
@@ -762,6 +783,19 @@ UserSchema.pre("save", function (next) {
           // New permissions
           Permission.MANAGE_DEPARTMENT_DEDUCTIONS,
           Permission.VIEW_DEPARTMENT_DEDUCTIONS,
+
+          // Settings Management
+          Permission.MANAGE_COMPANY_PROFILE,
+          Permission.MANAGE_DEPARTMENT_SETTINGS,
+          Permission.MANAGE_SYSTEM_SETTINGS,
+          Permission.MANAGE_USER_SETTINGS,
+          Permission.MANAGE_PAYROLL_SETTINGS,
+          Permission.MANAGE_LEAVE_SETTINGS,
+          Permission.MANAGE_DOCUMENT_SETTINGS,
+          Permission.MANAGE_NOTIFICATION_SETTINGS,
+          Permission.MANAGE_INTEGRATION_SETTINGS,
+          Permission.MANAGE_TAX_SETTINGS,
+          Permission.MANAGE_COMPLIANCE_SETTINGS,
         ];
         break;
 
@@ -825,6 +859,12 @@ UserSchema.pre("save", function (next) {
           // New permissions
           Permission.MANAGE_DEPARTMENT_DEDUCTIONS,
           Permission.VIEW_DEPARTMENT_DEDUCTIONS,
+
+          // Settings Management (Limited)
+          Permission.MANAGE_DEPARTMENT_SETTINGS,
+          Permission.MANAGE_USER_SETTINGS,
+          Permission.MANAGE_NOTIFICATION_SETTINGS,
+          Permission.MANAGE_LEAVE_SETTINGS,
         ];
         break;
 

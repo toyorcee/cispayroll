@@ -2,17 +2,86 @@ import UserModel, { OnboardingStatus } from "../models/User.js";
 import { ApiError } from "../utils/errorHandler.js";
 
 export class OnboardingController {
-  // Get all employees in onboarding
   static async getOnboardingEmployees(req, res, next) {
     try {
-      const employees = await UserModel.find({
+      const {
+        page = 1,
+        limit = 10,
+        status,
+        department,
+        search,
+        sortBy = "createdAt",
+        sortOrder = "desc",
+      } = req.query;
+
+      // Build query
+      const query = {
         "onboarding.status": { $ne: OnboardingStatus.COMPLETED },
         status: "active",
-      }).select("-password");
+      };
+
+      // Add filters if provided
+      if (status) {
+        query["onboarding.status"] = status;
+      }
+      if (department) {
+        query.department = department;
+      }
+      if (search) {
+        query.$or = [
+          { firstName: { $regex: search, $options: "i" } },
+          { lastName: { $regex: search, $options: "i" } },
+          { employeeId: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+        ];
+      }
+
+      // Calculate pagination
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const sort = { [sortBy]: sortOrder === "desc" ? -1 : 1 };
+
+      // Get total count for pagination
+      const total = await UserModel.countDocuments(query);
+
+      // Get paginated results
+      const employees = await UserModel.find(query)
+        .select("-password")
+        .populate("department", "name code")
+        .sort(sort)
+        .skip(skip)
+        .limit(parseInt(limit));
+
+      // Calculate onboarding statistics
+      const stats = await UserModel.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: "$onboarding.status",
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      // Format stats
+      const statusStats = stats.reduce((acc, curr) => {
+        acc[curr._id] = curr.count;
+        return acc;
+      }, {});
 
       res.status(200).json({
         success: true,
         data: employees,
+        pagination: {
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(total / parseInt(limit)),
+        },
+        stats: {
+          total,
+          byStatus: statusStats,
+          departments: await UserModel.distinct("department", query),
+        },
       });
     } catch (error) {
       next(error);

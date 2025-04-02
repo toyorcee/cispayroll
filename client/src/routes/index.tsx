@@ -32,7 +32,6 @@ import Dashboard from "../pages/pms/dashboard/Dashboard";
 import AllowanceManagement from "../pages/pms/payroll/AllowanceManagement";
 import BonusManagement from "../pages/pms/payroll/BonusManagement";
 import Landing from "../pages/Landing";
-import Disciplinary from "../pages/pms/disciplinary/Disciplinary";
 import ComingSoonPage from "../pages/Coming/ComingSoonPage";
 import FeedbackManagemnet from "../pages/feedback/FeedbackManagement";
 import MyPayslipsPage from "../pages/pms/payroll/MyPayslips";
@@ -40,6 +39,14 @@ import UserProfile from "../pages/pms/profile/UserProfile";
 import { RouteErrorFallback } from "../components/error/RouteErrorFallback";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorFallback } from "../components/error/ErrorFallback";
+
+// Import new settings components
+import PayrollSettings from "../pages/pms/settings/PayrollSettings";
+import LeaveSettings from "../pages/pms/settings/LeaveSettings";
+import DocumentSettings from "../pages/pms/settings/DocumentSettings";
+import SystemSettings from "../pages/pms/settings/SystemSettings";
+import MyAllowances from "../pages/pms/payroll/MyAllowances";
+import MyDeductions from "../pages/pms/payroll/MyDeductions";
 
 export interface RouteConfig {
   path: string;
@@ -136,9 +143,15 @@ export const routes: RouteConfig[] = [
       {
         path: "leave",
         label: "Leave Management",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.APPROVE_LEAVE, Permission.VIEW_TEAM_LEAVE],
-        requireAllPermissions: true,
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+        permissions: [
+          Permission.REQUEST_LEAVE,
+          Permission.VIEW_OWN_LEAVE,
+          Permission.CANCEL_OWN_LEAVE,
+          Permission.APPROVE_LEAVE,
+          Permission.VIEW_TEAM_LEAVE,
+        ],
+        requireAllPermissions: false,
         element: <LeaveManagement />,
       },
     ],
@@ -212,25 +225,25 @@ export const routes: RouteConfig[] = [
         requireAllPermissions: true,
         element: <MyPayslipsPage />,
       },
-      // {
-      //   path: "my-allowances",
-      //   label: "My Allowances",
-      //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-      //   permissions: [
-      //     Permission.VIEW_OWN_ALLOWANCES,
-      //     Permission.REQUEST_ALLOWANCES,
-      //   ],
-      //   requireAllPermissions: true,
-      //   element: <AllowanceManagement />,
-      // },
-      // {
-      //   path: "my-deductions",
-      //   label: "My Deductions",
-      //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-      //   permissions: [Permission.VIEW_OWN_DEDUCTIONS],
-      //   requireAllPermissions: true,
-      //   element: <Deductions />,
-      // },
+      {
+        path: "my-allowances",
+        label: "My Allowances",
+        roles: [UserRole.ADMIN, UserRole.USER],
+        permissions: [
+          Permission.VIEW_OWN_ALLOWANCES,
+          Permission.REQUEST_ALLOWANCES,
+        ],
+        requireAllPermissions: true,
+        element: <MyAllowances />,
+      },
+      {
+        path: "my-deductions",
+        label: "My Deductions",
+        roles: [UserRole.ADMIN, UserRole.USER],
+        permissions: [Permission.VIEW_OWN_DEDUCTIONS],
+        requireAllPermissions: true,
+        element: <MyDeductions />,
+      },
     ],
   },
   {
@@ -283,18 +296,24 @@ export const routes: RouteConfig[] = [
   {
     path: "settings",
     label: "Settings",
-    roles: [UserRole.SUPER_ADMIN],
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
     permissions: [
-      Permission.MANAGE_SYSTEM,
-      Permission.MANAGE_COMPANY_PROFILE,
-      Permission.MANAGE_TAX_CONFIG,
-      Permission.MANAGE_COMPLIANCE,
-      Permission.MANAGE_NOTIFICATIONS,
-      Permission.MANAGE_INTEGRATIONS,
+      Permission.MANAGE_SYSTEM_SETTINGS,
+      Permission.MANAGE_DEPARTMENT_SETTINGS,
+      Permission.MANAGE_USER_SETTINGS,
+      Permission.MANAGE_NOTIFICATION_SETTINGS,
     ],
-    requireAllPermissions: true,
-    element: <GeneralSettings />,
+    requireAllPermissions: false,
+    element: <Outlet />,
     children: [
+      {
+        path: "",
+        label: "General Settings",
+        roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_SYSTEM_SETTINGS],
+        requireAllPermissions: true,
+        element: <GeneralSettings />,
+      },
       {
         path: "company",
         label: "Company Profile",
@@ -306,55 +325,82 @@ export const routes: RouteConfig[] = [
       {
         path: "departments",
         label: "Department Management",
-        roles: [UserRole.SUPER_ADMIN],
-        permissions: [
-          Permission.CREATE_DEPARTMENT,
-          Permission.EDIT_DEPARTMENT,
-          Permission.DELETE_DEPARTMENT,
-          Permission.VIEW_ALL_DEPARTMENTS,
-        ],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.MANAGE_DEPARTMENT_SETTINGS],
         requireAllPermissions: true,
         element: <DepartmentManagement />,
       },
       {
-        path: "tax",
-        label: "Tax Configuration",
-        roles: [UserRole.SUPER_ADMIN],
-        permissions: [Permission.MANAGE_TAX_CONFIG],
-        requireAllPermissions: true,
-        element: <TaxConfiguration />,
-      },
-      {
-        path: "compliance",
-        label: "Compliance",
-        roles: [UserRole.SUPER_ADMIN],
-        permissions: [Permission.MANAGE_COMPLIANCE],
-        requireAllPermissions: true,
-        element: <Compliance />,
-      },
-      {
         path: "users",
         label: "User Management",
-        roles: [UserRole.SUPER_ADMIN],
-        permissions: [Permission.CREATE_USER, Permission.EDIT_USER],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.MANAGE_USER_SETTINGS],
         requireAllPermissions: true,
         element: <UserManagement />,
       },
       {
-        path: "notifications",
-        label: "Notifications",
+        path: "payroll",
+        label: "Payroll Settings",
         roles: [UserRole.SUPER_ADMIN],
-        permissions: [Permission.MANAGE_NOTIFICATIONS],
+        permissions: [Permission.MANAGE_PAYROLL_SETTINGS],
+        requireAllPermissions: true,
+        element: <PayrollSettings />,
+      },
+      {
+        path: "leave",
+        label: "Leave Settings",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.MANAGE_LEAVE_SETTINGS],
+        requireAllPermissions: true,
+        element: <LeaveSettings />,
+      },
+      {
+        path: "documents",
+        label: "Document Settings",
+        roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_DOCUMENT_SETTINGS],
+        requireAllPermissions: true,
+        element: <DocumentSettings />,
+      },
+      {
+        path: "notifications",
+        label: "Notification Settings",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.MANAGE_NOTIFICATION_SETTINGS],
         requireAllPermissions: true,
         element: <Notifications />,
       },
       {
         path: "integrations",
-        label: "Integrations",
+        label: "Integration Settings",
         roles: [UserRole.SUPER_ADMIN],
-        permissions: [Permission.MANAGE_INTEGRATIONS],
+        permissions: [Permission.MANAGE_INTEGRATION_SETTINGS],
         requireAllPermissions: true,
         element: <Integrations />,
+      },
+      {
+        path: "tax",
+        label: "Tax Settings",
+        roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_TAX_SETTINGS],
+        requireAllPermissions: true,
+        element: <TaxConfiguration />,
+      },
+      {
+        path: "compliance",
+        label: "Compliance Settings",
+        roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_COMPLIANCE_SETTINGS],
+        requireAllPermissions: true,
+        element: <Compliance />,
+      },
+      {
+        path: "system",
+        label: "System Settings",
+        roles: [UserRole.SUPER_ADMIN],
+        permissions: [Permission.MANAGE_SYSTEM_SETTINGS],
+        requireAllPermissions: true,
+        element: <SystemSettings />,
       },
     ],
   },
@@ -369,20 +415,6 @@ export const routes: RouteConfig[] = [
   //   requireAllPermissions: false,
   //   element: <Disciplinary />,
   // },
-  {
-    path: "leave",
-    label: "Leave",
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-    permissions: [
-      Permission.REQUEST_LEAVE,
-      Permission.VIEW_OWN_LEAVE,
-      Permission.CANCEL_OWN_LEAVE,
-      Permission.APPROVE_LEAVE,
-      Permission.VIEW_TEAM_LEAVE,
-    ],
-    requireAllPermissions: false,
-    element: <LeaveManagement />,
-  },
   {
     path: "profile",
     label: "My Profile",
