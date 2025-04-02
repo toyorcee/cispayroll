@@ -1,7 +1,6 @@
 // import React from "react";
 import { Payslip } from "../../../types/payroll";
 import { FaDownload, FaPrint, FaEnvelope } from "react-icons/fa";
-import { AiOutlineLoading3Quarters } from "react-icons/ai";
 // import { useAuth } from "../../../context/AuthContext";
 import { generatePayslipPDF } from "../../../utils/pdfGenerator";
 import { PayrollBranding } from "../../shared/PayrollBranding";
@@ -12,7 +11,7 @@ import { toast } from "react-hot-toast";
 interface PayslipDetailProps {
   payslip: Payslip;
   onClose: () => void;
-  setPayslip: React.Dispatch<React.SetStateAction<Payslip>>;
+  setPayslip: React.Dispatch<React.SetStateAction<Payslip | null>>;
 }
 
 const formatAmount = (amount: number | undefined | null) => {
@@ -63,11 +62,14 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
       const success = await payrollService.sendPayslipEmail(payslip.payslipId);
       if (success) {
         // Update local state to reflect email sent
-        setPayslip((prev) => ({
-          ...prev,
-          emailSent: true,
-          emailSentAt: new Date(),
-        }));
+        setPayslip((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            emailSent: true,
+            emailSentAt: new Date(),
+          } as Payslip;
+        });
       }
     } catch (error) {
       console.error("Error sending email:", error);
@@ -78,7 +80,6 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
 
   // Add null checks for all numeric values
   const basicSalary = payslip.earnings?.basicSalary || 0;
-  const totalAllowances = payslip.earnings?.allowances?.totalAllowances || 0;
   const totalDeductions = payslip.deductions?.totalDeductions || 0;
   const netPay = payslip.totals?.netPay || 0;
 

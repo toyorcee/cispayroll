@@ -11,7 +11,7 @@ import { toast } from "react-toastify";
 import { employeeService } from "../../../services/employeeService";
 import { Dialog } from "@headlessui/react";
 import { DepartmentModal } from "../../../components/departments/DepartmentModal";
-import { Department, DepartmentFormData } from "../../../types/department";
+import { Department } from "../../../types/department";
 import { useAuth } from "../../../context/AuthContext";
 import { UserRole, User, Permission } from "../../../types/auth";
 import { AxiosError } from "axios";
@@ -26,7 +26,6 @@ import { departmentService } from "../../../services/departmentService";
 import {
   onboardingService,
   OnboardingFilters,
-  OnboardingResponse,
 } from "../../../services/onboardingService";
 
 // Update the AdminUser interface to match User type exactly
@@ -47,22 +46,20 @@ interface AdminUser {
   permissions: Permission[];
 }
 
-interface EmployeeFormData {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  position: string;
-  gradeLevel: string;
-  workLocation: string;
-  dateJoined: string;
-  department: string;
+// Update the OnboardingEmployee interface to match the actual data structure
+interface ExtendedOnboardingEmployee extends OnboardingEmployee {
+  onboarding: {
+    status: string;
+  };
+  department: {
+    name: string;
+  };
 }
 
 const useOnboardingData = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [onboardingEmployees, setOnboardingEmployees] = useState<
-    OnboardingEmployee[]
+    ExtendedOnboardingEmployee[]
   >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,10 +78,10 @@ const useOnboardingData = () => {
 
   const fetchData = useCallback(
     async (page = 1, filters: OnboardingFilters = {}) => {
-    setIsLoading(true);
-    try {
-      const deps = await departmentService.getAllDepartments();
-      setDepartments(deps);
+      setIsLoading(true);
+      try {
+        const deps = await departmentService.getAllDepartments();
+        setDepartments(deps);
 
         const response = await onboardingService.getOnboardingEmployees({
           page,
@@ -93,10 +90,12 @@ const useOnboardingData = () => {
         });
 
         // Filter out super admins and only show employees in onboarding process
-        const filteredEmployees = response.data.filter((emp) => {
+        const filteredEmployees = (
+          response.data as ExtendedOnboardingEmployee[]
+        ).filter((emp) => {
           return (
             emp.role !== "SUPER_ADMIN" &&
-            emp.onboarding.status !== "completed" &&
+            emp.onboarding?.status !== "completed" &&
             emp.status !== "offboarding"
           );
         });
@@ -107,8 +106,8 @@ const useOnboardingData = () => {
             id: emp._id,
             name: `${emp.firstName} ${emp.lastName}`,
             role: emp.role,
-            status: emp.onboarding.status,
-            department: emp.department.name,
+            status: emp.onboarding?.status,
+            department: emp.department?.name || emp.department,
           }))
         );
 
@@ -122,21 +121,22 @@ const useOnboardingData = () => {
           ...response.stats,
           total: filteredEmployees.length,
           byStatus: filteredEmployees.reduce((acc, emp) => {
-            acc[emp.onboarding.status] = (acc[emp.onboarding.status] || 0) + 1;
+            acc[emp.onboarding?.status || "unknown"] =
+              (acc[emp.onboarding?.status || "unknown"] || 0) + 1;
             return acc;
           }, {} as Record<string, number>),
         });
-      setError(null);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        setError(error.message || "Failed to load data");
-      } else {
-        setError("An unknown error occurred");
+        setError(null);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          setError(error.message || "Failed to load data");
+        } else {
+          setError("An unknown error occurred");
+        }
+        setOnboardingEmployees([]);
+      } finally {
+        setIsLoading(false);
       }
-      setOnboardingEmployees([]);
-    } finally {
-      setIsLoading(false);
-    }
     },
     []
   );
@@ -144,6 +144,28 @@ const useOnboardingData = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    const refreshInterval = setInterval(async () => {
+      try {
+        const response = await onboardingService.getOnboardingEmployees();
+        // Transform the response to match ExtendedOnboardingEmployee type
+        const transformedEmployees = response.data.map((emp) => ({
+          ...emp,
+          department:
+            typeof emp.department === "string"
+              ? { name: emp.department }
+              : emp.department,
+          onboarding: emp.onboarding || { status: "not_started" },
+        }));
+        setOnboardingEmployees(transformedEmployees);
+      } catch (error) {
+        console.error("Error refreshing employees:", error);
+      }
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(refreshInterval);
+  }, []);
 
   return {
     departments,
@@ -174,7 +196,7 @@ export default function Onboarding() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showDepartmentModal, setShowDepartmentModal] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+  const [isCreating] = useState(false);
   const [filters, setFilters] = useState<OnboardingFilters>({
     status: "",
     department: "",
@@ -202,12 +224,11 @@ export default function Onboarding() {
     isLoading,
     error,
     fetchData,
-    user,
     pagination,
     stats,
   } = useOnboardingData();
 
-  const [page, setPage] = useState(1);
+  const [page] = useState(1);
   const [itemsPerPage] = useState(6);
 
   // Add a state for admins
@@ -219,19 +240,19 @@ export default function Onboarding() {
       try {
         const response = await employeeService.getAdmins();
         if (response && Array.isArray(response)) {
-        const transformedAdmins = response.map((admin) => ({
-          _id: admin._id,
-          id: admin._id,
-          firstName: admin.firstName,
-          lastName: admin.lastName,
-          email: admin.email,
-          role: admin.role || UserRole.ADMIN,
-          status: admin.status || "active",
-          permissions: (admin.permissions || []).map(
-            (perm) => perm as Permission
-          ),
-        }));
-        setAdmins(transformedAdmins as AdminUser[]);
+          const transformedAdmins = response.map((admin) => ({
+            _id: admin._id,
+            id: admin._id,
+            firstName: admin.firstName,
+            lastName: admin.lastName,
+            email: admin.email,
+            role: admin.role || UserRole.ADMIN,
+            status: admin.status || "active",
+            permissions: (admin.permissions || []).map(
+              (perm) => perm as Permission
+            ),
+          }));
+          setAdmins(transformedAdmins as AdminUser[]);
         } else {
           setAdmins([]);
         }
@@ -252,81 +273,29 @@ export default function Onboarding() {
     return () => clearTimeout(timer);
   }, [fetchData]);
 
-  useEffect(() => {
-    const refreshInterval = setInterval(async () => {
-      try {
-        const response = await employeeService.getOnboardingEmployees();
-        setOnboardingEmployees(response);
-      } catch (error) {
-        console.error("Error refreshing employees:", error);
-      }
-    }, 5 * 60 * 1000);
-
-    return () => clearInterval(refreshInterval);
-  }, []);
-
   // Define all your handler functions here
   const getFilteredEmployees = () => {
     const filtered =
       filters.status === "all"
-          ? onboardingEmployees
+        ? onboardingEmployees
         : onboardingEmployees.filter(
-            (emp) => emp.onboarding.status === filters.status
+            (emp) => emp.onboarding?.status === filters.status
           );
 
     return filtered;
   };
 
-const handleCreateEmployee = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const handleCreateEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
       await employeeService.createEmployee(formData);
       toast.success("Employee created successfully");
-    setShowCreateModal(false);
+      setShowCreateModal(false);
       fetchData();
     } catch (error) {
       if (error instanceof AxiosError) {
         toast.error(
           error.response?.data?.message || "Failed to create employee"
-        );
-    } else {
-        toast.error("An unexpected error occurred");
-    }
-  }
-};
-
-  const handleDepartmentSave = async (
-    formData: DepartmentFormData & { _id?: string }
-  ) => {
-    try {
-      if (formData._id) {
-        await departmentService.updateDepartment(formData._id, formData);
-      } else {
-        await departmentService.createDepartment(formData);
-      }
-
-      // Refresh departments
-      const response = await departmentService.getAllDepartments();
-      setDepartments(response);
-      toast.success(
-        formData._id ? "Department updated!" : "Department created!"
-      );
-    } catch (error) {
-      toast.error("Failed to save department");
-      throw error;
-    }
-  };
-
-  const handleDepartmentDelete = async (department: Department) => {
-    try {
-      await departmentService.deleteDepartment(department._id);
-      toast.success("Department deleted successfully");
-      setShowDepartmentModal(false);
-      fetchData();
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        toast.error(
-          error.response?.data?.message || "Failed to delete department"
         );
       } else {
         toast.error("An unexpected error occurred");
@@ -335,7 +304,7 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
   };
 
   const handlePageChange = (
-    event: React.ChangeEvent<unknown>,
+    _event: React.ChangeEvent<unknown>,
     value: number
   ) => {
     fetchData(value, filters);
@@ -344,26 +313,6 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
   const handleFilterChange = (newFilters: OnboardingFilters) => {
     setFilters(newFilters);
     fetchData(1, newFilters);
-  };
-
-  const handleFilterClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    const newFilters = { ...filters };
-    setFilters(newFilters);
-    fetchData(1, newFilters);
-  };
-
-  const handleDeleteEmployee = async (employeeId: string) => {
-    try {
-      await employeeService.deleteEmployee(employeeId);
-      setOnboardingEmployees((prev) =>
-        prev.filter((emp) => emp.id !== employeeId)
-      );
-      toast.success("Employee deleted successfully");
-    } catch (error) {
-      console.error("Error deleting employee:", error);
-      toast.error("Failed to delete employee");
-    }
   };
 
   const handleInitiateOffboarding = async (employeeId: string) => {
@@ -423,7 +372,10 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
           if (emp.id === employeeId) {
             return {
               ...emp,
-              status: nextStage,
+              onboarding: {
+                ...emp.onboarding,
+                status: nextStage,
+              },
               progress: calculateProgress(nextStage),
             };
           }
@@ -455,46 +407,6 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
         return 100;
       default:
         return 0;
-    }
-  };
-
-  const handleDepartmentSelect = (department: Department) => {
-    setFormData((prev) => ({ ...prev, department: department._id }));
-  };
-
-  const handleDepartmentUpdate = async (department: Department) => {
-    try {
-      await departmentService.updateDepartment(department._id, {
-        name: department.name,
-        code: department.code,
-        description: department.description,
-        location: department.location,
-        headOfDepartment: department.headOfDepartment._id,
-        status: department.status,
-      });
-      toast.success("Department updated successfully");
-      setShowDepartmentModal(false);
-      fetchData();
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        toast.error(
-          error.response?.data?.message || "Failed to update department"
-        );
-      } else {
-        toast.error("An unexpected error occurred");
-      }
-    }
-  };
-
-  // Add this function to handle task completion
-  const handleTaskComplete = async (employeeId: string, taskName: string) => {
-    try {
-      await onboardingService.completeTask(employeeId, taskName);
-      toast.success("Task completed successfully");
-      fetchData(); // Refresh the data
-    } catch (error) {
-      console.error("Error completing task:", error);
-      toast.error("Failed to complete task");
     }
   };
 
@@ -586,23 +498,23 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
                   handleFilterChange({ ...filters, search: e.target.value })
                 }
               />
-            <select
+              <select
                 value={filters.status}
                 onChange={(e) =>
                   handleFilterChange({ ...filters, status: e.target.value })
                 }
-              className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium
+                className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium
                        text-gray-700 hover:border-sky-500 focus:outline-none focus:ring-2 
                        focus:ring-sky-500 focus:border-transparent transition-all duration-200"
-            >
-              <option value="all">All Stages</option>
-              <option value="not_started">Not Started</option>
-              <option value="contract_stage">Contract Stage</option>
-              <option value="documentation_stage">Documentation Stage</option>
-              <option value="it_setup_stage">IT Setup Stage</option>
-              <option value="training_stage">Training Stage</option>
-              <option value="completed">Completed</option>
-            </select>
+              >
+                <option value="all">All Stages</option>
+                <option value="not_started">Not Started</option>
+                <option value="contract_stage">Contract Stage</option>
+                <option value="documentation_stage">Documentation Stage</option>
+                <option value="it_setup_stage">IT Setup Stage</option>
+                <option value="training_stage">Training Stage</option>
+                <option value="completed">Completed</option>
+              </select>
               <select
                 value={filters.department}
                 onChange={(e) =>
@@ -667,12 +579,14 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
                   <div className="mt-4 space-y-2">
                     <p className="text-sm text-gray-600">
                       <span className="font-medium">Department:</span>{" "}
-                      {employee.department.name}
+                      {typeof employee.department === "string"
+                        ? employee.department
+                        : employee.department?.name}
                     </p>
                     <p className="text-sm text-gray-600">
                       <span className="font-medium">Status:</span>{" "}
-                      {employee.onboarding.status
-                        .replace(/_/g, " ")
+                      {employee.onboarding?.status
+                        ?.replace(/_/g, " ")
                         .toUpperCase()}
                     </p>
 
@@ -683,32 +597,35 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
                           className="h-2 bg-indigo-600 rounded"
                           style={{
                             width: `${calculateProgress(
-                              employee.onboarding.status
+                              employee.onboarding?.status || "not_started"
                             )}%`,
                           }}
                         />
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
                         Onboarding Progress:{" "}
-                        {calculateProgress(employee.onboarding.status)}%
+                        {calculateProgress(
+                          employee.onboarding?.status || "not_started"
+                        )}
+                        %
                       </p>
                       <p className="text-xs text-gray-600 mt-1">
                         Current Stage:{" "}
-                        {employee.onboarding.status
-                          .replace(/_/g, " ")
+                        {employee.onboarding?.status
+                          ?.replace(/_/g, " ")
                           .toUpperCase()}
                       </p>
                     </div>
 
                     {/* Action Buttons */}
                     <div className="mt-4 pt-3 border-t border-gray-100 space-y-2">
-                      {employee.onboarding.status !==
+                      {employee.onboarding?.status !==
                         ONBOARDING_STAGES.COMPLETED && (
                         <button
                           onClick={() =>
                             handleUpdateOnboardingStage(
-                              employee._id,
-                              employee.onboarding.status
+                              employee.id,
+                              employee.onboarding?.status || "not_started"
                             )
                           }
                           className="w-full flex items-center justify-center space-x-2 px-4 py-2 
@@ -723,7 +640,7 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
                       )}
 
                       <button
-                        onClick={() => handleInitiateOffboarding(employee._id)}
+                        onClick={() => handleInitiateOffboarding(employee.id)}
                         className="w-full flex items-center justify-center space-x-2 px-4 py-2 
                                  bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 
                                  hover:to-red-700 text-white rounded-lg transition-all duration-200 

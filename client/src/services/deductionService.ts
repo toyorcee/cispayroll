@@ -6,7 +6,7 @@ import {
   CalculationMethod,
 } from "../types/deduction";
 
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = "https://payrollapi.digitalentshub.net/api";
 
 // Set default axios config
 axios.defaults.withCredentials = true;
@@ -80,7 +80,7 @@ export const deductionService = {
     }
   },
 
-  createVoluntaryDeduction: async (data: any) => {
+  createVoluntaryDeduction: async (data: CreateVoluntaryDeductionInput) => {
     try {
       const response = await axios.post(
         `${BASE_URL}/super-admin/deductions/voluntary`,

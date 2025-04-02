@@ -38,7 +38,7 @@ interface LeaveStats {
 }
 
 const LeaveManagement: React.FC = () => {
-  const { user, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([
     {
       id: "1",
@@ -52,7 +52,7 @@ const LeaveManagement: React.FC = () => {
     },
   ]);
 
-  const [stats, setStats] = useState<LeaveStats>({
+  const [stats] = useState<LeaveStats>({
     pendingRequests: 5,
     approvedRequests: 10,
     rejectedRequests: 2,

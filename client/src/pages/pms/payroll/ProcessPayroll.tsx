@@ -20,7 +20,6 @@ import {
   type PayrollPeriod,
   type PayrollStats,
   type PayrollData,
-  type PeriodPayrollResponse,
   type Payslip,
   type PayrollFilters,
 } from "../../../types/payroll";
@@ -43,11 +42,8 @@ import {
   TableRow,
   TableCell,
   Paper,
-  CircularProgress,
 } from "@mui/material";
 import { RunPayrollModal } from "../../../components/payroll/processpayroll/RunPayrollModal";
-import { useAuth } from "../../../context/AuthContext";
-import { UserRole } from "../../../types/auth";
 
 const statusColors: Record<PayrollStatus, string> = {
   [PayrollStatus.DRAFT]: "bg-gray-100 text-gray-800",
@@ -157,36 +153,7 @@ interface StatusBreakdown {
   totalNetPay: number;
 }
 
-interface PayrollSummary {
-  frequencyTotals: FrequencyTotal[];
-  statusBreakdown: StatusBreakdown[];
-  departmentBreakdown: Array<{
-    _id: string;
-    count: number;
-    totalNetPay: number;
-    departmentName: string;
-  }>;
-}
-
-interface PayrollResponse {
-  success: boolean;
-  data: {
-    payrolls: PayrollData[];
-    pagination: {
-      total: number;
-      page: number;
-      pages: number;
-    };
-    summary: PayrollSummary;
-  };
-}
-
 export default function ProcessPayroll() {
-  const { user } = useAuth();
-  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
-  const [selectedStatus, setSelectedStatus] = useState<PayrollStatus | "all">(
-    "all"
-  );
   const [selectedPayslip, setSelectedPayslip] = useState<Payslip | null>(null);
   const [showPayslipModal, setShowPayslipModal] = useState(false);
   const [selectedEmployeeData, setSelectedEmployeeData] = useState<{
@@ -196,8 +163,6 @@ export default function ProcessPayroll() {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedEmployeeHistory, setSelectedEmployeeHistory] = useState(null);
   const [showPeriodModal, setShowPeriodModal] = useState(false);
-  const [selectedPeriodData, setSelectedPeriodData] =
-    useState<PeriodPayrollResponse | null>(null);
   const [showRunPayrollModal, setShowRunPayrollModal] = useState(false);
   const [showApproveConfirm, setShowApproveConfirm] = useState(false);
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
@@ -235,23 +200,6 @@ export default function ProcessPayroll() {
     },
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: (data: {
-      payrollId: string;
-      status: string;
-      remarks?: string;
-    }) =>
-      payrollService.updatePayrollStatus(
-        data.payrollId,
-        data.status,
-        data.remarks
-      ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["payrollPeriods"] });
-      toast.success("Payroll status updated successfully");
-    },
-  });
-
   const processPaymentMutation = useMutation({
     mutationFn: (payrollId: string) => payrollService.processPayment(payrollId),
     onSuccess: () => {
@@ -268,69 +216,15 @@ export default function ProcessPayroll() {
     queryFn: () => payrollService.getAllPayrolls(filters),
   });
 
-  const stats = {
-    totalPayrollAmount:
-      payrollsData?.summary?.frequencyTotals?.reduce(
-        (sum: number, freq: FrequencyTotal) => sum + (freq.totalNetPay || 0),
-        0
-      ) || 0,
+  const { isLoading: isPeriodsLoading } = useQuery<PayrollPeriod[]>({
+    queryKey: ["payrollPeriods"],
+    queryFn: () => payrollService.getPayrollPeriods(),
+  });
 
-    employeesToProcess:
-      payrollsData?.payrolls?.filter(
-        (payroll: PayrollData) => payroll.status === PayrollStatus.DRAFT
-      ).length || 0,
-
-    pendingReviews:
-      payrollsData?.summary?.statusBreakdown?.find(
-        (status: StatusBreakdown) => status._id === "PENDING"
-      )?.count || 0,
-  };
-
-  const statusDistributionData = {
-    labels: ["Draft", "Pending", "Approved", "Paid", "Processing", "Rejected"],
-    datasets: [
-      {
-        label: "Status Distribution",
-        data: [
-          payrollsData?.payrolls?.filter(
-            (p: PayrollData) => p.status === PayrollStatus.DRAFT
-          ).length || 0,
-          payrollsData?.payrolls?.filter(
-            (p: PayrollData) => p.status === PayrollStatus.PENDING
-          ).length || 0,
-          payrollsData?.payrolls?.filter(
-            (p: PayrollData) => p.status === PayrollStatus.APPROVED
-          ).length || 0,
-          payrollsData?.payrolls?.filter(
-            (p: PayrollData) => p.status === PayrollStatus.PAID
-          ).length || 0,
-          payrollsData?.payrolls?.filter(
-            (p: PayrollData) => p.status === PayrollStatus.PROCESSING
-          ).length || 0,
-          payrollsData?.payrolls?.filter(
-            (p: PayrollData) => p.status === PayrollStatus.REJECTED
-          ).length || 0,
-        ],
-        backgroundColor: [
-          "rgba(156, 163, 175, 0.8)", // Draft - Gray
-          "rgba(234, 179, 8, 0.8)", // Pending - Yellow
-          "rgba(34, 197, 94, 0.8)", // Approved - Green
-          "rgba(59, 130, 246, 0.8)", // Paid - Blue
-          "rgba(249, 115, 22, 0.8)", // Processing - Orange
-          "rgba(239, 68, 68, 0.8)", // Rejected - Red
-        ],
-        borderColor: [
-          "rgba(156, 163, 175, 1)",
-          "rgba(234, 179, 8, 1)",
-          "rgba(34, 197, 94, 1)",
-          "rgba(59, 130, 246, 1)",
-          "rgba(249, 115, 22, 1)",
-          "rgba(239, 68, 68, 1)",
-        ],
-        borderWidth: 2,
-      },
-    ],
-  };
+  const { isLoading: isStatsLoading } = useQuery<PayrollStats>({
+    queryKey: ["payrollStats"],
+    queryFn: () => payrollService.getPayrollStats(),
+  });
 
   const handleFilterChange = (
     key: keyof PayrollFilters,
@@ -345,57 +239,6 @@ export default function ProcessPayroll() {
 
   const handlePageChange = (newPage: number) => {
     setFilters((prev) => ({ ...prev, page: newPage }));
-  };
-
-  const {
-    data: periodsData = [] as PayrollPeriod[],
-    isLoading: isPeriodsLoading,
-  } = useQuery<PayrollPeriod[]>({
-    queryKey: ["payrollPeriods"],
-    queryFn: () => payrollService.getPayrollPeriods(),
-  });
-
-  const { isLoading: isStatsLoading } = useQuery<PayrollStats>({
-    queryKey: ["payrollStats"],
-    queryFn: () => payrollService.getPayrollStats(),
-  });
-
-  const totalPayrollAmount = periodsData
-    .filter(
-      (period) =>
-        period.status === PayrollStatus.APPROVED ||
-        period.status === PayrollStatus.PAID
-    )
-    .reduce((sum, period) => sum + (period.totalNetSalary || 0), 0);
-
-  const employeesToProcess = periodsData
-    .filter((period) => period.status === PayrollStatus.PENDING)
-    .reduce((sum, period) => sum + (period.totalEmployees || 0), 0);
-
-  const pendingCount = periodsData.filter(
-    (period) => period.status === PayrollStatus.PENDING
-  ).length;
-
-  const filteredPeriods =
-    selectedStatus === "all"
-      ? periodsData
-      : periodsData.filter((period) => period.status === selectedStatus);
-
-  const handleViewPeriodDetails = async (period: PayrollPeriod) => {
-    try {
-      setShowPeriodModal(true);
-      setSelectedPeriodData(null); // Show loading state
-
-      const periodData = await payrollService.getPeriodPayroll(
-        period.month,
-        period.year
-      );
-      setSelectedPeriodData(periodData);
-    } catch (error) {
-      console.error("Failed to fetch period details:", error);
-      toast.error("Failed to fetch period details");
-      setShowPeriodModal(false);
-    }
   };
 
   const handleViewPayslip = async (employeeId: string) => {
@@ -447,29 +290,6 @@ export default function ProcessPayroll() {
     </div>
   );
 
-  const EmptyState = () => (
-    <tr>
-      <td colSpan={6} className="h-[calc(100vh-300px)]">
-        <div className="flex h-full w-full items-center justify-center">
-          <div className="flex flex-col items-center justify-center space-y-6 p-10 rounded-xl bg-green-50/50 ml-56">
-            <div className="p-5 rounded-full bg-green-100">
-              <FaMoneyBill className="h-14 w-14 text-green-600" />
-            </div>
-            <div className="text-center space-y-3">
-              <h3 className="text-2xl font-semibold text-green-600">
-                No Payroll Data
-              </h3>
-              <p className="text-gray-600 text-base max-w-sm leading-relaxed">
-                Start by clicking "Run New Payroll" to begin processing payroll
-                for this period
-              </p>
-            </div>
-          </div>
-        </div>
-      </td>
-    </tr>
-  );
-
   const isLoading = isPeriodsLoading || isStatsLoading;
 
   const statusDistRef = useRef(null);
@@ -477,44 +297,6 @@ export default function ProcessPayroll() {
 
   const isStatusDistInView = useInView(statusDistRef, { amount: 0.5 });
   const isMonthlyCompInView = useInView(monthlyCompRef, { amount: 0.5 });
-
-  const payrollTrendsData = {
-    labels: periodsData.map(
-      (period) =>
-        `${new Date(period.year, period.month - 1).toLocaleString("default", {
-          month: "short",
-        })}/${period.year}`
-    ),
-    datasets: [
-      {
-        label: "Monthly Payroll Amount",
-        data: periodsData.map((period) => period.totalNetSalary || 0),
-        borderColor: "rgb(34 197 94)",
-        backgroundColor: "rgba(34, 197, 94, 0.1)",
-        tension: 0.4,
-      },
-    ],
-  };
-
-  const employeeTrendsData = {
-    labels: periodsData.map(
-      (period) =>
-        `${new Date(period.year, period.month - 1).toLocaleString("default", {
-          month: "short",
-        })}/${period.year}`
-    ),
-    datasets: [
-      {
-        label: "Number of Employees",
-        data: periodsData.map((period) => period.totalEmployees || 0),
-        borderColor: Array(periodsData.length).fill("rgb(59 130 246)"),
-        backgroundColor: Array(periodsData.length).fill(
-          "rgba(59, 130, 246, 0.8)"
-        ),
-        borderWidth: 2,
-      },
-    ],
-  };
 
   const monthlyComparisonData = {
     labels: Array.from(
@@ -528,7 +310,7 @@ export default function ProcessPayroll() {
           ?.map((payroll: PayrollData) => {
             const date = new Date(payroll.processedDate || new Date());
             return `${date.toLocaleString("default", {
-          month: "short",
+              month: "short",
             })}/${date.getFullYear()}`;
           }) || []
       )
@@ -723,61 +505,61 @@ export default function ProcessPayroll() {
             </button>
           </div>
 
-            <div>
-              <p className="text-sm text-gray-700">
-                Showing{" "}
-                <span className="font-medium">
-                  {(filters.page - 1) * filters.limit + 1}
-                </span>{" "}
-                to{" "}
-                <span className="font-medium">
-                  {Math.min(
-                    filters.page * filters.limit,
-                    payrollsData.pagination.total
-                  )}
-                </span>{" "}
-                of{" "}
-                <span className="font-medium">
-                  {payrollsData.pagination.total}
-                </span>{" "}
-                results
-              </p>
-            </div>
+          <div>
+            <p className="text-sm text-gray-700">
+              Showing{" "}
+              <span className="font-medium">
+                {(filters.page - 1) * filters.limit + 1}
+              </span>{" "}
+              to{" "}
+              <span className="font-medium">
+                {Math.min(
+                  filters.page * filters.limit,
+                  payrollsData.pagination.total
+                )}
+              </span>{" "}
+              of{" "}
+              <span className="font-medium">
+                {payrollsData.pagination.total}
+              </span>{" "}
+              results
+            </p>
+          </div>
 
-              <nav
-                className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
-                aria-label="Pagination"
-              >
-                <button
+          <nav
+            className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+            aria-label="Pagination"
+          >
+            <button
               onClick={() => handlePageChange(filters.page - 1)}
-                  disabled={filters.page === 1}
-                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="sr-only">Previous</span>
-                  <FaChevronLeft className="h-5 w-5" aria-hidden="true" />
-                </button>
-                {[...Array(payrollsData.pagination.pages)].map((_, i) => (
-                  <button
-                    key={i + 1}
+              disabled={filters.page === 1}
+              className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span className="sr-only">Previous</span>
+              <FaChevronLeft className="h-5 w-5" aria-hidden="true" />
+            </button>
+            {[...Array(payrollsData.pagination.pages)].map((_, i) => (
+              <button
+                key={i + 1}
                 onClick={() => handlePageChange(i + 1)}
-                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                      filters.page === i + 1
-                        ? "z-10 bg-green-50 border-green-500 text-green-600"
-                        : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-                <button
+                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                  filters.page === i + 1
+                    ? "z-10 bg-green-50 border-green-500 text-green-600"
+                    : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
               onClick={() => handlePageChange(filters.page + 1)}
-                  disabled={filters.page === payrollsData.pagination.pages}
-                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="sr-only">Next</span>
-                  <FaChevronRight className="h-5 w-5" aria-hidden="true" />
-                </button>
-              </nav>
+              disabled={filters.page === payrollsData.pagination.pages}
+              className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span className="sr-only">Next</span>
+              <FaChevronRight className="h-5 w-5" aria-hidden="true" />
+            </button>
+          </nav>
         </div>
       )}
     </div>
@@ -968,6 +750,76 @@ export default function ProcessPayroll() {
     }
   };
 
+  const statusDistributionData = {
+    labels: Object.keys(PayrollStatus),
+    datasets: [
+      {
+        data: Object.values(PayrollStatus).map(
+          (status) =>
+            payrollsData?.summary?.statusBreakdown?.find(
+              (s: StatusBreakdown) => s._id === status
+            )?.count || 0
+        ),
+        backgroundColor: [
+          "rgba(34, 197, 94, 0.8)",
+          "rgba(59, 130, 246, 0.8)",
+          "rgba(239, 68, 68, 0.8)",
+          "rgba(245, 158, 11, 0.8)",
+          "rgba(139, 92, 246, 0.8)",
+          "rgba(107, 114, 128, 0.8)",
+        ],
+        borderColor: ["white", "white", "white", "white", "white", "white"],
+        borderWidth: 2,
+      },
+    ],
+  };
+
+  const employeeTrendsData = {
+    labels: Array.from(
+      new Set(
+        payrollsData?.payrolls?.map((payroll: PayrollData) => {
+          const date = new Date(payroll.processedDate || new Date());
+          return `${date.toLocaleString("default", {
+            month: "short",
+          })}/${date.getFullYear()}`;
+        }) || []
+      )
+    ).sort() as string[],
+    datasets: [
+      {
+        label: "Employee Count",
+        data: Array.from<string>(
+          new Set<string>(
+            payrollsData?.payrolls?.map(
+              (p: PayrollData) =>
+                `${new Date(
+                  p.processedDate || new Date()
+                ).getMonth()}-${new Date(
+                  p.processedDate || new Date()
+                ).getFullYear()}`
+            ) || []
+          )
+        ).map((monthYear: string) => {
+          const [month, year] = monthYear.split("-");
+          return (
+            payrollsData?.payrolls?.filter(
+              (p: PayrollData) =>
+                new Date(p.processedDate || new Date())
+                  .getMonth()
+                  .toString() === month &&
+                new Date(p.processedDate || new Date())
+                  .getFullYear()
+                  .toString() === year
+            ).length || 0
+          );
+        }),
+        backgroundColor: ["rgba(59, 130, 246, 0.8)"],
+        borderColor: ["white"],
+        borderWidth: 2,
+      },
+    ],
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -993,7 +845,13 @@ export default function ProcessPayroll() {
         <SummaryCard
           icon={<FaMoneyBill className="h-6 w-6 text-green-600" />}
           title="Total Payroll Amount"
-          value={formatCurrency(stats.totalPayrollAmount)}
+          value={formatCurrency(
+            payrollsData?.summary?.frequencyTotals?.reduce(
+              (sum: number, freq: FrequencyTotal) =>
+                sum + (freq.totalNetPay || 0),
+              0
+            ) || 0
+          )}
         />
 
         <SummaryCard
@@ -1227,6 +1085,13 @@ export default function ProcessPayroll() {
             setSelectedPayslip(null);
             setShowPeriodModal(true);
           }}
+          setPayslip={(value) => {
+            if (typeof value === "function") {
+              setSelectedPayslip(value);
+            } else {
+              setSelectedPayslip(value);
+            }
+          }}
         />
       )}
 
@@ -1252,7 +1117,6 @@ export default function ProcessPayroll() {
       <PayrollPeriodModal
         isOpen={showPeriodModal}
         onClose={() => setShowPeriodModal(false)}
-        onViewPayslip={handleViewPayslip}
         onViewHistory={handleViewEmployeeHistory}
         isLoading={isLoading}
       />

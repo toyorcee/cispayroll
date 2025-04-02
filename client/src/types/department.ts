@@ -8,6 +8,7 @@ export interface DepartmentBasic {
 
 export interface Department {
   _id: string;
+  id: string;
   name: string;
   code: string;
   description?: string;
@@ -18,7 +19,12 @@ export interface Department {
     lastName: string;
     email: string;
   };
+  adminId?: string;
+  adminName?: string;
+  employeeCount?: number;
   status: "active" | "inactive";
+  createdAt?: Date;
+  updatedAt?: Date;
   employeeCounts: {
     total: number;
     admins: number;
@@ -27,6 +33,7 @@ export interface Department {
 }
 
 export interface DepartmentFormData {
+  id?: string;
   name: string;
   code: string;
   description?: string;

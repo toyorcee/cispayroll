@@ -3,7 +3,6 @@ import { BaseModal } from "../../shared/BaseModal";
 import { employeeService } from "../../../services/employeeService";
 import { departmentService } from "../../../services/departmentService";
 import { payrollService } from "../../../services/payrollService";
-import { salaryStructureService } from "../../../services/salaryStructureService";
 import {
   useQuery,
   UseQueryResult,
@@ -16,15 +15,8 @@ import {
   DepartmentEmployee,
   DepartmentEmployeeResponse,
 } from "../../../types/employee";
-import {
-  PayrollFrequency,
-  PayrollStatus,
-  PayrollData,
-  ISalaryComponent,
-} from "../../../types/payroll";
+import { PayrollFrequency, PayrollData } from "../../../types/payroll";
 import React from "react";
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 
 interface PayrollFormData {
   month: number;
@@ -65,7 +57,6 @@ export const RunPayrollModal = ({
   onSuccess,
   editData,
 }: RunPayrollModalProps) => {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
@@ -79,7 +70,6 @@ export const RunPayrollModal = ({
     components: [],
   });
   const [showSuccess, setShowSuccess] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Add updatePayrollMutation
   const updatePayrollMutation = useMutation({
@@ -142,7 +132,7 @@ export const RunPayrollModal = ({
         month: editData.month,
         year: editData.year,
         employee: editData.employee._id,
-        salaryGrade: editData.salaryGrade._id || "",
+        salaryGrade: editData.salaryGrade.level || "",
         basicSalary: editData.basicSalary,
         components: allowanceComponents,
       });

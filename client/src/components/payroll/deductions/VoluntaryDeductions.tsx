@@ -49,7 +49,7 @@ export const VoluntaryDeductions = ({
       }
       setShowForm(false);
       setEditingDeduction(null);
-    } catch  {
+    } catch {
       toast.error(
         editingDeduction
           ? "Failed to update deduction"
@@ -62,7 +62,7 @@ export const VoluntaryDeductions = ({
     try {
       await onToggle(id);
       toast.success("Deduction status updated successfully");
-    } catch  {
+    } catch {
       toast.error("Failed to update deduction status");
     }
   };
@@ -74,7 +74,7 @@ export const VoluntaryDeductions = ({
     try {
       await onDelete(id);
       toast.success("Deduction deleted successfully");
-    } catch{
+    } catch {
       toast.error("Failed to delete deduction");
     }
   };
@@ -104,6 +104,7 @@ export const VoluntaryDeductions = ({
           <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
             <DeductionForm
               deduction={editingDeduction || undefined}
+              deductionType={DeductionType.VOLUNTARY}
               onSubmit={handleSubmit}
               onCancel={() => {
                 setShowForm(false);

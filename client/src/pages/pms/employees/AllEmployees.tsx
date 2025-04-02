@@ -37,8 +37,7 @@ import { salaryStructureService } from "../../../services/salaryStructureService
 // Additional imports
 import { toast } from "react-toastify";
 import { Dialog } from "@headlessui/react";
-import { Department, DepartmentFormData } from "../../../types/department";
-import { User } from "../../../types/user";
+import { Department } from "../../../types/department";
 import type { AdminResponse } from "../../../services/employeeService";
 import { ISalaryGrade } from "../../../types/salary";
 
@@ -62,11 +61,6 @@ const LoadingDots = () => (
   </div>
 );
 
-interface DepartmentData {
-  _id: string;
-  name: string;
-}
-
 interface EmployeeFormData {
   firstName: string;
   lastName: string;
@@ -83,7 +77,6 @@ interface EmployeeFormData {
 export default function AllEmployees() {
   const { user } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<EmployeeFilters>({
     page: 1,
     limit: 10,
@@ -92,7 +85,6 @@ export default function AllEmployees() {
     department: undefined,
   });
   const [totalEmployees, setTotalEmployees] = useState(0);
-  const [showFilters, setShowFilters] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
     null
   );
@@ -118,7 +110,6 @@ export default function AllEmployees() {
   const [admins, setAdmins] = useState<AdminResponse[]>([]);
 
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
-  const isAdmin = user?.role === UserRole.ADMIN;
 
   const getActionPermissions = () => {
     if (isSuperAdmin) {

@@ -1,7 +1,3 @@
-interface EmployeeTableSkeletonProps {
-  isSuperAdmin: boolean;
-}
-
 export const EmployeeTableSkeleton = ({
   isSuperAdmin,
 }: {

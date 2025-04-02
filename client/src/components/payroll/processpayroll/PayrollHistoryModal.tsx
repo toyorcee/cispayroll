@@ -113,7 +113,6 @@ interface PayrollHistoryModalProps {
       averagePayroll: number;
     };
   } | null;
-  isLoading?: boolean;
 }
 
 const statusColors: Record<PayrollStatus, string> = {
@@ -141,12 +140,11 @@ const PayrollHistoryModal: React.FC<PayrollHistoryModalProps> = ({
   isOpen,
   onClose,
   data,
-  isLoading = false,
 }) => {
   const [page] = React.useState(0);
   const [rowsPerPage] = React.useState(5);
 
-  // Only return null if we have no data and we're not loading
+  // Only return null if we have no data
   if (!data) return null;
 
   return (

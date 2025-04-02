@@ -101,10 +101,8 @@ const documentTemplates: DocumentTemplate[] = [
 ];
 
 const DocumentSettings: React.FC = () => {
-  const [documentTypesList, setDocumentTypesList] =
-    useState<DocumentType[]>(documentTypes);
-  const [templates, setTemplates] =
-    useState<DocumentTemplate[]>(documentTemplates);
+  const [documentTypesList] = useState<DocumentType[]>(documentTypes);
+  const [templates] = useState<DocumentTemplate[]>(documentTemplates);
   const [settings, setSettings] = useState<DocumentSettings>({
     requireDigitalSignatures: true,
     enableVersionControl: true,

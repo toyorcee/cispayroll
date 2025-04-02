@@ -1,7 +1,6 @@
 import { UserRole } from "../types/auth";
 import {
   FaUserShield,
-  FaMoneyBill,
   FaMoneyBillWave,
   FaCalendarCheck,
   FaUserPlus,
@@ -13,10 +12,6 @@ import {
   FaExclamationTriangle,
   FaCheckCircle,
   FaUserTie,
-  FaCalendar,
-  FaFileInvoiceDollar,
-  FaBriefcase,
-  FaChartLine,
 } from "react-icons/fa";
 import { IconType } from "react-icons";
 

@@ -46,7 +46,7 @@ const AllowanceStatus = {
 };
 
 export default function AllowanceManagement() {
-  const [allowances, setAllowances] = useState<Allowance[]>([]);
+  const [allowances] = useState<Allowance[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingAllowance, setEditingAllowance] = useState<
     Allowance | undefined
@@ -230,78 +230,78 @@ export default function AllowanceManagement() {
                 ) : (
                   allowances.map((allowance) => (
                     <tr key={allowance._id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
                           {allowance.employeeName}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Last modified:{" "}
-                        {new Date(
-                          allowance.lastModified || Date.now()
-                        ).toLocaleDateString()}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                        {allowance.type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {allowance.calculationMethod === "percentage"
-                          ? `${allowance.value}%`
-                          : `₦${allowance.value.toLocaleString()}`}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                        {allowance.calculationMethod}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Last modified:{" "}
+                          {new Date(
+                            allowance.lastModified || Date.now()
+                          ).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                          {allowance.type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {allowance.calculationMethod === "percentage"
+                            ? `${allowance.value}%`
+                            : `₦${allowance.value.toLocaleString()}`}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                          {allowance.calculationMethod}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
                           {allowance.employeeId}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
                           onClick={() => handleToggleStatus(allowance._id)}
-                        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
+                          className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
                           ${
                             allowance.isActive
                               ? "bg-green-100 text-green-800 hover:bg-green-200"
                               : "bg-red-100 text-red-800 hover:bg-red-200"
                           }`}
-                      >
-                        {allowance.isActive ? "Active" : "Inactive"}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => handleEdit(allowance)}
-                        className="text-green-600 hover:text-green-900 mr-4"
-                        title="Edit Allowance"
-                      >
-                        <FaEdit className="h-4 w-4" />
-                      </button>
-                      <button
+                        >
+                          {allowance.isActive ? "Active" : "Inactive"}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => handleEdit(allowance)}
+                          className="text-green-600 hover:text-green-900 mr-4"
+                          title="Edit Allowance"
+                        >
+                          <FaEdit className="h-4 w-4" />
+                        </button>
+                        <button
                           onClick={() => handleDelete(allowance._id)}
-                        className="text-red-600 hover:text-red-900 mr-4"
-                        title="Delete Allowance"
-                      >
-                        <FaTrash className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          /* View history */
-                        }}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="View History"
-                      >
-                        <FaHistory className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
+                          className="text-red-600 hover:text-red-900 mr-4"
+                          title="Delete Allowance"
+                        >
+                          <FaTrash className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            /* View history */
+                          }}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="View History"
+                        >
+                          <FaHistory className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
                   ))
                 )}
               </tbody>

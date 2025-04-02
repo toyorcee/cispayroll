@@ -3,7 +3,6 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { motion } from "framer-motion";
-import { FaMoneyCheckAlt } from "react-icons/fa";
 import {
   TbCurrencyDollar,
   TbCurrencyEuro,
@@ -19,7 +18,7 @@ import { ImageUpload } from "../../components/ImageUpload";
 
 // Remove the existing axios defaults and create a new axios instance
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000",
+  baseURL: import.meta.env.VITE_API_URL || "https://payrollapi.digitalentshub.net",
   withCredentials: true,
 });
 

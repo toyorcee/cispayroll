@@ -34,7 +34,7 @@ interface Bonus {
 }
 
 export default function BonusManagement() {
-  const [bonuses, setBonuses] = useState<Bonus[]>([]);
+  const [bonuses] = useState<Bonus[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingBonus, setEditingBonus] = useState<Bonus | undefined>(
     undefined

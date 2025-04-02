@@ -7,8 +7,6 @@ import { employeeService } from "../../services/employeeService";
 import { Combobox } from "@headlessui/react";
 import { AdminResponse } from "../../services/employeeService";
 import { departmentService } from "../../services/departmentService";
-import axios from "axios";
-import { toast } from "react-hot-toast";
 import { DeleteDepartmentModal } from "./DeleteDepartmentModal";
 
 interface DepartmentModalProps {
@@ -325,7 +323,7 @@ export const DepartmentModal = ({
                                         }`
                                       }
                                     >
-                                      {({ selected, active }) => (
+                                      {({ selected }) => (
                                         <>
                                           <span
                                             className={`block truncate ${

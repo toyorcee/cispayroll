@@ -14,6 +14,7 @@ interface User {
   status: "active" | "inactive" | "suspended";
   position: string;
   employeeId: string;
+  permissions: Permission[];
 }
 
 // Demo data
@@ -28,6 +29,7 @@ const users: User[] = [
     status: "active",
     position: "Senior Engineer",
     employeeId: "EMP001",
+    permissions: [],
   },
   {
     _id: "2",
@@ -39,6 +41,7 @@ const users: User[] = [
     status: "active",
     position: "HR Manager",
     employeeId: "EMP002",
+    permissions: [],
   },
   {
     _id: "3",
@@ -50,6 +53,7 @@ const users: User[] = [
     status: "inactive",
     position: "Accountant",
     employeeId: "EMP003",
+    permissions: [],
   },
   {
     _id: "4",
@@ -61,6 +65,7 @@ const users: User[] = [
     status: "suspended",
     position: "Marketing Manager",
     employeeId: "EMP004",
+    permissions: [],
   },
 ];
 
@@ -138,6 +143,7 @@ export default function UserManagement() {
     const newUserWithId: User = {
       ...newUser,
       _id: (usersList.length + 1).toString(),
+      permissions: getDefaultPermissions(newUser.role)
     };
     setUsersList([...usersList, newUserWithId]);
     setShowAddUser(false);

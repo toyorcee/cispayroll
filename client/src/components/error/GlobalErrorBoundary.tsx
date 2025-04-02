@@ -34,7 +34,7 @@ export class GlobalErrorBoundary extends React.Component<Props, State> {
   }
 }
 
-function RouteErrorFallback() {
+export function RouteErrorFallback() {
   const error = useRouteError();
   const navigate = useNavigate();
 

@@ -1,9 +1,7 @@
 import { Dialog } from "@headlessui/react";
-import { Employee, DepartmentBasic } from "../../types/employee";
+import { Employee } from "../../types/employee";
 import { useState, useEffect } from "react";
 import { FaTimes, FaSpinner } from "react-icons/fa";
-import { useQuery } from "@tanstack/react-query";
-import { employeeService } from "../../services/employeeService";
 import { departmentService } from "../../services/departmentService";
 import { toast } from "react-hot-toast";
 
@@ -41,8 +39,8 @@ export const EditEmployeeModal = ({
     if (employee) {
       // Handle department value
       const departmentValue =
-        typeof employee.department === "object"
-          ? employee.department._id
+        typeof employee.department === "object" && employee.department !== null
+          ? (employee.department as { _id: string })._id
           : employee.department;
 
       setFormData({

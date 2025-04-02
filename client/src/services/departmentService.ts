@@ -5,7 +5,7 @@ import { Department, DepartmentFormData } from "../types/department";
 import { AdminResponse } from "./employeeService";
 import { toast } from "react-toastify";
 
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = "https://payrollapi.digitalentshub.net/api";
 
 export interface DepartmentResponse {
   _id: string;
@@ -82,6 +82,16 @@ export interface AdminUser {
     _id: string;
     name: string;
     code: string;
+  };
+}
+
+export interface ChartStats {
+  departmentDistribution: {
+    labels: string[];
+    datasets: Array<{
+      data: number[];
+      label?: string;
+    }>;
   };
 }
 
@@ -261,5 +271,17 @@ export const departmentService = {
         return response.data.admins;
       },
     });
+  },
+
+  getChartStats: async (): Promise<ChartStats> => {
+    try {
+      const response = await axios.get<{ data: ChartStats }>(
+        `${BASE_URL}/departments/chart-stats`
+      );
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Failed to fetch chart stats:", error);
+      throw error;
+    }
   },
 };

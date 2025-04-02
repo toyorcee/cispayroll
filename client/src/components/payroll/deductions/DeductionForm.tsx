@@ -49,55 +49,6 @@ const VOLUNTARY_CATEGORIES = [
   { value: "miscellaneous", label: "Miscellaneous" },
 ];
 
-// First, create a helper function to get the value field label and validation
-const getValueFieldConfig = (
-  deductionType: string,
-  calculationMethod: string
-) => {
-  switch (calculationMethod) {
-    case CalculationMethod.FIXED:
-      return {
-        label: "Fixed Amount",
-        suffix: "NGN",
-        placeholder: "Enter fixed amount",
-        step: "1",
-        validation: {
-          required: "Amount is required",
-          min: { value: 0, message: "Amount cannot be negative" },
-          max: { value: 1000000000, message: "Amount is too large" },
-        },
-      };
-    case CalculationMethod.PERCENTAGE:
-      return {
-        label: "Percentage Value",
-        suffix: "%",
-        placeholder: "Enter percentage (e.g., 1.5)",
-        step: "0.01",
-        validation: {
-          required: "Percentage is required",
-          min: { value: 0, message: "Percentage cannot be negative" },
-          max: { value: 100, message: "Percentage cannot exceed 100%" },
-        },
-      };
-    case CalculationMethod.PROGRESSIVE:
-      return {
-        label: "Progressive Rate",
-        suffix: "",
-        placeholder: "Configure tax brackets below",
-        step: "0.01",
-        validation: {},
-      };
-    default:
-      return {
-        label: "Value",
-        suffix: "",
-        placeholder: "Enter value",
-        step: "1",
-        validation: { required: "Value is required" },
-      };
-  }
-};
-
 export const DeductionForm = ({
   deduction,
   isLoading,
@@ -113,7 +64,7 @@ export const DeductionForm = ({
 
   const {
     register,
-    handleSubmit,
+    handleSubmit: formHandleSubmit,
     formState: { errors },
     watch,
     setValue,
@@ -154,12 +105,9 @@ export const DeductionForm = ({
     setValue("taxBrackets", newBrackets);
   };
 
-  const handleSubmitForm = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const onSubmitForm = async (formData: FormInputs) => {
     setSubmitting(true);
     try {
-      const formData = watch();
-
       // Format the data properly
       const formattedData = {
         ...formData,
@@ -196,7 +144,6 @@ export const DeductionForm = ({
 
   useEffect(() => {
     setValue("value", 0);
-
     setShowTaxBrackets(calculationMethod === CalculationMethod.PROGRESSIVE);
   }, [calculationMethod, setValue]);
 
@@ -204,7 +151,7 @@ export const DeductionForm = ({
 
   return (
     <form
-      onSubmit={handleSubmitForm}
+      onSubmit={formHandleSubmit(onSubmitForm)}
       className="space-y-6 bg-white p-6 rounded-lg shadow"
     >
       <div className="flex items-center justify-between mb-6">

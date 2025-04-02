@@ -13,11 +13,7 @@ import { CircularProgress } from "@mui/material";
 import { toast } from "react-toastify";
 import { BaseModal } from "../shared/BaseModal";
 import { salaryStructureService } from "../../services/salaryStructureService";
-import {
-  ISalaryComponent,
-  ComponentType,
-  CreateSalaryGradeDTO,
-} from "../../types/salary";
+import { ComponentType, CreateSalaryGradeDTO } from "../../types/salary";
 import { useAuth } from "../../context/AuthContext";
 import { Permission } from "../../types/auth";
 import { departmentService } from "../../services/departmentService";
@@ -67,8 +63,6 @@ export default function NewSalaryGrade({
     register,
     handleSubmit,
     reset,
-    watch,
-    setValue,
     formState: { errors, isSubmitting },
   } = useForm<SalaryGradeFormData>({
     resolver: zodResolver(salaryGradeSchema),
@@ -91,9 +85,6 @@ export default function NewSalaryGrade({
       isActive: true,
     },
   ]);
-
-  // Watch the departmentId value
-  const selectedDepartmentWatch = watch("departmentId");
 
   // Update the department change handler
   const handleDeptChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -198,19 +189,6 @@ export default function NewSalaryGrade({
     } finally {
       setLoading(false);
     }
-  };
-
-  const validateComponent = (comp: ISalaryComponent) => {
-    if (!comp.name.trim()) {
-      return "Component name is required";
-    }
-    if (comp.value <= 0) {
-      return "Value must be greater than 0";
-    }
-    if (comp.calculationMethod === "percentage" && comp.value > 100) {
-      return "Percentage cannot exceed 100%";
-    }
-    return null;
   };
 
   const addComponent = () => {

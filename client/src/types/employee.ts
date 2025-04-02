@@ -1,5 +1,5 @@
-import { Status, BankDetails, Allowance, Deduction } from "./common";
-import { UserRole, Permission } from "./auth";
+import { BankDetails, Allowance, Deduction } from "./common";
+import { Permission } from "./auth";
 export enum LeaveStatus {
   pending = "pending",
   approved = "approved",
@@ -132,47 +132,46 @@ export interface OnboardingTask {
 }
 
 export interface OnboardingEmployee {
-  _id: string;
+  _id?: string;
   id: string;
   employeeId: string;
   firstName: string;
   lastName: string;
-  email: string;
-  phone: string;
-  role: string;
-  permissions: string[];
-  department: {
-    _id: string;
-    name: string;
-    code: string;
-  };
+  email?: string;
+  phone?: string;
+  role?: string;
+  permissions?: string[];
+  department: string | { name: string };
   position: string;
-  gradeLevel: string;
-  workLocation: string;
-  dateJoined: string;
+  gradeLevel?: string;
+  workLocation?: string;
+  dateJoined?: string;
+  startDate: string;
   status: string;
+  progress: number;
+  supervisor: string;
+  tasks: OnboardingTask[];
+  documents: {
+    contractSigned: boolean;
+    idSubmitted: boolean;
+    bankDetailsProvided: boolean;
+    taxInfoSubmitted: boolean;
+  };
   onboarding: {
     status: string;
-    progress: number;
-    tasks: {
-      name: string;
-      completed: boolean;
-      _id: string;
-      id: string;
-    }[];
   };
-  emergencyContact: {
+  emergencyContact?: {
     name: string;
     relationship: string;
     phone: string;
   };
-  bankDetails: {
+  bankDetails?: {
     bankName: string;
     accountNumber: string;
     accountName: string;
   };
   profileImage?: string;
-  fullName: string;
+  fullName?: string;
 }
 
 export type OffboardingStatus = "pending_exit" | "in_progress" | "completed";
@@ -253,6 +252,11 @@ export interface EmployeeDetails {
   profileImage?: string;
   createdAt: string;
   updatedAt: string;
+  emergencyContact?: {
+    name: string;
+    relationship: string;
+    phone: string;
+  };
 }
 
 export interface CreateEmployeeData {

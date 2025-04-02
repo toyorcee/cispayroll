@@ -82,7 +82,10 @@ export default function UserProfile() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 bg-blue-50 rounded-lg">
                 <Typography variant="subtitle2" className="text-blue-700 mb-2">
-                  Department: {user.department}
+                  Department:{" "}
+                  {typeof user?.department === "string"
+                    ? user.department
+                    : user?.department?.name || "Not assigned"}
                 </Typography>
                 <Typography variant="body2" className="text-gray-600">
                   Manage department resources and team members
@@ -119,7 +122,10 @@ export default function UserProfile() {
                   Position Details
                 </Typography>
                 <Typography variant="body2" className="text-gray-600">
-                  {user.position} at {user.department}
+                  {user?.position} at{" "}
+                  {typeof user?.department === "string"
+                    ? user.department
+                    : user?.department?.name || "Not assigned"}
                 </Typography>
               </div>
               <div className="p-4 bg-yellow-50 rounded-lg">
@@ -274,7 +280,9 @@ export default function UserProfile() {
                             Department
                           </Typography>
                           <Typography variant="body2" className="text-gray-700">
-                            {user?.department}
+                            {typeof user?.department === "string"
+                              ? user.department
+                              : user?.department?.name || "Not assigned"}
                           </Typography>
                         </div>
                       </div>
@@ -289,7 +297,10 @@ export default function UserProfile() {
                             Position
                           </Typography>
                           <Typography variant="body2" className="text-gray-700">
-                            {user?.position}
+                            {user?.position} at{" "}
+                            {typeof user?.department === "string"
+                              ? user.department
+                              : user?.department?.name || "Not assigned"}
                           </Typography>
                         </div>
                       </div>

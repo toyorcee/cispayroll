@@ -30,6 +30,9 @@ export const onboardingEmployees: OnboardingEmployee[] = [
       bankDetailsProvided: true,
       taxInfoSubmitted: false,
     },
+    onboarding: {
+      status: "documentation_pending",
+    },
   },
   {
     id: "ONB002",
@@ -60,6 +63,9 @@ export const onboardingEmployees: OnboardingEmployee[] = [
       bankDetailsProvided: true,
       taxInfoSubmitted: false,
     },
+    onboarding: {
+      status: "it_setup_pending",
+    },
   },
   {
     id: "ONB003",
@@ -89,6 +95,9 @@ export const onboardingEmployees: OnboardingEmployee[] = [
       idSubmitted: true,
       bankDetailsProvided: false,
       taxInfoSubmitted: false,
+    },
+    onboarding: {
+      status: "contract_pending",
     },
   },
 ];

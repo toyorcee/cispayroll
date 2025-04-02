@@ -18,25 +18,8 @@ import { AuthSkeleton } from "../components/skeletons/AuthSkeleton";
 import { ImageUpload } from "../components/ImageUpload";
 
 axios.defaults.baseURL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  import.meta.env.VITE_API_URL || "https://payrollapi.digitalentshub.net/api";
 axios.defaults.withCredentials = true;
-
-interface ImageUploadProps {
-  onImageSelect: (file: File | null) => void;
-}
-
-interface FormData {
-  emergencyContact: {
-    name: string;
-    relationship: string;
-    phone: string;
-  };
-  bankDetails: {
-    bankName: string;
-    accountNumber: string;
-    accountName: string;
-  };
-}
 
 interface UserData {
   firstName: string;
@@ -61,6 +44,19 @@ interface UserData {
   };
 }
 
+interface RegistrationFormData {
+  emergencyContact: {
+    name: string;
+    relationship: string;
+    phone: string;
+  };
+  bankDetails: {
+    bankName: string;
+    accountNumber: string;
+    accountName: string;
+  };
+}
+
 const CompleteRegistration = () => {
   const { token } = useParams();
   const navigate = useNavigate();
@@ -70,7 +66,7 @@ const CompleteRegistration = () => {
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<RegistrationFormData>({
     emergencyContact: {
       name: "",
       relationship: "",

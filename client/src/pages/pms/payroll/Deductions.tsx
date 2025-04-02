@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FaPlus } from "react-icons/fa";
 import { deductionService } from "../../../services/deductionService";
 import {
   Deduction,
   CreateDeductionInput,
   UpdateDeductionInput,
+  DeductionType,
 } from "../../../types/deduction";
 import { DeductionsTable } from "../../../components/payroll/deductions/DeductionsTable";
 import { DeductionForm } from "../../../components/payroll/deductions/DeductionForm";
@@ -27,29 +28,9 @@ export default function Deductions() {
   >(undefined);
   const [showTypeMenu, setShowTypeMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [deductionType, setDeductionType] = useState<"statutory" | "voluntary">(
-    "voluntary"
+  const [deductionType, setDeductionType] = useState<DeductionType>(
+    DeductionType.VOLUNTARY
   );
-  const [filterStatus, setFilterStatus] = useState<
-    "all" | "active" | "inactive" | "custom"
-  >("all");
-
-  const filteredDeductions = useMemo(() => {
-    let filtered =
-      deductionType === "statutory"
-        ? deductions.statutory
-        : deductions.voluntary;
-
-    if (filterStatus === "active") {
-      filtered = filtered.filter((d) => d.isActive);
-    } else if (filterStatus === "inactive") {
-      filtered = filtered.filter((d) => !d.isActive);
-    } else if (filterStatus === "custom") {
-      filtered = filtered.filter((d) => d.isCustom);
-    }
-
-    return filtered;
-  }, [deductions, deductionType, filterStatus]);
 
   const fetchDeductions = async () => {
     try {
@@ -130,7 +111,7 @@ export default function Deductions() {
   const handleCreateDeduction = async (data: CreateDeductionInput) => {
     try {
       setIsLoading(true);
-      if (deductionType === "statutory") {
+      if (deductionType === DeductionType.STATUTORY) {
         await deductionService.createCustomStatutoryDeduction(data);
       } else {
         await deductionService.createVoluntaryDeduction(data);
@@ -177,7 +158,7 @@ export default function Deductions() {
               <div className="py-1" role="menu">
                 <button
                   onClick={() => {
-                    setDeductionType("statutory");
+                    setDeductionType(DeductionType.STATUTORY);
                     setShowAddForm(true);
                     setShowTypeMenu(false);
                   }}
@@ -188,7 +169,7 @@ export default function Deductions() {
                 </button>
                 <button
                   onClick={() => {
-                    setDeductionType("voluntary");
+                    setDeductionType(DeductionType.VOLUNTARY);
                     setShowAddForm(true);
                     setShowTypeMenu(false);
                   }}

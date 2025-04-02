@@ -46,7 +46,7 @@ interface LeaveSettings {
 }
 
 const LeaveSettings: React.FC = () => {
-  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([
+  const [leaveTypes] = useState<LeaveType[]>([
     {
       id: "1",
       name: "Annual Leave",
@@ -76,7 +76,7 @@ const LeaveSettings: React.FC = () => {
     },
   ]);
 
-  const [leavePolicies, setLeavePolicies] = useState<LeavePolicy[]>([
+  const [leavePolicies] = useState<LeavePolicy[]>([
     {
       id: "1",
       name: "Standard Policy",

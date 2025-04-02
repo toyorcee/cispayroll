@@ -4,7 +4,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { Permission } from "../../../types/auth";
 
 const MyAllowances: React.FC = () => {
-  const { user, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
 
   // Check if user has permission to view their own allowances
   if (!hasPermission(Permission.VIEW_OWN_ALLOWANCES)) {

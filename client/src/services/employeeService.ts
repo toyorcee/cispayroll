@@ -18,7 +18,7 @@ import { UserRole } from "../types/auth";
 import { DashboardStats } from "../data/dashboardData";
 import { salaryStructureService } from "./salaryStructureService";
 
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = "https://payrollapi.digitalentshub.net/api";
 
 // Set default axios config to always include credentials
 axios.defaults.withCredentials = true;

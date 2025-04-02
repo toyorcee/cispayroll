@@ -49,9 +49,9 @@ interface NewLeaveRequest {
 }
 
 const UserLeaveManagement: React.FC = () => {
-  const { user, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
   const [openDialog, setOpenDialog] = useState(false);
-  const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([
+  const [leaveBalances] = useState<LeaveBalance[]>([
     {
       leaveType: "Annual Leave",
       total: 20,

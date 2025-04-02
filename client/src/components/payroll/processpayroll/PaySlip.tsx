@@ -25,7 +25,6 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
   // Add null checks for all numeric values
   const basicSalary = data.basicSalary || 0;
   const totalAllowances = data.allowances?.totalAllowances || 0;
-  const totalBonuses = data.bonuses?.totalBonuses || 0;
   const totalDeductions = data.deductions?.totalDeductions || 0;
   const netPay = data.totals?.netPay || 0;
 

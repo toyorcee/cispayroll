@@ -1,21 +1,12 @@
 import { useEffect, useState, useRef, lazy, Suspense } from "react";
-import { IconType } from "react-icons";
 import { motion, useInView } from "framer-motion";
 import { useAuth } from "../../../context/AuthContext";
-import { UserRole, Permission } from "../../../types/auth";
+import { Permission } from "../../../types/auth";
 import { getRoleSpecificWelcomeMessage } from "../../../utils/dashboardUtils";
 import { GlobalErrorBoundary } from "../../../components/error/GlobalErrorBoundary";
-import {
-  getRoleStats,
-  getRoleActivities,
-  payrollData,
-  departmentData,
-  departmentPieData,
-  DashboardStats,
-} from "../../../data/dashboardData";
+import { getRoleStats, DashboardStats } from "../../../data/dashboardData";
 import { employeeService } from "../../../services/employeeService";
 import StatCard from "../../../components/dashboard/StatCard";
-import ActivityItem from "../../../components/dashboard/ActivityItem";
 import { departmentService } from "../../../services/departmentService";
 
 // Lazy load chart components
@@ -36,49 +27,17 @@ export default function Dashboard() {
   const [dashboardStats, setDashboardStats] = useState<
     DashboardStats | undefined
   >(undefined);
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [totalUsers, setTotalUsers] = useState<number | null>(null);
-  interface Stat {
-    name: string;
-    value: number;
-    icon?: string;
-  }
-
-  const [stats, setStats] = useState<Stat[]>([]);
-  interface Activity {
-    id: number;
-    type: string;
-    action: string;
-    time: string;
-    icon: IconType;
-    name?: string;
-    department?: string;
-    status?: string;
-    details?: string;
-    period?: string;
-    duration?: string;
-    count?: string;
-    description?: string;
-  }
-
-  const [chartData] = useState({
-    payroll: payrollData,
-    department: departmentData,
-  });
 
   // Add refs for each chart section
-  const payrollRef = useRef(null);
   const distributionRef = useRef(null);
   const pieChartRef = useRef(null);
   const lineChartRef = useRef(null);
 
-  const isPayrollInView = useInView(payrollRef, { amount: 0.5 });
   const isDistributionInView = useInView(distributionRef, { amount: 0.5 });
   const isPieChartInView = useInView(pieChartRef, { amount: 0.5 });
   const isLineChartInView = useInView(lineChartRef, { amount: 0.5 });
 
-  const { data: chartStats, isLoading: isChartStatsLoading } =
-    departmentService.useGetDepartmentChartStats();
+  const { data: chartStats } = departmentService.useGetDepartmentChartStats();
 
   // For admin/user specific stats
   const { data: roleStats } = departmentService.useGetRoleSpecificStats(
@@ -186,14 +145,8 @@ export default function Dashboard() {
     const fetchDashboardData = async () => {
       try {
         setError(null);
-
-        // Fetch dashboard stats
         const stats = await employeeService.getDashboardStats();
         setDashboardStats(stats);
-
-        // Get role-specific activities
-        const fetchedActivities = getRoleActivities(user?.role);
-        setActivities(fetchedActivities);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load dashboard data"
