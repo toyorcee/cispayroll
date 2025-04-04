@@ -14,6 +14,17 @@ export class ApiError extends Error {
 }
 
 /**
+ * Custom App Error class for handling application-specific errors
+ */
+export class AppError extends Error {
+  constructor(message, statusCode = 500) {
+    super(message);
+    this.name = "AppError";
+    this.statusCode = statusCode;
+  }
+}
+
+/**
  * Handles different types of errors and returns appropriate error responses
  * @param {Error} error - The error object to handle
  * @returns {Object} Formatted error response with status code and message
@@ -44,7 +55,7 @@ export const handleError = (error) => {
   }
 
   // Custom API error
-  if (error instanceof ApiError) {
+  if (error instanceof ApiError || error instanceof AppError) {
     return {
       statusCode: error.statusCode,
       message: error.message,

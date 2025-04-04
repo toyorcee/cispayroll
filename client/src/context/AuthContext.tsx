@@ -39,6 +39,7 @@ interface AuthContextType {
   isSuperAdmin: () => boolean;
   isAdmin: () => boolean;
   isUser: () => boolean;
+  updateUser: (user: User) => void;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
@@ -208,6 +209,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return user?.role === UserRole.USER;
   };
 
+  const updateUser = (updatedUser: User) => {
+    setUser(updatedUser);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -225,6 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isSuperAdmin,
         isAdmin,
         isUser,
+        updateUser,
       }}
     >
       {children}
@@ -285,4 +291,52 @@ const handleAuthError = (error: unknown) => {
     throw new Error(message);
   }
   throw error;
+};
+
+const transformUserData = (data: any): User => {
+  // Ensure department has all required fields with proper defaults
+  const department = data.department
+    ? {
+        _id: data.department._id || "",
+        name: data.department.name || "",
+        code: data.department.code || "",
+      }
+    : {
+        _id: "",
+        name: "",
+        code: "",
+      };
+
+  return {
+    _id: data._id || "",
+    employeeId: data.employeeId || "",
+    firstName: data.firstName || "",
+    lastName: data.lastName || "",
+    email: data.email || "",
+    phone: data.phone || "",
+    role: data.role || "user",
+    permissions: Array.isArray(data.permissions) ? data.permissions : [],
+    department,
+    position: data.position || "",
+    status: data.status || "active",
+    gradeLevel: data.gradeLevel || "",
+    workLocation: data.workLocation || "",
+    dateJoined: data.dateJoined ? new Date(data.dateJoined) : new Date(),
+    emergencyContact: {
+      name: data.emergencyContact?.name || "",
+      relationship: data.emergencyContact?.relationship || "",
+      phone: data.emergencyContact?.phone || "",
+    },
+    bankDetails: {
+      bankName: data.bankDetails?.bankName || "",
+      accountNumber: data.bankDetails?.accountNumber || "",
+      accountName: data.bankDetails?.accountName || "",
+    },
+    profileImage: data.profileImage || "",
+    reportingTo: data.reportingTo || null,
+    isEmailVerified: Boolean(data.isEmailVerified),
+    lastLogin: data.lastLogin ? new Date(data.lastLogin) : undefined,
+    createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+    updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
+  };
 };

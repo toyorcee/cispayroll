@@ -31,7 +31,7 @@ import { EditEmployeeModal } from "../../../components/employees/EditEmployeeMod
 // Service imports
 import { employeeService } from "../../../services/employeeService";
 import { departmentService } from "../../../services/departmentService";
-import { mapEmployeeToDetails } from "../../../utils/mappers";
+// import { mapEmployeeToDetails } from "../../../utils/mappers";
 import { salaryStructureService } from "../../../services/salaryStructureService";
 
 // Additional imports
@@ -85,7 +85,7 @@ export default function AllEmployees() {
     department: undefined,
   });
   const [totalEmployees, setTotalEmployees] = useState(0);
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(
     null
   );
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -137,7 +137,9 @@ export default function AllEmployees() {
     isLoading: employeesLoading,
     error: employeesError,
     refetch,
-  } = employeeService.useGetEmployees(filters);
+  } = user?.role === UserRole.ADMIN
+    ? employeeService.adminService.useGetEmployees(filters)
+    : employeeService.useGetEmployees(filters);
 
   const { data: salaryGrades, isLoading: salaryGradesLoading } = useQuery<
     ISalaryGrade[]
@@ -186,28 +188,29 @@ export default function AllEmployees() {
     setFilters((prev) => ({ ...prev, search: query, page: 1 }));
   };
 
-  const handleEmployeeClick = (employee: Employee) => {
-    setSelectedEmployee(employee);
+  const handleEmployeeClick = (employeeId: string) => {
+    console.log("Employee clicked:", employeeId);
+    setSelectedEmployeeId(employeeId);
     setShowDetailsModal(true);
   };
 
   const handleEditClick = (e: React.MouseEvent, employee: Employee) => {
     e.stopPropagation();
-    setSelectedEmployee(employee);
+    setSelectedEmployeeId(employee._id);
     setShowEditModal(true);
   };
 
   const handleDeleteClick = async (e: React.MouseEvent, employee: Employee) => {
     e.stopPropagation();
-    setSelectedEmployee(employee);
+    setSelectedEmployeeId(employee._id);
     setShowDeleteModal(true);
   };
 
   const handleDelete = async () => {
-    if (!selectedEmployee) return;
+    if (!selectedEmployeeId) return;
     try {
-      await employeeService.deleteEmployee(selectedEmployee._id);
-      setEmployees(employees.filter((e) => e._id !== selectedEmployee._id));
+      await employeeService.deleteEmployee(selectedEmployeeId);
+      setEmployees(employees.filter((e) => e._id !== selectedEmployeeId));
       await refreshDepartments();
       toast.success("Employee deleted successfully");
       setShowDeleteModal(false);
@@ -336,7 +339,7 @@ export default function AllEmployees() {
   };
 
   const handleUpdateEmployee = async (data: Partial<Employee>) => {
-    if (!selectedEmployee) return;
+    if (!selectedEmployeeId) return;
     try {
       const updateData = {
         ...data,
@@ -347,7 +350,7 @@ export default function AllEmployees() {
               data.department,
       };
 
-      await employeeService.updateEmployee(selectedEmployee._id, updateData);
+      await employeeService.updateEmployee(selectedEmployeeId, updateData);
       await refetch();
       setShowEditModal(false);
       toast.success("Employee updated successfully");
@@ -365,6 +368,26 @@ export default function AllEmployees() {
       departments?.find((d) => d._id === department)?.name || "No Department"
     );
   };
+
+  // Use the hook to fetch employee details
+  const { data: employeeDetails } = useQuery({
+    queryKey: ["employee", selectedEmployeeId],
+    queryFn: () => employeeService.getEmployeeById(selectedEmployeeId || ""),
+    enabled: !!selectedEmployeeId,
+  });
+
+  // Fetch departments when component mounts
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const departments = await departmentService.getAllDepartments();
+        setDepartments(departments);
+      } catch (error) {
+        console.error("Failed to fetch departments:", error);
+      }
+    };
+    fetchDepartments();
+  }, []);
 
   return (
     <motion.div
@@ -479,7 +502,7 @@ export default function AllEmployees() {
                   {employees.map((employee) => (
                     <tr
                       key={employee._id}
-                      onClick={() => handleEmployeeClick(employee)}
+                      onClick={() => handleEmployeeClick(employee._id || "")}
                       className="hover:bg-gray-50 cursor-pointer transition-colors"
                     >
                       <td className="px-3 py-2">
@@ -538,7 +561,7 @@ export default function AllEmployees() {
               {employees.map((employee) => (
                 <div
                   key={employee._id}
-                  onClick={() => handleEmployeeClick(employee)}
+                  onClick={() => handleEmployeeClick(employee._id || "")}
                   className="p-3 border-b border-gray-200 hover:bg-gray-50 cursor-pointer"
                 >
                   <div className="flex justify-between items-start mb-1">
@@ -634,19 +657,23 @@ export default function AllEmployees() {
       )}
 
       <EmployeeDetailsModal
-        employee={
-          selectedEmployee ? mapEmployeeToDetails(selectedEmployee) : null
-        }
+        employee={employeeDetails || null}
+        departments={departments}
         isOpen={showDetailsModal}
-        onClose={() => setShowDetailsModal(false)}
+        onClose={() => {
+          setShowDetailsModal(false);
+          setSelectedEmployeeId(null);
+        }}
       />
 
       <DeleteEmployeeModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         employeeName={
-          selectedEmployee
-            ? `${selectedEmployee.firstName} ${selectedEmployee.lastName}`
+          selectedEmployeeId
+            ? employees.find((e) => e._id === selectedEmployeeId)?.firstName +
+              " " +
+              employees.find((e) => e._id === selectedEmployeeId)?.lastName
             : ""
         }
         onConfirm={handleDelete}
@@ -655,7 +682,10 @@ export default function AllEmployees() {
       <EditEmployeeModal
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
-        employee={selectedEmployee}
+        employee={
+          employees.find((e) => e._id === selectedEmployeeId) ||
+          ({} as Employee)
+        }
         onSave={handleUpdateEmployee}
       />
 

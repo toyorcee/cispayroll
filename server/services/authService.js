@@ -1,9 +1,9 @@
 import bcrypt from "bcryptjs";
-import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
-import { UserRole, Permission } from "../models/User.js";
+import { UserRole } from "../models/User.js";
 import { ApiError } from "../utils/errorHandler.js";
 import UserModel from "../models/User.js";
+import { AppError } from "../utils/errorHandler.js";
 
 export class AuthService {
   static validatePassword(password) {
@@ -70,20 +70,50 @@ export class AuthService {
   }
 
   static formatUserResponse(user) {
+    // Ensure department data is properly formatted
+    const department = user.department
+      ? {
+          _id: user.department._id || "",
+          name: user.department.name || "",
+          code: user.department.code || "",
+        }
+      : {
+          _id: "",
+          name: "",
+          code: "",
+        };
+
     return {
-      id: user._id.toString(),
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      role: user.role,
-      permissions: user.permissions,
-      employeeId: user.employeeId,
-      position: user.position,
-      gradeLevel: user.gradeLevel,
-      workLocation: user.workLocation,
-      ...(user.role !== UserRole.SUPER_ADMIN && {
-        department: user.department,
-      }),
+      _id: user._id.toString(),
+      employeeId: user.employeeId || "",
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      email: user.email || "",
+      phone: user.phone || "",
+      role: user.role || "user",
+      permissions: Array.isArray(user.permissions) ? user.permissions : [],
+      department,
+      position: user.position || "",
+      status: user.status || "active",
+      gradeLevel: user.gradeLevel || "",
+      workLocation: user.workLocation || "",
+      dateJoined: user.dateJoined || new Date(),
+      emergencyContact: {
+        name: user.emergencyContact?.name || "",
+        relationship: user.emergencyContact?.relationship || "",
+        phone: user.emergencyContact?.phone || "",
+      },
+      bankDetails: {
+        bankName: user.bankDetails?.bankName || "",
+        accountNumber: user.bankDetails?.accountNumber || "",
+        accountName: user.bankDetails?.accountName || "",
+      },
+      profileImage: user.profileImage || "",
+      reportingTo: user.reportingTo || null,
+      isEmailVerified: Boolean(user.isEmailVerified),
+      lastLogin: user.lastLogin || undefined,
+      createdAt: user.createdAt || new Date(),
+      updatedAt: user.updatedAt || new Date(),
     };
   }
 
@@ -92,42 +122,34 @@ export class AuthService {
     return emailRegex.test(email);
   }
 
-  static async loginUser(credentials) {
-    const user = await UserModel.findOne({ email: credentials.email })
-      .select("+password")
-      .exec();
+  static async loginUser({ email, password }) {
+    try {
+      const user = await UserModel.findOne({ email })
+        .populate({
+          path: "department",
+          select: "_id name code",
+        })
+        .select("+password");
 
-    if (!user) {
-      throw new ApiError(401, "Invalid credentials");
+      if (!user) {
+        throw new AppError("Invalid credentials", 401);
+      }
+
+      const isPasswordValid = await user.comparePassword(password);
+      if (!isPasswordValid) {
+        throw new AppError("Invalid credentials", 401);
+      }
+
+      // For now, let's just check if user exists and password is valid
+      // We'll handle department validation separately
+      const token = user.generateAuthToken();
+      user.password = undefined;
+
+      return { user, token };
+    } catch (error) {
+      console.error("Login error:", error);
+      throw error;
     }
-
-    if (!user.isEmailVerified) {
-      throw new ApiError(401, "Please verify your email before logging in");
-    }
-
-    if (user.status === "inactive" || user.status === "suspended") {
-      throw new ApiError(
-        401,
-        "Your account is not active. Please contact administrator"
-      );
-    }
-
-    const isMatch = await this.comparePasswords(
-      credentials.password,
-      user.password
-    );
-    if (!isMatch) {
-      throw new ApiError(401, "Invalid credentials");
-    }
-
-    const token = this.generateToken(user);
-    user.lastLogin = new Date();
-    await user.save();
-
-    return {
-      user: this.formatUserResponse(user),
-      token,
-    };
   }
 
   static async createUser(userData) {

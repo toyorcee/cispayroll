@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+import bcryptjs from "bcryptjs";
+import jwt from "jsonwebtoken";
 const { Schema, Types } = mongoose;
 
 // Enums
@@ -44,9 +46,9 @@ export const Permission = {
   MANAGE_PAYMENT_METHODS: "MANAGE_PAYMENT_METHODS",
 
   // New specific payslip permissions
-  VIEW_ALL_PAYSLIPS: "VIEW_ALL_PAYSLIPS", // Super admin only
-  VIEW_DEPARTMENT_PAYSLIPS: "VIEW_DEPARTMENT_PAYSLIPS", // Department admins
-  VIEW_OWN_PAYSLIP: "VIEW_OWN_PAYSLIP", // Regular users
+  VIEW_ALL_PAYSLIPS: "VIEW_ALL_PAYSLIPS",
+  VIEW_DEPARTMENT_PAYSLIPS: "VIEW_DEPARTMENT_PAYSLIPS",
+  VIEW_OWN_PAYSLIP: "VIEW_OWN_PAYSLIP",
 
   // ===== Leave Management =====
   APPROVE_LEAVE: "APPROVE_LEAVE",
@@ -190,26 +192,21 @@ const UserSchema = new Schema(
   {
     employeeId: {
       type: String,
-      required: function () {
-        return this.role !== UserRole.SUPER_ADMIN;
-      },
-      trim: true,
+      required: true,
+      unique: true,
     },
     firstName: {
       type: String,
-      required: [true, "First name is required"],
-      trim: true,
+      required: true,
     },
     lastName: {
       type: String,
-      required: [true, "Last name is required"],
-      trim: true,
+      required: true,
     },
     email: {
       type: String,
-      required: [true, "Email is required"],
-      trim: true,
-      lowercase: true,
+      required: true,
+      unique: true,
     },
     phone: {
       type: String,
@@ -245,10 +242,7 @@ const UserSchema = new Schema(
     },
     position: {
       type: String,
-      required: function () {
-        return this.role !== UserRole.SUPER_ADMIN;
-      },
-      trim: true,
+      required: true,
     },
     gradeLevel: {
       type: String,
@@ -318,11 +312,6 @@ const UserSchema = new Schema(
     profileImage: {
       type: String,
       default: null,
-      get: function (value) {
-        if (!value) return null;
-        if (value.startsWith("http")) return value;
-        return `${process.env.BASE_URL || ""}${value}`;
-      },
     },
     reportingTo: {
       type: Schema.Types.ObjectId,
@@ -335,7 +324,6 @@ const UserSchema = new Schema(
     lastLogin: Date,
     invitationToken: {
       type: String,
-      index: true,
     },
     invitationExpires: Date,
     createdBy: {
@@ -626,6 +614,54 @@ const UserSchema = new Schema(
         },
       },
     ],
+    // Fields to be filled during registration
+    personalDetails: {
+      middleName: String,
+      dateOfBirth: Date,
+      gender: String,
+      maritalStatus: String,
+      nationality: String,
+      stateOfOrigin: String,
+      lga: String,
+      address: {
+        street: String,
+        city: String,
+        state: String,
+        country: String,
+        zipCode: String,
+      },
+      nextOfKin: {
+        name: String,
+        relationship: String,
+        phone: String,
+        address: {
+          street: String,
+          city: String,
+          state: String,
+          zipCode: String,
+          country: String,
+        },
+      },
+      qualifications: [
+        {
+          highestEducation: String,
+          institution: String,
+          yearGraduated: String,
+        },
+      ],
+    },
+    emergencyContact: {
+      name: String,
+      relationship: String,
+      phone: String,
+      address: String,
+    },
+    bankDetails: {
+      bankName: String,
+      accountNumber: String,
+      accountName: String,
+      bankCode: String,
+    },
   },
   {
     timestamps: true,
@@ -901,6 +937,21 @@ UserSchema.set("toJSON", {
   },
 });
 
+// JSON Transform
+UserSchema.set("toJSON", {
+  virtuals: true,
+  transform: function (_doc, ret) {
+    if (ret.profileImage) {
+      ret.profileImageUrl = `${process.env.BASE_URL}/${ret.profileImage}`;
+    } else {
+      ret.profileImageUrl = `${process.env.BASE_URL}/uploads/profiles/default-avatar.png`;
+    }
+    delete ret.password;
+    delete ret.__v;
+    return ret;
+  },
+});
+
 // Clear existing indexes and add new ones
 UserSchema.clearIndexes();
 UserSchema.index({ email: 1 }, { unique: true });
@@ -1040,6 +1091,24 @@ UserSchema.methods.getActiveDeductions = function () {
       ),
     },
   };
+};
+
+// Add the comparePassword method to the UserSchema
+UserSchema.methods.comparePassword = async function (candidatePassword) {
+  return bcryptjs.compare(candidatePassword, this.password);
+};
+
+// Add the generateAuthToken method
+UserSchema.methods.generateAuthToken = function () {
+  return jwt.sign(
+    {
+      id: this._id.toString(),
+      role: this.role,
+      permissions: this.permissions,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "24h" }
+  );
 };
 
 export default mongoose.model("User", UserSchema);

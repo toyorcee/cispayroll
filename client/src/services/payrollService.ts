@@ -11,7 +11,7 @@ import type {
 } from "../types/payroll";
 import { salaryStructureService } from "./salaryStructureService";
 
-const BASE_URL = "https://payrollapi.digitalentshub.net/api/super-admin";
+const BASE_URL = "http://localhost:5000/api/super-admin";
 
 interface PayrollFilters {
   dateRange?: string;

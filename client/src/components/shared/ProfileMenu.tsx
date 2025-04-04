@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { FaUserCircle, FaUserCog, FaSignOutAlt } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
@@ -17,10 +17,43 @@ export function ProfileMenu({
   onToggle,
 }: ProfileMenuProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signOut, user } = useAuth();
   const [isLocalOpen, setIsLocalOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  console.log("User data in ProfileMenu:", user);
+  // Close menu on route change
+  useEffect(() => {
+    if (isLocalOpen) {
+      setIsLocalOpen(false);
+    }
+    if (onToggle && isOpen) {
+      onToggle();
+    }
+  }, [location.pathname]);
+
+  // Click outside handler
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsLocalOpen(false);
+        if (onToggle) onToggle();
+      }
+    }
+
+    if (isLocalOpen || isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isLocalOpen, isOpen, onToggle]);
+
+  // console.log("User data in ProfileMenu:", user);
+
+  // Add this console log near the top of your component to debug
+  console.log("User profile image:", user?.profileImage);
 
   // Get initials from username
   const getInitials = () => {
@@ -82,7 +115,7 @@ export function ProfileMenu({
   const toggleMenu = onToggle || (() => setIsLocalOpen(!isLocalOpen));
 
   return (
-    <div className="relative" id="profile-menu">
+    <div className="relative" id="profile-menu" ref={menuRef}>
       <button
         onClick={toggleMenu}
         className={`flex items-center gap-3 p-2 hover:bg-green-50 rounded-lg transition-all duration-300 
@@ -94,17 +127,26 @@ export function ProfileMenu({
         <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center overflow-hidden">
           {user?.profileImage ? (
             <img
-              src={user.profileImage}
+              src={`${import.meta.env.VITE_API_URL}/${user.profileImage.replace(
+                /\\/g,
+                "/"
+              )}`}
               alt={getFullName()}
               className="w-full h-full object-cover"
               onError={(e) => {
-                // If image fails to load, show initials
                 const target = e.target as HTMLImageElement;
                 target.style.display = "none";
-                const fallback = document.createElement("span");
-                fallback.className = "text-sm font-medium text-green-600";
-                fallback.textContent = getInitials();
-                target.parentElement?.appendChild(fallback);
+                const parent = target.parentElement;
+                if (parent) {
+                  const existingFallback = parent.querySelector("span");
+                  if (existingFallback) {
+                    parent.removeChild(existingFallback);
+                  }
+                  const fallback = document.createElement("span");
+                  fallback.className = "text-sm font-medium text-green-600";
+                  fallback.textContent = getInitials();
+                  parent.appendChild(fallback);
+                }
               }}
             />
           ) : (

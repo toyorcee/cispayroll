@@ -1,47 +1,36 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog } from "@headlessui/react";
-import { EmployeeDetails } from "../../types/employee";
-import {
-  FaTimes,
-  FaPhone,
-  FaEnvelope,
-  FaMapMarkerAlt,
-  FaCalendarAlt,
-  FaClock,
-  FaUserTie,
-  FaIdCard,
-  FaBuilding,
-} from "react-icons/fa";
+import { EmployeeDetails, Department } from "../../types/employee";
+import { FaTimes, FaPhone, FaEnvelope } from "react-icons/fa";
 import { format } from "date-fns";
 
 interface EmployeeDetailsModalProps {
   employee: EmployeeDetails | null;
+  departments: Department[];
   isOpen: boolean;
   onClose: () => void;
 }
 
 export const EmployeeDetailsModal = ({
   employee,
+  departments,
   isOpen,
   onClose,
 }: EmployeeDetailsModalProps) => {
   if (!employee) return null;
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "active":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "pending":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "offboarding":
-        return "bg-orange-100 text-orange-800 border-orange-200";
-      case "suspended":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "terminated":
-        return "bg-red-100 text-red-800 border-red-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
+  const DEFAULT_AVATAR = "/images/default-avatar.png";
+  const imageUrl = employee.profileImage
+    ? `http://localhost:5000/${employee.profileImage}`
+    : DEFAULT_AVATAR;
+
+  const renderDepartmentName = (department: any) => {
+    if (typeof department === "object" && department !== null) {
+      return department.name || "No Department";
     }
+    return (
+      departments?.find((d) => d._id === department)?.name || "No Department"
+    );
   };
 
   return (
@@ -54,7 +43,6 @@ export const EmployeeDetailsModal = ({
           open={isOpen}
         >
           <div className="min-h-screen px-4 text-center flex items-center justify-center">
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 0.5 }}
@@ -64,209 +52,327 @@ export const EmployeeDetailsModal = ({
               onClick={onClose}
             />
 
-            {/* Modal */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative bg-white rounded-xl shadow-xl w-full max-w-4xl mx-auto p-8"
+              className="relative bg-white rounded-xl shadow-xl w-full max-w-4xl mx-auto p-4 sm:p-6 max-h-[90vh] overflow-y-auto"
             >
               <button
                 onClick={onClose}
-                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+                className="sticky top-0 right-0 float-right z-10 text-gray-400 hover:text-gray-600"
               >
                 <FaTimes className="w-5 h-5" />
               </button>
 
-              <div className="flex flex-col md:flex-row gap-8">
-                {/* Left Column - Profile Image & Basic Info */}
-                <div className="md:w-1/3">
-                  <div className="relative mb-6">
-                    <div className="w-40 h-40 mx-auto rounded-full p-1 bg-gradient-to-r from-green-400 to-blue-500">
+              <div className="flex flex-col md:flex-row gap-4 sm:gap-6">
+                {/* Left Column */}
+                <div className="w-full md:w-1/3 space-y-4 sm:space-y-6">
+                  <div className="relative">
+                    <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto rounded-full p-1 bg-gradient-to-r from-green-400 to-blue-500">
                       <div className="w-full h-full rounded-full border-4 border-white overflow-hidden bg-gray-100">
                         <img
-                          src={employee.profileImage || "/default-avatar.png"}
+                          src={imageUrl}
                           alt={`${employee.firstName} ${employee.lastName}`}
                           className="w-full h-full object-cover"
                         />
                       </div>
                     </div>
-                    <div className="absolute -bottom-2 right-1/3 w-8 h-8 rounded-full bg-white border-4 border-white flex items-center justify-center">
-                      <div
-                        className={`w-full h-full rounded-full ${getStatusColor(
-                          employee.status
-                        )}`}
-                      />
-                    </div>
                   </div>
 
-                  <div className="text-center mb-6">
-                    <h2 className="text-2xl font-bold text-gray-900">
-                      {employee.firstName} {employee.lastName}
+                  <div className="text-center">
+                    <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
+                      {employee.fullName}
                     </h2>
-                    <p className="text-green-600 font-medium mt-1">
+                    <p className="text-xs sm:text-sm text-gray-500">
                       {employee.position}
                     </p>
-                    <div
-                      className={`inline-block px-3 py-1 rounded-full text-sm font-medium mt-2 ${getStatusColor(
-                        employee.status
-                      )}`}
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mt-2 ${
+                        employee.status === "active"
+                          ? "bg-green-100 text-green-800"
+                          : employee.status === "pending"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
                     >
-                      {employee.status.charAt(0).toUpperCase() +
-                        employee.status.slice(1)}
-                    </div>
+                      {employee.status}
+                    </span>
                   </div>
 
-                  {/* Contact Information */}
-                  <div className="space-y-3">
+                  <div className="space-y-3 sm:space-y-4">
                     <div className="flex items-center text-gray-600">
-                      <FaEnvelope className="w-4 h-4 mr-3" />
-                      <span className="text-sm">{employee.email}</span>
+                      <FaEnvelope className="w-4 h-4 mr-3 text-green-500" />
+                      <div>
+                        <p className="text-xs text-gray-500">Email</p>
+                        <p className="text-sm font-medium">{employee.email}</p>
+                      </div>
                     </div>
+
                     <div className="flex items-center text-gray-600">
-                      <FaPhone className="w-4 h-4 mr-3" />
-                      <span className="text-sm">{employee.phone}</span>
+                      <FaPhone className="w-4 h-4 mr-3 text-green-500" />
+                      <div>
+                        <p className="text-xs text-gray-500">Phone</p>
+                        <p className="text-sm font-medium">{employee.phone}</p>
+                      </div>
                     </div>
-                    <div className="flex items-center text-gray-600">
-                      <FaMapMarkerAlt className="w-4 h-4 mr-3" />
-                      <span className="text-sm">{employee.workLocation}</span>
+
+                    <div className="pt-3 sm:pt-4 border-t border-gray-100">
+                      <h3 className="text-sm font-medium text-green-600 mb-2 sm:mb-3">
+                        System Information
+                      </h3>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs text-gray-500">Created</p>
+                          <p className="text-sm font-medium">
+                            {format(
+                              new Date(employee.createdAt),
+                              "MMM dd, yyyy"
+                            )}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Last Updated</p>
+                          <p className="text-sm font-medium">
+                            {format(
+                              new Date(employee.updatedAt),
+                              "MMM dd, yyyy"
+                            )}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Last Login</p>
+                          <p className="text-sm font-medium">
+                            {employee.lastLogin
+                              ? format(
+                                  new Date(employee.lastLogin),
+                                  "MMM dd, yyyy"
+                                )
+                              : "Never"}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Right Column - Detailed Information */}
-                <div className="md:w-2/3 border-t md:border-t-0 md:border-l border-gray-200 pt-6 md:pt-0 md:pl-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Employee Details */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                        Employee Information
+                {/* Right Column */}
+                <div className="w-full md:w-2/3 space-y-4 sm:space-y-6">
+                  {/* Basic Employment Info */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500">Employee ID</p>
+                      <p className="text-sm font-medium">
+                        {employee.employeeId}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Grade Level</p>
+                      <p className="text-sm font-medium">
+                        {employee.gradeLevel}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Work Location</p>
+                      <p className="text-sm font-medium">
+                        {employee.workLocation}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Department</p>
+                      <p className="text-sm font-medium">
+                        {renderDepartmentName(employee.department)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Personal Details Section */}
+                  {employee.personalDetails && (
+                    <div className="pt-3 sm:pt-4 border-t border-gray-100">
+                      <h3 className="text-sm font-medium text-green-600 mb-2 sm:mb-3">
+                        Personal Details
                       </h3>
-
-                      <div className="space-y-3">
-                        <div className="flex items-center text-gray-600">
-                          <FaIdCard className="w-4 h-4 mr-3" />
-                          <div>
-                            <p className="text-xs text-gray-500">Employee ID</p>
-                            <p className="text-sm font-medium">
-                              {employee.employeeId}
-                            </p>
-                          </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        <div>
+                          <p className="text-xs text-gray-500">Middle Name</p>
+                          <p className="text-sm font-medium">
+                            {employee.personalDetails.middleName}
+                          </p>
                         </div>
-
-                        <div className="flex items-center text-gray-600">
-                          <FaUserTie className="w-4 h-4 mr-3" />
-                          <div>
-                            <p className="text-xs text-gray-500">Role</p>
-                            <p className="text-sm font-medium">
-                              {employee.role === "SUPER_ADMIN"
-                                ? "Super Admin"
-                                : employee.role === "ADMIN"
-                                ? "Department Admin"
-                                : "Regular Employee"}
-                            </p>
-                          </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Date of Birth</p>
+                          <p className="text-sm font-medium">
+                            {format(
+                              new Date(employee.personalDetails.dateOfBirth),
+                              "MMM dd, yyyy"
+                            )}
+                          </p>
                         </div>
-
-                        <div className="flex items-center text-gray-600">
-                          <FaBuilding className="w-4 h-4 mr-3" />
-                          <div>
-                            <p className="text-xs text-gray-500">Department</p>
-                            <p className="text-sm font-medium">
-                              {typeof employee.department === "object"
-                                ? employee.department.name
-                                : employee.department || "No Department"}
-                            </p>
-                          </div>
+                        <div>
+                          <p className="text-xs text-gray-500">
+                            Marital Status
+                          </p>
+                          <p className="text-sm font-medium capitalize">
+                            {employee.personalDetails.maritalStatus}
+                          </p>
                         </div>
-
-                        <div className="flex items-center text-gray-600">
-                          <FaClock className="w-4 h-4 mr-3" />
-                          <div>
-                            <p className="text-xs text-gray-500">Grade Level</p>
-                            <p className="text-sm font-medium">
-                              {employee.gradeLevel}
-                            </p>
-                          </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Nationality</p>
+                          <p className="text-sm font-medium">
+                            {employee.personalDetails.nationality}
+                          </p>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Employment Details */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                        Employment Details
-                      </h3>
-
-                      <div className="space-y-3">
-                        <div className="flex items-center text-gray-600">
-                          <FaCalendarAlt className="w-4 h-4 mr-3" />
-                          <div>
-                            <p className="text-xs text-gray-500">Date Joined</p>
-                            <p className="text-sm font-medium">
-                              {format(
-                                new Date(employee.dateJoined),
-                                "MMM dd, yyyy"
-                              )}
-                            </p>
-                          </div>
-                        </div>
-
-                        {employee.lastLogin && (
-                          <div className="flex items-center text-gray-600">
-                            <FaClock className="w-4 h-4 mr-3" />
+                      {/* Address Section */}
+                      {employee.personalDetails.address && (
+                        <div className="mt-4">
+                          <h4 className="text-xs font-medium text-green-600 mb-2">
+                            Address
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                             <div>
-                              <p className="text-xs text-gray-500">
-                                Last Login
-                              </p>
+                              <p className="text-xs text-gray-500">Street</p>
                               <p className="text-sm font-medium">
-                                {format(
-                                  new Date(employee.lastLogin),
-                                  "MMM dd, yyyy HH:mm"
-                                )}
+                                {employee.personalDetails.address.street}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">City</p>
+                              <p className="text-sm font-medium">
+                                {employee.personalDetails.address.city}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">State</p>
+                              <p className="text-sm font-medium">
+                                {employee.personalDetails.address.state}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Country</p>
+                              <p className="text-sm font-medium">
+                                {employee.personalDetails.address.country}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">ZIP Code</p>
+                              <p className="text-sm font-medium">
+                                {employee.personalDetails.address.zipCode}
                               </p>
                             </div>
                           </div>
-                        )}
-                      </div>
-
-                      {/* Additional Employment Information */}
-                      {employee.status === "PENDING" && (
-                        <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                          <p className="text-sm text-blue-800">
-                            Invitation sent - Waiting for account activation
-                          </p>
                         </div>
                       )}
-                    </div>
-                  </div>
 
-                  {/* System Information */}
-                  <div className="mt-6 pt-6 border-t border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      System Information
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                      <div>
-                        <p className="text-xs text-gray-500">Created At</p>
-                        <p className="font-medium">
-                          {format(
-                            new Date(employee.createdAt),
-                            "MMM dd, yyyy HH:mm"
-                          )}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Last Updated</p>
-                        <p className="font-medium">
-                          {format(
-                            new Date(employee.updatedAt),
-                            "MMM dd, yyyy HH:mm"
-                          )}
-                        </p>
+                      {/* Qualifications Section */}
+                      {employee.personalDetails.qualifications &&
+                        employee.personalDetails.qualifications.length > 0 && (
+                          <div className="mt-4">
+                            <h4 className="text-xs font-medium text-green-600 mb-2">
+                              Qualifications
+                            </h4>
+                            <div className="space-y-3">
+                              {employee.personalDetails.qualifications.map(
+                                (qual, index) => (
+                                  <div
+                                    key={qual._id || index}
+                                    className="bg-gray-50 p-3 rounded-lg"
+                                  >
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                      <div>
+                                        <p className="text-xs text-gray-500">
+                                          Highest Education
+                                        </p>
+                                        <p className="text-sm font-medium">
+                                          {qual.highestEducation}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-gray-500">
+                                          Institution
+                                        </p>
+                                        <p className="text-sm font-medium">
+                                          {qual.institution}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-gray-500">
+                                          Year Graduated
+                                        </p>
+                                        <p className="text-sm font-medium">
+                                          {qual.yearGraduated}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  )}
+
+                  {/* Bank Details */}
+                  {employee.bankDetails && (
+                    <div className="pt-3 sm:pt-4 border-t border-gray-100">
+                      <h3 className="text-sm font-medium text-green-600 mb-2 sm:mb-3">
+                        Bank Details
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        <div>
+                          <p className="text-xs text-gray-500">Bank Name</p>
+                          <p className="text-sm font-medium">
+                            {employee.bankDetails.bankName}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">
+                            Account Number
+                          </p>
+                          <p className="text-sm font-medium">
+                            {employee.bankDetails.accountNumber}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Account Name</p>
+                          <p className="text-sm font-medium">
+                            {employee.bankDetails.accountName}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Emergency Contact */}
+                  {employee.emergencyContact && (
+                    <div className="pt-3 sm:pt-4 border-t border-gray-100">
+                      <h3 className="text-sm font-medium text-green-600 mb-2 sm:mb-3">
+                        Emergency Contact
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        <div>
+                          <p className="text-xs text-gray-500">Name</p>
+                          <p className="text-sm font-medium">
+                            {employee.emergencyContact.name}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Relationship</p>
+                          <p className="text-sm font-medium">
+                            {employee.emergencyContact.relationship}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Phone</p>
+                          <p className="text-sm font-medium">
+                            {employee.emergencyContact.phone}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>

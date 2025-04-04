@@ -1,4 +1,4 @@
-import { BankDetails, Allowance, Deduction } from "./common";
+import { Allowance, Deduction } from "./common";
 import { Permission } from "./auth";
 export enum LeaveStatus {
   pending = "pending",
@@ -29,8 +29,85 @@ export interface LeaveRequest {
 }
 
 export interface Task {
+  _id: string;
+  id: string;
   name: string;
   completed: boolean;
+  completedAt?: string;
+}
+
+export interface Department {
+  _id: string;
+  name: string;
+  code: string;
+}
+
+export interface BankDetails {
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  bankCode: string;
+}
+
+export interface EmergencyContact {
+  name: string;
+  relationship: string;
+  phone: string;
+}
+
+export interface OnboardingDetails {
+  status: string;
+  progress: number;
+  tasks: OnboardingTask[];
+  startedAt?: Date;
+  completedAt?: Date;
+}
+
+export interface OffboardingDetails {
+  exitInterview: {
+    completed: boolean;
+  };
+  status: "pending_exit" | "in_progress" | "completed";
+  initiatedAt: string;
+  initiatedBy: string;
+  checklist: OffboardingChecklist[];
+}
+
+export interface DeductionPreferences {
+  statutory: {
+    defaultStatutory: Record<string, { opted: boolean }>;
+  };
+}
+
+export interface CreatedBy {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  id: string;
+}
+
+export interface PersonalDetails {
+  address: {
+    street: string;
+    city: string;
+    state: string;
+    country: string;
+    zipCode: string;
+  };
+  middleName: string;
+  dateOfBirth: string;
+  maritalStatus: string;
+  nationality: string;
+  qualifications: Qualification[];
+}
+
+export interface Qualification {
+  highestEducation: string;
+  institution: string;
+  yearGraduated: string;
+  _id: string;
+  id: string;
 }
 
 export interface Employee {
@@ -39,10 +116,11 @@ export interface Employee {
   employeeId: string;
   firstName: string;
   lastName: string;
+  fullName: string;
   email: string;
   phone: string;
   role: string;
-  department: string;
+  department: Department;
   position: string;
   gradeLevel: string;
   workLocation: string;
@@ -88,11 +166,7 @@ export interface Employee {
     rate: number;
     hoursWorked: number;
   };
-  emergencyContact?: {
-    name: string;
-    relationship: string;
-    phone: string;
-  };
+  emergencyContact: EmergencyContact;
   profileImage?: string;
   reportingTo?: string;
   isEmailVerified?: boolean;
@@ -108,6 +182,7 @@ export interface Employee {
     hrClearance?: boolean;
     departmentClearance?: boolean;
   };
+  personalDetails?: PersonalDetails;
 }
 
 export type OnboardingStatus =
@@ -124,54 +199,42 @@ export type OnboardingTaskName =
   | "pension_setup";
 
 export interface OnboardingTask {
-  name: OnboardingTaskName;
+  _id: string;
+  name: string;
   completed: boolean;
-  dueDate?: Date;
-  assignedTo?: string;
-  notes?: string;
+  completedAt?: Date;
 }
 
 export interface OnboardingEmployee {
-  _id?: string;
+  _id: string;
   id: string;
   employeeId: string;
   firstName: string;
   lastName: string;
-  email?: string;
-  phone?: string;
-  role?: string;
-  permissions?: string[];
-  department: string | { name: string };
+  email: string;
+  phone: string;
+  role: string;
+  permissions: string[];
   position: string;
-  gradeLevel?: string;
-  workLocation?: string;
-  dateJoined?: string;
-  startDate: string;
+  gradeLevel: string;
+  workLocation: string;
+  dateJoined: Date;
   status: string;
-  progress: number;
-  supervisor: string;
-  tasks: OnboardingTask[];
-  documents: {
-    contractSigned: boolean;
-    idSubmitted: boolean;
-    bankDetailsProvided: boolean;
-    taxInfoSubmitted: boolean;
-  };
+  profileImage: string;
+  department: string | { name: string };
   onboarding: {
     status: string;
+    progress: number;
+    tasks: Task[];
+    startedAt?: string;
   };
-  emergencyContact?: {
-    name: string;
-    relationship: string;
-    phone: string;
-  };
-  bankDetails?: {
-    bankName: string;
-    accountNumber: string;
-    accountName: string;
-  };
-  profileImage?: string;
-  fullName?: string;
+  fullName: string;
+  // ... other fields as needed
+}
+
+export interface ExtendedOnboardingEmployee extends OnboardingEmployee {
+  // Add any additional properties specific to extended version
+  // If there are no additional properties, you might not need this interface at all
 }
 
 export type OffboardingStatus = "pending_exit" | "in_progress" | "completed";
@@ -234,29 +297,8 @@ export interface EmployeeFilters {
   department?: string;
 }
 
-export interface EmployeeDetails {
-  id: string;
-  employeeId: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  role: string;
-  position: string;
-  gradeLevel: string;
-  workLocation: string;
-  department: string | { name: string; _id: string };
-  status: string;
-  dateJoined: string;
-  lastLogin?: string;
-  profileImage?: string;
-  createdAt: string;
-  updatedAt: string;
-  emergencyContact?: {
-    name: string;
-    relationship: string;
-    phone: string;
-  };
+export interface EmployeeDetails extends Employee {
+  fullName: string;
 }
 
 export interface CreateEmployeeData {
@@ -273,32 +315,15 @@ export interface CreateEmployeeData {
 }
 
 export interface OffboardingChecklist {
-  exitInterview: boolean;
-  assetsReturned: boolean;
-  knowledgeTransfer: boolean;
-  accessRevoked: boolean;
-  finalSettlement: boolean;
+  completed: boolean;
+  _id: string;
+  id: string;
 }
 
 export interface OffboardingDocument {
   type: "exit_interview" | "asset_return" | "final_settlement" | "clearance";
   url: string;
   generatedAt: Date;
-}
-
-export interface OffboardingDetails {
-  status: OffboardingStatus;
-  lastWorkingDay: Date;
-  initiatedAt: Date;
-  initiatedBy: string;
-  checklist: OffboardingChecklist;
-  documents?: OffboardingDocument[];
-}
-
-export interface DepartmentBasic {
-  _id: string;
-  name: string;
-  code: string;
 }
 
 export interface DepartmentEmployee {
@@ -337,4 +362,14 @@ export interface SalaryGrade {
     _id: string;
   }[];
   isActive: boolean;
+}
+
+export interface Offboarding {
+  exitInterview: {
+    completed: boolean;
+  };
+  status: "pending_exit" | "in_progress" | "completed";
+  initiatedAt: string;
+  initiatedBy: string;
+  checklist: OffboardingChecklist[];
 }

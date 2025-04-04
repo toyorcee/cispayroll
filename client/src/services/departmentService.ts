@@ -5,7 +5,7 @@ import { Department, DepartmentFormData } from "../types/department";
 import { AdminResponse } from "./employeeService";
 import { toast } from "react-toastify";
 
-const BASE_URL = "https://payrollapi.digitalentshub.net/api";
+const BASE_URL = "http://localhost:5000/api";
 
 export interface DepartmentResponse {
   _id: string;

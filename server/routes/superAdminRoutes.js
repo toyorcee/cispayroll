@@ -59,6 +59,12 @@ router.get(
 );
 
 router.get(
+  "/users/offboarding",
+  requirePermission([Permission.VIEW_OFFBOARDING]),
+  SuperAdminController.getOffboardingUsers
+);
+
+router.get(
   "/users/:id",
   requirePermission([Permission.VIEW_ALL_USERS]),
   SuperAdminController.getUserById

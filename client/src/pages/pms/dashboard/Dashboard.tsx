@@ -40,14 +40,14 @@ export default function Dashboard() {
   const { data: chartStats } = departmentService.useGetDepartmentChartStats();
 
   // For admin/user specific stats
-  const { data: roleStats } = departmentService.useGetRoleSpecificStats(
-    user?.role.toLowerCase() || "",
-    hasPermission(Permission.VIEW_ALL_DEPARTMENTS)
-      ? (typeof user?.department === "object"
-          ? user.department._id
-          : user?.department) || ""
-      : user?._id || ""
-  );
+  // const { data: roleStats } = departmentService.useGetRoleSpecificStats(
+  //   user?.role.toLowerCase() || "",
+  //   hasPermission(Permission.VIEW_ALL_DEPARTMENTS)
+  //     ? (typeof user?.department === "object"
+  //         ? user.department._id
+  //         : user?.department) || ""
+  //     : user?._id || ""
+  // );
 
   // Pie Chart - Department Size Distribution (percentage)
   const pieChartData = chartStats
@@ -159,7 +159,17 @@ export default function Dashboard() {
 
   // Render different charts based on permissions
   const renderPermissionBasedCharts = () => {
+    // Add debug logs
+    console.log("User Role:", user?.role);
+    console.log(
+      "Has VIEW_ALL_DEPARTMENTS:",
+      hasPermission(Permission.VIEW_ALL_DEPARTMENTS)
+    );
+    console.log("User Department:", user?.department);
+
+    // Superadmin view
     if (hasPermission(Permission.VIEW_ALL_DEPARTMENTS)) {
+      console.log("Rendering Superadmin Charts");
       return (
         <>
           <div
@@ -175,7 +185,6 @@ export default function Dashboard() {
               )}
             </Suspense>
           </div>
-
           <div
             ref={distributionRef}
             className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]"
@@ -193,75 +202,18 @@ export default function Dashboard() {
       );
     }
 
-    if (hasPermission(Permission.MANAGE_DEPARTMENT_USERS) && roleStats) {
-      return (
-        <>
-          <div className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]">
-            <h2 className="text-lg font-semibold mb-4">
-              Department Employee Status
-            </h2>
-            <Suspense fallback={<ChartLoading />}>
-              <BarChart data={roleStats.departmentStats} />
-            </Suspense>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]">
-            <h2 className="text-lg font-semibold mb-4">
-              Monthly Employee Growth
-            </h2>
-            <Suspense fallback={<ChartLoading />}>
-              <LineChart data={roleStats.monthlyGrowth} />
-            </Suspense>
-          </div>
-        </>
-      );
-    }
-
-    // Regular user view
-    if (hasPermission(Permission.VIEW_PERSONAL_INFO) && roleStats) {
-      return (
-        <>
-          <div className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]">
-            <h2 className="text-lg font-semibold mb-4">Department Overview</h2>
-            <Suspense fallback={<ChartLoading />}>
-              <BarChart data={roleStats.departmentStats} />
-            </Suspense>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]">
-            <h2 className="text-lg font-semibold mb-4">Your Department Info</h2>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="font-medium">Department:</span>
-                <span>{roleStats.userStats.department}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="font-medium">Position:</span>
-                <span>{roleStats.userStats.position}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="font-medium">Active Colleagues:</span>
-                <span>{roleStats.userStats.colleagues}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="font-medium">Joined Date:</span>
-                <span>
-                  {new Date(
-                    roleStats.userStats.joinedDate
-                  ).toLocaleDateString()}
-                </span>
-              </div>
-            </div>
-          </div>
-        </>
-      );
-    }
-
+    // Admin view
     if (user?.role === "ADMIN" && user?.department) {
+      console.log("Rendering Admin Charts");
       const { data: adminStats, isLoading: adminStatsLoading } =
         departmentService.useGetAdminDepartmentStats(
-          user.department.toString()
+          typeof user.department === "object"
+            ? user.department._id
+            : user.department
         );
+
+      console.log("Admin Stats:", adminStats);
+      console.log("Admin Stats Loading:", adminStatsLoading);
 
       if (adminStatsLoading) return <ChartLoading />;
       if (!adminStats) return null;
@@ -276,7 +228,6 @@ export default function Dashboard() {
               <BarChart data={adminStats.departmentStats} />
             </Suspense>
           </div>
-
           <div className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]">
             <h2 className="text-lg font-semibold mb-4">
               Monthly Employee Growth
@@ -288,6 +239,9 @@ export default function Dashboard() {
         </>
       );
     }
+
+    console.log("No charts rendered - no matching conditions");
+    return null;
   };
 
   if (error) {
@@ -380,27 +334,6 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-
-        {/* Recent Activity */}
-        {/* <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white rounded-lg shadow-lg overflow-hidden"
-        >
-          <div className="p-6">
-            <h2 className="text-lg font-semibold">Recent Activity</h2>
-            <div className="mt-4 space-y-4">
-              {activities.map((activity, index) => (
-                <ActivityItem
-                  key={activity.id}
-                  activity={activity}
-                  index={index}
-                />
-              ))}
-            </div>
-          </div>
-        </motion.div> */}
       </motion.div>
     </GlobalErrorBoundary>
   );

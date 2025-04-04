@@ -8,6 +8,7 @@ import UserModel, {
 import { ApiError } from "../utils/errorHandler.js";
 import { EmailService } from "./emailService.js";
 import { v4 as uuidv4 } from "uuid";
+import DepartmentModel from "../models/Department.js";
 
 export class EmployeeService {
   static async createEmployee(data, creator) {
@@ -27,6 +28,15 @@ export class EmployeeService {
       const existingUser = await UserModel.findOne({ email: data.email });
       if (existingUser) {
         throw new ApiError(400, "Email already registered");
+      }
+
+      // Validate department if provided
+      if (data.department) {
+        const department = await DepartmentModel.findById(data.department);
+        if (!department) {
+          throw new ApiError(400, "Invalid department selected");
+        }
+        data.department = department._id; // Store only the reference
       }
 
       const invitationToken = uuidv4();
@@ -82,8 +92,13 @@ export class EmployeeService {
       const employee = await UserModel.create(employeeData);
       await EmailService.sendInvitationEmail(employee.email, invitationToken);
 
+      // Return formatted response with populated department
+      const populatedEmployee = await UserModel.findById(employee._id)
+        .populate("department", "name code")
+        .select("-password");
+
       return {
-        employee: this.formatEmployeeResponse(employee),
+        employee: this.formatEmployeeResponse(populatedEmployee),
         invitationToken,
       };
     } catch (error) {
@@ -123,10 +138,29 @@ export class EmployeeService {
       firstName: employee.firstName,
       lastName: employee.lastName,
       email: employee.email,
+      phone: employee.phone,
       position: employee.position,
-      department: employee.department?.toString(),
+      department: employee.department
+        ? {
+            _id: employee.department._id,
+            name: employee.department.name,
+            code: employee.department.code,
+          }
+        : null,
       status: employee.status,
       role: employee.role,
+      permissions: employee.permissions || [],
+      gradeLevel: employee.gradeLevel,
+      workLocation: employee.workLocation,
+      dateJoined: employee.dateJoined,
+      emergencyContact: employee.emergencyContact,
+      bankDetails: employee.bankDetails,
+      profileImage: employee.profileImage,
+      reportingTo: employee.reportingTo,
+      isEmailVerified: employee.isEmailVerified,
+      lastLogin: employee.lastLogin,
+      createdAt: employee.createdAt,
+      updatedAt: employee.updatedAt,
     };
   }
 
@@ -333,5 +367,25 @@ export class EmployeeService {
     user.resetPasswordExpires = undefined;
     await user.save();
     return this.formatEmployeeResponse(user);
+  }
+
+  static async getEmployeeById(employeeId) {
+    try {
+      const employee = await UserModel.findById(employeeId)
+        .populate({
+          path: "department",
+          select: "_id name code",
+        })
+        .select("-password");
+
+      if (!employee) {
+        throw new ApiError(404, "Employee not found");
+      }
+
+      return this.formatEmployeeResponse(employee);
+    } catch (error) {
+      console.error("Error in getEmployeeById:", error);
+      throw error;
+    }
   }
 }

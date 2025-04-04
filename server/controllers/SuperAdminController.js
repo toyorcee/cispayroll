@@ -3850,6 +3850,28 @@ export class SuperAdminController {
       });
     }
   }
+
+  static async getOffboardingUsers(req, res) {
+    try {
+      const offboardingUsers = await UserModel.find({
+        status: "offboarding",
+      })
+        .select("-password")
+        .populate("department", "name code")
+        .populate("createdBy", "firstName lastName");
+
+      return res.status(200).json({
+        success: true,
+        data: offboardingUsers,
+      });
+    } catch (error) {
+      console.error("Error fetching offboarding users:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch offboarding users",
+      });
+    }
+  }
 }
 
 // Add this helper function

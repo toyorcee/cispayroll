@@ -39,7 +39,7 @@ const modules: ModuleItem[] = [
     description:
       "Manage salaries, deductions, and employee benefits seamlessly",
     icon: <FaMoneyCheckAlt className="w-full h-full text-green-600" />,
-    path: "/pms/payroll/structure",
+    path: "/pms/dashboard",
     isReady: true,
   },
   {

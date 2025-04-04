@@ -9,23 +9,21 @@ async function updateSuperAdminProfile() {
     console.log("🔄 Starting super admin profile update...");
 
     const superAdminId = "67d7d55acccafb0fc97432ec";
-    const profileImage =
-      "uploads\\profiles\\profile-1743379455710-320318529.jpeg";
 
-    // Find and update the super admin, bypassing the getter
+    // Only update the profile image path
+    const updateData = {
+      profileImage: "uploads/profiles/profile-1743379455710-320318529.jpeg",
+    };
+
     const updatedUser = await UserModel.findByIdAndUpdate(
       superAdminId,
-      { $set: { profileImage } },
+      { $set: updateData },
       { new: true, runValidators: false }
     );
 
     if (updatedUser) {
-      console.log("✅ Successfully updated super admin profile image");
-      console.log("Updated user:", {
-        id: updatedUser._id,
-        name: `${updatedUser.firstName} ${updatedUser.lastName}`,
-        profileImage: updatedUser.profileImage,
-      });
+      console.log("✅ Successfully updated super admin profile image path");
+      console.log("Updated profile image:", updatedUser.profileImage);
     } else {
       console.log("❌ Super admin not found");
     }
@@ -35,7 +33,6 @@ async function updateSuperAdminProfile() {
     console.error("❌ Error updating super admin profile:", error);
     process.exit(1);
   } finally {
-    // Close the MongoDB connection
     await mongoose.disconnect();
     console.log("📝 Database connection closed");
   }

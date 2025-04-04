@@ -33,6 +33,14 @@ export class EmployeeController {
           : undefined,
       };
 
+      // Add department population
+      const department = await DepartmentModel.findById(
+        employeeData.department
+      );
+      if (!department) {
+        throw new ApiError(400, "Invalid department selected");
+      }
+
       // Generate employee ID with dynamic prefix
       const today = new Date();
       const day = today.getDate().toString().padStart(2, "0");
@@ -79,6 +87,7 @@ export class EmployeeController {
         invitationToken,
         invitationExpires,
         createdBy: creator._id,
+        department: department._id,
       });
 
       await employee.save();
@@ -266,25 +275,26 @@ export class EmployeeController {
 
   static async updateProfileImage(req, res, next) {
     try {
+      // 1. Check if file exists in request
       if (!req.file) {
         throw new ApiError(400, "No image file provided");
       }
 
-      // Get the current user to check for existing profile image
+      // 2. Find current user
       const currentUser = await UserModel.findById(req.user.id);
       if (!currentUser) {
         throw new ApiError(404, "Employee not found");
       }
 
-      // Delete old profile image if it exists
+      // 3. Handle existing image (Update case)
       if (currentUser.profileImage) {
         const oldImagePath = path.join(process.cwd(), currentUser.profileImage);
         if (fs.existsSync(oldImagePath)) {
-          fs.unlinkSync(oldImagePath);
+          fs.unlinkSync(oldImagePath); // Delete old image file
         }
       }
 
-      // Update user with new profile image path
+      // 4. Update user with new image path (Works for both initial and update)
       const user = await UserModel.findByIdAndUpdate(
         req.user.id,
         {
@@ -299,13 +309,14 @@ export class EmployeeController {
         throw new ApiError(404, "Employee not found");
       }
 
+      // 5. Return success response
       res.status(200).json({
         success: true,
         message: "Profile image updated successfully",
         profileImage: user.profileImage,
       });
     } catch (error) {
-      // If there's an error and a file was uploaded, delete it
+      // 6. Error handling - cleanup uploaded file if something fails
       if (req.file) {
         const filePath = path.join(process.cwd(), req.file.path);
         if (fs.existsSync(filePath)) {
@@ -397,6 +408,26 @@ export class EmployeeController {
       console.error("Error fetching dashboard stats:", error);
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async getEmployeeById(req, res, next) {
+    try {
+      const employee = await UserModel.findById(req.params.id)
+        .select("-password")
+        .populate("department", "name code")
+        .populate("createdBy", "firstName lastName");
+
+      if (!employee) {
+        throw new ApiError(404, "Employee not found");
+      }
+
+      res.status(200).json({
+        success: true,
+        employee,
+      });
+    } catch (error) {
+      next(error);
     }
   }
 }

@@ -8,7 +8,7 @@ import {
   // ComponentType, // Add this import
 } from "../types/salary";
 
-const BASE_URL = "https://payrollapi.digitalentshub.net/api";
+const BASE_URL = "http://localhost:5000/api";
 
 // Set default axios config
 axios.defaults.withCredentials = true;

@@ -39,6 +39,7 @@ import UserProfile from "../pages/pms/profile/UserProfile";
 import { RouteErrorFallback } from "../components/error/RouteErrorFallback";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorFallback } from "../components/error/ErrorFallback";
+import { AuthProvider } from "../context/AuthContext";
 
 // Import new settings components
 import PayrollSettings from "../pages/pms/settings/PayrollSettings";
@@ -437,13 +438,15 @@ export const routes: RouteConfig[] = [
 export const router = createBrowserRouter([
   {
     element: (
-      <SkeletonProvider>
-        <NavigationProvider>
-          <GlobalErrorBoundary>
-            <Outlet />
-          </GlobalErrorBoundary>
-        </NavigationProvider>
-      </SkeletonProvider>
+      <AuthProvider>
+        <SkeletonProvider>
+          <NavigationProvider>
+            <GlobalErrorBoundary>
+              <Outlet />
+            </GlobalErrorBoundary>
+          </NavigationProvider>
+        </SkeletonProvider>
+      </AuthProvider>
     ),
     errorElement: <RouteErrorFallback />,
     children: [

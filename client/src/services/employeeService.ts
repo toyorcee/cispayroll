@@ -6,9 +6,9 @@ import {
   CreateEmployeeData,
   OnboardingEmployee,
   OffboardingDetails,
-  DepartmentBasic,
   EmployeeResponse,
   DepartmentEmployeeResponse,
+  EmployeeDetails,
 } from "../types/employee";
 import { Department, DepartmentFormData } from "../types/department";
 import { OnboardingStats } from "../types/chart";
@@ -17,8 +17,9 @@ import { UserRole } from "../types/auth";
 // import { api } from "./api";
 import { DashboardStats } from "../data/dashboardData";
 import { salaryStructureService } from "./salaryStructureService";
+import { mapEmployeeToDetails } from "../utils/mappers";
 
-const BASE_URL = "https://payrollapi.digitalentshub.net/api";
+const BASE_URL = "http://localhost:5000/api";
 
 // Set default axios config to always include credentials
 axios.defaults.withCredentials = true;
@@ -252,27 +253,20 @@ export const employeeService = {
     }
   },
 
-  async getEmployeeById(id: string): Promise<Partial<Employee>> {
+  async getEmployeeById(id: string): Promise<EmployeeDetails> {
     try {
       const response = await axios.get(`${BASE_URL}/employees/${id}`);
-      const emp = response.data;
+      const { employee } = response.data;
 
       // Ensure dates are properly formatted
-      try {
-        if (emp.dateJoined) {
-          emp.dateJoined = new Date(emp.dateJoined).toISOString();
-        }
-        if (emp.startDate) {
-          emp.startDate = new Date(emp.startDate).toISOString();
-        }
-      } catch {
-        // If date parsing fails, use current date
-        const currentDate = new Date().toISOString();
-        emp.dateJoined = emp.dateJoined || currentDate;
-        emp.startDate = emp.startDate || currentDate;
+      if (employee.dateJoined) {
+        employee.dateJoined = new Date(employee.dateJoined).toISOString();
+      }
+      if (employee.startDate) {
+        employee.startDate = new Date(employee.startDate).toISOString();
       }
 
-      return emp;
+      return mapEmployeeToDetails(employee);
     } catch (error) {
       console.error(`Error fetching employee ${id}:`, error);
       throw error;
@@ -587,7 +581,7 @@ export const employeeService = {
   },
 
   // Add a function to get department by ID
-  getDepartmentById: async (departmentId: string): Promise<DepartmentBasic> => {
+  getDepartmentById: async (departmentId: string): Promise<Department> => {
     try {
       const response = await axios.get(
         `${BASE_URL}/super-admin/departments/${departmentId}`
@@ -722,5 +716,52 @@ export const employeeService = {
         staleTime: 5 * 60 * 1000, // 5 minutes
       });
     },
+  },
+
+  async getOffboardingUsers() {
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/super-admin/users/offboarding`,
+        { withCredentials: true }
+      );
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to fetch offboarding users"
+        );
+      }
+
+      return response.data.data;
+    } catch (error) {
+      console.error("Failed to fetch offboarding users:", error);
+      throw error;
+    }
+  },
+
+  getUserById: async (userId: string) => {
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/super-admin/users/${userId}`
+      );
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to fetch user");
+      }
+      return response.data.user;
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      throw error;
+    }
+  },
+
+  useGetUserById: (userId: string | undefined) => {
+    return useQuery({
+      queryKey: ["user", userId],
+      queryFn: () => {
+        if (!userId) throw new Error("User ID is required");
+        return employeeService.getUserById(userId);
+      },
+      enabled: !!userId, // Only run query if userId exists
+      staleTime: 5 * 60 * 1000,
+    });
   },
 };

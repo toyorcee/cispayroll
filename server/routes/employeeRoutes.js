@@ -78,7 +78,12 @@ router.delete(
   EmployeeController.deleteEmployee
 );
 
-// Dashboard stats route - accessible to all roles
+router.get(
+  "/:id",
+  requirePermission([Permission.VIEW_EMPLOYEE_DETAILS]),
+  EmployeeController.getEmployeeById
+);
+
 router.get("/dashboard/stats", EmployeeController.getDashboardStats);
 
 export default router;

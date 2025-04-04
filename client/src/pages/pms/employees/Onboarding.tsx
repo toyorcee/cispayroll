@@ -4,7 +4,6 @@ import {
   FaUserPlus,
   FaUsers,
   FaBuildingColumns,
-  FaUserMinus,
 } from "react-icons/fa6";
 import { FaTimes, FaSpinner } from "react-icons/fa";
 import { toast } from "react-toastify";
@@ -18,6 +17,7 @@ import { AxiosError } from "axios";
 import {
   CreateEmployeeData,
   OnboardingEmployee,
+  ExtendedOnboardingEmployee,
 } from "../../../types/employee";
 import { Pagination } from "@mui/material";
 import { Grid } from "@mui/material";
@@ -27,6 +27,7 @@ import {
   onboardingService,
   OnboardingFilters,
 } from "../../../services/onboardingService";
+import { OnboardingDetailsModal } from "../../../components/modals/OnboardingDetailsModal";
 
 // Update the AdminUser interface to match User type exactly
 interface AdminUser {
@@ -44,16 +45,6 @@ interface AdminUser {
     | "terminated"
     | "offboarding";
   permissions: Permission[];
-}
-
-// Update the OnboardingEmployee interface to match the actual data structure
-interface ExtendedOnboardingEmployee extends OnboardingEmployee {
-  onboarding: {
-    status: string;
-  };
-  department: {
-    name: string;
-  };
 }
 
 const useOnboardingData = () => {
@@ -78,10 +69,10 @@ const useOnboardingData = () => {
 
   const fetchData = useCallback(
     async (page = 1, filters: OnboardingFilters = {}) => {
-    setIsLoading(true);
-    try {
-      const deps = await departmentService.getAllDepartments();
-      setDepartments(deps);
+      setIsLoading(true);
+      try {
+        const deps = await departmentService.getAllDepartments();
+        setDepartments(deps);
 
         const response = await onboardingService.getOnboardingEmployees({
           page,
@@ -100,16 +91,16 @@ const useOnboardingData = () => {
           );
         });
 
-        console.log(
-          "Filtered Onboarding Employees:",
-          filteredEmployees.map((emp) => ({
-            id: emp._id,
-            name: `${emp.firstName} ${emp.lastName}`,
-            role: emp.role,
-            status: emp.onboarding?.status,
-            department: emp.department?.name || emp.department,
-          }))
-        );
+        // console.log(
+        //   "Filtered Onboarding Employees:",
+        //   filteredEmployees.map((emp) => ({
+        //     id: emp._id,
+        //     name: `${emp.firstName} ${emp.lastName}`,
+        //     role: emp.role,
+        //     status: emp.onboarding?.status,
+        //     department: emp.department?.name || emp.department,
+        //   }))
+        // );
 
         setOnboardingEmployees(filteredEmployees);
         setPagination({
@@ -126,17 +117,17 @@ const useOnboardingData = () => {
             return acc;
           }, {} as Record<string, number>),
         });
-      setError(null);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        setError(error.message || "Failed to load data");
-      } else {
-        setError("An unknown error occurred");
+        setError(null);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          setError(error.message || "Failed to load data");
+        } else {
+          setError("An unknown error occurred");
+        }
+        setOnboardingEmployees([]);
+      } finally {
+        setIsLoading(false);
       }
-      setOnboardingEmployees([]);
-    } finally {
-      setIsLoading(false);
-    }
     },
     []
   );
@@ -149,15 +140,20 @@ const useOnboardingData = () => {
     const refreshInterval = setInterval(async () => {
       try {
         const response = await onboardingService.getOnboardingEmployees();
-        // Transform the response to match ExtendedOnboardingEmployee type
         const transformedEmployees = response.data.map((emp) => ({
           ...emp,
           department:
             typeof emp.department === "string"
               ? { name: emp.department }
               : emp.department,
-          onboarding: emp.onboarding || { status: "not_started" },
-        }));
+          onboarding: {
+            status: emp.onboarding?.status || "not_started",
+            progress: emp.onboarding?.progress || 0,
+            tasks: emp.onboarding?.tasks || [],
+            startedAt: emp.onboarding?.startedAt,
+          },
+        })) as OnboardingEmployee[];
+
         setOnboardingEmployees(transformedEmployees);
       } catch (error) {
         console.error("Error refreshing employees:", error);
@@ -220,7 +216,6 @@ export default function Onboarding() {
     departments,
     setDepartments,
     onboardingEmployees,
-    setOnboardingEmployees,
     isLoading,
     error,
     fetchData,
@@ -234,25 +229,30 @@ export default function Onboarding() {
   // Add a state for admins
   const [admins, setAdmins] = useState<AdminUser[]>([]);
 
+  const [selectedEmployee, setSelectedEmployee] =
+    useState<OnboardingEmployee | null>(null);
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   // Update the fetchAdmins function to properly type the permissions
   useEffect(() => {
     const fetchAdmins = async () => {
       try {
         const response = await employeeService.getAdmins();
         if (response && Array.isArray(response)) {
-        const transformedAdmins = response.map((admin) => ({
-          _id: admin._id,
-          id: admin._id,
-          firstName: admin.firstName,
-          lastName: admin.lastName,
-          email: admin.email,
-          role: admin.role || UserRole.ADMIN,
-          status: admin.status || "active",
-          permissions: (admin.permissions || []).map(
-            (perm) => perm as Permission
-          ),
-        }));
-        setAdmins(transformedAdmins as AdminUser[]);
+          const transformedAdmins = response.map((admin) => ({
+            _id: admin._id,
+            id: admin._id,
+            firstName: admin.firstName,
+            lastName: admin.lastName,
+            email: admin.email,
+            role: admin.role || UserRole.ADMIN,
+            status: admin.status || "active",
+            permissions: (admin.permissions || []).map(
+              (perm) => perm as Permission
+            ),
+          }));
+          setAdmins(transformedAdmins as AdminUser[]);
         } else {
           setAdmins([]);
         }
@@ -277,7 +277,7 @@ export default function Onboarding() {
   const getFilteredEmployees = () => {
     const filtered =
       filters.status === "all"
-          ? onboardingEmployees
+        ? onboardingEmployees
         : onboardingEmployees.filter(
             (emp) => emp.onboarding?.status === filters.status
           );
@@ -285,19 +285,19 @@ export default function Onboarding() {
     return filtered;
   };
 
-const handleCreateEmployee = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const handleCreateEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
       await employeeService.createEmployee(formData);
       toast.success("Employee created successfully");
-    setShowCreateModal(false);
+      setShowCreateModal(false);
       fetchData();
     } catch (error) {
       if (error instanceof AxiosError) {
         toast.error(
           error.response?.data?.message || "Failed to create employee"
         );
-    } else {
+      } else {
         toast.error("An unexpected error occurred");
       }
     }
@@ -315,99 +315,11 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
     fetchData(1, newFilters);
   };
 
-  const handleInitiateOffboarding = async (employeeId: string) => {
-    try {
-      // Simplified payload to match backend expectations
-      const response = await employeeService.initiateOffboarding(employeeId);
-
-      if (response.success) {
-        // Remove from onboarding list
-        setOnboardingEmployees((prev) =>
-          prev.filter((emp) => emp.id !== employeeId)
-        );
-        toast.success("Employee offboarding initiated");
-        fetchData(); // Refresh the list
-      } else {
-        throw new Error("Failed to initiate offboarding");
-      }
-    } catch (error) {
-      console.error("❌ Error:", error);
-      toast.error("Failed to initiate offboarding");
-    }
-  };
-
-  // Add this new function after the other handler functions
-  const handleUpdateOnboardingStage = async (
-    employeeId: string,
-    currentStage: string
-  ) => {
-    try {
-      let nextStage;
-      switch (currentStage) {
-        case ONBOARDING_STAGES.NOT_STARTED:
-          nextStage = ONBOARDING_STAGES.CONTRACT_STAGE;
-          break;
-        case ONBOARDING_STAGES.CONTRACT_STAGE:
-          nextStage = ONBOARDING_STAGES.DOCUMENTATION_STAGE;
-          break;
-        case ONBOARDING_STAGES.DOCUMENTATION_STAGE:
-          nextStage = ONBOARDING_STAGES.IT_SETUP_STAGE;
-          break;
-        case ONBOARDING_STAGES.IT_SETUP_STAGE:
-          nextStage = ONBOARDING_STAGES.TRAINING_STAGE;
-          break;
-        case ONBOARDING_STAGES.TRAINING_STAGE:
-          nextStage = ONBOARDING_STAGES.COMPLETED;
-          break;
-        default:
-          return;
-      }
-
-      // Call the backend API to update the stage
-      await employeeService.updateOnboardingStage(employeeId, nextStage);
-
-      // Update the local state
-      setOnboardingEmployees((prev) =>
-        prev.map((emp) => {
-          if (emp.id === employeeId) {
-            return {
-              ...emp,
-              onboarding: {
-                ...emp.onboarding,
-              status: nextStage,
-              },
-              progress: calculateProgress(nextStage),
-            };
-          }
-          return emp;
-        })
-      );
-
-      toast.success("Onboarding stage updated successfully");
-    } catch (error) {
-      console.error("Error updating onboarding stage:", error);
-      toast.error("Failed to update onboarding stage");
-    }
-  };
-
-  // Add this helper function to calculate progress percentage
-  const calculateProgress = (stage: string): number => {
-    switch (stage) {
-      case ONBOARDING_STAGES.NOT_STARTED:
-        return 0;
-      case ONBOARDING_STAGES.CONTRACT_STAGE:
-        return 20;
-      case ONBOARDING_STAGES.DOCUMENTATION_STAGE:
-        return 40;
-      case ONBOARDING_STAGES.IT_SETUP_STAGE:
-        return 60;
-      case ONBOARDING_STAGES.TRAINING_STAGE:
-        return 80;
-      case ONBOARDING_STAGES.COMPLETED:
-        return 100;
-      default:
-        return 0;
-    }
+  // Add this function to handle opening the modal
+  const handleOpenModal = (employee: OnboardingEmployee) => {
+    console.log("Opening modal for:", employee);
+    setSelectedEmployee(employee);
+    setIsModalOpen(true);
   };
 
   // Now you can safely use conditional rendering
@@ -498,23 +410,23 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
                   handleFilterChange({ ...filters, search: e.target.value })
                 }
               />
-            <select
+              <select
                 value={filters.status}
                 onChange={(e) =>
                   handleFilterChange({ ...filters, status: e.target.value })
                 }
-              className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium
+                className="px-4 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium
                        text-gray-700 hover:border-sky-500 focus:outline-none focus:ring-2 
                        focus:ring-sky-500 focus:border-transparent transition-all duration-200"
-            >
-              <option value="all">All Stages</option>
-              <option value="not_started">Not Started</option>
-              <option value="contract_stage">Contract Stage</option>
-              <option value="documentation_stage">Documentation Stage</option>
-              <option value="it_setup_stage">IT Setup Stage</option>
-              <option value="training_stage">Training Stage</option>
-              <option value="completed">Completed</option>
-            </select>
+              >
+                <option value="all">All Stages</option>
+                <option value="not_started">Not Started</option>
+                <option value="contract_stage">Contract Stage</option>
+                <option value="documentation_stage">Documentation Stage</option>
+                <option value="it_setup_stage">IT Setup Stage</option>
+                <option value="training_stage">Training Stage</option>
+                <option value="completed">Completed</option>
+              </select>
               <select
                 value={filters.department}
                 onChange={(e) =>
@@ -556,100 +468,59 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
           <Grid container spacing={3}>
             {displayedEmployees.map((employee) => (
               <Grid item xs={12} sm={6} lg={4} key={employee._id}>
-                <div className="bg-white rounded-lg shadow p-6 relative">
-                  {/* User Info Section */}
-                  <div className="flex items-center space-x-4">
-                    <div className="h-12 w-12 bg-indigo-100 rounded-full flex items-center justify-center">
-                      <span className="text-indigo-600 text-lg font-semibold">
-                        {employee.firstName[0]}
-                        {employee.lastName[0]}
+                <div className="bg-white rounded-lg shadow-md p-6 mb-4 min-h-[200px] flex flex-col justify-between">
+                  {/* Top Section */}
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900">
+                          {employee.firstName} {employee.lastName}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {employee.position}
+                        </p>
+                      </div>
+                      <span
+                        className={`px-3 py-1 text-sm font-semibold rounded-full 
+                        ${
+                          employee.onboarding.status === "completed"
+                            ? "bg-green-100 text-green-800"
+                            : employee.onboarding.status === "in_progress"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {employee.onboarding.status.replace("_", " ")}
                       </span>
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 truncate">
-                        {`${employee.firstName} ${employee.lastName}`}
-                      </h3>
-                      <p className="text-sm text-gray-500 truncate">
-                        {employee.position}
-                      </p>
+
+                    {/* Progress Section */}
+                    <div className="mb-4">
+                      <div className="flex justify-between mb-2">
+                        <span className="text-sm font-semibold text-gray-700">
+                          Onboarding Progress
+                        </span>
+                        <span className="text-sm font-bold text-gray-900">
+                          {employee.onboarding.progress}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div
+                          className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                          style={{ width: `${employee.onboarding.progress}%` }}
+                        ></div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Employee Details */}
-                  <div className="mt-4 space-y-2">
-                    <p className="text-sm text-gray-600">
-                      <span className="font-medium">Department:</span>{" "}
-                      {typeof employee.department === "string"
-                        ? employee.department
-                        : employee.department?.name}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      <span className="font-medium">Status:</span>{" "}
-                      {employee.onboarding?.status
-                        ?.replace(/_/g, " ")
-                        .toUpperCase()}
-                    </p>
-
-                    {/* Progress Bar */}
-                    <div className="mt-2">
-                      <div className="h-2 bg-gray-200 rounded">
-                        <div
-                          className="h-2 bg-indigo-600 rounded"
-                          style={{
-                            width: `${calculateProgress(
-                              employee.onboarding?.status || "not_started"
-                            )}%`,
-                          }}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Onboarding Progress:{" "}
-                        {calculateProgress(
-                          employee.onboarding?.status || "not_started"
-                        )}
-                        %
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        Current Stage:{" "}
-                        {employee.onboarding?.status
-                          ?.replace(/_/g, " ")
-                          .toUpperCase()}
-                      </p>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="mt-4 pt-3 border-t border-gray-100 space-y-2">
-                      {employee.onboarding?.status !==
-                        ONBOARDING_STAGES.COMPLETED && (
-                        <button
-                          onClick={() =>
-                            handleUpdateOnboardingStage(
-                              employee.id,
-                              employee.onboarding?.status || "not_started"
-                            )
-                          }
-                          className="w-full flex items-center justify-center space-x-2 px-4 py-2 
-                                   bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 
-                                   hover:to-indigo-700 text-white rounded-lg transition-all duration-200 
-                                   transform hover:scale-[1.02] mb-2"
-                        >
-                          <span className="font-medium">
-                            Move to Next Stage
-                          </span>
-                        </button>
-                      )}
-
+                  {/* Bottom Section with Actions */}
+                  <div className="mt-auto pt-4 border-t border-gray-200">
+                    <div className="flex justify-between items-center space-x-4">
                       <button
-                        onClick={() => handleInitiateOffboarding(employee.id)}
-                        className="w-full flex items-center justify-center space-x-2 px-4 py-2 
-                                 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 
-                                 hover:to-red-700 text-white rounded-lg transition-all duration-200 
-                                 transform hover:scale-[1.02]"
+                        onClick={() => handleOpenModal(employee)}
+                        className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold py-2 px-4 rounded-lg transition-colors duration-200"
                       >
-                        <FaUserMinus className="text-lg" />
-                        <span className="font-medium">
-                          Initiate Offboarding
-                        </span>
+                        View Details
                       </button>
                     </div>
                   </div>
@@ -913,6 +784,70 @@ const handleCreateEmployee = async (e: React.FormEvent) => {
           setDepartments(response);
         }}
       />
+
+      {/* Add this where you want to show the employee list */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {onboardingEmployees.map((employee) => (
+          <div
+            key={employee._id}
+            className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow cursor-pointer"
+            onClick={() => handleOpenModal(employee)}
+          >
+            <div className="flex items-center space-x-4">
+              <div className="flex-shrink-0">
+                <img
+                  src={`${import.meta.env.VITE_API_URL}/${
+                    employee.profileImage
+                  }`}
+                  alt={`${employee.firstName} ${employee.lastName}`}
+                  className="h-16 w-16 rounded-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = "/default-avatar.png";
+                  }}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-semibold text-gray-900 truncate">
+                  {employee.firstName} {employee.lastName}
+                </h3>
+                <p className="text-sm text-gray-500">{employee.position}</p>
+                <div className="mt-2">
+                  <div className="flex items-center">
+                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full"
+                        style={{ width: `${employee.onboarding.progress}%` }}
+                      />
+                    </div>
+                    <span className="ml-2 text-sm text-gray-600">
+                      {employee.onboarding.progress}%
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-2 text-sm text-gray-500">
+                  <p>
+                    Department:{" "}
+                    {typeof employee.department === "string"
+                      ? employee.department
+                      : employee.department?.name}
+                  </p>
+                  <p>Status: {employee.onboarding.status}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Add the modal */}
+      {selectedEmployee && (
+        <OnboardingDetailsModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          employee={selectedEmployee}
+          onTaskComplete={fetchData}
+        />
+      )}
     </motion.div>
   );
 }

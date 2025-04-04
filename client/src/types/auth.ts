@@ -163,7 +163,13 @@ export interface User {
   phone: string;
   role: UserRole;
   permissions: Permission[];
-  department: string | Department;
+  department:
+    | string
+    | {
+        _id: string;
+        name: string;
+        code: string;
+      };
   position: string;
   gradeLevel: string;
   workLocation: string;
@@ -180,6 +186,7 @@ export interface User {
     accountName: string;
   };
   profileImage?: string;
+  profileImageUrl?: string;
   reportingTo?: string;
   isEmailVerified: boolean;
   lastLogin?: Date;

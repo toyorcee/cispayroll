@@ -70,37 +70,31 @@ export class InvitationController {
   static async verifyInvitation(req, res) {
     try {
       const { token } = req.params;
-      console.log("Verifying token:", token);
 
-      // Find user by invitationToken directly
       const user = await UserModel.findOne({
         invitationToken: token,
         invitationExpires: { $gt: new Date() },
         status: "pending",
-      });
+      }).select("email firstName lastName department");
 
       if (!user) {
-        console.log("No user found with token");
         return res.status(400).json({
           success: false,
           message: "Invalid or expired invitation token",
         });
       }
 
-      console.log("User found:", user.email);
       res.status(200).json({
         success: true,
-        userData: {
+        message: "Invitation token is valid",
+        user: {
+          email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          email: user.email,
-          employeeId: user.employeeId,
-          position: user.position,
           department: user.department,
         },
       });
     } catch (error) {
-      console.error("Verification error:", error);
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
     }
@@ -109,10 +103,14 @@ export class InvitationController {
   static async completeRegistration(req, res) {
     try {
       const { token, password, confirmPassword } = req.body;
+
+      // Parse nested objects
+      const personalDetails = JSON.parse(req.body.personalDetails);
       const emergencyContact = JSON.parse(req.body.emergencyContact);
       const bankDetails = JSON.parse(req.body.bankDetails);
       const profileImage = req.file?.path;
 
+      // Validate password
       if (password !== confirmPassword) {
         throw new ApiError(400, "Passwords do not match");
       }
@@ -121,28 +119,57 @@ export class InvitationController {
         throw new ApiError(400, "Password must be at least 8 characters long");
       }
 
+      // Find and validate user
       const user = await UserModel.findOne({
         invitationToken: token,
         invitationExpires: { $gt: new Date() },
         status: "pending",
-      });
+      }).populate("department", "name code");
 
       if (!user) {
         throw new ApiError(400, "Invalid or expired invitation token");
       }
 
-      // Update user with all fields
+      // Update user data
       user.password = await bcrypt.hash(password, 10);
       user.status = "active";
       user.isEmailVerified = true;
-      user.emergencyContact = emergencyContact;
-      user.bankDetails = bankDetails;
 
+      // Update nested objects
+      user.personalDetails = {
+        ...user.personalDetails,
+        ...personalDetails,
+        address: {
+          ...user.personalDetails?.address,
+          ...personalDetails.address,
+        },
+        nextOfKin: {
+          ...user.personalDetails?.nextOfKin,
+          ...personalDetails.nextOfKin,
+          address: {
+            ...user.personalDetails?.nextOfKin?.address,
+            ...personalDetails.nextOfKin?.address,
+          },
+        },
+        qualifications: personalDetails.qualifications || [],
+      };
+
+      user.emergencyContact = {
+        ...user.emergencyContact,
+        ...emergencyContact,
+      };
+
+      user.bankDetails = {
+        ...user.bankDetails,
+        ...bankDetails,
+      };
+
+      // Handle profile image
       if (profileImage) {
-        user.profileImage = profileImage;
+        user.profileImage = profileImage.replace(/\\/g, "/");
       }
 
-      // Initialize onboarding when user becomes active
+      // Initialize onboarding
       user.onboarding = {
         status: OnboardingStatus.NOT_STARTED,
         tasks: [
@@ -162,7 +189,7 @@ export class InvitationController {
 
       await user.save();
 
-      // Generate JWT token for immediate login
+      // Generate JWT token
       const authToken = jwt.sign(
         { id: user._id, role: user.role },
         process.env.JWT_SECRET,
@@ -180,6 +207,11 @@ export class InvitationController {
           email: user.email,
           employeeId: user.employeeId,
           role: user.role,
+          department: {
+            _id: user.department._id,
+            name: user.department.name,
+            code: user.department.code,
+          },
         },
       });
     } catch (error) {
