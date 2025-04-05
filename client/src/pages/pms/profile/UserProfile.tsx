@@ -86,9 +86,9 @@ export default function UserProfile() {
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/employees/profile/image`,
         {
-          method: "POST",
+        method: "POST",
           credentials: "include",
-          body: formData,
+        body: formData,
         }
       );
 
@@ -272,8 +272,8 @@ export default function UserProfile() {
           <div className="w-full lg:w-1/3">
             <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-300 border border-gray-100">
               <Box className="flex flex-col items-center mb-4 sm:mb-6">
-                <div className="relative">
-                  <Avatar
+              <div className="relative">
+                <Avatar
                     src={
                       userDetails?.profileImageUrl ||
                       (userDetails?.profileImage
@@ -284,119 +284,119 @@ export default function UserProfile() {
                       "/default-avatar.png"
                     }
                     alt={`${userDetails?.firstName} ${userDetails?.lastName}`}
-                    sx={{
+                  sx={{
                       width: { xs: 100, sm: 120 },
                       height: { xs: 100, sm: 120 },
-                      mb: 2,
-                      border: "4px solid #fff",
-                      boxShadow: "0 0 20px rgba(0,0,0,0.1)",
-                      cursor: canEditProfile ? "pointer" : "default",
+                    mb: 2,
+                    border: "4px solid #fff",
+                    boxShadow: "0 0 20px rgba(0,0,0,0.1)",
+                    cursor: canEditProfile ? "pointer" : "default",
                       backgroundColor: "#e5e7eb",
-                    }}
-                    onClick={canEditProfile ? handleImageClick : undefined}
+                  }}
+                  onClick={canEditProfile ? handleImageClick : undefined}
                   >
                     {!userDetails?.profileImageUrl &&
                       !userDetails?.profileImage &&
                       `${userDetails?.firstName?.[0]}${userDetails?.lastName?.[0]}`}
                   </Avatar>
 
-                  {canEditProfile && (
-                    <>
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleImageUpload}
-                        accept="image/jpeg,image/png,image/gif"
-                        style={{ display: "none" }}
-                      />
-                      <Tooltip title="Update Photo">
-                        <IconButton
-                          size="small"
-                          className="absolute bottom-0 right-0 bg-green-50 hover:bg-green-100 shadow-md"
-                          sx={{
-                            border: "2px solid #fff",
-                            "&:hover": {
-                              backgroundColor: "#f0fdf4",
-                            },
-                          }}
-                          onClick={handleImageClick}
-                          disabled={isUploading}
-                        >
-                          {isUploading ? (
+                {canEditProfile && (
+                  <>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImageUpload}
+                      accept="image/jpeg,image/png,image/gif"
+                      style={{ display: "none" }}
+                    />
+                    <Tooltip title="Update Photo">
+                      <IconButton
+                        size="small"
+                        className="absolute bottom-0 right-0 bg-green-50 hover:bg-green-100 shadow-md"
+                        sx={{
+                          border: "2px solid #fff",
+                          "&:hover": {
+                            backgroundColor: "#f0fdf4",
+                          },
+                        }}
+                        onClick={handleImageClick}
+                        disabled={isUploading}
+                      >
+                        {isUploading ? (
                             <CircularProgress
                               size={16}
                               className="text-green-600"
                             />
-                          ) : (
-                            <EditIcon className="text-green-600 w-4 h-4" />
-                          )}
-                        </IconButton>
-                      </Tooltip>
-                    </>
-                  )}
-                </div>
-                <Typography
-                  variant="h5"
+                        ) : (
+                          <EditIcon className="text-green-600 w-4 h-4" />
+                        )}
+                      </IconButton>
+                    </Tooltip>
+                  </>
+                )}
+              </div>
+              <Typography
+                variant="h5"
                   className="text-gray-800 font-semibold mt-4 text-base sm:text-lg md:text-xl text-center"
-                >
+              >
                   {userDetails?.firstName} {userDetails?.lastName}
-                </Typography>
+              </Typography>
                 <Typography
                   variant="body2"
                   className="text-gray-500 text-sm sm:text-base"
                 >
                   {userDetails?.role}
-                </Typography>
-              </Box>
+              </Typography>
+            </Box>
 
               <Divider className="my-3 sm:my-4" />
 
               <Box className="space-y-3 sm:space-y-4">
                 <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
                   <EmailIcon className="text-green-600 text-base sm:text-lg" />
-                  <div>
+                <div>
                     <Typography
                       variant="caption"
                       className="text-gray-500 text-xs sm:text-sm"
                     >
-                      Email
-                    </Typography>
+                    Email
+                  </Typography>
                     <Typography
                       variant="body2"
                       className="text-gray-700 text-sm sm:text-base break-all"
                     >
                       {userDetails?.email}
-                    </Typography>
-                  </div>
+                  </Typography>
                 </div>
+              </div>
 
                 <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
                   <PhoneIcon className="text-green-600 text-base sm:text-lg" />
-                  <div>
+                <div>
                     <Typography
                       variant="caption"
                       className="text-gray-500 text-xs sm:text-sm"
                     >
-                      Phone
-                    </Typography>
+                    Phone
+                  </Typography>
                     <Typography
                       variant="body2"
                       className="text-gray-700 text-sm sm:text-base"
                     >
                       {userDetails?.phone}
-                    </Typography>
-                  </div>
+                  </Typography>
                 </div>
+              </div>
 
                 <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
                   <LocationIcon className="text-green-600 text-base sm:text-lg" />
-                  <div>
+                <div>
                     <Typography
                       variant="caption"
                       className="text-gray-500 text-xs sm:text-sm"
                     >
                       Address
-                    </Typography>
+                  </Typography>
                     <Typography
                       variant="body2"
                       className="text-gray-700 text-sm sm:text-base"
@@ -404,9 +404,9 @@ export default function UserProfile() {
                       {userDetails?.personalDetails?.address?.street},
                       {userDetails?.personalDetails?.address?.city},
                       {userDetails?.personalDetails?.address?.state}
-                    </Typography>
-                  </div>
+                  </Typography>
                 </div>
+              </div>
 
                 {canEditProfile && (
                   <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
@@ -431,13 +431,13 @@ export default function UserProfile() {
 
                 <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
                   <EmergencyIcon className="text-green-600 text-base sm:text-lg" />
-                  <div>
-                    <Typography
-                      variant="caption"
+                        <div>
+                          <Typography
+                            variant="caption"
                       className="text-gray-500 text-xs sm:text-sm"
-                    >
+                          >
                       Emergency Contact
-                    </Typography>
+                          </Typography>
                     <Typography
                       variant="body2"
                       className="text-gray-700 text-sm sm:text-base"
@@ -446,31 +446,82 @@ export default function UserProfile() {
                       {userDetails?.emergencyContact?.relationship})
                       <br />
                       {userDetails?.emergencyContact?.phone}
+                          </Typography>
+                        </div>
+                      </div>
+
+                <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                  <BadgeIcon className="text-green-600 text-base sm:text-lg" />
+                        <div>
+                          <Typography
+                            variant="caption"
+                      className="text-gray-500 text-xs sm:text-sm"
+                          >
+                      Personal Information
+                          </Typography>
+                    <Typography
+                      variant="body2"
+                      className="text-gray-700 text-sm sm:text-base"
+                    >
+                      {userDetails?.personalDetails?.middleName && (
+                        <div>
+                          Middle Name: {userDetails.personalDetails.middleName}
+                        </div>
+                      )}
+                      <div>
+                        Date of Birth:{" "}
+                        {userDetails?.personalDetails?.dateOfBirth
+                          ? new Date(
+                              userDetails.personalDetails.dateOfBirth
+                            ).toLocaleDateString("en-US", {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })
+                          : "Not set"}
+                      </div>
+                      <div>
+                        Marital Status:{" "}
+                        {userDetails?.personalDetails?.maritalStatus
+                          ? userDetails.personalDetails.maritalStatus
+                              .charAt(0)
+                              .toUpperCase() +
+                            userDetails.personalDetails.maritalStatus.slice(1)
+                          : "Not set"}
+                      </div>
+                      <div>
+                        Nationality:{" "}
+                        {userDetails?.personalDetails?.nationality || "Not set"}
+                      </div>
                     </Typography>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
-                  <SchoolIcon className="text-green-600 text-base sm:text-lg" />
+                  <LocationIcon className="text-green-600 text-base sm:text-lg" />
                   <div>
                     <Typography
                       variant="caption"
                       className="text-gray-500 text-xs sm:text-sm"
                     >
-                      Education
+                      Full Address
                     </Typography>
-                    {userDetails?.personalDetails?.qualifications?.map(
-                      (qual: Qualification, index: number) => (
-                        <Typography
-                          key={qual.id || index}
-                          variant="body2"
-                          className="text-gray-700 text-sm sm:text-base"
-                        >
-                          {qual.highestEducation} - {qual.institution} (
-                          {qual.yearGraduated})
-                        </Typography>
-                      )
-                    )}
+                    <Typography
+                      variant="body2"
+                      className="text-gray-700 text-sm sm:text-base"
+                    >
+                      {userDetails?.personalDetails?.address ? (
+                        <>
+                          {userDetails.personalDetails.address.street},<br />
+                          {userDetails.personalDetails.address.city},<br />
+                          {userDetails.personalDetails.address.state},<br />
+                          {userDetails.personalDetails.address.country}{" "}
+                          {userDetails.personalDetails.address.zipCode}
+                        </>
+                      ) : (
+                        "Address not set"
+                      )}
+                    </Typography>
                   </div>
                 </div>
               </Box>
@@ -573,8 +624,8 @@ export default function UserProfile() {
                         </Typography>
                       </div>
                     </div>
-                  </div>
-                </div>
+                      </div>
+                    </div>
 
                 {/* Right column */}
                 <div className="w-full sm:w-1/2">
@@ -672,9 +723,9 @@ export default function UserProfile() {
                 </div>
               </div>
             </Card>
-          </div>
-        </div>
-      )}
+                    </div>
+                  </div>
+                )}
     </div>
   );
 }

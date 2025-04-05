@@ -627,3 +627,38 @@ export interface LineChartData {
   labels: string[];
   datasets: LineChartDataset[];
 }
+
+export interface PayrollResponse {
+  success: boolean;
+  data: {
+    payrolls: PayrollData[];
+    pagination: {
+      total: number;
+      page: number;
+      pages: number;
+    };
+    summary: {
+      frequencyTotals: Array<{
+        _id: string;
+        totalNetPay: number;
+        totalGrossPay: number;
+        totalDeductions: number;
+        count: number;
+        paidCount: number;
+        approvedCount: number;
+        pendingCount: number;
+      }>;
+      statusBreakdown: Array<{
+        _id: string;
+        count: number;
+        totalNetPay: number;
+      }>;
+      departmentBreakdown: Array<{
+        _id: string;
+        count: number;
+        totalNetPay: number;
+        departmentName: string;
+      }>;
+    };
+  };
+}

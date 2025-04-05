@@ -17,6 +17,7 @@ import {
   PayrollStatus,
   PayrollData,
   PayrollFilters,
+  PayrollResponse,
 } from "../../../types/payroll";
 import { toast } from "react-toastify";
 import { payrollService } from "../../../services/payrollService";
@@ -107,16 +108,17 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
   });
 
   // Use the same query as ProcessPayroll page
-  const { data: payrollsData, isLoading: isPayrollsLoading } = useQuery({
-    queryKey: ["payrolls", filters],
-    queryFn: () => payrollService.getAllPayrolls(filters),
-  });
+  const { data: payrollsData, isLoading: isPayrollsLoading } =
+    useQuery<PayrollResponse>({
+      queryKey: ["payrolls", filters],
+      queryFn: () => payrollService.getAllPayrolls(filters),
+    });
 
   // Calculate summary from filtered payrolls
   const summary = {
-    totalEmployees: payrollsData?.payrolls?.length || 0,
+    totalEmployees: payrollsData?.data?.payrolls?.length || 0,
     totalNetPay:
-      payrollsData?.payrolls
+      payrollsData?.data?.payrolls
         ?.filter(
           (p: PayrollData) =>
             p.status === PayrollStatus.APPROVED ||
@@ -127,7 +129,7 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
           0
         ) || 0,
     totalBasicSalary:
-      payrollsData?.payrolls
+      payrollsData?.data?.payrolls
         ?.filter(
           (p: PayrollData) =>
             p.status === PayrollStatus.APPROVED ||
@@ -138,7 +140,7 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
           0
         ) || 0,
     totalAllowances:
-      payrollsData?.payrolls
+      payrollsData?.data?.payrolls
         ?.filter(
           (p: PayrollData) =>
             p.status === PayrollStatus.APPROVED ||
@@ -150,7 +152,7 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
           0
         ) || 0,
     totalDeductions:
-      payrollsData?.payrolls
+      payrollsData?.data?.payrolls
         ?.filter(
           (p: PayrollData) =>
             p.status === PayrollStatus.APPROVED ||
@@ -162,7 +164,7 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
           0
         ) || 0,
     statusBreakdown:
-      payrollsData?.payrolls?.reduce(
+      payrollsData?.data?.payrolls?.reduce(
         (acc: Record<PayrollStatus, number>, p: PayrollData) => {
           acc[p.status] = (acc[p.status] || 0) + 1;
           return acc;
@@ -276,50 +278,45 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {payrollsData?.payrolls.map((row: PayrollData) => (
-                    <TableRow key={row._id} hover>
+                  {(payrollsData?.data?.payrolls ?? []).map((payroll) => (
+                    <TableRow key={payroll._id} className="hover:bg-gray-50">
                       <TableCell>
-                        <div>
-                          <div className="font-medium text-sm">
-                            {row.employee.fullName}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {row.employee.employeeId}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{row.department.name}</TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium text-sm">
-                            {row.salaryGrade.level}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {row.salaryGrade.description}
-                          </div>
-                        </div>
+                        {payroll.employee?.fullName ?? "Unassigned"}
                       </TableCell>
                       <TableCell>
-                        ₦{row.totals.basicSalary.toLocaleString()}
+                        {payroll.employee?.employeeId ?? "No ID"}
                       </TableCell>
                       <TableCell>
-                        ₦{row.totals.totalAllowances.toLocaleString()}
+                        {payroll.department?.name ?? "Unassigned"}
                       </TableCell>
                       <TableCell>
-                        ₦{row.totals.totalDeductions.toLocaleString()}
+                        {payroll.salaryGrade?.level ?? "N/A"}
                       </TableCell>
                       <TableCell>
-                        ₦{row.totals.netPay.toLocaleString()}
+                        {payroll.totals.basicSalary?.toLocaleString() ?? "N/A"}
+                      </TableCell>
+                      <TableCell>
+                        {payroll.totals.totalAllowances?.toLocaleString() ??
+                          "N/A"}
+                      </TableCell>
+                      <TableCell>
+                        {payroll.totals.totalDeductions?.toLocaleString() ??
+                          "N/A"}
+                      </TableCell>
+                      <TableCell>
+                        {payroll.totals.netPay?.toLocaleString() ?? "N/A"}
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={row.status}
-                          color={getChipColor(row.status)}
+                          label={payroll.status}
+                          color={getChipColor(payroll.status)}
                           size="small"
                         />
                       </TableCell>
                       <TableCell className="min-w-[200px]">
-                        <ActionButtons employeeId={row.employee._id} />
+                        <ActionButtons
+                          employeeId={payroll.employee?._id ?? ""}
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -333,7 +330,7 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
             <TablePagination
               rowsPerPageOptions={[5, 10, 25]}
               component="div"
-              count={payrollsData?.pagination?.total || 0}
+              count={payrollsData?.data?.pagination?.total || 0}
               rowsPerPage={filters.limit}
               page={filters.page - 1}
               onPageChange={(_, newPage) =>
@@ -343,7 +340,7 @@ const PayrollPeriodModal: React.FC<PayrollPeriodModalProps> = ({
                 setFilters((prev) => ({
                   ...prev,
                   limit: parseInt(event.target.value, 10),
-                  page: 1, // Reset to first page when changing rows per page
+                  page: 1,
                 }))
               }
               size="small"

@@ -301,7 +301,7 @@ export default function ProcessPayroll() {
   const monthlyComparisonData = {
     labels: Array.from(
       new Set(
-        payrollsData?.payrolls
+        payrollsData?.data?.payrolls
           ?.filter(
             (payroll: PayrollData) =>
               payroll.status === PayrollStatus.APPROVED ||
@@ -320,7 +320,7 @@ export default function ProcessPayroll() {
         label: "Total Net Pay",
         data: Array.from<string>(
           new Set<string>(
-            payrollsData?.payrolls
+            payrollsData?.data?.payrolls
               ?.filter(
                 (payroll: PayrollData) =>
                   payroll.status === PayrollStatus.APPROVED ||
@@ -338,7 +338,7 @@ export default function ProcessPayroll() {
         ).map((monthYear: string) => {
           const [month, year] = monthYear.split("-");
           return (
-            payrollsData?.payrolls
+            payrollsData?.data?.payrolls
               ?.filter(
                 (p: PayrollData) =>
                   (p.status === PayrollStatus.APPROVED ||
@@ -356,10 +356,10 @@ export default function ProcessPayroll() {
               ) || 0
           );
         }),
-        borderColor: Array(payrollsData?.payrolls?.length || 0).fill(
+        borderColor: Array(payrollsData?.data?.payrolls?.length || 0).fill(
           "rgb(34, 197, 94)"
         ),
-        backgroundColor: Array(payrollsData?.payrolls?.length || 0).fill(
+        backgroundColor: Array(payrollsData?.data?.payrolls?.length || 0).fill(
           "rgba(34, 197, 94, 0.8)"
         ),
         borderWidth: 2,
@@ -388,10 +388,12 @@ export default function ProcessPayroll() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {payrollsData?.payrolls?.length > 0 ? (
-              payrollsData?.payrolls?.map((payroll: PayrollData) => (
+            {(payrollsData?.data?.payrolls ?? []).length > 0 ? (
+              payrollsData?.data?.payrolls?.map((payroll: PayrollData) => (
                 <TableRow key={payroll._id} className="hover:bg-gray-50">
-                  <TableCell>{payroll.employee.fullName}</TableCell>
+                  <TableCell>
+                    {payroll.employee?.fullName ?? "Unassigned"}
+                  </TableCell>
                   <TableCell>{payroll.salaryGrade.level}</TableCell>
                   <TableCell>{formatCurrency(payroll.totals.netPay)}</TableCell>
                   <TableCell>
@@ -410,10 +412,11 @@ export default function ProcessPayroll() {
                     <div className="flex items-center justify-center space-x-2">
                       <button
                         onClick={() =>
-                          handleViewEmployeeHistory(payroll.employee._id)
+                          handleViewEmployeeHistory(payroll.employee?._id ?? "")
                         }
                         className="text-blue-600 hover:text-blue-800"
                         title="View History"
+                        disabled={!payroll.employee}
                       >
                         <FaHistory />
                       </button>
@@ -486,7 +489,7 @@ export default function ProcessPayroll() {
         </Table>
       </TableContainer>
 
-      {payrollsData?.pagination && (
+      {payrollsData?.data?.pagination && (
         <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200 sm:px-6 rounded-b-lg">
           <div className="flex justify-between flex-1 sm:hidden">
             <button
@@ -498,7 +501,7 @@ export default function ProcessPayroll() {
             </button>
             <button
               onClick={() => handlePageChange(filters.page + 1)}
-              disabled={filters.page === payrollsData.pagination.pages}
+              disabled={filters.page === payrollsData?.data?.pagination?.pages}
               className="relative inline-flex items-center px-4 py-2 ml-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next
@@ -515,12 +518,12 @@ export default function ProcessPayroll() {
               <span className="font-medium">
                 {Math.min(
                   filters.page * filters.limit,
-                  payrollsData.pagination.total
+                  payrollsData?.data?.pagination?.total
                 )}
               </span>{" "}
               of{" "}
               <span className="font-medium">
-                {payrollsData.pagination.total}
+                {payrollsData?.data?.pagination?.total}
               </span>{" "}
               results
             </p>
@@ -538,7 +541,7 @@ export default function ProcessPayroll() {
               <span className="sr-only">Previous</span>
               <FaChevronLeft className="h-5 w-5" aria-hidden="true" />
             </button>
-            {[...Array(payrollsData.pagination.pages)].map((_, i) => (
+            {[...Array(payrollsData?.data?.pagination?.pages)].map((_, i) => (
               <button
                 key={i + 1}
                 onClick={() => handlePageChange(i + 1)}
@@ -553,7 +556,7 @@ export default function ProcessPayroll() {
             ))}
             <button
               onClick={() => handlePageChange(filters.page + 1)}
-              disabled={filters.page === payrollsData.pagination.pages}
+              disabled={filters.page === payrollsData?.data?.pagination?.pages}
               className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="sr-only">Next</span>
@@ -652,14 +655,17 @@ export default function ProcessPayroll() {
 
   const handleApproveClick = (payrollId: string) => {
     queryClient.setQueryData(["payrolls", filters], (oldData: any) => {
-      if (!oldData?.payrolls) return oldData;
+      if (!oldData?.data?.payrolls) return oldData;
       return {
         ...oldData,
-        payrolls: oldData.payrolls.map((payroll: PayrollData) =>
-          payroll._id === payrollId
-            ? { ...payroll, status: PayrollStatus.APPROVED }
-            : payroll
-        ),
+        data: {
+          ...oldData.data,
+          payrolls: oldData.data.payrolls.map((payroll: PayrollData) =>
+            payroll._id === payrollId
+              ? { ...payroll, status: PayrollStatus.APPROVED }
+              : payroll
+          ),
+        },
       };
     });
 
@@ -683,14 +689,17 @@ export default function ProcessPayroll() {
   const handleConfirmReject = () => {
     if (selectedPayrollId) {
       queryClient.setQueryData(["payrolls", filters], (oldData: any) => {
-        if (!oldData?.payrolls) return oldData;
+        if (!oldData?.data?.payrolls) return oldData;
         return {
           ...oldData,
-          payrolls: oldData.payrolls.map((payroll: PayrollData) =>
-            payroll._id === selectedPayrollId
-              ? { ...payroll, status: PayrollStatus.REJECTED }
-              : payroll
-          ),
+          data: {
+            ...oldData.data,
+            payrolls: oldData.data.payrolls.map((payroll: PayrollData) =>
+              payroll._id === selectedPayrollId
+                ? { ...payroll, status: PayrollStatus.REJECTED }
+                : payroll
+            ),
+          },
         };
       });
 
@@ -707,14 +716,17 @@ export default function ProcessPayroll() {
   const handleSubmitForApproval = async (payrollId: string) => {
     try {
       queryClient.setQueryData(["payrolls", filters], (oldData: any) => {
-        if (!oldData?.payrolls) return oldData;
+        if (!oldData?.data?.payrolls) return oldData;
         return {
           ...oldData,
-          payrolls: oldData.payrolls.map((payroll: PayrollData) =>
-            payroll._id === payrollId
-              ? { ...payroll, status: PayrollStatus.PENDING }
-              : payroll
-          ),
+          data: {
+            ...oldData.data,
+            payrolls: oldData.data.payrolls.map((payroll: PayrollData) =>
+              payroll._id === payrollId
+                ? { ...payroll, status: PayrollStatus.PENDING }
+                : payroll
+            ),
+          },
         };
       });
 
@@ -756,7 +768,7 @@ export default function ProcessPayroll() {
       {
         data: Object.values(PayrollStatus).map(
           (status) =>
-            payrollsData?.summary?.statusBreakdown?.find(
+            payrollsData?.data?.summary?.statusBreakdown?.find(
               (s: StatusBreakdown) => s._id === status
             )?.count || 0
         ),
@@ -777,7 +789,7 @@ export default function ProcessPayroll() {
   const employeeTrendsData = {
     labels: Array.from(
       new Set(
-        payrollsData?.payrolls?.map((payroll: PayrollData) => {
+        payrollsData?.data?.payrolls?.map((payroll: PayrollData) => {
           const date = new Date(payroll.processedDate || new Date());
           return `${date.toLocaleString("default", {
             month: "short",
@@ -790,7 +802,7 @@ export default function ProcessPayroll() {
         label: "Employee Count",
         data: Array.from<string>(
           new Set<string>(
-            payrollsData?.payrolls?.map(
+            payrollsData?.data?.payrolls?.map(
               (p: PayrollData) =>
                 `${new Date(
                   p.processedDate || new Date()
@@ -802,7 +814,7 @@ export default function ProcessPayroll() {
         ).map((monthYear: string) => {
           const [month, year] = monthYear.split("-");
           return (
-            payrollsData?.payrolls?.filter(
+            payrollsData?.data?.payrolls?.filter(
               (p: PayrollData) =>
                 new Date(p.processedDate || new Date())
                   .getMonth()
@@ -846,7 +858,7 @@ export default function ProcessPayroll() {
           icon={<FaMoneyBill className="h-6 w-6 text-green-600" />}
           title="Total Payroll Amount"
           value={formatCurrency(
-            payrollsData?.summary?.frequencyTotals?.reduce(
+            payrollsData?.data?.summary?.frequencyTotals?.reduce(
               (sum: number, freq: FrequencyTotal) =>
                 sum + (freq.totalNetPay || 0),
               0
@@ -858,7 +870,7 @@ export default function ProcessPayroll() {
           icon={<FaFileAlt className="h-6 w-6 text-yellow-600" />}
           title="Drafts to Process"
           value={
-            payrollsData?.payrolls
+            payrollsData?.data?.payrolls
               ?.filter(
                 (payroll: PayrollData) => payroll.status === PayrollStatus.DRAFT
               )
@@ -870,7 +882,7 @@ export default function ProcessPayroll() {
           icon={<FaExclamationTriangle className="h-6 w-6 text-orange-600" />}
           title="Pending Reviews"
           value={
-            payrollsData?.summary?.statusBreakdown
+            payrollsData?.data?.summary?.statusBreakdown
               ?.find((status: StatusBreakdown) => status._id === "PENDING")
               ?.count.toString() || "0"
           }
@@ -899,7 +911,7 @@ export default function ProcessPayroll() {
             data={{
               labels: Array.from(
                 new Set(
-                  payrollsData?.payrolls?.map((payroll: PayrollData) => {
+                  payrollsData?.data?.payrolls?.map((payroll: PayrollData) => {
                     const date = new Date(payroll.processedDate || new Date());
                     return `${date.toLocaleString("default", {
                       month: "short",
@@ -912,7 +924,7 @@ export default function ProcessPayroll() {
                   label: "Paid Amount",
                   data: Array.from<string>(
                     new Set<string>(
-                      payrollsData?.payrolls?.map(
+                      payrollsData?.data?.payrolls?.map(
                         (p: PayrollData) =>
                           `${new Date(
                             p.processedDate || new Date()
@@ -924,7 +936,7 @@ export default function ProcessPayroll() {
                   ).map((monthYear: string) => {
                     const [month, year] = monthYear.split("-");
                     return (
-                      payrollsData?.payrolls
+                      payrollsData?.data?.payrolls
                         ?.filter(
                           (p: PayrollData) =>
                             new Date(p.processedDate || new Date())
@@ -950,7 +962,7 @@ export default function ProcessPayroll() {
                   label: "Approved Amount",
                   data: Array.from<string>(
                     new Set<string>(
-                      payrollsData?.payrolls?.map(
+                      payrollsData?.data?.payrolls?.map(
                         (p: PayrollData) =>
                           `${new Date(
                             p.processedDate || new Date()
@@ -962,7 +974,7 @@ export default function ProcessPayroll() {
                   ).map((monthYear: string) => {
                     const [month, year] = monthYear.split("-");
                     return (
-                      payrollsData?.payrolls
+                      payrollsData?.data?.payrolls
                         ?.filter(
                           (p: PayrollData) =>
                             new Date(p.processedDate || new Date())
@@ -988,7 +1000,7 @@ export default function ProcessPayroll() {
                   label: "Rejected Amount",
                   data: Array.from<string>(
                     new Set<string>(
-                      payrollsData?.payrolls?.map(
+                      payrollsData?.data?.payrolls?.map(
                         (p: PayrollData) =>
                           `${new Date(
                             p.processedDate || new Date()
@@ -1000,7 +1012,7 @@ export default function ProcessPayroll() {
                   ).map((monthYear: string) => {
                     const [month, year] = monthYear.split("-");
                     return (
-                      payrollsData?.payrolls
+                      payrollsData?.data?.payrolls
                         ?.filter(
                           (p: PayrollData) =>
                             new Date(p.processedDate || new Date())

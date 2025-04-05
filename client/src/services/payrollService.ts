@@ -8,6 +8,7 @@ import type {
   PayrollData,
   PayrollStats,
   PeriodPayrollResponse,
+  PayrollResponse,
 } from "../types/payroll";
 import { salaryStructureService } from "./salaryStructureService";
 
@@ -218,7 +219,9 @@ export const payrollService = {
   },
 
   // Payroll Queries
-  getAllPayrolls: async (filters?: PayrollFilters) => {
+  getAllPayrolls: async (
+    filters?: PayrollFilters
+  ): Promise<PayrollResponse> => {
     try {
       const params = new URLSearchParams();
       if (filters) {
@@ -234,20 +237,7 @@ export const payrollService = {
         throw new Error(response.data.message || "Failed to fetch payrolls");
       }
 
-      // Ensure we always return the expected data structure
-      return {
-        payrolls: response.data.data.payrolls || [],
-        pagination: response.data.data.pagination || {
-          total: 0,
-          page: 1,
-          pages: 1,
-        },
-        summary: response.data.data.summary || {
-          frequencyTotals: [],
-          statusBreakdown: [],
-          departmentBreakdown: [],
-        },
-      };
+      return response.data;
     } catch (error) {
       console.error("❌ Error fetching payrolls:", error);
       const errorMessage =

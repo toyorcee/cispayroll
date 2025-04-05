@@ -154,6 +154,27 @@ export interface Department {
   updatedAt: Date;
 }
 
+export interface PersonalDetails {
+  address: {
+    street: string;
+    city: string;
+    state: string;
+    country: string;
+    zipCode: string;
+  };
+  middleName?: string;
+  dateOfBirth: string;
+  maritalStatus: string;
+  nationality: string;
+  qualifications: Array<{
+    highestEducation: string;
+    institution: string;
+    yearGraduated: string;
+    _id: string;
+    id: string;
+  }>;
+}
+
 export interface User {
   _id: string;
   employeeId: string;
@@ -192,4 +213,5 @@ export interface User {
   lastLogin?: Date;
   createdAt: Date;
   updatedAt: Date;
+  personalDetails?: PersonalDetails;
 }

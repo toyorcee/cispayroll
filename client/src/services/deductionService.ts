@@ -116,10 +116,7 @@ export const deductionService = {
 
   toggleDeductionStatus: async (
     id: string
-  ): Promise<{
-    deduction: Deduction;
-    allDeductions: { statutory: Deduction[]; voluntary: Deduction[] };
-  }> => {
+  ): Promise<{ deduction: Deduction }> => {
     try {
       const response = await axios.patch(
         `${BASE_URL}/super-admin/deductions/${id}/toggle`

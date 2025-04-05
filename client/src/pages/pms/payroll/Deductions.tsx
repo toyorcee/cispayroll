@@ -83,10 +83,17 @@ export default function Deductions() {
   const handleToggleStatus = async (id: string) => {
     try {
       setIsLoading(true);
-      const { allDeductions } = await deductionService.toggleDeductionStatus(
-        id
-      );
-      setDeductions(allDeductions);
+      const { deduction } = await deductionService.toggleDeductionStatus(id);
+
+      // Update only the specific deduction in the state
+      setDeductions((prevDeductions) => ({
+        statutory: prevDeductions.statutory.map((d) =>
+          d._id === id ? { ...d, isActive: deduction.isActive } : d
+        ),
+        voluntary: prevDeductions.voluntary.map((d) =>
+          d._id === id ? { ...d, isActive: deduction.isActive } : d
+        ),
+      }));
     } catch (error) {
       console.error("Toggle status failed:", error);
     } finally {

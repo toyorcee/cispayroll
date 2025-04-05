@@ -346,28 +346,12 @@ export class DeductionService {
         throw new ApiError(404, "Deduction not found");
       }
 
-      // Fetch all deductions after toggle
-      const allDeductions = await Deduction.find();
-
-      const result = {
-        deduction,
-        allDeductions: {
-          statutory: allDeductions.filter(
-            (d) => d.type === DeductionType.STATUTORY
-          ),
-          voluntary: allDeductions.filter(
-            (d) => d.type === DeductionType.VOLUNTARY
-          ),
-        },
-      };
-
-      console.log("✅ Toggle complete with all deductions:", {
+      console.log("✅ Toggle complete:", {
         toggledId: deduction._id,
         newStatus: deduction.isActive,
-        totalDeductions: allDeductions.length,
       });
 
-      return result;
+      return { deduction }; // Only return the updated deduction
     } catch (error) {
       console.error("❌ Toggle status failed:", error);
       throw new ApiError(
