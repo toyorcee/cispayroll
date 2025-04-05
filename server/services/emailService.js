@@ -62,7 +62,9 @@ export class EmailService {
                           display: inline-block;
                           transition: all 0.3s ease;
                           font-size: 16px;
-                          box-shadow: 0 2px 4px rgba(22, 163, 74, 0.2);">
+                          box-shadow: 0 2px 4px rgba(22, 163, 74, 0.2);"
+                   target="_blank"
+                   rel="noopener noreferrer">
                   Complete Account Setup
                 </a>
               </div>
@@ -112,7 +114,7 @@ export class EmailService {
         `,
       });
     } catch (error) {
-      console.error("Error sending invitation email:", error);
+      console.error("Failed to send invitation email:", error);
       throw new ApiError(500, "Failed to send invitation email");
     }
   }

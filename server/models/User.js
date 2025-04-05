@@ -98,7 +98,10 @@ export const Permission = {
   MANAGE_BONUSES: "MANAGE_BONUSES",
   VIEW_BONUSES: "VIEW_BONUSES",
   EDIT_BONUSES: "EDIT_BONUSES",
+  CREATE_BONUSES: "CREATE_BONUSES",
+  DELETE_BONUSES: "DELETE_BONUSES",
   MANAGE_OVERTIME: "MANAGE_OVERTIME",
+  VIEW_OWN_BONUS: "VIEW_OWN_BONUS",
 
   // Reports & Analytics
   VIEW_PAYROLL_REPORTS: "VIEW_PAYROLL_REPORTS",
@@ -137,6 +140,29 @@ export const Permission = {
   MANAGE_INTEGRATION_SETTINGS: "MANAGE_INTEGRATION_SETTINGS",
   MANAGE_TAX_SETTINGS: "MANAGE_TAX_SETTINGS",
   MANAGE_COMPLIANCE_SETTINGS: "MANAGE_COMPLIANCE_SETTINGS",
+
+  // Add these new permissions
+  MANAGE_DEPARTMENT_ALLOWANCES: "MANAGE_DEPARTMENT_ALLOWANCES",
+  VIEW_DEPARTMENT_ALLOWANCES: "VIEW_DEPARTMENT_ALLOWANCES",
+  MANAGE_DEPARTMENT_BONUSES: "MANAGE_DEPARTMENT_BONUSES",
+  VIEW_DEPARTMENT_BONUSES: "VIEW_DEPARTMENT_BONUSES",
+
+  // Personal Information
+  UPDATE_PROFILE: "UPDATE_PROFILE",
+  CHANGE_PASSWORD: "CHANGE_PASSWORD",
+
+  // Document Management
+  VIEW_OWN_DOCUMENTS: "VIEW_OWN_DOCUMENTS",
+  UPLOAD_DOCUMENTS: "UPLOAD_DOCUMENTS",
+
+  // Notifications
+  VIEW_NOTIFICATIONS: "VIEW_NOTIFICATIONS",
+  MARK_NOTIFICATIONS_READ: "MARK_NOTIFICATIONS_READ",
+
+  // Feedback
+  SUBMIT_FEEDBACK: "SUBMIT_FEEDBACK",
+  VIEW_OWN_FEEDBACK: "VIEW_OWN_FEEDBACK",
+  MANAGE_FEEDBACK: "MANAGE_FEEDBACK",
 };
 
 export const UserLifecycleState = {
@@ -798,7 +824,10 @@ UserSchema.pre("save", function (next) {
           Permission.MANAGE_BONUSES,
           Permission.VIEW_BONUSES,
           Permission.EDIT_BONUSES,
+          Permission.CREATE_BONUSES,
+          Permission.DELETE_BONUSES,
           Permission.MANAGE_OVERTIME,
+          Permission.VIEW_OWN_BONUS,
 
           // Reports & Analytics
           Permission.VIEW_PAYROLL_REPORTS,
@@ -832,6 +861,12 @@ UserSchema.pre("save", function (next) {
           Permission.MANAGE_INTEGRATION_SETTINGS,
           Permission.MANAGE_TAX_SETTINGS,
           Permission.MANAGE_COMPLIANCE_SETTINGS,
+
+          // Add the new department-specific permissions
+          Permission.MANAGE_DEPARTMENT_ALLOWANCES,
+          Permission.VIEW_DEPARTMENT_ALLOWANCES,
+          Permission.MANAGE_DEPARTMENT_BONUSES,
+          Permission.VIEW_DEPARTMENT_BONUSES,
         ];
         break;
 
@@ -884,6 +919,9 @@ UserSchema.pre("save", function (next) {
 
           // Allowances Management
           Permission.VIEW_ALLOWANCES,
+          Permission.EDIT_ALLOWANCES,
+          Permission.CREATE_ALLOWANCES,
+          Permission.DELETE_ALLOWANCES,
           Permission.APPROVE_ALLOWANCES,
           Permission.VIEW_OWN_ALLOWANCES,
           Permission.REQUEST_ALLOWANCES,
@@ -891,6 +929,20 @@ UserSchema.pre("save", function (next) {
           // Deductions Management
           Permission.VIEW_DEDUCTIONS,
           Permission.EDIT_DEDUCTIONS,
+
+          // Bonuses Management
+          Permission.MANAGE_BONUSES,
+          Permission.VIEW_BONUSES,
+          Permission.EDIT_BONUSES,
+          Permission.CREATE_BONUSES,
+          Permission.DELETE_BONUSES,
+          Permission.MANAGE_OVERTIME,
+          Permission.VIEW_OWN_BONUS,
+
+          // Reports & Analytics
+          Permission.VIEW_PAYROLL_REPORTS,
+          Permission.VIEW_EMPLOYEE_REPORTS,
+          Permission.VIEW_TAX_REPORTS,
 
           // New permissions
           Permission.MANAGE_DEPARTMENT_DEDUCTIONS,
@@ -901,6 +953,17 @@ UserSchema.pre("save", function (next) {
           Permission.MANAGE_USER_SETTINGS,
           Permission.MANAGE_NOTIFICATION_SETTINGS,
           Permission.MANAGE_LEAVE_SETTINGS,
+
+          // Add the new department-specific permissions
+          Permission.MANAGE_DEPARTMENT_ALLOWANCES,
+          Permission.VIEW_DEPARTMENT_ALLOWANCES,
+          Permission.MANAGE_DEPARTMENT_BONUSES,
+          Permission.VIEW_DEPARTMENT_BONUSES,
+
+          // Additional System Settings
+          Permission.MANAGE_SYSTEM_SETTINGS,
+          Permission.MANAGE_PAYROLL_SETTINGS,
+          Permission.MANAGE_DOCUMENT_SETTINGS,
         ];
         break;
 
@@ -908,18 +971,39 @@ UserSchema.pre("save", function (next) {
         this.permissions = [
           // Dashboard Access
           Permission.VIEW_DASHBOARD,
+
+          // Personal Information
           Permission.VIEW_PERSONAL_INFO,
+          Permission.EDIT_PERSONAL_INFO,
+
+          // Leave Management
           Permission.REQUEST_LEAVE,
           Permission.VIEW_OWN_LEAVE,
           Permission.CANCEL_OWN_LEAVE,
+
+          // Payroll Access
           Permission.VIEW_OWN_PAYSLIP,
           Permission.VIEW_OWN_ALLOWANCES,
           Permission.REQUEST_ALLOWANCES,
           Permission.VIEW_OWN_DEDUCTIONS,
+          Permission.VIEW_OWN_BONUS,
 
-          // New permissions
-          Permission.MANAGE_DEPARTMENT_DEDUCTIONS,
-          Permission.VIEW_DEPARTMENT_DEDUCTIONS,
+          // Document Management
+          Permission.VIEW_OWN_DOCUMENTS,
+          Permission.UPLOAD_DOCUMENTS,
+
+          // Notifications
+          Permission.VIEW_NOTIFICATIONS,
+          Permission.MARK_NOTIFICATIONS_READ,
+
+          // Profile Management
+          Permission.UPDATE_PROFILE,
+          Permission.CHANGE_PASSWORD,
+
+          // Feedback
+          Permission.SUBMIT_FEEDBACK,
+          Permission.VIEW_OWN_FEEDBACK,
+          Permission.MANAGE_FEEDBACK,
         ];
         break;
     }

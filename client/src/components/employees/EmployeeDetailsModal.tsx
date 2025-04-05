@@ -25,12 +25,15 @@ export const EmployeeDetailsModal = ({
     : DEFAULT_AVATAR;
 
   const renderDepartmentName = (department: any) => {
+    if (!department) return "No Department";
+
     if (typeof department === "object" && department !== null) {
       return department.name || "No Department";
     }
-    return (
-      departments?.find((d) => d._id === department)?.name || "No Department"
-    );
+
+    // If department is a string (ID), find it in the departments list
+    const foundDepartment = departments?.find((d) => d._id === department);
+    return foundDepartment?.name || "No Department";
   };
 
   return (
@@ -163,7 +166,13 @@ export const EmployeeDetailsModal = ({
                     <div>
                       <p className="text-xs text-gray-500">Employee ID</p>
                       <p className="text-sm font-medium">
-                        {employee.employeeId}
+                        {employee.employeeId || "Not Assigned"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Position</p>
+                      <p className="text-sm font-medium">
+                        {employee.position || "Not Assigned"}
                       </p>
                     </div>
                     <div>

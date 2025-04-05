@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { BaseModal } from "../shared/BaseModal";
-import { Employee } from "../../types/employee";
+import { Employee, Department } from "../../types/employee";
 import { Status } from "../../types/common";
 import { toast } from "react-toastify";
 import { LoadingSpinner } from "../shared/LoadingSpinner";
@@ -9,7 +9,7 @@ interface EmployeeFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   employee?: Employee | null;
-  departments: { id: string; name: string }[];
+  departments: Department[];
   onSubmit: (data: Partial<Employee>) => Promise<void>;
 }
 
@@ -26,7 +26,7 @@ export const EmployeeFormModal = ({
     lastName: "",
     email: "",
     phone: "",
-    department: "",
+    department: undefined,
     position: "",
     gradeLevel: "",
     workLocation: "",
@@ -36,11 +36,26 @@ export const EmployeeFormModal = ({
       bankName: "",
       accountNumber: "",
       accountName: "",
+      bankCode: "",
     },
     emergencyContact: {
       name: "",
       relationship: "",
       phone: "",
+    },
+    personalDetails: {
+      dateOfBirth: "",
+      maritalStatus: "",
+      nationality: "",
+      middleName: "",
+      address: {
+        street: "",
+        city: "",
+        state: "",
+        country: "",
+        zipCode: "",
+      },
+      qualifications: [],
     },
   });
 
@@ -48,6 +63,7 @@ export const EmployeeFormModal = ({
     if (employee) {
       setFormData({
         ...employee,
+        department: employee.department || undefined,
       });
     }
   }, [employee]);
@@ -72,10 +88,19 @@ export const EmployeeFormModal = ({
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+    const { name, value } = e.target;
+    if (name === "department") {
+      const selectedDepartment = departments.find((dept) => dept._id === value);
+      setFormData((prev) => ({
+        ...prev,
+        department: selectedDepartment || undefined,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
   };
 
   return (
@@ -184,6 +209,136 @@ export const EmployeeFormModal = ({
                   className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:!border-green-500 focus:!ring-green-500"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Date of Birth
+                </label>
+                <input
+                  type="date"
+                  name="personalDetails.dateOfBirth"
+                  value={formData.personalDetails?.dateOfBirth || ""}
+                  onChange={handleChange}
+                  required
+                  className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:!border-green-500 focus:!ring-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Marital Status
+                </label>
+                <select
+                  name="personalDetails.maritalStatus"
+                  value={formData.personalDetails?.maritalStatus || ""}
+                  onChange={handleChange}
+                  required
+                  className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:!border-green-500 focus:!ring-green-500"
+                >
+                  <option value="">Select Status</option>
+                  <option value="single">Single</option>
+                  <option value="married">Married</option>
+                  <option value="divorced">Divorced</option>
+                  <option value="widowed">Widowed</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Nationality
+                </label>
+                <input
+                  type="text"
+                  name="personalDetails.nationality"
+                  value={formData.personalDetails?.nationality || ""}
+                  onChange={handleChange}
+                  required
+                  className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:!border-green-500 focus:!ring-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Middle Name
+                </label>
+                <input
+                  type="text"
+                  name="personalDetails.middleName"
+                  value={formData.personalDetails?.middleName || ""}
+                  onChange={handleChange}
+                  className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:!border-green-500 focus:!ring-green-500"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Address Information */}
+          <section className="space-y-6">
+            <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
+              Address Information
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Street Address
+                </label>
+                <input
+                  type="text"
+                  name="personalDetails.address.street"
+                  value={formData.personalDetails?.address?.street || ""}
+                  onChange={handleChange}
+                  required
+                  className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:!border-green-500 focus:!ring-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  City
+                </label>
+                <input
+                  type="text"
+                  name="personalDetails.address.city"
+                  value={formData.personalDetails?.address?.city || ""}
+                  onChange={handleChange}
+                  required
+                  className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:!border-green-500 focus:!ring-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  State
+                </label>
+                <input
+                  type="text"
+                  name="personalDetails.address.state"
+                  value={formData.personalDetails?.address?.state || ""}
+                  onChange={handleChange}
+                  required
+                  className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:!border-green-500 focus:!ring-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Country
+                </label>
+                <input
+                  type="text"
+                  name="personalDetails.address.country"
+                  value={formData.personalDetails?.address?.country || ""}
+                  onChange={handleChange}
+                  required
+                  className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:!border-green-500 focus:!ring-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  ZIP Code
+                </label>
+                <input
+                  type="text"
+                  name="personalDetails.address.zipCode"
+                  value={formData.personalDetails?.address?.zipCode || ""}
+                  onChange={handleChange}
+                  required
+                  className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:!border-green-500 focus:!ring-green-500"
+                />
+              </div>
             </div>
           </section>
 
@@ -199,14 +354,14 @@ export const EmployeeFormModal = ({
                 </label>
                 <select
                   name="department"
-                  value={formData.department}
+                  value={formData.department?._id || ""}
                   onChange={handleChange}
                   required
                   className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:!border-green-500 focus:!ring-green-500"
                 >
                   <option value="">Select Department</option>
                   {departments.map((dept) => (
-                    <option key={dept.id} value={dept.name}>
+                    <option key={dept._id} value={dept._id}>
                       {dept.name}
                     </option>
                   ))}
@@ -286,7 +441,7 @@ export const EmployeeFormModal = ({
                   className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:!border-green-500 focus:!ring-green-500"
                 />
               </div>
-              <div className="col-span-2">
+              <div>
                 <label className="block text-sm font-medium text-gray-700">
                   Account Name
                 </label>
@@ -294,6 +449,19 @@ export const EmployeeFormModal = ({
                   type="text"
                   name="bankDetails.accountName"
                   value={formData.bankDetails?.accountName}
+                  onChange={handleChange}
+                  required
+                  className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:!border-green-500 focus:!ring-green-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Bank Code
+                </label>
+                <input
+                  type="text"
+                  name="bankDetails.bankCode"
+                  value={formData.bankDetails?.bankCode}
                   onChange={handleChange}
                   required
                   className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:!border-green-500 focus:!ring-green-500"

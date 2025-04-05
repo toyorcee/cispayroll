@@ -42,9 +42,19 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Super Admin Access
   if (user.role === UserRole.SUPER_ADMIN) {
-    // Super Admin should not see My Allowances or My Deductions
-    if (path.includes("/my-allowances") || path.includes("/my-deductions")) {
-      toast.error("Access denied: Super Admin cannot access personal views");
+    // Check permissions for personal views
+    if (
+      path.includes("/my-bonus") &&
+      !user.permissions?.includes(Permission.VIEW_OWN_BONUS)
+    ) {
+      toast.error("Access denied: Cannot view personal bonus");
+      return <Navigate to="/pms/dashboard" replace />;
+    }
+    if (
+      path.includes("/my-payslips") &&
+      !user.permissions?.includes(Permission.VIEW_OWN_PAYSLIP)
+    ) {
+      toast.error("Access denied: Cannot view personal payslips");
       return <Navigate to="/pms/dashboard" replace />;
     }
     return <>{children || element}</>;
@@ -88,9 +98,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       // Admin Management Routes
       if (
         path.includes("/structure") ||
+        path.includes("/deductions") ||
         path.includes("/allowances") ||
         path.includes("/bonuses") ||
-        path.includes("/deductions") ||
         path.includes("/process")
       ) {
         const adminPayrollPermissions = [
@@ -100,12 +110,32 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           Permission.EDIT_PAYROLL,
           Permission.VIEW_SALARY_STRUCTURE,
           Permission.EDIT_SALARY_STRUCTURE,
-          Permission.VIEW_ALLOWANCES,
-          Permission.EDIT_ALLOWANCES,
           Permission.VIEW_DEDUCTIONS,
           Permission.EDIT_DEDUCTIONS,
+          Permission.MANAGE_DEPARTMENT_DEDUCTIONS,
+          Permission.VIEW_DEPARTMENT_DEDUCTIONS,
+          Permission.MANAGE_DEPARTMENT_ALLOWANCES,
+          Permission.VIEW_DEPARTMENT_ALLOWANCES,
+          Permission.MANAGE_DEPARTMENT_BONUSES,
+          Permission.VIEW_DEPARTMENT_BONUSES,
         ];
-        if (
+
+        // Change this check to handle bonuses specifically
+        if (path.includes("/bonuses")) {
+          const bonusPermissions = [
+            Permission.MANAGE_DEPARTMENT_BONUSES,
+            Permission.VIEW_DEPARTMENT_BONUSES,
+            Permission.VIEW_BONUSES,
+            Permission.MANAGE_BONUSES,
+            Permission.CREATE_BONUSES,
+            Permission.DELETE_BONUSES,
+            Permission.EDIT_BONUSES,
+          ];
+          if (!bonusPermissions.some((p) => user.permissions?.includes(p))) {
+            toast.error("Access denied: No bonus management permissions");
+            return <Navigate to="/pms/dashboard" replace />;
+          }
+        } else if (
           !adminPayrollPermissions.some((p) => user.permissions?.includes(p))
         ) {
           toast.error("Access denied: No payroll management permissions");
@@ -113,7 +143,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         }
       }
 
-      // Personal Views (My Allowances, My Deductions)
+      // Personal Views
       if (path.includes("/my-allowances")) {
         if (!user.permissions?.includes(Permission.VIEW_OWN_ALLOWANCES)) {
           toast.error("Access denied: Cannot view personal allowances");
@@ -124,6 +154,14 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       if (path.includes("/my-deductions")) {
         if (!user.permissions?.includes(Permission.VIEW_OWN_DEDUCTIONS)) {
           toast.error("Access denied: Cannot view personal deductions");
+          return <Navigate to="/pms/dashboard" replace />;
+        }
+      }
+
+      // My Bonus
+      if (path.includes("/my-bonus")) {
+        if (!user.permissions?.includes(Permission.VIEW_OWN_BONUS)) {
+          toast.error("Access denied: Cannot view personal bonus");
           return <Navigate to="/pms/dashboard" replace />;
         }
       }

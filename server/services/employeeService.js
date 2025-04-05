@@ -19,7 +19,8 @@ export class EmployeeService {
         !data.lastName ||
         !data.email ||
         !data.phone ||
-        !data.position
+        !data.position ||
+        !data.department
       ) {
         throw new ApiError(400, "Required fields are missing");
       }
@@ -31,12 +32,9 @@ export class EmployeeService {
       }
 
       // Validate department if provided
-      if (data.department) {
-        const department = await DepartmentModel.findById(data.department);
-        if (!department) {
-          throw new ApiError(400, "Invalid department selected");
-        }
-        data.department = department._id; // Store only the reference
+      const department = await DepartmentModel.findById(data.department);
+      if (!department) {
+        throw new ApiError(400, "Invalid department selected");
       }
 
       const invitationToken = uuidv4();
@@ -65,10 +63,8 @@ export class EmployeeService {
           ],
         },
         createdBy: creator._id,
-        department:
-          creator.role === UserRole.ADMIN
-            ? creator.department
-            : data.department,
+        department: department._id,
+        position: data.position,
         onboarding: {
           status: OnboardingStatus.NOT_STARTED,
           tasks: [
@@ -84,13 +80,16 @@ export class EmployeeService {
               category: "orientation",
               deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
             },
-            // Add more default tasks
           ],
         },
       };
 
       const employee = await UserModel.create(employeeData);
-      await EmailService.sendInvitationEmail(employee.email, invitationToken);
+      await EmailService.sendInvitationEmail(
+        employee.email,
+        invitationToken,
+        employee.role
+      );
 
       // Return formatted response with populated department
       const populatedEmployee = await UserModel.findById(employee._id)

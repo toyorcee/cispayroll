@@ -48,6 +48,7 @@ import DocumentSettings from "../pages/pms/settings/DocumentSettings";
 import SystemSettings from "../pages/pms/settings/SystemSettings";
 import MyAllowances from "../pages/pms/payroll/MyAllowances";
 import MyDeductions from "../pages/pms/payroll/MyDeductions";
+import MyBonus from "../pages/pms/payroll/MyBonus";
 
 export interface RouteConfig {
   path: string;
@@ -162,12 +163,14 @@ export const routes: RouteConfig[] = [
     label: "Payroll",
     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
     permissions: [
+      // Separate permissions by role access
+      // Super Admin
       Permission.VIEW_ALL_PAYROLL,
+      // Admin
       Permission.VIEW_DEPARTMENT_PAYROLL,
+      Permission.MANAGE_DEPARTMENT_DEDUCTIONS,
+      // All Users (including Admin)
       Permission.VIEW_OWN_PAYSLIP,
-      Permission.VIEW_ALLOWANCES,
-      Permission.EDIT_ALLOWANCES,
-      Permission.VIEW_DEDUCTIONS,
       Permission.VIEW_OWN_ALLOWANCES,
       Permission.REQUEST_ALLOWANCES,
       Permission.VIEW_OWN_DEDUCTIONS,
@@ -183,39 +186,61 @@ export const routes: RouteConfig[] = [
           Permission.VIEW_SALARY_STRUCTURE,
           Permission.EDIT_SALARY_STRUCTURE,
         ],
-        requireAllPermissions: true,
+        requireAllPermissions: false,
         element: <SalaryStructure />,
       },
       {
         path: "deductions",
         label: "Statutory Deductions",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.VIEW_DEDUCTIONS, Permission.EDIT_DEDUCTIONS],
-        requireAllPermissions: true,
+        permissions: [
+          Permission.VIEW_DEDUCTIONS,
+          Permission.EDIT_DEDUCTIONS,
+          Permission.MANAGE_DEPARTMENT_DEDUCTIONS,
+          Permission.VIEW_DEPARTMENT_DEDUCTIONS,
+        ],
+        requireAllPermissions: false,
         element: <Deductions />,
       },
       {
         path: "allowances",
         label: "Allowances",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.VIEW_ALLOWANCES, Permission.EDIT_ALLOWANCES],
-        requireAllPermissions: true,
+        permissions: [
+          Permission.VIEW_ALLOWANCES,
+          Permission.EDIT_ALLOWANCES,
+          Permission.MANAGE_DEPARTMENT_ALLOWANCES,
+          Permission.VIEW_DEPARTMENT_ALLOWANCES,
+        ],
+        requireAllPermissions: false,
         element: <AllowanceManagement />,
       },
       {
         path: "bonuses",
         label: "Bonuses",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.VIEW_BONUSES, Permission.MANAGE_BONUSES],
-        requireAllPermissions: true,
+        permissions: [
+          Permission.VIEW_BONUSES,
+          Permission.MANAGE_BONUSES,
+          Permission.MANAGE_DEPARTMENT_BONUSES,
+          Permission.VIEW_DEPARTMENT_BONUSES,
+          Permission.CREATE_BONUSES,
+          Permission.DELETE_BONUSES,
+          Permission.EDIT_BONUSES,
+        ],
+        requireAllPermissions: false,
         element: <BonusManagement />,
       },
       {
         path: "process",
         label: "Process Payroll",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.CREATE_PAYROLL, Permission.EDIT_PAYROLL],
-        requireAllPermissions: true,
+        permissions: [
+          Permission.CREATE_PAYROLL,
+          Permission.EDIT_PAYROLL,
+          Permission.VIEW_DEPARTMENT_PAYROLL,
+        ],
+        requireAllPermissions: false,
         element: <ProcessPayroll />,
       },
       {
@@ -229,7 +254,7 @@ export const routes: RouteConfig[] = [
       {
         path: "my-allowances",
         label: "My Allowances",
-        roles: [UserRole.ADMIN, UserRole.USER],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
         permissions: [
           Permission.VIEW_OWN_ALLOWANCES,
           Permission.REQUEST_ALLOWANCES,
@@ -240,10 +265,18 @@ export const routes: RouteConfig[] = [
       {
         path: "my-deductions",
         label: "My Deductions",
-        roles: [UserRole.ADMIN, UserRole.USER],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
         permissions: [Permission.VIEW_OWN_DEDUCTIONS],
         requireAllPermissions: true,
         element: <MyDeductions />,
+      },
+      {
+        path: "my-bonus",
+        label: "My Bonus",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+        permissions: [Permission.VIEW_OWN_BONUS],
+        requireAllPermissions: true,
+        element: <MyBonus />,
       },
     ],
   },
@@ -303,6 +336,9 @@ export const routes: RouteConfig[] = [
       Permission.MANAGE_DEPARTMENT_SETTINGS,
       Permission.MANAGE_USER_SETTINGS,
       Permission.MANAGE_NOTIFICATION_SETTINGS,
+      Permission.MANAGE_LEAVE_SETTINGS,
+      Permission.MANAGE_PAYROLL_SETTINGS,
+      Permission.MANAGE_DOCUMENT_SETTINGS,
     ],
     requireAllPermissions: false,
     element: <Outlet />,
@@ -310,7 +346,7 @@ export const routes: RouteConfig[] = [
       {
         path: "",
         label: "General Settings",
-        roles: [UserRole.SUPER_ADMIN],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
         permissions: [Permission.MANAGE_SYSTEM_SETTINGS],
         requireAllPermissions: true,
         element: <GeneralSettings />,
@@ -342,7 +378,7 @@ export const routes: RouteConfig[] = [
       {
         path: "payroll",
         label: "Payroll Settings",
-        roles: [UserRole.SUPER_ADMIN],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
         permissions: [Permission.MANAGE_PAYROLL_SETTINGS],
         requireAllPermissions: true,
         element: <PayrollSettings />,
@@ -358,7 +394,7 @@ export const routes: RouteConfig[] = [
       {
         path: "documents",
         label: "Document Settings",
-        roles: [UserRole.SUPER_ADMIN],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
         permissions: [Permission.MANAGE_DOCUMENT_SETTINGS],
         requireAllPermissions: true,
         element: <DocumentSettings />,

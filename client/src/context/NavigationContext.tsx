@@ -9,6 +9,8 @@ import {
   CurrencyDollarIcon,
   DocumentTextIcon,
   CogIcon,
+  UserIcon,
+  ChatBubbleLeftIcon,
 } from "@heroicons/react/24/outline";
 
 type NavigationContextType = {
@@ -49,7 +51,6 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
         "Reports",
         "Settings",
         "Profile",
-        "Feedback",
       ];
     }
 
@@ -85,6 +86,20 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
             Permission.VIEW_OWN_ALLOWANCES,
             Permission.REQUEST_ALLOWANCES,
             Permission.VIEW_OWN_DEDUCTIONS,
+            Permission.MANAGE_DEPARTMENT_DEDUCTIONS,
+            Permission.VIEW_DEPARTMENT_DEDUCTIONS,
+            Permission.MANAGE_DEPARTMENT_ALLOWANCES,
+            Permission.VIEW_DEPARTMENT_ALLOWANCES,
+            Permission.MANAGE_DEPARTMENT_BONUSES,
+            Permission.VIEW_DEPARTMENT_BONUSES,
+            Permission.VIEW_BONUSES,
+            Permission.MANAGE_BONUSES,
+            Permission.CREATE_BONUSES,
+            Permission.DELETE_BONUSES,
+            Permission.EDIT_BONUSES,
+            Permission.CREATE_PAYROLL,
+            Permission.EDIT_PAYROLL,
+            Permission.GENERATE_PAYSLIP,
           ].includes(p)
         )
       ) {
@@ -109,11 +124,6 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       if (user.permissions.includes(Permission.VIEW_PERSONAL_INFO)) {
         availableMenus.push("Profile");
       }
-
-      // Feedback
-      if (user.permissions.includes(Permission.MANAGE_FEEDBACK)) {
-        availableMenus.push("Feedback");
-      }
     }
 
     // For User, only show basic menus
@@ -126,6 +136,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
             Permission.VIEW_OWN_ALLOWANCES,
             Permission.REQUEST_ALLOWANCES,
             Permission.VIEW_OWN_DEDUCTIONS,
+            Permission.VIEW_OWN_BONUS,
           ].includes(p)
         )
       ) {
@@ -135,11 +146,6 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       // Profile
       if (user.permissions.includes(Permission.VIEW_PERSONAL_INFO)) {
         availableMenus.push("Profile");
-      }
-
-      // Feedback
-      if (user.permissions.includes(Permission.MANAGE_FEEDBACK)) {
-        availableMenus.push("Feedback");
       }
     }
 
@@ -181,6 +187,8 @@ export const menuItems: NavigationItem[] = [
     name: "Dashboard",
     href: "/pms/dashboard",
     icon: ChartBarIcon,
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+    permissions: [Permission.VIEW_DASHBOARD],
   },
   {
     name: "Employees",
@@ -223,13 +231,14 @@ export const menuItems: NavigationItem[] = [
       Permission.VIEW_ALLOWANCES,
       Permission.EDIT_ALLOWANCES,
       Permission.VIEW_DEDUCTIONS,
+      Permission.EDIT_DEDUCTIONS,
       Permission.VIEW_OWN_ALLOWANCES,
       Permission.REQUEST_ALLOWANCES,
       Permission.VIEW_OWN_DEDUCTIONS,
+      Permission.VIEW_OWN_BONUS,
     ],
     requireAllPermissions: false,
     subItems: [
-      // Admin-only items
       {
         name: "Salary Structure",
         href: "/pms/payroll/structure",
@@ -242,20 +251,41 @@ export const menuItems: NavigationItem[] = [
       {
         name: "Allowances",
         href: "/pms/payroll/allowances",
-        permissions: [Permission.VIEW_ALLOWANCES, Permission.EDIT_ALLOWANCES],
+        permissions: [
+          Permission.VIEW_ALLOWANCES,
+          Permission.EDIT_ALLOWANCES,
+          Permission.MANAGE_DEPARTMENT_ALLOWANCES,
+          Permission.VIEW_DEPARTMENT_ALLOWANCES,
+        ],
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        requireAllPermissions: false,
       },
       {
         name: "Bonuses",
         href: "/pms/payroll/bonuses",
-        permissions: [Permission.VIEW_BONUSES, Permission.MANAGE_BONUSES],
+        permissions: [
+          Permission.VIEW_BONUSES,
+          Permission.MANAGE_BONUSES,
+          Permission.MANAGE_DEPARTMENT_BONUSES,
+          Permission.VIEW_DEPARTMENT_BONUSES,
+          Permission.CREATE_BONUSES,
+          Permission.DELETE_BONUSES,
+          Permission.EDIT_BONUSES,
+        ],
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        requireAllPermissions: false,
       },
       {
         name: "Deductions",
         href: "/pms/payroll/deductions",
-        permissions: [Permission.VIEW_DEDUCTIONS, Permission.EDIT_DEDUCTIONS],
+        permissions: [
+          Permission.VIEW_DEDUCTIONS,
+          Permission.EDIT_DEDUCTIONS,
+          Permission.MANAGE_DEPARTMENT_DEDUCTIONS,
+          Permission.VIEW_DEPARTMENT_DEDUCTIONS,
+        ],
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        requireAllPermissions: false,
       },
       {
         name: "Process Payroll",
@@ -263,7 +293,6 @@ export const menuItems: NavigationItem[] = [
         permissions: [Permission.CREATE_PAYROLL, Permission.EDIT_PAYROLL],
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
       },
-      // User-accessible items
       {
         name: "My Payslips",
         href: "/pms/payroll/my-payslips",
@@ -283,6 +312,12 @@ export const menuItems: NavigationItem[] = [
         name: "My Deductions",
         href: "/pms/payroll/my-deductions",
         permissions: [Permission.VIEW_OWN_DEDUCTIONS],
+        roles: [UserRole.ADMIN, UserRole.USER],
+      },
+      {
+        name: "My Bonus",
+        href: "/pms/payroll/my-bonus",
+        permissions: [Permission.VIEW_OWN_BONUS],
         roles: [UserRole.ADMIN, UserRole.USER],
       },
     ],
@@ -339,7 +374,7 @@ export const menuItems: NavigationItem[] = [
       {
         name: "General Settings",
         href: "/pms/settings",
-        roles: [UserRole.SUPER_ADMIN],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
         permissions: [Permission.MANAGE_SYSTEM_SETTINGS],
       },
       {
@@ -363,7 +398,7 @@ export const menuItems: NavigationItem[] = [
       {
         name: "Payroll Settings",
         href: "/pms/settings/payroll",
-        roles: [UserRole.SUPER_ADMIN],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
         permissions: [Permission.MANAGE_PAYROLL_SETTINGS],
       },
       {
@@ -375,7 +410,7 @@ export const menuItems: NavigationItem[] = [
       {
         name: "Document Settings",
         href: "/pms/settings/documents",
-        roles: [UserRole.SUPER_ADMIN],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
         permissions: [Permission.MANAGE_DOCUMENT_SETTINGS],
       },
       {
@@ -404,47 +439,13 @@ export const menuItems: NavigationItem[] = [
       },
     ],
   },
-  // {
-  //   name: "Disciplinary",
-  //   href: "/pms/disciplinary",
-  //   icon: FaGavel,
-  //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-  //   permissions: [
-  //     Permission.MANAGE_DISCIPLINARY_ACTIONS,
-  //     Permission.VIEW_DISCIPLINARY_RECORDS,
-  //   ],
-  //   requireAllPermissions: false,
-  // },
-  // {
-  //   name: "Leave",
-  //   href: "/pms/leave",
-  //   icon: DocumentTextIcon,
-  //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-  //   permissions: [
-  //     Permission.REQUEST_LEAVE,
-  //     Permission.VIEW_OWN_LEAVE,
-  //     Permission.CANCEL_OWN_LEAVE,
-  //     Permission.APPROVE_LEAVE,
-  //     Permission.VIEW_TEAM_LEAVE,
-  //   ],
-  //   requireAllPermissions: false,
-  // },
-  // {
-  //   name: "Profile",
-  //   href: "/pms/profile",
-  //   icon: DocumentTextIcon,
-  //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-  //   permissions: [Permission.VIEW_PERSONAL_INFO],
-  //   requireAllPermissions: true,
-  // },
-  // {
-  //   name: "Feedback",
-  //   href: "/pms/feedback",
-  //   icon: DocumentTextIcon,
-  //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-  //   permissions: [Permission.MANAGE_FEEDBACK],
-  //   requireAllPermissions: true,
-  // },
+  {
+    name: "Profile",
+    href: "/pms/profile",
+    icon: UserIcon,
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+    permissions: [Permission.VIEW_PERSONAL_INFO],
+  },
 ].map((item) => {
   return item;
 });
