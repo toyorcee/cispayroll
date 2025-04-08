@@ -76,7 +76,11 @@ export function Sidebar() {
   const filteredNavigation = menuItems.filter((item: NavigationItem) => {
     // Super Admin sees everything except personal views
     if (hasRole(UserRole.SUPER_ADMIN)) {
-      if (item.name === "My Allowances" || item.name === "My Deductions") {
+      if (
+        item.name === "My Allowances" ||
+        item.name === "My Deductions" ||
+        item.name === "My Bonus"
+      ) {
         return false;
       }
       return true;
@@ -103,13 +107,15 @@ export function Sidebar() {
       if (hasRole(UserRole.SUPER_ADMIN)) {
         if (
           subItem.name === "My Allowances" ||
-          subItem.name === "My Deductions"
+          subItem.name === "My Deductions" ||
+          subItem.name === "My Bonus"
         ) {
           return false;
         }
         return true;
       }
 
+      // For non-super admin users, check roles and permissions normally
       // Check roles
       if (subItem.roles && !subItem.roles.some((role) => hasRole(role))) {
         return false;

@@ -19,7 +19,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   permissions,
   requireAllPermissions = false,
 }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, isSuperAdmin, isAdmin } = useAuth();
   const location = useLocation();
   const { getSkeleton } = useSkeleton();
 
@@ -108,6 +108,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           Permission.VIEW_DEPARTMENT_PAYROLL,
           Permission.CREATE_PAYROLL,
           Permission.EDIT_PAYROLL,
+          Permission.DELETE_PAYROLL,
+          Permission.SUBMIT_PAYROLL,
           Permission.VIEW_SALARY_STRUCTURE,
           Permission.EDIT_SALARY_STRUCTURE,
           Permission.VIEW_DEDUCTIONS,
@@ -118,6 +120,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           Permission.VIEW_DEPARTMENT_ALLOWANCES,
           Permission.MANAGE_DEPARTMENT_BONUSES,
           Permission.VIEW_DEPARTMENT_BONUSES,
+          Permission.GENERATE_PAYSLIP,
         ];
 
         // Change this check to handle bonuses specifically
@@ -374,6 +377,62 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     if (!hasRequiredPermissions) {
       toast.error("Access denied: Insufficient permissions");
+      return <Navigate to="/pms/dashboard" replace />;
+    }
+  }
+
+  // Process Payroll - Only for SUPER_ADMIN
+  if (path.includes("/process")) {
+    // Use the auth context's isSuperAdmin method
+    if (!isSuperAdmin()) {
+      toast.error(
+        "Access denied: Process Payroll is only available for Super Admins"
+      );
+      return <Navigate to="/pms/dashboard" replace />;
+    }
+
+    const processPayrollPermissions = [
+      Permission.CREATE_PAYROLL,
+      Permission.EDIT_PAYROLL,
+      Permission.DELETE_PAYROLL,
+      Permission.SUBMIT_PAYROLL,
+      Permission.VIEW_ALL_PAYROLL,
+      Permission.GENERATE_PAYSLIP,
+    ];
+
+    if (!processPayrollPermissions.some((p) => user.permissions?.includes(p))) {
+      toast.error(
+        "Access denied: Insufficient permissions for Process Payroll"
+      );
+      return <Navigate to="/pms/dashboard" replace />;
+    }
+  }
+
+  // Process Department Payroll - Only for ADMIN
+  if (path.includes("/department-process")) {
+    // Strictly check if user is an ADMIN (not SUPER_ADMIN)
+    if (user.role !== UserRole.ADMIN) {
+      toast.error(
+        "Access denied: Process Department Payroll is only available for Department Admins"
+      );
+      return <Navigate to="/pms/dashboard" replace />;
+    }
+
+    const departmentPayrollPermissions = [
+      Permission.CREATE_PAYROLL,
+      Permission.EDIT_PAYROLL,
+      Permission.DELETE_PAYROLL,
+      Permission.SUBMIT_PAYROLL,
+      Permission.VIEW_DEPARTMENT_PAYROLL,
+      Permission.GENERATE_PAYSLIP,
+    ];
+
+    if (
+      !departmentPayrollPermissions.some((p) => user.permissions?.includes(p))
+    ) {
+      toast.error(
+        "Access denied: Insufficient permissions for Process Department Payroll"
+      );
       return <Navigate to="/pms/dashboard" replace />;
     }
   }

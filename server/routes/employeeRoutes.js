@@ -7,6 +7,7 @@ import {
 } from "../middleware/authMiddleware.js";
 import { UserRole, Permission } from "../models/User.js";
 import { upload } from "../middleware/multerMiddleware.js";
+import { SuperAdminController } from "../controllers/SuperAdminController.js";
 
 const router = Router();
 
@@ -18,6 +19,13 @@ router.post(
   "/create",
   requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
   EmployeeController.createEmployee
+);
+
+// Salary grades route - accessible to both admin and super admin
+router.get(
+  "/salary-grades",
+  requireRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+  SuperAdminController.getAllSalaryGrades
 );
 
 // Employee (self) routes

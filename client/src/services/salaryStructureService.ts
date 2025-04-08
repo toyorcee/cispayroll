@@ -24,8 +24,9 @@ interface UpdateSalaryGradeInput {
 export const salaryStructureService = {
   getAllSalaryGrades: async (): Promise<ISalaryGrade[]> => {
     try {
+      // Use the new route that's accessible to both super admins and regular admins
       const response = await axios.get<{ data: ISalaryGrade[] }>(
-        `${BASE_URL}/super-admin/salary-grades`
+        `${BASE_URL}/employees/salary-grades`
       );
 
       // Just return the data directly from backend

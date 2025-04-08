@@ -716,6 +716,108 @@ export const employeeService = {
         staleTime: 5 * 60 * 1000, // 5 minutes
       });
     },
+
+    // Create new employee
+    createEmployee: async (
+      employeeData: CreateEmployeeData
+    ): Promise<Employee> => {
+      try {
+        console.log("Admin service creating employee with data:", employeeData);
+
+        // Ensure we're sending the exact structure expected by the API
+        const response = await axios.post(`${BASE_URL}/admin/employees`, {
+          firstName: employeeData.firstName,
+          lastName: employeeData.lastName,
+          email: employeeData.email,
+          phone: employeeData.phone,
+          position: employeeData.position,
+          gradeLevel: employeeData.gradeLevel,
+          workLocation: employeeData.workLocation,
+          dateJoined: employeeData.dateJoined,
+        });
+
+        console.log("Admin service create employee response:", response.data);
+        return response.data.employee;
+      } catch (error) {
+        console.error("Error creating employee via admin service:", error);
+        throw error;
+      }
+    },
+
+    // Update employee
+    updateEmployee: async (id: string, data: Partial<Employee>) => {
+      try {
+        const response = await axios.put(
+          `${BASE_URL}/admin/employees/${id}`,
+          data
+        );
+        return response.data;
+      } catch (error) {
+        console.error("Error updating employee:", error);
+        throw error;
+      }
+    },
+
+    // Delete employee
+    deleteEmployee: async (id: string) => {
+      try {
+        const response = await axios.delete(
+          `${BASE_URL}/admin/employees/${id}`
+        );
+        return response.data;
+      } catch (error) {
+        console.error("Error deleting employee:", error);
+        throw error;
+      }
+    },
+
+    // Get employee by ID
+    getEmployeeById: async (id: string): Promise<EmployeeDetails> => {
+      try {
+        const response = await axios.get(`${BASE_URL}/admin/employees/${id}`);
+        const { employee } = response.data;
+
+        // Ensure dates are properly formatted
+        if (employee.dateJoined) {
+          employee.dateJoined = new Date(employee.dateJoined).toISOString();
+        }
+        if (employee.startDate) {
+          employee.startDate = new Date(employee.startDate).toISOString();
+        }
+
+        return mapEmployeeToDetails(employee);
+      } catch (error) {
+        console.error(`Error fetching employee ${id}:`, error);
+        throw error;
+      }
+    },
+
+    // Get user by ID
+    getUserById: async (userId: string) => {
+      try {
+        const response = await axios.get(`${BASE_URL}/admin/users/${userId}`);
+        if (!response.data.success) {
+          throw new Error(response.data.message || "Failed to fetch user");
+        }
+        return response.data.user;
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        throw error;
+      }
+    },
+
+    // React Query hook for getting user by ID
+    useGetUserById: (userId: string | undefined) => {
+      return useQuery({
+        queryKey: ["admin", "user", userId],
+        queryFn: () => {
+          if (!userId) throw new Error("User ID is required");
+          return employeeService.adminService.getUserById(userId);
+        },
+        enabled: !!userId,
+        staleTime: 5 * 60 * 1000,
+      });
+    },
   },
 
   async getOffboardingUsers() {

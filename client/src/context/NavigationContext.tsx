@@ -225,17 +225,22 @@ export const menuItems: NavigationItem[] = [
     icon: CurrencyDollarIcon,
     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
     permissions: [
+      // Super Admin
       Permission.VIEW_ALL_PAYROLL,
+      // Admin
       Permission.VIEW_DEPARTMENT_PAYROLL,
+      Permission.CREATE_PAYROLL,
+      Permission.EDIT_PAYROLL,
+      Permission.DELETE_PAYROLL,
+      Permission.SUBMIT_PAYROLL,
+      Permission.VIEW_DEPARTMENT_DEDUCTIONS,
+      Permission.VIEW_DEPARTMENT_ALLOWANCES,
+      Permission.VIEW_DEPARTMENT_BONUSES,
+      // All Users (including Admin)
       Permission.VIEW_OWN_PAYSLIP,
-      Permission.VIEW_ALLOWANCES,
-      Permission.EDIT_ALLOWANCES,
-      Permission.VIEW_DEDUCTIONS,
-      Permission.EDIT_DEDUCTIONS,
       Permission.VIEW_OWN_ALLOWANCES,
       Permission.REQUEST_ALLOWANCES,
       Permission.VIEW_OWN_DEDUCTIONS,
-      Permission.VIEW_OWN_BONUS,
     ],
     requireAllPermissions: false,
     subItems: [
@@ -290,8 +295,28 @@ export const menuItems: NavigationItem[] = [
       {
         name: "Process Payroll",
         href: "/pms/payroll/process",
-        permissions: [Permission.CREATE_PAYROLL, Permission.EDIT_PAYROLL],
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [
+          Permission.CREATE_PAYROLL,
+          Permission.EDIT_PAYROLL,
+          Permission.DELETE_PAYROLL,
+          Permission.SUBMIT_PAYROLL,
+          Permission.VIEW_ALL_PAYROLL,
+          Permission.GENERATE_PAYSLIP,
+        ],
+        roles: [UserRole.SUPER_ADMIN],
+      },
+      {
+        name: "Process Department Payroll",
+        href: "/pms/payroll/department-process",
+        permissions: [
+          Permission.CREATE_PAYROLL,
+          Permission.EDIT_PAYROLL,
+          Permission.DELETE_PAYROLL,
+          Permission.SUBMIT_PAYROLL,
+          Permission.VIEW_DEPARTMENT_PAYROLL,
+          Permission.GENERATE_PAYSLIP,
+        ],
+        roles: [UserRole.ADMIN],
       },
       {
         name: "My Payslips",

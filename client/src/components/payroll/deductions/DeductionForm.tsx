@@ -9,6 +9,9 @@ import {
   DeductionScope,
   DeductionApplicability,
   TaxBracket,
+  DeductionType,
+  CreateDeductionInput,
+  UpdateDeductionInput,
 } from "../../../types/deduction";
 import { FormSkeleton } from "./Skeletons";
 
@@ -16,7 +19,9 @@ interface DeductionFormProps {
   deduction?: Deduction;
   isLoading?: boolean;
   deductionType: "statutory" | "voluntary";
-  onSubmit: (data: Partial<Deduction>) => Promise<void>;
+  onSubmit: (
+    data: CreateDeductionInput | UpdateDeductionInput
+  ) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -31,6 +36,7 @@ interface FormInputs {
   scope: DeductionScope;
   applicability: DeductionApplicability;
   isCustom: boolean;
+  isActive: boolean;
 }
 
 // Add these constants at the top of the file after imports
@@ -75,13 +81,15 @@ export const DeductionForm = ({
       calculationMethod:
         deduction?.calculationMethod || CalculationMethod.FIXED,
       value: deduction?.value || 0,
-      effectiveDate: deduction?.effectiveDate || new Date(),
+      effectiveDate: deduction?.effectiveDate
+        ? new Date(deduction.effectiveDate)
+        : new Date(),
       taxBrackets: deduction?.taxBrackets || [{ min: 0, max: null, rate: 0 }],
       category: deduction?.category || DeductionCategory.GENERAL,
-      scope: deduction?.scope || DeductionScope.COMPANY_WIDE,
-      applicability:
-        deduction?.applicability || DeductionApplicability.INDIVIDUAL,
+      scope: deduction?.scope || DeductionScope.COMPANY,
+      applicability: deduction?.applicability || DeductionApplicability.GLOBAL,
       isCustom: deduction?.isCustom || false,
+      isActive: deduction?.isActive ?? true,
     },
   });
 
@@ -108,21 +116,52 @@ export const DeductionForm = ({
   const onSubmitForm = async (formData: FormInputs) => {
     setSubmitting(true);
     try {
-      // Format the data properly
-      const formattedData = {
+      const submissionData = {
         ...formData,
-        // Parse value based on calculation method
-        value:
-          formData.calculationMethod === CalculationMethod.PERCENTAGE
-            ? parseFloat(formData.value.toString())
-            : Math.round(formData.value),
-        // Use current date if effectiveDate is empty
-        effectiveDate: formData.effectiveDate || new Date(),
+        type: deductionType,
+        effectiveDate:
+          formData.effectiveDate instanceof Date
+            ? formData.effectiveDate
+            : new Date(formData.effectiveDate),
       };
 
-      await onSubmit(formattedData);
+      if (deduction) {
+        // For updates, we need to convert to UpdateDeductionInput
+        const updateData: UpdateDeductionInput = {
+          name: submissionData.name,
+          description: submissionData.description,
+          calculationMethod: submissionData.calculationMethod,
+          value: submissionData.value,
+          taxBrackets: submissionData.taxBrackets,
+          isActive: submissionData.isActive,
+          effectiveDate: submissionData.effectiveDate,
+          isCustom: submissionData.isCustom,
+          category: submissionData.category,
+          scope: submissionData.scope,
+          applicability: submissionData.applicability,
+          type: submissionData.type as "statutory" | "voluntary",
+        };
+        await onSubmit(updateData);
+      } else {
+        // For creation, we need to convert to CreateDeductionInput
+        const createData: CreateDeductionInput = {
+          name: submissionData.name,
+          description: submissionData.description,
+          calculationMethod: submissionData.calculationMethod,
+          value: submissionData.value,
+          taxBrackets: submissionData.taxBrackets,
+          isActive: submissionData.isActive,
+          effectiveDate: submissionData.effectiveDate,
+          isCustom: submissionData.isCustom,
+          category: submissionData.category,
+          scope: submissionData.scope,
+          applicability: submissionData.applicability,
+          type: submissionData.type as "statutory" | "voluntary",
+        };
+        await onSubmit(createData);
+      }
     } catch (error) {
-      console.error("Form submission failed:", error);
+      console.error("Error submitting form:", error);
     } finally {
       setSubmitting(false);
     }

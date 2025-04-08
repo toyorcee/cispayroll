@@ -1,10 +1,9 @@
 import { ApiError } from "../utils/errorHandler.js";
 import { Types } from "mongoose";
-import { PAYROLL_STATUS } from "../models/Payroll.js";
+import { PAYROLL_STATUS, PayrollFrequency } from "../models/Payroll.js";
 import mongoose from "mongoose";
-import { PayrollFrequency } from "../models/Payroll.js";
 
-// Keep this simple validation for basic request checking
+// Keep this comprehensive validation for super admin payroll creation
 export const validatePayrollCreate = (req, res, next) => {
   try {
     console.log("🔍 Validating payroll data:", req.body);

@@ -1,18 +1,17 @@
 export enum DeductionType {
-  STATUTORY = "statutory",
-  VOLUNTARY = "voluntary",
+  STATUTORY = "STATUTORY",
+  VOLUNTARY = "VOLUNTARY",
 }
 
 export enum CalculationMethod {
-  FIXED = "fixed",
-  PERCENTAGE = "percentage",
-  PROGRESSIVE = "progressive",
+  FIXED = "FIXED",
+  PERCENTAGE = "PERCENTAGE",
+  PROGRESSIVE = "PROGRESSIVE",
 }
 
 export enum DeductionScope {
-  COMPANY_WIDE = "company_wide",
+  COMPANY = "company",
   DEPARTMENT = "department",
-  INDIVIDUAL = "individual",
 }
 
 export enum DeductionCategory {
@@ -27,6 +26,13 @@ export enum DeductionApplicability {
   INDIVIDUAL = "individual",
 }
 
+export enum DeductionOptOutReason {
+  PERSONAL_CHOICE = "personal_choice",
+  ALTERNATIVE_PLAN = "alternative_plan",
+  TEMPORARY_SUSPENSION = "temporary_suspension",
+  OTHER = "other",
+}
+
 export interface TaxBracket {
   min: number;
   max: number | null;
@@ -36,24 +42,52 @@ export interface TaxBracket {
 export interface Deduction {
   _id: string;
   name: string;
-  type: "statutory" | "voluntary";
-  description?: string;
+  type: DeductionType;
+  description: string;
   calculationMethod: CalculationMethod;
   value: number;
   taxBrackets?: TaxBracket[];
   isActive: boolean;
-  effectiveDate: Date;
-  isCustom: boolean;
-  category: DeductionCategory;
   scope: DeductionScope;
+  department?: string;
   createdBy: string;
   updatedBy: string;
-  applicability: DeductionApplicability;
-  assignedEmployees?: string[];
-  assignmentHistory: any[];
-  createdAt: Date;
-  updatedAt: Date;
-  assignedEmployeesCount: number;
+  createdAt: string;
+  updatedAt: string;
+  effectiveDate?: string;
+  category?: DeductionCategory;
+  applicability?: DeductionApplicability;
+  isCustom?: boolean;
+}
+
+export interface DeductionPreference {
+  deduction: string;
+  opted: boolean;
+  startDate: string;
+  endDate?: string;
+  optedAt: string;
+  optedBy: string;
+  amount?: number;
+  percentage?: number;
+  notes?: string;
+  optOutReason?: DeductionOptOutReason;
+}
+
+export interface UserDeductionPreferences {
+  statutory: {
+    standardStatutory: DeductionPreference[];
+    customStatutory: DeductionPreference[];
+  };
+  voluntary: {
+    standardVoluntary: DeductionPreference[];
+    customVoluntary: DeductionPreference[];
+  };
+}
+
+export interface DeductionResponse {
+  statutory: Deduction[];
+  voluntary: Deduction[];
+  departmentSpecific?: Deduction[];
 }
 
 export type CreateDeductionInput = {
@@ -70,14 +104,6 @@ export type CreateDeductionInput = {
   applicability: DeductionApplicability;
   type: "statutory" | "voluntary";
 };
-
-export interface DeductionsResponse {
-  success: boolean;
-  data: {
-    statutory: Deduction[];
-    voluntary: Deduction[];
-  };
-}
 
 export type UpdateDeductionInput = {
   name?: string;

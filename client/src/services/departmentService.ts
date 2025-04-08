@@ -95,6 +95,45 @@ export interface ChartStats {
   };
 }
 
+export interface AdminDepartmentChartStats {
+  departmentStats: {
+    labels: string[];
+    datasets: [
+      {
+        label: string;
+        data: number[];
+        backgroundColor: string[];
+        borderColor: string[];
+        borderWidth: number;
+      }
+    ];
+  };
+  roleDistribution: {
+    labels: string[];
+    datasets: [
+      {
+        label: string;
+        data: number[];
+        backgroundColor: string[];
+        borderColor: string[];
+        borderWidth: number;
+      }
+    ];
+  };
+  monthlyGrowth: {
+    labels: string[];
+    datasets: [
+      {
+        label: string;
+        data: number[];
+        borderColor: string;
+        backgroundColor: string;
+        tension: number;
+      }
+    ];
+  };
+}
+
 export const DEPARTMENTS_QUERY_KEY = ["departments"] as const;
 
 export const prefetchDepartments = async (queryClient: QueryClient) => {
@@ -283,5 +322,27 @@ export const departmentService = {
       console.error("Failed to fetch chart stats:", error);
       throw error;
     }
+  },
+
+  getAdminDepartmentChartStats: async () => {
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/admin/department/stats/charts`,
+        {
+          withCredentials: true,
+        }
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Error fetching admin department chart stats:", error);
+      throw error;
+    }
+  },
+
+  useGetAdminDepartmentChartStats: () => {
+    return useQuery<AdminDepartmentChartStats>({
+      queryKey: ["adminDepartmentChartStats"],
+      queryFn: () => departmentService.getAdminDepartmentChartStats(),
+    });
   },
 };

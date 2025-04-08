@@ -767,6 +767,18 @@ export class PayrollService {
       };
     } catch (error) {
       console.error("❌ Error calculating payroll:", error);
+
+      // If it's already an ApiError, just rethrow it
+      if (error instanceof ApiError) {
+        throw error;
+      }
+
+      // For duplicate payroll errors, provide a clear message
+      if (error.message?.includes("already exists")) {
+        throw new ApiError(400, error.message);
+      }
+
+      // For other errors, provide a more detailed message
       throw new ApiError(500, `Failed to calculate payroll: ${error.message}`);
     }
   }
@@ -829,83 +841,100 @@ export class PayrollService {
   /**
    * Calculate employee payroll with all applicable deductions
    */
-  static async calculateEmployeePayroll({
-    employeeId,
-    departmentId,
-    basicSalary,
-    grossSalary,
-    allowances = [],
-  }) {
+  static async calculateEmployeePayroll(employee, salaryGrade, month, year) {
     try {
-      console.log("🧮 Calculating payroll for employee:", employeeId);
+      // Get all applicable deductions
+      const standardDeductions = await DeductionService.getStandardDeductions();
+      const departmentDeductions =
+        await DeductionService.getDepartmentDeductions(employee.department);
 
-      // 1. Calculate all types of deductions
-      const [standardDeductions, deptDeductions] = await Promise.all([
-        DeductionService.calculateAllDeductions({
-          basicSalary,
-          grossSalary,
-          employeeId,
-          departmentId,
-        }),
-        DeductionService.calculateDepartmentDeductions({
-          basicSalary,
-          grossSalary,
-          departmentId,
-        }),
-      ]);
+      // Combine all deductions
+      const allDeductions = [
+        ...standardDeductions.statutory,
+        ...standardDeductions.voluntary,
+        ...departmentDeductions.departmentSpecific,
+      ];
 
-      // 2. Combine all deductions
-      const totalDeductions = {
-        statutory: {
-          ...standardDeductions.statutory,
-          ...deptDeductions.statutory,
-        },
-        voluntary: {
-          ...standardDeductions.voluntary,
-          ...deptDeductions.voluntary,
-        },
-      };
+      // Calculate statutory deductions
+      const statutoryDeductions = allDeductions
+        .filter((d) => d.type === "statutory")
+        .map((deduction) => {
+          const amount = this.calculateDeductionAmount(
+            deduction,
+            salaryGrade.basicSalary
+          );
+          return {
+            name: deduction.name,
+            type: deduction.type,
+            description: deduction.description,
+            amount,
+            calculationMethod: deduction.calculationMethod,
+          };
+        });
 
-      // 3. Calculate totals
-      const statutoryTotal = Object.values(totalDeductions.statutory).reduce(
-        (sum, item) => sum + item.amount,
-        0
-      );
-      const voluntaryTotal = Object.values(totalDeductions.voluntary).reduce(
-        (sum, item) => sum + item.amount,
-        0
-      );
+      // Calculate voluntary deductions
+      const voluntaryDeductions = allDeductions
+        .filter((d) => d.type === "voluntary")
+        .map((deduction) => {
+          const amount = this.calculateDeductionAmount(
+            deduction,
+            salaryGrade.basicSalary
+          );
+          return {
+            name: deduction.name,
+            type: deduction.type,
+            description: deduction.description,
+            amount,
+            calculationMethod: deduction.calculationMethod,
+          };
+        });
 
-      // 4. Calculate allowances total
-      const allowancesTotal = allowances.reduce(
-        (sum, allowance) => sum + allowance.amount,
-        0
-      );
+      // Calculate department-specific deductions
+      const departmentSpecificDeductions = allDeductions
+        .filter(
+          (d) =>
+            d.scope === "department" &&
+            d.department.toString() === employee.department.toString()
+        )
+        .map((deduction) => {
+          const amount = this.calculateDeductionAmount(
+            deduction,
+            salaryGrade.basicSalary
+          );
+          return {
+            name: deduction.name,
+            type: deduction.type,
+            description: deduction.description,
+            amount,
+            calculationMethod: deduction.calculationMethod,
+          };
+        });
 
-      // 5. Calculate net salary
-      const netSalary =
-        grossSalary + allowancesTotal - (statutoryTotal + voluntaryTotal);
+      // Calculate net salary
+      const grossSalary = salaryGrade.basicSalary + salaryGrade.totalAllowances;
+      const totalDeductions = [
+        ...statutoryDeductions,
+        ...voluntaryDeductions,
+        ...departmentSpecificDeductions,
+      ].reduce((sum, d) => sum + d.amount, 0);
+
+      const netSalary = grossSalary - totalDeductions;
 
       return {
-        employeeId,
-        departmentId,
-        salaryDetails: {
-          basic: basicSalary,
-          gross: grossSalary,
-          allowances: allowancesTotal,
-          deductions: {
-            statutory: totalDeductions.statutory,
-            voluntary: totalDeductions.voluntary,
-            statutoryTotal,
-            voluntaryTotal,
-            total: statutoryTotal + voluntaryTotal,
-          },
-          net: netSalary,
+        employee: employee._id,
+        basicSalary: salaryGrade.basicSalary,
+        allowances: salaryGrade.allowances,
+        deductions: {
+          statutory: statutoryDeductions,
+          voluntary: voluntaryDeductions,
+          departmentSpecific: departmentSpecificDeductions,
         },
+        grossSalary,
+        totalDeductions,
+        netSalary,
       };
     } catch (error) {
-      console.error("❌ Error calculating payroll:", error);
-      throw new ApiError(500, `Payroll calculation failed: ${error.message}`);
+      throw new ApiError(500, "Failed to calculate employee payroll");
     }
   }
 

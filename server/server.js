@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
-import { traceError } from "./utils/errorHandler.js";
+import { traceError, ApiError } from "./utils/errorHandler.js";
 import multer from "multer";
 import fs from "fs";
 
@@ -31,6 +31,7 @@ import feedbackRoute from "./routes/feedbackRoutes.js";
 import departmentRoutes from "./routes/departmentRoutes.js";
 import passwordRoutes from "./routes/passwordRoutes.js";
 import deductionRoutes from "./routes/deductionRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -181,6 +182,7 @@ app.use("/api/feedback", routeErrorWrapper(feedbackRoute));
 app.use("/api/departments", routeErrorWrapper(departmentRoutes));
 app.use("/api/password", routeErrorWrapper(passwordRoutes));
 app.use("/api/deductions", routeErrorWrapper(deductionRoutes));
+app.use("/api/notifications", routeErrorWrapper(notificationRoutes));
 
 // Enhanced health check
 app.get("/api/health", (_req, res) => {
@@ -223,9 +225,21 @@ app.use((err, req, res, next) => {
     headers: req.headers,
   });
 
-  res.status(500).json({
+  // Determine status code
+  const statusCode = error.statusCode || 500;
+
+  // Determine error message
+  let errorMessage = "Internal server error";
+
+  if (error instanceof ApiError) {
+    errorMessage = error.message;
+  } else if (error.message) {
+    errorMessage = error.message;
+  }
+
+  res.status(statusCode).json({
     success: false,
-    message: "Internal server error",
+    message: errorMessage,
     error:
       process.env.NODE_ENV === "development"
         ? {

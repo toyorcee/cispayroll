@@ -260,7 +260,18 @@ const parseUserData = (data: Partial<User>): User => ({
         Object.values(Permission).includes(p as Permission)
       )
     : [],
-  department: data.department || "",
+  department:
+    typeof data.department === "object" && data.department
+      ? {
+          _id: data.department._id || "",
+          name: data.department.name || "",
+          code: data.department.code || "",
+        }
+      : {
+          _id: "",
+          name: "",
+          code: "",
+        },
   position: data.position || "",
   gradeLevel: data.gradeLevel || "",
   workLocation: data.workLocation || "",

@@ -129,6 +129,29 @@ const PayrollSchema = new Schema(
           },
         },
       ],
+      departmentSpecific: [
+        {
+          name: {
+            type: String,
+            required: [true, "Deduction name is required"],
+          },
+          type: {
+            type: String,
+            enum: ["STATUTORY", "VOLUNTARY"],
+            required: [true, "Deduction type is required"],
+          },
+          description: String,
+          amount: {
+            type: Number,
+            required: [true, "Deduction amount is required"],
+          },
+          calculationMethod: {
+            type: String,
+            enum: ["FIXED", "PERCENTAGE", "PROGRESSIVE"],
+            required: [true, "Calculation method is required"],
+          },
+        },
+      ],
       totalDeductions: {
         type: Number,
         required: [true, "Total deductions is required"],
@@ -348,12 +371,18 @@ PayrollSchema.methods.calculateTotals = function () {
     (sum, other) => sum + other.amount,
     0
   );
+  const departmentSpecificDeductions =
+    this.deductions.departmentSpecific.reduce(
+      (sum, deduction) => sum + deduction.amount,
+      0
+    );
   const totalDeductions =
     taxDeductions +
     pensionDeductions +
     nhfDeductions +
     loanDeductions +
-    otherDeductions;
+    otherDeductions +
+    departmentSpecificDeductions;
 
   // Update totals
   this.totals = {

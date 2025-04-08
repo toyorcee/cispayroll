@@ -30,6 +30,7 @@ export const Permission = {
   DELETE_DEPARTMENT: "DELETE_DEPARTMENT",
   VIEW_ALL_DEPARTMENTS: "VIEW_ALL_DEPARTMENTS",
   MANAGE_DEPARTMENT_USERS: "MANAGE_DEPARTMENT_USERS",
+  VIEW_DEPARTMENT_STATS: "VIEW_DEPARTMENT_STATS",
 
   // ===== Payroll Permissions =====
   CREATE_PAYROLL: "CREATE_PAYROLL",
@@ -758,6 +759,7 @@ UserSchema.pre("save", function (next) {
           Permission.DELETE_DEPARTMENT,
           Permission.VIEW_ALL_DEPARTMENTS,
           Permission.MANAGE_DEPARTMENT_USERS,
+          Permission.VIEW_DEPARTMENT_STATS,
 
           // Payroll Management
           Permission.CREATE_PAYROLL,
@@ -883,10 +885,13 @@ UserSchema.pre("save", function (next) {
           // Department Management
           Permission.VIEW_ALL_DEPARTMENTS,
           Permission.MANAGE_DEPARTMENT_USERS,
+          Permission.VIEW_DEPARTMENT_STATS,
 
           // Payroll Management
           Permission.CREATE_PAYROLL,
           Permission.EDIT_PAYROLL,
+          Permission.DELETE_PAYROLL,
+          Permission.SUBMIT_PAYROLL,
           Permission.VIEW_DEPARTMENT_PAYROLL,
           Permission.GENERATE_PAYSLIP,
           Permission.VIEW_REPORTS,

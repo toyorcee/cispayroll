@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import User, { Permission } from "../models/User.js";
+import User, { Permission, UserRole } from "../models/User.js";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -37,16 +37,26 @@ const missingPermissions = [
 
   // Personal bonus view permission for SUPER_ADMIN
   Permission.VIEW_OWN_BONUS,
+
+  // New permission to add
+  Permission.VIEW_DEPARTMENT_STATS,
 ];
 
 async function updateAdminPermissions() {
   try {
-    console.log("🔄 Starting SUPER_ADMIN bonus permission update...");
+    console.log(
+      "🔄 Starting permission update for SUPER_ADMIN and ADMIN users..."
+    );
 
     // Find all super admin users
-    const superAdminUsers = await User.find({ role: "SUPER_ADMIN" });
+    const superAdminUsers = await User.find({ role: UserRole.SUPER_ADMIN });
     console.log(`Found ${superAdminUsers.length} SUPER_ADMIN users to update`);
 
+    // Find all admin users
+    const adminUsers = await User.find({ role: UserRole.ADMIN });
+    console.log(`Found ${adminUsers.length} ADMIN users to update`);
+
+    // Update SUPER_ADMIN users
     for (const user of superAdminUsers) {
       // Add VIEW_OWN_BONUS permission if they don't already have it
       if (!user.permissions.includes(Permission.VIEW_OWN_BONUS)) {
@@ -76,9 +86,39 @@ async function updateAdminPermissions() {
       }
     }
 
+    // Update ADMIN users
+    for (const user of adminUsers) {
+      // Add VIEW_DEPARTMENT_STATS permission if they don't already have it
+      if (!user.permissions.includes(Permission.VIEW_DEPARTMENT_STATS)) {
+        const updatedPermissions = [
+          ...user.permissions,
+          Permission.VIEW_DEPARTMENT_STATS,
+        ];
+
+        // Update the user
+        const updatedUser = await User.findByIdAndUpdate(
+          user._id,
+          {
+            $set: {
+              permissions: updatedPermissions,
+            },
+          },
+          { new: true }
+        );
+
+        console.log(
+          `✅ Added VIEW_DEPARTMENT_STATS permission to ADMIN: ${updatedUser.fullName} (${updatedUser.employeeId})`
+        );
+      } else {
+        console.log(
+          `ℹ️ ADMIN ${user.fullName} (${user.employeeId}) already has VIEW_DEPARTMENT_STATS permission`
+        );
+      }
+    }
+
     console.log("✨ Update completed successfully!");
   } catch (error) {
-    console.error("❌ Error updating SUPER_ADMIN permissions:", error);
+    console.error("❌ Error updating permissions:", error);
     process.exit(1);
   } finally {
     // Close the MongoDB connection

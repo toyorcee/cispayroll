@@ -851,6 +851,7 @@ export class DeductionService {
    */
   static async getDepartmentDeductions(departmentId) {
     try {
+      // Get all deductions that are either company-wide or specific to this department
       const deductions = await Deduction.find({
         $or: [
           { scope: DeductionScope.COMPANY_WIDE },
@@ -862,6 +863,7 @@ export class DeductionService {
         isActive: true,
       });
 
+      // Group deductions by type and scope
       return {
         statutory: deductions.filter((d) => d.type === DeductionType.STATUTORY),
         voluntary: deductions.filter((d) => d.type === DeductionType.VOLUNTARY),

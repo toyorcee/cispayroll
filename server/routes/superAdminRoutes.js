@@ -556,4 +556,19 @@ router.delete(
   SuperAdminController.deletePaymentMethod
 );
 
+// Add these new routes for bulk processing
+router.post(
+  "/payroll/process-department",
+  requirePermission([Permission.CREATE_PAYROLL]),
+  validatePayrollCreate,
+  SuperAdminController.processDepartmentEmployeesPayroll
+);
+
+router.post(
+  "/payroll/process-all-departments",
+  requirePermission([Permission.CREATE_PAYROLL]),
+  validatePayrollCreate,
+  SuperAdminController.processAllDepartmentsPayroll
+);
+
 export default router;

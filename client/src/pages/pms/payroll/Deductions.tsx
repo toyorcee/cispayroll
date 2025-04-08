@@ -9,6 +9,7 @@ import {
 } from "../../../types/deduction";
 import { DeductionsTable } from "../../../components/payroll/deductions/DeductionsTable";
 import { DeductionForm } from "../../../components/payroll/deductions/DeductionForm";
+import { useAuth } from "../../../context/AuthContext";
 
 interface DeductionsState {
   statutory: Deduction[];
@@ -16,6 +17,7 @@ interface DeductionsState {
 }
 
 export default function Deductions() {
+  const { user } = useAuth();
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [deductions, setDeductions] = useState<DeductionsState>({
@@ -35,7 +37,10 @@ export default function Deductions() {
   const fetchDeductions = async () => {
     try {
       setIsInitialLoading(true);
-      const deductionsData = await deductionService.getAllDeductions();
+      const deductionsData =
+        user?.role === "ADMIN"
+          ? await deductionService.adminService.getAllDeductions()
+          : await deductionService.getAllDeductions();
       setDeductions(deductionsData);
     } catch (error) {
       console.error("❌ Error fetching deductions:", error);
@@ -60,16 +65,10 @@ export default function Deductions() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleUpdate = async (
-    id: string,
-    data: Omit<UpdateDeductionInput, "type">
-  ) => {
+  const handleUpdate = async (id: string, data: UpdateDeductionInput) => {
     try {
       setIsLoading(true);
-      await deductionService.updateDeduction(id, {
-        ...data,
-        type: deductionType,
-      } as UpdateDeductionInput);
+      await deductionService.updateDeduction(id, data);
       await fetchDeductions();
       setShowAddForm(false);
       setEditingDeduction(undefined);
@@ -118,13 +117,14 @@ export default function Deductions() {
   const handleCreateDeduction = async (data: CreateDeductionInput) => {
     try {
       setIsLoading(true);
-      if (deductionType === DeductionType.STATUTORY) {
+      if (data.type === "statutory") {
         await deductionService.createCustomStatutoryDeduction(data);
       } else {
         await deductionService.createVoluntaryDeduction(data);
       }
       await fetchDeductions();
       setShowAddForm(false);
+      setEditingDeduction(undefined);
     } catch (error) {
       console.error("Error creating deduction:", error);
     } finally {
@@ -221,12 +221,16 @@ export default function Deductions() {
             </div>
             <DeductionForm
               deduction={editingDeduction}
-              deductionType={deductionType}
+              deductionType={
+                deductionType === DeductionType.STATUTORY
+                  ? "statutory"
+                  : "voluntary"
+              }
               onSubmit={async (data) => {
                 if (editingDeduction) {
                   await handleUpdate(
                     editingDeduction._id,
-                    data as Omit<UpdateDeductionInput, "type">
+                    data as UpdateDeductionInput
                   );
                 } else {
                   await handleCreateDeduction(data as CreateDeductionInput);

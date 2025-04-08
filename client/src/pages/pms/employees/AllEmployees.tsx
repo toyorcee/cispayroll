@@ -10,7 +10,6 @@ import {
 import {
   Employee,
   EmployeeFilters,
-  CreateEmployeeData,
 } from "../../../types/employee";
 import { Status } from "../../../types/common";
 import { useAuth } from "../../../context/AuthContext";
@@ -110,6 +109,7 @@ export default function AllEmployees() {
   const [admins, setAdmins] = useState<AdminResponse[]>([]);
 
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
+  const isAdmin = user?.role === UserRole.ADMIN;
 
   const getActionPermissions = () => {
     if (isSuperAdmin) {
@@ -134,12 +134,12 @@ export default function AllEmployees() {
 
   const {
     data: employeesData,
-    isLoading: employeesLoading,
+    isLoading: isLoadingEmployees,
     error: employeesError,
     refetch,
-  } = user?.role === UserRole.ADMIN
-    ? employeeService.adminService.useGetEmployees(filters)
-    : employeeService.useGetEmployees(filters);
+  } = isSuperAdmin
+    ? employeeService.useGetEmployees(filters)
+    : employeeService.adminService.useGetEmployees(filters);
 
   const { data: salaryGrades, isLoading: salaryGradesLoading } = useQuery<
     ISalaryGrade[]
@@ -153,7 +153,7 @@ export default function AllEmployees() {
   const { data: adminsData } = employeeService.useGetAdmins();
 
   console.log("React Query State:", {
-    employeesLoading,
+    isLoadingEmployees,
     employeesData,
     employeesError,
   });
@@ -161,10 +161,17 @@ export default function AllEmployees() {
   useEffect(() => {
     console.log("useEffect triggered with employeesData:", employeesData);
     if (employeesData) {
-      setEmployees(employeesData.data || []);
-      setTotalEmployees(employeesData.pagination?.total || 0);
+      // Preserve the original data structure for super admin
+      if (isSuperAdmin) {
+        setEmployees(employeesData.data || []);
+        setTotalEmployees(employeesData.pagination?.total || 0);
+      } else {
+        // For regular admin, use the new structure
+        setEmployees(employeesData.users || []);
+        setTotalEmployees(employeesData.totalUsers || 0);
+      }
     }
-  }, [employeesData]);
+  }, [employeesData, isSuperAdmin]);
 
   useEffect(() => {
     if (departmentsData) {
@@ -289,74 +296,83 @@ export default function AllEmployees() {
     </div>
   );
 
-  const handleCreateEmployee = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsCreating(true);
+  const handleCreateEmployee = async (formData: EmployeeFormData) => {
     try {
-      if (!formData.department && isSuperAdmin) {
-        toast.error("Please select a department");
-        return;
+      setIsCreating(true);
+      console.log("Creating employee with data:", formData);
+
+      // Ensure department is set for admin users
+      if (!formData.department && isAdmin) {
+        const userDepartment =
+          typeof user?.department === "object"
+            ? user.department._id
+            : user?.department;
+
+        if (!userDepartment) {
+          toast.error("No department assigned to admin user");
+          return;
+        }
+
+        formData.department = userDepartment;
       }
 
-      const departmentId = isSuperAdmin
-        ? formData.department
-        : (typeof user?.department === "object"
-            ? user.department._id
-            : user?.department) ?? "";
+      // For admin users, we need to ensure the role is set to USER
+      if (isAdmin) {
+        formData.role = "USER";
+      }
 
-      const employeeData: CreateEmployeeData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phone: formData.phone,
-        role: formData.role,
-        position: formData.position,
-        gradeLevel: formData.gradeLevel,
-        workLocation: formData.workLocation,
-        dateJoined: formData.dateJoined,
-        department: departmentId,
-      };
+      console.log("User role:", user?.role);
+      console.log("Is admin:", isAdmin);
+      console.log("Is super admin:", isSuperAdmin);
 
-      await employeeService.createEmployee(employeeData);
-      toast.success("Employee created successfully!");
+      let response;
+      if (isSuperAdmin) {
+        console.log("Using super admin service to create employee");
+        response = await employeeService.createEmployee(formData);
+      } else {
+        console.log("Using admin service to create employee");
+        response = await employeeService.adminService.createEmployee(formData);
+      }
+
+      console.log("Employee creation response:", response);
+
+      toast.success("Employee created successfully. Invitation sent.");
       setShowCreateModal(false);
       refetch();
-    } catch (error: any) {
-      if (
-        error.response?.status === 500 &&
-        error.response?.data?.message?.includes("duplicate key")
-      ) {
-        toast.error(
-          `Email ${formData.email} is already in use. Please use a different email.`
-        );
-      } else {
-        toast.error("Error creating employee. Please try again.");
-      }
+    } catch (error) {
       console.error("Error creating employee:", error);
+      toast.error("Failed to create employee. Please try again.");
     } finally {
       setIsCreating(false);
     }
   };
 
-  const handleUpdateEmployee = async (data: Partial<Employee>) => {
-    if (!selectedEmployeeId) return;
+  const handleUpdateEmployee = async (id: string, data: Partial<Employee>) => {
     try {
-      const updateData = {
-        ...data,
-        department:
-          typeof data.department === "object" && "name" in data.department
-            ? (data.department as any)._id
-            : departments?.find((d) => d.name === data.department)?._id ||
-              data.department,
-      };
+      const response = isSuperAdmin
+        ? await employeeService.updateEmployee(id, data)
+        : await employeeService.adminService.updateEmployee(id, data);
 
-      await employeeService.updateEmployee(selectedEmployeeId, updateData);
-      await refetch();
-      setShowEditModal(false);
       toast.success("Employee updated successfully");
+      setShowEditModal(false);
+      refetch();
     } catch (error) {
+      console.error("Error updating employee:", error);
       toast.error("Failed to update employee");
-      throw error;
+    }
+  };
+
+  const handleDeleteEmployee = async (id: string) => {
+    try {
+      const response = isSuperAdmin
+        ? await employeeService.deleteEmployee(id)
+        : await employeeService.adminService.deleteEmployee(id);
+
+      toast.success("Employee deleted successfully");
+      refetch();
+    } catch (error) {
+      console.error("Error deleting employee:", error);
+      toast.error("Failed to delete employee");
     }
   };
 
@@ -372,7 +388,12 @@ export default function AllEmployees() {
   // Use the hook to fetch employee details
   const { data: employeeDetails } = useQuery({
     queryKey: ["employee", selectedEmployeeId],
-    queryFn: () => employeeService.getEmployeeById(selectedEmployeeId || ""),
+    queryFn: () => {
+      if (!selectedEmployeeId) return null;
+      return isSuperAdmin
+        ? employeeService.getEmployeeById(selectedEmployeeId)
+        : employeeService.adminService.getEmployeeById(selectedEmployeeId);
+    },
     enabled: !!selectedEmployeeId,
   });
 
@@ -456,7 +477,7 @@ export default function AllEmployees() {
       </div>
 
       <div className="bg-white rounded-lg shadow mt-6 overflow-hidden">
-        {employeesLoading ? (
+        {isLoadingEmployees ? (
           <div className="w-full">
             <EmployeeTableSkeleton isSuperAdmin={isSuperAdmin} />
             <div className="text-center mt-4">Loading employees...</div>
@@ -613,7 +634,7 @@ export default function AllEmployees() {
         )}
       </div>
 
-      {!employeesLoading && employees.length > 0 && (
+      {!isLoadingEmployees && employees.length > 0 && (
         <div className="mt-6">
           <div className="flex flex-col items-center gap-2 text-sm text-gray-600 mb-4">
             <div>
@@ -686,7 +707,7 @@ export default function AllEmployees() {
           employees.find((e) => e._id === selectedEmployeeId) ||
           ({} as Employee)
         }
-        onSave={handleUpdateEmployee}
+        onSave={(data) => handleUpdateEmployee(selectedEmployeeId || "", data)}
       />
 
       <Dialog
@@ -709,7 +730,13 @@ export default function AllEmployees() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateEmployee} className="space-y-4">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleCreateEmployee(formData);
+              }}
+              className="space-y-4"
+            >
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">

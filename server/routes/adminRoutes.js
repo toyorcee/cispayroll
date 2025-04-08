@@ -7,9 +7,16 @@ import {
 import { AdminController } from "../controllers/AdminController.js";
 import { Permission } from "../models/User.js";
 import {
-  validatePayrollCreate,
   validatePayrollUpdate,
+  validateEmployeePayrollHistory,
+  validatePayrollApproval,
+  validatePayrollRejection,
 } from "../middleware/payrollValidation.js";
+import {
+  validateAdminSinglePayrollCreate,
+  validateAdminBulkPayrollCreate,
+  validateAdminPayrollSubmission,
+} from "../middleware/adminPayrollValidation.js";
 
 const router = Router();
 
@@ -22,6 +29,36 @@ router.get(
   "/employees",
   requirePermission([Permission.VIEW_ALL_USERS]),
   AdminController.getAllEmployees
+);
+
+router.get(
+  "/employees/:id",
+  requirePermission([Permission.VIEW_ALL_USERS]),
+  AdminController.getEmployeeById
+);
+
+router.post(
+  "/employees",
+  requirePermission([Permission.CREATE_USER]),
+  AdminController.createEmployee
+);
+
+router.put(
+  "/employees/:id",
+  requirePermission([Permission.EDIT_USER]),
+  AdminController.updateEmployee
+);
+
+router.delete(
+  "/employees/:id",
+  requirePermission([Permission.DELETE_USER]),
+  AdminController.deleteEmployee
+);
+
+router.get(
+  "/departments/:id/employees",
+  requirePermission([Permission.VIEW_ALL_USERS]),
+  AdminController.getDepartmentEmployees
 );
 
 router.get(
@@ -44,15 +81,39 @@ router.put(
 
 // ===== Payroll Management Routes =====
 router.get(
+  "/payroll/periods",
+  requirePermission([Permission.VIEW_DEPARTMENT_PAYROLL]),
+  AdminController.getDepartmentPayrollPeriods
+);
+
+router.get(
+  "/payroll/stats",
+  requirePermission([Permission.VIEW_DEPARTMENT_PAYROLL]),
+  AdminController.getPayrollStats
+);
+
+router.get(
+  "/payroll/history/:employeeId",
+  requirePermission([Permission.VIEW_DEPARTMENT_PAYROLL]),
+  validateEmployeePayrollHistory,
+  AdminController.getEmployeePayrollHistory
+);
+
+router.get(
   "/payroll",
   requirePermission([Permission.VIEW_DEPARTMENT_PAYROLL]),
   AdminController.getDepartmentPayroll
 );
 
+router.get(
+  "/payroll/:id",
+  requirePermission([Permission.VIEW_DEPARTMENT_PAYROLL]),
+  AdminController.getPayrollById
+);
+
 router.post(
   "/payroll",
   requirePermission([Permission.CREATE_PAYROLL]),
-  validatePayrollCreate,
   AdminController.createDepartmentPayroll
 );
 
@@ -61,6 +122,66 @@ router.put(
   requirePermission([Permission.EDIT_PAYROLL]),
   validatePayrollUpdate,
   AdminController.updateDepartmentPayroll
+);
+
+router.patch(
+  "/payroll/:id/approve",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  validatePayrollApproval,
+  AdminController.approvePayroll
+);
+
+router.patch(
+  "/payroll/:id/reject",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  validatePayrollRejection,
+  AdminController.rejectPayroll
+);
+
+router.post(
+  "/payroll/:id/process-payment",
+  requirePermission([Permission.PROCESS_PAYMENT]),
+  AdminController.processPayment
+);
+
+router.patch(
+  "/payroll/:id/submit",
+  requirePermission([Permission.SUBMIT_PAYROLL]),
+  AdminController.submitPayroll
+);
+
+router.get(
+  "/payslip/:employeeId",
+  requirePermission([Permission.VIEW_DEPARTMENT_PAYSLIPS]),
+  AdminController.viewPayslip
+);
+
+router.post(
+  "/payroll/process-single",
+  requirePermission([Permission.CREATE_PAYROLL]),
+  validateAdminSinglePayrollCreate,
+  AdminController.processSingleEmployeePayroll
+);
+
+router.post(
+  "/payroll/process-department",
+  requirePermission([Permission.CREATE_PAYROLL]),
+  validateAdminBulkPayrollCreate,
+  AdminController.processDepartmentPayroll
+);
+
+router.post(
+  "/payroll/submit-department",
+  requirePermission([Permission.SUBMIT_PAYROLL]),
+  validateAdminPayrollSubmission,
+  AdminController.submitDepartmentPayrolls
+);
+
+router.post(
+  "/payroll/process-multiple",
+  requirePermission([Permission.CREATE_PAYROLL]),
+  validateAdminBulkPayrollCreate,
+  AdminController.processMultipleEmployeesPayroll
 );
 
 // ===== Salary Structure & Allowances Management Routes =====
@@ -101,75 +222,79 @@ router.patch(
 );
 
 // ===== Deduction Management Routes =====
-// Department-specific deduction routes
-router.post(
-  "/department/deductions",
-  requirePermission([Permission.MANAGE_DEPARTMENT_DEDUCTIONS]),
-  AdminController.createDepartmentDeduction
+// Get all deductions (including company-wide and department-specific)
+router.get(
+  "/deductions",
+  requirePermission([Permission.VIEW_DEDUCTIONS]),
+  AdminController.getAllDeductions
 );
 
+// Get department-specific deductions
 router.get(
-  "/department/deductions",
+  "/deductions/department",
   requirePermission([Permission.VIEW_DEPARTMENT_DEDUCTIONS]),
   AdminController.getDepartmentDeductions
 );
 
-// Fix: Add employee deductions route
-router.get(
-  "/department/employees/:employeeId/deductions",
-  requirePermission([Permission.VIEW_DEPARTMENT_DEDUCTIONS]),
-  AdminController.getDepartmentEmployeeDeductions
+// Create department-specific deduction
+router.post(
+  "/deductions/department",
+  requirePermission([Permission.MANAGE_DEPARTMENT_DEDUCTIONS]),
+  AdminController.createDepartmentDeduction
 );
 
-// Fix: Individual assignment routes
+// Employee-specific deduction routes
 router.post(
-  "/department/deductions/:deductionId/assign/:employeeId",
+  "/deductions/:deductionId/assign/:employeeId",
   requirePermission([Permission.MANAGE_DEPARTMENT_DEDUCTIONS]),
-  AdminController.assignDepartmentDeductionToEmployee
+  AdminController.assignDeductionToEmployee
 );
 
 router.delete(
-  "/department/deductions/:deductionId/employees/:employeeId",
+  "/deductions/:deductionId/employees/:employeeId",
   requirePermission([Permission.MANAGE_DEPARTMENT_DEDUCTIONS]),
   AdminController.removeDeductionFromEmployee
 );
 
-// Fix: Batch operations routes
-router.post(
-  "/department/deductions/:deductionId/assign-batch",
-  requirePermission([Permission.MANAGE_DEPARTMENT_DEDUCTIONS]),
-  AdminController.assignDepartmentDeductionToMultipleEmployees
-);
-
-router.post(
-  "/department/deductions/:deductionId/remove-batch",
-  requirePermission([Permission.MANAGE_DEPARTMENT_DEDUCTIONS]),
-  AdminController.removeDepartmentDeductionFromMultipleEmployees
-);
-
-// Fix: History and details routes
 router.get(
-  "/department/deductions/:deductionId/history",
+  "/employees/:employeeId/deductions",
   requirePermission([Permission.VIEW_DEPARTMENT_DEDUCTIONS]),
-  AdminController.getDepartmentDeductionHistory
+  AdminController.getEmployeeDeductions
 );
 
+// Batch operations
+router.post(
+  "/deductions/:deductionId/assign-batch",
+  requirePermission([Permission.MANAGE_DEPARTMENT_DEDUCTIONS]),
+  AdminController.assignDeductionToMultipleEmployees
+);
+
+router.delete(
+  "/deductions/:deductionId/remove-batch",
+  requirePermission([Permission.MANAGE_DEPARTMENT_DEDUCTIONS]),
+  AdminController.removeDeductionFromMultipleEmployees
+);
+
+// ===== Department Statistics Routes =====
 router.get(
-  "/deductions/:id",
-  requirePermission([Permission.VIEW_DEDUCTIONS]),
-  AdminController.getDeductionDetails
+  "/department/stats/charts",
+  requirePermission([Permission.VIEW_DEPARTMENT_STATS]),
+  AdminController.getDepartmentChartStats
 );
 
-router.put(
-  "/department/deductions/:id",
-  requirePermission([Permission.EDIT_DEDUCTIONS]),
-  AdminController.updateDepartmentDeduction
+// Bulk approval/rejection routes
+router.post(
+  "/payroll/approve-department",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  validateAdminPayrollSubmission,
+  AdminController.approveDepartmentPayrolls
 );
 
-router.patch(
-  "/department/deductions/:id/toggle",
-  requirePermission([Permission.EDIT_DEDUCTIONS]),
-  AdminController.toggleDeductionStatus
+router.post(
+  "/payroll/reject-department",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  validateAdminPayrollSubmission,
+  AdminController.rejectDepartmentPayrolls
 );
 
 export default router;

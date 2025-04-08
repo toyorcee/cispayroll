@@ -9,6 +9,7 @@ import AllEmployees from "../pages/pms/employees/AllEmployees";
 import Onboarding from "../pages/pms/employees/Onboarding";
 import LeaveManagement from "../pages/pms/employees/LeaveManagement";
 import ProcessPayroll from "../pages/pms/payroll/ProcessPayroll";
+import ProcessDepartmentPayroll from "../pages/pms/payroll/ProcessDepartmentPayroll";
 import SalaryStructure from "../pages/pms/payroll/SalaryStructure";
 import Deductions from "../pages/pms/payroll/Deductions";
 import PayrollReports from "../pages/pms/reports/PayrollReports";
@@ -168,7 +169,13 @@ export const routes: RouteConfig[] = [
       Permission.VIEW_ALL_PAYROLL,
       // Admin
       Permission.VIEW_DEPARTMENT_PAYROLL,
-      Permission.MANAGE_DEPARTMENT_DEDUCTIONS,
+      Permission.CREATE_PAYROLL,
+      Permission.EDIT_PAYROLL,
+      Permission.DELETE_PAYROLL,
+      Permission.SUBMIT_PAYROLL,
+      Permission.VIEW_DEPARTMENT_DEDUCTIONS,
+      Permission.VIEW_DEPARTMENT_ALLOWANCES,
+      Permission.VIEW_DEPARTMENT_BONUSES,
       // All Users (including Admin)
       Permission.VIEW_OWN_PAYSLIP,
       Permission.VIEW_OWN_ALLOWANCES,
@@ -234,14 +241,32 @@ export const routes: RouteConfig[] = [
       {
         path: "process",
         label: "Process Payroll",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        roles: [UserRole.SUPER_ADMIN],
         permissions: [
           Permission.CREATE_PAYROLL,
           Permission.EDIT_PAYROLL,
-          Permission.VIEW_DEPARTMENT_PAYROLL,
+          Permission.DELETE_PAYROLL,
+          Permission.SUBMIT_PAYROLL,
+          Permission.VIEW_ALL_PAYROLL,
+          Permission.GENERATE_PAYSLIP,
         ],
         requireAllPermissions: false,
         element: <ProcessPayroll />,
+      },
+      {
+        path: "department-process",
+        label: "Process Department Payroll",
+        roles: [UserRole.ADMIN],
+        permissions: [
+          Permission.CREATE_PAYROLL,
+          Permission.EDIT_PAYROLL,
+          Permission.DELETE_PAYROLL,
+          Permission.SUBMIT_PAYROLL,
+          Permission.VIEW_DEPARTMENT_PAYROLL,
+          Permission.GENERATE_PAYSLIP,
+        ],
+        requireAllPermissions: false,
+        element: <ProcessDepartmentPayroll />,
       },
       {
         path: "my-payslips",
@@ -298,7 +323,7 @@ export const routes: RouteConfig[] = [
         label: "Payroll Reports",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
         permissions: [Permission.VIEW_PAYROLL_REPORTS],
-        requireAllPermissions: false,
+        requireAllPermissions: true,
         element: <PayrollReports />,
       },
       {
@@ -306,7 +331,7 @@ export const routes: RouteConfig[] = [
         label: "Employee Reports",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
         permissions: [Permission.VIEW_EMPLOYEE_REPORTS],
-        requireAllPermissions: false,
+        requireAllPermissions: true,
         element: <EmployeeReports />,
       },
       {
@@ -314,7 +339,7 @@ export const routes: RouteConfig[] = [
         label: "Tax Reports",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
         permissions: [Permission.VIEW_TAX_REPORTS],
-        requireAllPermissions: false,
+        requireAllPermissions: true,
         element: <TaxReports />,
       },
       {
