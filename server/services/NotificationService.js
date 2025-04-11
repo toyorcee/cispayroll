@@ -142,9 +142,9 @@ export class NotificationService {
 
       // Get employee details with department
       const user = await UserModel.findById(userId).populate(
-        "department",
-        "name code"
-      );
+      "department",
+      "name code"
+    );
       if (!user) {
         console.error(`❌ User not found for notification: ${userId}`);
         return null;
@@ -153,7 +153,7 @@ export class NotificationService {
       const departmentName = user.department?.name || "Not assigned";
       const departmentCode = user.department?.code || "N/A";
 
-      console.log(
+    console.log(
         `👤 Employee details for notification: ${user.firstName} ${user.lastName} (${userId})`
       );
       console.log(`🏢 Department: ${departmentName}`);
@@ -171,17 +171,17 @@ export class NotificationService {
         : `New payroll submission for ${user.firstName} ${user.lastName} (${departmentName}) for ${payrollData.month}/${payrollData.year} requires ${levelDisplay} approval`;
 
       // Enhanced notification data with UI-friendly information
-      const notificationData = {
-        recipient: userId,
-        type: "payroll",
-        title: `Payroll ${type.replace(/_/g, " ").toLowerCase()}`,
-        data: {
+    const notificationData = {
+      recipient: userId,
+      type: "payroll",
+      title: `Payroll ${type.replace(/_/g, " ").toLowerCase()}`,
+      data: {
           // Core payroll data
           payrollId: payrollData._id,
           month: payrollData.month,
           year: payrollData.year,
           status: payrollData.status,
-          remarks,
+        remarks,
 
           // Employee information
           employeeId: payrollData.employee?.employeeId || "N/A",
@@ -225,21 +225,21 @@ export class NotificationService {
           createdAt: new Date(),
           periodStart: payrollData.periodStart,
           periodEnd: payrollData.periodEnd,
-        },
-        read: false,
+      },
+      read: false,
         message,
-      };
+    };
 
-      console.log(
+    console.log(
         "📝 Notification data:",
-        JSON.stringify(notificationData, null, 2)
-      );
+      JSON.stringify(notificationData, null, 2)
+    );
 
-      const notification = await Notification.create(notificationData);
-      console.log(`✅ Notification created with ID: ${notification._id}`);
+    const notification = await Notification.create(notificationData);
+    console.log(`✅ Notification created with ID: ${notification._id}`);
       console.log(`📨 Notification saved for user: ${userId}`);
 
-      return notification;
+    return notification;
     } catch (error) {
       console.error(`❌ Error creating notification:`, error);
       throw error;
