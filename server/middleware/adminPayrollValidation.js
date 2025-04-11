@@ -237,6 +237,21 @@ export const validateAdminPayrollSubmission = (req, res, next) => {
   }
 };
 
+export const validatePayrollSubmission = (req, res, next) => {
+  try {
+    const { remarks } = req.body;
+
+    // Remarks is optional, but if provided, validate it
+    if (remarks && typeof remarks !== "string") {
+      throw new ApiError(400, "Remarks must be a string");
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const validateAdminDepartmentPayrollCreate = async (req, res, next) => {
   try {
     const { month, year, frequency } = req.body;

@@ -247,7 +247,9 @@ export class AdminController {
   // ===== Payroll Management Methods =====
   static async getDepartmentPayroll(req, res, next) {
     try {
-      const { department } = req.user;
+      const admin = await UserModel.findById(req.user.id);
+      const { department } = admin;
+
       if (!department) {
         return res.status(400).json({
           success: false,
@@ -264,7 +266,27 @@ export class AdminController {
         employeeId,
       } = req.query;
 
-      const query = { department };
+      let query = {};
+
+      // Check if user is Finance Director
+      const isFinanceDirector =
+        admin.position &&
+        new RegExp("head of finance|finance director|finance head", "i").test(
+          admin.position
+        );
+
+      if (isFinanceDirector) {
+        // For Finance Director, show payrolls that need their approval
+        query = {
+          status: PAYROLL_STATUS.PENDING,
+          "approvalFlow.currentLevel": APPROVAL_LEVELS.FINANCE_DIRECTOR,
+        };
+        console.log("🔍 Fetching payrolls for Finance Director approval");
+      } else {
+        // For other users, show only their department's payrolls
+        query = { department };
+        console.log("🔍 Fetching payrolls for department:", department);
+      }
 
       // Add date range filter if provided
       if (startDate && endDate) {
@@ -284,14 +306,20 @@ export class AdminController {
         query.employee = employeeId;
       }
 
+      console.log("📊 Query:", JSON.stringify(query, null, 2));
+
       const payrolls = await PayrollModel.find(query)
         .populate("employee", "firstName lastName email employeeId")
         .populate("department", "name")
+        .populate("approvalFlow.submittedBy", "firstName lastName")
+        .populate("approvalFlow.approvedBy", "firstName lastName")
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(parseInt(limit));
 
       const total = await PayrollModel.countDocuments(query);
+
+      console.log(`✅ Found ${payrolls.length} payrolls`);
 
       return res.status(200).json({
         success: true,
@@ -660,128 +688,38 @@ export class AdminController {
             }
           } else if (nextLevel === APPROVAL_LEVELS.FINANCE_DIRECTOR) {
             console.log("🔍 Looking for Finance Director approver...");
-            console.log("Current user:", {
-              id: req.user._id,
-              position: req.user.position,
-              department: req.user.department,
-            });
 
-            // First try to find the current user if they are in a finance position
-            let nextApprover = await UserModel.findOne({
-              _id: req.user._id,
-              position: {
-                $regex: new RegExp(
-                  "(head of finance|finance director|finance head)",
-                  "i"
-                ),
-              },
+            // Find the Finance and Accounting department
+            const financeDepartment = await DepartmentModel.findOne({
+              name: "Finance and Accounting",
               status: "active",
             });
 
-            if (nextApprover) {
-              console.log("✅ Found current user as finance approver");
-            } else {
+            if (financeDepartment) {
               console.log(
-                "⚠️ Current user is not a finance approver, looking for other approvers..."
+                `✅ Found Finance and Accounting department: ${financeDepartment.name} (${financeDepartment._id})`
               );
 
-              // Try to find Olaniyan Emmanuel specifically as Head of Finance
+              // Find the Head of Finance in this department
               nextApprover = await UserModel.findOne({
-                firstName: "Olaniyan",
-                lastName: "Emmanuel",
-                position: "Head of Finance",
+                department: financeDepartment._id,
+                position: {
+                  $regex: new RegExp("head of finance", "i"),
+                },
                 status: "active",
               });
 
               if (nextApprover) {
                 console.log(
-                  `✅ Found Olaniyan Emmanuel as Head of Finance: ${nextApprover.firstName} ${nextApprover.lastName}`
+                  `✅ Found Finance Director: ${nextApprover.firstName} ${nextApprover.lastName}`
                 );
               } else {
                 console.log(
-                  "⚠️ Olaniyan Emmanuel not found, trying department search..."
+                  "❌ No Finance Director found in Finance and Accounting department"
                 );
-
-                // Try to find any finance head in the Finance and Accounting department
-                nextApprover = await UserModel.findOne({
-                  department: "67e9dc77c6a350a3b61a7317", // Finance and Accounting department ID
-                  position: {
-                    $regex: new RegExp(
-                      "(head of finance|finance director|finance head)",
-                      "i"
-                    ),
-                  },
-                  status: "active",
-                });
-
-                if (nextApprover) {
-                  console.log(
-                    `✅ Found finance approver in Finance and Accounting department: ${nextApprover.firstName} ${nextApprover.lastName}`
-                  );
-                } else {
-                  console.log(
-                    "⚠️ No finance approver found in Finance and Accounting department, trying flexible search..."
-                  );
-
-                  // Try the flexible department search
-                  const financeDepartment = await DepartmentModel.findOne({
-                    $or: [
-                      { _id: "67e9dc77c6a350a3b61a7317" }, // Try exact ID first
-                      { name: "Finance and Accounting" }, // Try exact name
-                      {
-                        name: {
-                          $regex: new RegExp(
-                            "(finance|financial|accounting)",
-                            "i"
-                          ),
-                        },
-                      }, // Try regex as fallback
-                    ],
-                    status: "active",
-                  });
-
-                  if (financeDepartment) {
-                    console.log(
-                      `✅ Found finance department: ${financeDepartment.name} (${financeDepartment._id})`
-                    );
-                    nextApprover = await UserModel.findOne({
-                      department: financeDepartment._id,
-                      position: {
-                        $regex: new RegExp(
-                          "(head of finance|finance director|finance head|finance manager|financial manager)",
-                          "i"
-                        ),
-                      },
-                      status: "active",
-                    });
-
-                    if (nextApprover) {
-                      console.log(
-                        `✅ Found finance approver in ${financeDepartment.name}: ${nextApprover.firstName} ${nextApprover.lastName}`
-                      );
-                    } else {
-                      console.log(
-                        `❌ No finance approver found in ${financeDepartment.name}`
-                      );
-                    }
-                  } else {
-                    console.log("❌ No finance department found");
-                  }
-                }
               }
-            }
-
-            if (nextApprover) {
-              console.log(
-                `✅ Final approver found: ${nextApprover.firstName} ${nextApprover.lastName}`
-              );
-              console.log("Approver details:", {
-                id: nextApprover._id,
-                position: nextApprover.position,
-                department: nextApprover.department,
-              });
             } else {
-              console.log("❌ No Finance Director found after all attempts");
+              console.log("❌ Finance and Accounting department not found");
             }
           } else if (nextLevel === APPROVAL_LEVELS.SUPER_ADMIN) {
             nextApprover = await UserModel.findOne({
@@ -1268,64 +1206,71 @@ export class AdminController {
 
       await payroll.save();
 
-      // Create notifications for all stakeholders
+      // Create a map to track notifications by user ID to avoid duplicates
+      const notificationMap = new Map();
+
+      // Helper function to add a notification to the map
+      const addNotification = (userId, role) => {
+        if (!userId) return;
+
+        const userIdStr = userId.toString();
+        if (!notificationMap.has(userIdStr)) {
+          notificationMap.set(userIdStr, {
+            userId,
+            roles: [role],
+            customMessage: `Submitted for ${role.toLowerCase()} approval`,
+          });
+        } else {
+          // User already has a notification, just add the role
+          const existing = notificationMap.get(userIdStr);
+          existing.roles.push(role);
+          // Update message to include all roles
+          existing.customMessage = `Submitted for ${existing.roles
+            .join(" and ")
+            .toLowerCase()} approval`;
+        }
+      };
+
+      // Add notifications for all stakeholders
+      if (departmentHead) {
+        addNotification(departmentHead._id, "Department Head");
+      }
+
+      if (hrManager) {
+        addNotification(hrManager._id, "HR Manager");
+      }
+
+      if (financeDirector) {
+        addNotification(financeDirector._id, "Finance Director");
+      }
+
+      // Add notifications for super admins
+      superAdmins.forEach((superAdmin) => {
+        addNotification(superAdmin._id, "Super Admin");
+      });
+
+      // Add notification for employee
+      addNotification(payroll.employee, "Employee");
+
+      // Create notifications from the map
       const notificationPromises = [];
 
-      // Notify department head
-      notificationPromises.push(
-        NotificationService.createPayrollNotification(
-          departmentHead._id,
-          NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
-          payroll,
-          remarks || "Submitted for department head approval"
-        )
-      );
+      notificationMap.forEach((notification, userId) => {
+        console.log(
+          `Creating notification for user ${userId} with roles: ${notification.roles.join(
+            ", "
+          )}`
+        );
 
-      // Notify HR Manager if found
-      if (hrManager) {
         notificationPromises.push(
           NotificationService.createPayrollNotification(
-            hrManager._id,
+            notification.userId,
             NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
             payroll,
-            remarks || "Submitted for department head approval"
+            remarks || notification.customMessage
           )
         );
-      }
-
-      // Notify Finance Director if found
-      if (financeDirector) {
-        notificationPromises.push(
-          NotificationService.createPayrollNotification(
-            financeDirector._id,
-            NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
-            payroll,
-            remarks || "Submitted for department head approval"
-          )
-        );
-      }
-
-      // Notify super admins
-      for (const superAdmin of superAdmins) {
-        notificationPromises.push(
-          NotificationService.createPayrollNotification(
-            superAdmin._id,
-            NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
-            payroll,
-            remarks || "Submitted for department head approval"
-          )
-        );
-      }
-
-      // Notify employee
-      notificationPromises.push(
-        NotificationService.createPayrollNotification(
-          payroll.employee,
-          NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
-          payroll,
-          remarks || "Submitted for department head approval"
-        )
-      );
+      });
 
       await Promise.all(notificationPromises);
 

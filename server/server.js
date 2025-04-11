@@ -33,6 +33,7 @@ import departmentRoutes from "./routes/departmentRoutes.js";
 import passwordRoutes from "./routes/passwordRoutes.js";
 import deductionRoutes from "./routes/deductionRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import approvalRoutes from "./routes/approvalRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -197,6 +198,7 @@ app.use("/api/departments", routeErrorWrapper(departmentRoutes));
 app.use("/api/password", routeErrorWrapper(passwordRoutes));
 app.use("/api/deductions", routeErrorWrapper(deductionRoutes));
 app.use("/api/notifications", routeErrorWrapper(notificationRoutes));
+app.use("/api/approvals", routeErrorWrapper(approvalRoutes));
 
 // Enhanced health check
 app.get("/api/health", (_req, res) => {

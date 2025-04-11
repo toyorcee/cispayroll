@@ -170,20 +170,61 @@ export class NotificationService {
         ? notificationMessages[type](user, payrollData, remarks)
         : `New payroll submission for ${user.firstName} ${user.lastName} (${departmentName}) for ${payrollData.month}/${payrollData.year} requires ${levelDisplay} approval`;
 
+      // Enhanced notification data with UI-friendly information
       const notificationData = {
         recipient: userId,
         type: "payroll",
         title: `Payroll ${type.replace(/_/g, " ").toLowerCase()}`,
         data: {
+          // Core payroll data
           payrollId: payrollData._id,
           month: payrollData.month,
           year: payrollData.year,
           status: payrollData.status,
           remarks,
-          employeeName: `${user.firstName} ${user.lastName}`,
-          departmentName,
-          departmentCode,
+
+          // Employee information
+          employeeId: payrollData.employee?.employeeId || "N/A",
+          employeeName: `${payrollData.employee?.firstName || ""} ${
+            payrollData.employee?.lastName || ""
+          }`,
+          employeeEmail: payrollData.employee?.email || "N/A",
+          employeeDepartment:
+            payrollData.employee?.department?.name || "Unknown Department",
+          employeeDepartmentCode:
+            payrollData.employee?.department?.code || "Unknown",
+
+          // Financial information
+          basicSalary: payrollData.basicSalary || 0,
+          totalAllowances: payrollData.totals?.totalAllowances || 0,
+          totalDeductions: payrollData.totals?.totalDeductions || 0,
+          netPay: payrollData.totals?.netPay || 0,
+
+          // Approval flow information
           currentLevel: levelDisplay,
+          nextApprovalLevel:
+            payrollData.approvalFlow?.nextApprovalLevel || null,
+          approvalHistory: payrollData.approvalFlow?.history || [],
+
+          // UI rendering helpers
+          notificationType: type,
+          actionRequired:
+            type.includes("PENDING") || type.includes("SUBMITTED"),
+          priority: type.includes("REJECTED")
+            ? "high"
+            : type.includes("PENDING")
+            ? "medium"
+            : "low",
+          icon: this.getNotificationIcon(type),
+          color: this.getNotificationColor(type),
+
+          // Action buttons for frontend
+          actions: this.getNotificationActions(type, payrollData._id),
+
+          // Timestamps
+          createdAt: new Date(),
+          periodStart: payrollData.periodStart,
+          periodEnd: payrollData.periodEnd,
         },
         read: false,
         message,
@@ -200,8 +241,8 @@ export class NotificationService {
 
       return notification;
     } catch (error) {
-      console.error("❌ Error creating notification:", error);
-      return null;
+      console.error(`❌ Error creating notification:`, error);
+      throw error;
     }
   }
 
@@ -248,5 +289,92 @@ export class NotificationService {
     });
 
     return await Promise.all(notifications);
+  }
+
+  // Helper function to get appropriate icon for notification type
+  static getNotificationIcon(type) {
+    if (type.includes("APPROVED")) return "check-circle";
+    if (type.includes("REJECTED")) return "x-circle";
+    if (type.includes("PENDING")) return "clock";
+    if (type.includes("SUBMITTED")) return "send";
+    if (type.includes("COMPLETED")) return "check-double";
+    if (type.includes("PAID")) return "credit-card";
+    return "bell";
+  }
+
+  // Helper function to get appropriate color for notification type
+  static getNotificationColor(type) {
+    if (type.includes("APPROVED")) return "success";
+    if (type.includes("REJECTED")) return "danger";
+    if (type.includes("PENDING")) return "warning";
+    if (type.includes("SUBMITTED")) return "info";
+    if (type.includes("COMPLETED")) return "success";
+    if (type.includes("PAID")) return "primary";
+    return "secondary";
+  }
+
+  // Helper function to get appropriate actions for notification type
+  static getNotificationActions(type, payrollId) {
+    const actions = [];
+
+    if (type.includes("PENDING") || type.includes("SUBMITTED")) {
+      actions.push({
+        label: "View Details",
+        action: "view",
+        url: `/payroll/${payrollId}`,
+        icon: "eye",
+      });
+
+      actions.push({
+        label: "Approve",
+        action: "approve",
+        url: `/payroll/${payrollId}/approve`,
+        icon: "check",
+      });
+
+      actions.push({
+        label: "Reject",
+        action: "reject",
+        url: `/payroll/${payrollId}/reject`,
+        icon: "x",
+      });
+    } else if (type.includes("APPROVED")) {
+      actions.push({
+        label: "View Details",
+        action: "view",
+        url: `/payroll/${payrollId}`,
+        icon: "eye",
+      });
+    } else if (type.includes("REJECTED")) {
+      actions.push({
+        label: "View Details",
+        action: "view",
+        url: `/payroll/${payrollId}`,
+        icon: "eye",
+      });
+
+      actions.push({
+        label: "Edit",
+        action: "edit",
+        url: `/payroll/${payrollId}/edit`,
+        icon: "edit",
+      });
+    } else if (type.includes("COMPLETED")) {
+      actions.push({
+        label: "View Details",
+        action: "view",
+        url: `/payroll/${payrollId}`,
+        icon: "eye",
+      });
+
+      actions.push({
+        label: "Download",
+        action: "download",
+        url: `/payroll/${payrollId}/download`,
+        icon: "download",
+      });
+    }
+
+    return actions;
   }
 }

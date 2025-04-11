@@ -32,6 +32,9 @@ import { AuditAction, AuditEntity } from "../models/Audit.js";
 import { PaymentStatus } from "../models/Payment.js";
 import generatePayslipPDF from "../utils/pdfGenerator.js";
 import { EmailService } from "../services/EmailService.js";
+import BaseApprovalController, {
+  APPROVAL_LEVELS,
+} from "./BaseApprovalController.js";
 
 const asObjectId = (id) => new Types.ObjectId(id);
 
@@ -1576,6 +1579,28 @@ export class SuperAdminController {
     try {
       const { id } = req.params;
       const { remarks } = req.body;
+      const admin = await UserModel.findById(req.user.id);
+
+      console.log(
+        `\n🔍 Starting Super Admin payroll approval process for ID: ${id}`
+      );
+      console.log(
+        `👤 Approver: ${admin.firstName} ${admin.lastName} (${admin.position})`
+      );
+      console.log(`🏢 Department: ${admin.department?.name || "Not assigned"}`);
+      console.log(`📝 Remarks: ${remarks || "None provided"}`);
+
+      // Check if user is a Super Admin
+      if (
+        admin.role !== "ADMIN" ||
+        !admin.permissions.includes("MANAGE_SYSTEM")
+      ) {
+        console.error(`❌ Permission denied for user: ${admin._id}`);
+        throw new ApiError(
+          403,
+          "You must be a Super Admin to approve at this level"
+        );
+      }
 
       const payroll = await PayrollModel.findById(id);
       // ... approval logic
@@ -3835,8 +3860,8 @@ export class SuperAdminController {
           // Check if payroll already exists
           const existingPayroll = await PayrollModel.findOne({
             employee: employee._id,
-        month,
-        year,
+            month,
+            year,
             frequency,
             status: {
               $nin: [PAYROLL_STATUS.REJECTED, PAYROLL_STATUS.CANCELLED],

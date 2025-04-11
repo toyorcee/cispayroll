@@ -833,8 +833,14 @@ const ProcessDepartmentPayroll = () => {
   // Function to determine if approval buttons should be shown
   const showApprovalButtons = (
     currentLevel: string,
-    userPosition: string
+    userPosition: string,
+    payrollStatus: string
   ): boolean => {
+    // Don't show approve button if payroll is not pending
+    if (payrollStatus !== "PENDING") {
+      return false;
+    }
+
     const userPositionLower = userPosition.toLowerCase();
 
     console.log("showApprovalButtons called with:", {
@@ -843,40 +849,15 @@ const ProcessDepartmentPayroll = () => {
       userPositionLower,
       isHR,
       isHRPosition,
+      payrollStatus,
     });
 
     // For HR department users
-    if (isHR) {
-      // HR users can only approve at HR_MANAGER level
+    if (isHR && isHRPosition) {
+      // HR users can approve at HR_MANAGER level
       if (currentLevel === "HR_MANAGER") {
-        // Check if the user has an HR-related position
-        const hrPositions = [
-          "head of human resources",
-          "hr manager",
-          "hr head",
-          "human resources manager",
-          "hr director",
-          "head of hr",
-          "hr",
-          "human resources",
-        ];
-
-        // Check if any of the HR positions are included in the user's position
-        const canApprove = hrPositions.some((pos) =>
-          userPositionLower.includes(pos)
-        );
-        console.log("HR user at HR_MANAGER level:", {
-          hrPositions,
-          canApprove,
-        });
-        return canApprove;
+        return true;
       }
-      // HR users cannot approve at DEPARTMENT_HEAD level
-      if (currentLevel === "DEPARTMENT_HEAD") {
-        console.log("HR user at DEPARTMENT_HEAD level - cannot approve");
-        return false;
-      }
-      console.log("HR user at other level - cannot approve");
       return false; // HR users can only approve at HR_MANAGER level
     }
 
@@ -889,12 +870,18 @@ const ProcessDepartmentPayroll = () => {
       (currentLevel === "HR_MANAGER" &&
         userPositionLower.includes("hr manager")) ||
       (currentLevel === "FINANCE_DIRECTOR" &&
-        userPositionLower.includes("finance")) ||
+        [
+          "head of finance",
+          "finance director",
+          "finance head",
+          "finance manager",
+        ].some((pos) => userPositionLower.includes(pos.toLowerCase()))) ||
       (currentLevel === "SUPER_ADMIN" && userPositionLower.includes("admin"));
 
     console.log("Non-HR user:", {
       currentLevel,
       canApprove,
+      userPositionLower,
     });
 
     return canApprove;
@@ -903,8 +890,14 @@ const ProcessDepartmentPayroll = () => {
   // Function to determine if rejection buttons should be shown
   const showRejectionButtons = (
     currentLevel: string,
-    userPosition: string
+    userPosition: string,
+    payrollStatus: string
   ): boolean => {
+    // Don't show reject button if payroll is not pending
+    if (payrollStatus !== "PENDING") {
+      return false;
+    }
+
     const userPositionLower = userPosition.toLowerCase();
 
     console.log("showRejectionButtons called with:", {
@@ -913,6 +906,7 @@ const ProcessDepartmentPayroll = () => {
       userPositionLower,
       isHR,
       isHRPosition,
+      payrollStatus,
     });
 
     // For HR department users, they can reject at any level if they have the permission
@@ -951,6 +945,30 @@ const ProcessDepartmentPayroll = () => {
 
     return canReject;
   };
+
+  // Add debug effect for payroll approval checks
+  useEffect(() => {
+    payrolls.forEach((payroll) => {
+      if (payroll.status === "PENDING") {
+        console.log("Payroll approval check:", {
+          currentLevel: payroll.approvalFlow?.currentLevel,
+          userPosition: user?.position,
+          payrollStatus: payroll.status,
+          isHR,
+          isHRPosition,
+          showApprovalResult: showApprovalButtons(
+            payroll.approvalFlow?.currentLevel || "",
+            user?.position || "",
+            payroll.status
+          ),
+          showHRApproval:
+            isHR &&
+            isHRPosition &&
+            payroll.approvalFlow?.currentLevel === "HR_MANAGER",
+        });
+      }
+    });
+  }, [payrolls, user?.position, isHR, isHRPosition]);
 
   const PayrollTable = () => (
     <div className="space-y-2 mt-3">
@@ -1132,7 +1150,8 @@ const ProcessDepartmentPayroll = () => {
                             <>
                               {(showApprovalButtons(
                                 payroll.approvalFlow?.currentLevel || "",
-                                user?.position || ""
+                                user?.position || "",
+                                payroll.status
                               ) ||
                                 (isHR &&
                                   isHRPosition &&
@@ -1148,7 +1167,10 @@ const ProcessDepartmentPayroll = () => {
                                     payroll.approvalFlow?.currentLevel ===
                                     "DEPARTMENT_HEAD"
                                       ? "Approve as HOD"
-                                      : "Approve as HR Manager"
+                                      : payroll.approvalFlow?.currentLevel ===
+                                        "HR_MANAGER"
+                                      ? "Approve as HR Manager"
+                                      : "Approve"
                                   }
                                   disabled={
                                     approveMutation.isPending &&
@@ -1166,7 +1188,8 @@ const ProcessDepartmentPayroll = () => {
 
                               {(showRejectionButtons(
                                 payroll.approvalFlow?.currentLevel || "",
-                                user?.position || ""
+                                user?.position || "",
+                                payroll.status
                               ) ||
                                 (isHR && isHRPosition)) && (
                                 <button
