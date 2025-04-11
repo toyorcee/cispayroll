@@ -12,6 +12,7 @@ import {
   validateEmployeePayrollHistory,
   validatePayrollApproval,
   validatePayrollRejection,
+  validateBulkPayrollCreate,
 } from "../middleware/payrollValidation.js";
 
 const router = Router();
@@ -158,13 +159,6 @@ router.post(
   requirePermission([Permission.CREATE_PAYROLL]),
   validatePayrollCreate,
   SuperAdminController.createPayroll
-);
-
-// Submit payroll for approval (DRAFT -> PENDING)
-router.patch(
-  "/payroll/:id/submit",
-  requirePermission([Permission.CREATE_PAYROLL]),
-  SuperAdminController.submitPayroll
 );
 
 // Start processing payroll (PENDING -> PROCESSING)
@@ -560,14 +554,14 @@ router.delete(
 router.post(
   "/payroll/process-department",
   requirePermission([Permission.CREATE_PAYROLL]),
-  validatePayrollCreate,
+  validateBulkPayrollCreate,
   SuperAdminController.processDepartmentEmployeesPayroll
 );
 
 router.post(
   "/payroll/process-all-departments",
   requirePermission([Permission.CREATE_PAYROLL]),
-  validatePayrollCreate,
+  validateBulkPayrollCreate,
   SuperAdminController.processAllDepartmentsPayroll
 );
 

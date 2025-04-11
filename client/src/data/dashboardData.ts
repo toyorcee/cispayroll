@@ -12,6 +12,7 @@ import {
   FaExclamationTriangle,
   FaCheckCircle,
   FaUserTie,
+  FaBell,
 } from "react-icons/fa";
 import { IconType } from "react-icons";
 
@@ -159,23 +160,15 @@ export const getRoleStats = (
     case UserRole.USER:
       return [
         {
-          name: "Total Staff",
+          name: "Total Employees",
           value: stats.employees.total.toString(),
-          subtext: `${stats.employees.active} Active`,
+          subtext: "Including Admins and Staff",
           icon: FaUsers,
           href: "/employees",
           color: "blue",
         },
         {
-          name: "Departments",
-          value: stats.departments.total.toString(),
-          subtext: `${stats.departments.hodCount} HODs`,
-          icon: FaBuilding,
-          href: "/departments",
-          color: "green",
-        },
-        {
-          name: "Pending Approvals",
+          name: "Monthly Growth",
           value: stats.employees.pending.toString(),
           subtext: "New Employees",
           icon: FaUserPlus,
@@ -183,12 +176,12 @@ export const getRoleStats = (
           color: "yellow",
         },
         {
-          name: "Active Employees",
-          value: stats.employees.active.toString(),
-          subtext: "Currently Working",
-          icon: FaUsers,
-          href: "/employees",
-          color: "blue",
+          name: "Unread Notifications",
+          value: "0", // Placeholder for unread notifications
+          subtext: "Notifications",
+          icon: FaBell,
+          href: "/notifications",
+          color: "red",
         },
       ];
     default:

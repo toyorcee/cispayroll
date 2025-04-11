@@ -75,7 +75,7 @@ router.put(
 
 router.post(
   "/profile/image",
-  requirePermission([Permission.VIEW_PERSONAL_INFO]),
+  requirePermission([Permission.EDIT_PERSONAL_INFO]),
   upload.single("image"),
   EmployeeController.updateProfileImage
 );

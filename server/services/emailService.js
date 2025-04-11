@@ -559,9 +559,9 @@ export class EmailService {
   }
 
   async sendPasswordResetEmail(to, resetToken) {
-    const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
+    const resetUrl = `${process.env.CLIENT_URL}/auth/reset-password?token=${resetToken}`;
     const mailOptions = {
-      from: process.env.EMAIL_FROM,
+      from: process.env.EMAIL_USER,
       to,
       subject: "Password Reset Request",
       html: EmailService.getPasswordResetTemplate(resetUrl),

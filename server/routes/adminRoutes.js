@@ -16,6 +16,7 @@ import {
   validateAdminSinglePayrollCreate,
   validateAdminBulkPayrollCreate,
   validateAdminPayrollSubmission,
+  validateAdminDepartmentPayrollCreate,
 } from "../middleware/adminPayrollValidation.js";
 
 const router = Router();
@@ -126,6 +127,16 @@ router.put(
 
 router.patch(
   "/payroll/:id/approve",
+  (req, res, next) => {
+    console.log("Approval request received:", {
+      path: req.path,
+      method: req.method,
+      body: req.body,
+      params: req.params,
+      user: req.user,
+    });
+    next();
+  },
   requirePermission([Permission.APPROVE_PAYROLL]),
   validatePayrollApproval,
   AdminController.approvePayroll
@@ -138,7 +149,7 @@ router.patch(
   AdminController.rejectPayroll
 );
 
-router.post(
+router.patch(
   "/payroll/:id/process-payment",
   requirePermission([Permission.PROCESS_PAYMENT]),
   AdminController.processPayment
@@ -148,6 +159,13 @@ router.patch(
   "/payroll/:id/submit",
   requirePermission([Permission.SUBMIT_PAYROLL]),
   AdminController.submitPayroll
+);
+
+// Submit multiple payrolls for approval
+router.post(
+  "/payroll/submit-bulk",
+  requirePermission([Permission.SUBMIT_PAYROLL]),
+  AdminController.submitBulkPayrolls
 );
 
 router.get(
@@ -166,7 +184,7 @@ router.post(
 router.post(
   "/payroll/process-department",
   requirePermission([Permission.CREATE_PAYROLL]),
-  validateAdminBulkPayrollCreate,
+  validateAdminDepartmentPayrollCreate,
   AdminController.processDepartmentPayroll
 );
 

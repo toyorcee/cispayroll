@@ -146,11 +146,16 @@ export const validateEmployeePayrollHistory = (req, res, next) => {
 export const validatePayrollApproval = (req, res, next) => {
   try {
     const { id } = req.params;
-    const { remarks } = req.body;
+    const { action = "APPROVE", remarks = "" } = req.body;
 
     // Validate payroll ID
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new ApiError(400, "Invalid payroll ID format");
+    }
+
+    // Validate action if provided
+    if (action && !["APPROVE", "REJECT"].includes(action)) {
+      throw new ApiError(400, "Invalid action. Must be 'APPROVE' or 'REJECT'");
     }
 
     // Validate remarks if provided
@@ -162,6 +167,13 @@ export const validatePayrollApproval = (req, res, next) => {
         throw new ApiError(400, "Remarks cannot exceed 500 characters");
       }
     }
+
+    // Set default values in req.body
+    req.body = {
+      ...req.body,
+      action: action || "APPROVE",
+      remarks: remarks || "",
+    };
 
     next();
   } catch (error) {
@@ -192,6 +204,53 @@ export const validatePayrollRejection = (req, res, next) => {
       throw new ApiError(400, "Remarks cannot exceed 500 characters");
     }
 
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Validation for bulk payroll processing (department-wide or all-departments)
+export const validateBulkPayrollCreate = (req, res, next) => {
+  try {
+    console.log("🔍 Validating bulk payroll data:", req.body);
+    const { month, year, frequency, departmentId } = req.body;
+
+    // Check required fields
+    if (!month || !year) {
+      throw new ApiError(400, "Missing required fields: month and year");
+    }
+
+    // Validate month (1-12)
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      throw new ApiError(400, "Month must be between 1 and 12");
+    }
+
+    // Validate year (reasonable range: 1900-2100)
+    if (!Number.isInteger(year) || year < 1900 || year > 2100) {
+      throw new ApiError(400, `Year must be between 1900 and 2100`);
+    }
+
+    // Validate frequency if provided
+    if (frequency && !Object.values(PayrollFrequency).includes(frequency)) {
+      throw new ApiError(400, "Invalid payroll frequency");
+    }
+
+    // Validate departmentId if provided (for department-wide processing)
+    if (departmentId && !mongoose.Types.ObjectId.isValid(departmentId)) {
+      throw new ApiError(400, "Invalid department ID");
+    }
+
+    // Validate that payroll isn't for past dates
+    const currentDate = new Date();
+    if (
+      year < currentDate.getFullYear() ||
+      (year === currentDate.getFullYear() && month < currentDate.getMonth() + 1)
+    ) {
+      throw new ApiError(400, "Cannot create payroll for past dates");
+    }
+
+    console.log("✅ Bulk payroll validation passed");
     next();
   } catch (error) {
     next(error);

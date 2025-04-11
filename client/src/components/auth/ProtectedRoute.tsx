@@ -352,7 +352,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     // Profile
     if (path.startsWith("/pms/profile")) {
-      if (!user.permissions?.includes(Permission.VIEW_PERSONAL_INFO)) {
+      if (
+        !user.permissions?.includes(Permission.VIEW_PERSONAL_INFO) &&
+        !user.permissions?.includes(Permission.EDIT_PERSONAL_INFO)
+      ) {
         toast.error("Access denied: Cannot view profile");
         return <Navigate to="/pms/dashboard" replace />;
       }

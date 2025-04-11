@@ -15,26 +15,31 @@ import {
   Edit as EditIcon,
   Email as EmailIcon,
   Phone as PhoneIcon,
-  Business as BusinessIcon,
   Badge as BadgeIcon,
   CalendarMonth as CalendarIcon,
   LocationOn as LocationIcon,
   ContactEmergency as EmergencyIcon,
   AccountBalance as AccountBalanceIcon,
-  School as SchoolIcon,
   Circle as CircleIcon,
 } from "@mui/icons-material";
 import { Permission } from "../../../types/auth.js";
 import { useState, useRef } from "react";
 import { toast } from "react-toastify";
 import { employeeService } from "../../../services/employeeService";
-import { useQueryClient } from "@tanstack/react-query";
 
 interface Qualification {
   _id: string;
   highestEducation: string;
   institution: string;
   yearGraduated: string;
+  id: string;
+}
+
+interface OnboardingTask {
+  _id: string;
+  name: string;
+  completed: boolean;
+  completedAt?: string;
   id: string;
 }
 
@@ -45,78 +50,34 @@ interface ImageUploadResponse {
 }
 
 export default function UserProfile() {
-  const { user: authUser, hasPermission, updateUser } = useAuth();
+  const { user: authUser, hasPermission } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const queryClient = useQueryClient();
+  const { data: user, isLoading } = employeeService.useGetUserProfile();
+  const { mutate: updateImage } = employeeService.useUpdateProfileImage();
 
-  const { data: userDetails, isLoading } = employeeService.useGetUserById(
-    authUser?._id
-  );
-
-  const canEditProfile = hasPermission(Permission.VIEW_PERSONAL_INFO);
+  const canEditProfile =
+    !!authUser &&
+    !!user &&
+    authUser._id === user._id &&
+    hasPermission(Permission.EDIT_PERSONAL_INFO);
 
   const handleImageClick = () => {
-    fileInputRef.current?.click();
+    if (canEditProfile) {
+      fileInputRef.current?.click();
+    }
   };
 
-  const handleImageUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file || !authUser) return;
-
-    // Validate file type
-    if (!file.type.match(/^image\/(jpeg|png|gif)$/)) {
-      toast.error("Please upload a valid image file (JPG, PNG, or GIF)");
-      return;
-    }
-
-    // Validate file size (5MB limit)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size should be less than 5MB");
-      return;
-    }
-
+  const handleImageUpload = async (file: File) => {
     try {
       setIsUploading(true);
-      const formData = new FormData();
-      formData.append("image", file);
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/employees/profile/image`,
-        {
-        method: "POST",
-          credentials: "include",
-        body: formData,
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Upload failed");
-      }
-
-      const data: ImageUploadResponse = await response.json();
-
-      if (data.success) {
-        // Invalidate and refetch the user query
-        await queryClient.invalidateQueries({
-          queryKey: ["user", authUser._id],
-        });
-        toast.success(data.message || "Profile image updated successfully");
-      }
+      await updateImage(file);
+      toast.success("Profile image updated successfully");
     } catch (error) {
-      console.error("Upload error:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to upload image"
-      );
+      console.error("Error uploading image:", error);
+      toast.error("Failed to update profile image");
     } finally {
       setIsUploading(false);
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
   };
 
@@ -140,124 +101,167 @@ export default function UserProfile() {
   };
 
   const renderRoleSpecificInfo = () => {
-    switch (userDetails?.role) {
+    switch (user?.role) {
       case UserRole.SUPER_ADMIN:
         return (
-          <Card className="p-6 mb-4 hover:shadow-lg transition-shadow duration-300 border border-gray-100">
-            <div className="flex justify-between items-center mb-4">
-              <Typography variant="h6" className="text-gray-800 font-semibold">
-                Administrative Access
-              </Typography>
-              <div className="flex items-center space-x-2">
-                <span className="px-3 py-1 bg-purple-100 text-purple-600 rounded-full text-sm font-medium">
-                  Super Admin
-                </span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-purple-50 rounded-lg">
-                <Typography
-                  variant="subtitle2"
-                  className="text-purple-700 mb-2"
-                >
-                  System Configuration
-                </Typography>
-                <Typography variant="body2" className="text-gray-600">
-                  Full access to system settings and configurations
-                </Typography>
-              </div>
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <Typography variant="subtitle2" className="text-blue-700 mb-2">
-                  User Management
-                </Typography>
-                <Typography variant="body2" className="text-gray-600">
-                  Complete control over user accounts and permissions
-                </Typography>
-              </div>
-            </div>
-          </Card>
+          <div className="space-y-4">
+            <Typography variant="subtitle2" className="text-blue-700 mb-2">
+              Department:{" "}
+              {typeof user?.department === "string"
+                ? user.department
+                : user?.department?.name || "Not assigned"}
+            </Typography>
+            <Typography variant="body2" className="text-gray-600">
+              Position: {user?.position || "Not assigned"}
+            </Typography>
+            <Typography variant="body2" className="text-gray-600">
+              {user?.position} at{" "}
+              {typeof user?.department === "string"
+                ? user.department
+                : user?.department?.name || "Not assigned"}
+            </Typography>
+          </div>
         );
-
       case UserRole.ADMIN:
         return (
-          <Card className="p-6 mb-4 hover:shadow-lg transition-shadow duration-300 border border-gray-100">
-            <div className="flex justify-between items-center mb-4">
-              <Typography variant="h6" className="text-gray-800 font-semibold">
-                Department Management
-              </Typography>
-              <div className="flex items-center space-x-2">
-                <span className="px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-sm font-medium">
-                  Admin
-                </span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <Typography variant="subtitle2" className="text-blue-700 mb-2">
-                  Department:{" "}
-                  {typeof userDetails?.department === "string"
-                    ? userDetails.department
-                    : userDetails?.department?.name || "Not assigned"}
-                </Typography>
-                <Typography variant="body2" className="text-gray-600">
-                  Manage department resources and team members
-                </Typography>
-              </div>
-              <div className="p-4 bg-green-50 rounded-lg">
-                <Typography variant="subtitle2" className="text-green-700 mb-2">
-                  Payroll Access
-                </Typography>
-                <Typography variant="body2" className="text-gray-600">
-                  Process and manage department payroll
-                </Typography>
-              </div>
-            </div>
-          </Card>
+          <div className="space-y-4">
+            <Typography variant="subtitle2" className="text-yellow-700 mb-2">
+              Employee ID: {user?.employeeId}
+            </Typography>
+            <Typography variant="body2" className="text-gray-600">
+              Position: {user?.position || "Not assigned"}
+            </Typography>
+          </div>
         );
-
       case UserRole.USER:
         return (
-          <Card className="p-6 mb-4 hover:shadow-lg transition-shadow duration-300 border border-gray-100">
-            <div className="flex justify-between items-center mb-4">
-              <Typography variant="h6" className="text-gray-800 font-semibold">
-                Employee Information
-              </Typography>
-              <div className="flex items-center space-x-2">
-                <span className="px-3 py-1 bg-green-100 text-green-600 rounded-full text-sm font-medium">
-                  Employee
-                </span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-green-50 rounded-lg">
-                <Typography variant="subtitle2" className="text-green-700 mb-2">
-                  Position Details
-                </Typography>
-                <Typography variant="body2" className="text-gray-600">
-                  {userDetails?.position} at{" "}
-                  {typeof userDetails?.department === "string"
-                    ? userDetails.department
-                    : userDetails?.department?.name || "Not assigned"}
-                </Typography>
-              </div>
-              <div className="p-4 bg-yellow-50 rounded-lg">
-                <Typography
-                  variant="subtitle2"
-                  className="text-yellow-700 mb-2"
-                >
-                  Employee ID: {userDetails?.employeeId}
-                </Typography>
-                <Typography variant="body2" className="text-gray-600">
-                  Access your employee resources and benefits
-                </Typography>
-              </div>
-            </div>
-          </Card>
+          <div className="space-y-4">
+            <Typography variant="subtitle2" className="text-green-700 mb-2">
+              Employee ID: {user?.employeeId}
+            </Typography>
+            <Typography variant="body2" className="text-gray-600">
+              Position: {user?.position || "Not assigned"}
+            </Typography>
+          </div>
         );
-
       default:
         return null;
     }
+  };
+
+  const renderQualifications = () => {
+    if (!user?.personalDetails?.qualifications?.length) return null;
+
+    return (
+      <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-300 border border-gray-100 mt-4">
+        <Box className="flex items-center space-x-2 mb-4">
+          <BadgeIcon className="text-green-600" />
+          <Typography variant="h6" className="text-gray-800 font-semibold">
+            Qualifications
+          </Typography>
+        </Box>
+        <div className="space-y-4">
+          {user.personalDetails.qualifications.map((qual: Qualification) => (
+            <div
+              key={qual._id}
+              className="flex items-start space-x-3 p-2 hover:bg-gray-50 rounded-lg"
+            >
+              <BadgeIcon className="text-green-600 mt-1" />
+              <div>
+                <Typography variant="subtitle1" className="font-medium">
+                  {qual.highestEducation}
+                </Typography>
+                <Typography variant="body2" className="text-gray-600">
+                  {qual.institution}
+                </Typography>
+                <Typography variant="caption" className="text-gray-500">
+                  Graduated: {qual.yearGraduated}
+                </Typography>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    );
+  };
+
+  const renderNextOfKin = () => {
+    if (!user?.personalDetails?.nextOfKin) return null;
+
+    return (
+      <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-300 border border-gray-100 mt-4">
+        <Box className="flex items-center space-x-2 mb-4">
+          <EmergencyIcon className="text-green-600" />
+          <Typography variant="h6" className="text-gray-800 font-semibold">
+            Next of Kin
+          </Typography>
+        </Box>
+        <div className="space-y-3">
+          <div className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg">
+            <BadgeIcon className="text-green-600" />
+            <div>
+              <Typography variant="subtitle2" className="text-gray-700">
+                {user.personalDetails.nextOfKin.name}
+              </Typography>
+              <Typography variant="body2" className="text-gray-600">
+                Relationship: {user.personalDetails.nextOfKin.relationship}
+              </Typography>
+              <Typography variant="body2" className="text-gray-600">
+                Phone: {user.personalDetails.nextOfKin.phone}
+              </Typography>
+              <Typography variant="body2" className="text-gray-600">
+                Address: {user.personalDetails.nextOfKin.address.street},{" "}
+                {user.personalDetails.nextOfKin.address.city},{" "}
+                {user.personalDetails.nextOfKin.address.state}
+              </Typography>
+            </div>
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
+  const renderOnboardingStatus = () => {
+    if (!user?.onboarding) return null;
+
+    return (
+      <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-300 border border-gray-100 mt-4">
+        <Box className="flex items-center space-x-2 mb-4">
+          <CalendarIcon className="text-green-600" />
+          <Typography variant="h6" className="text-gray-800 font-semibold">
+            Onboarding Status
+          </Typography>
+        </Box>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Typography variant="subtitle2" className="text-gray-700">
+              Status: {user.onboarding.status}
+            </Typography>
+            <Typography variant="body2" className="text-gray-600">
+              Progress: {user.onboarding.progress}%
+            </Typography>
+          </div>
+          <div className="space-y-2">
+            {user.onboarding.tasks.map((task: OnboardingTask) => (
+              <div key={task._id} className="flex items-center space-x-2">
+                <CircleIcon
+                  className={`${
+                    task.completed ? "text-green-600" : "text-gray-400"
+                  }`}
+                  sx={{ fontSize: 12 }}
+                />
+                <Typography
+                  variant="body2"
+                  className={task.completed ? "text-gray-600" : "text-gray-500"}
+                >
+                  {task.name}
+                </Typography>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
+    );
   };
 
   return (
@@ -272,141 +276,145 @@ export default function UserProfile() {
           <div className="w-full lg:w-1/3">
             <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-300 border border-gray-100">
               <Box className="flex flex-col items-center mb-4 sm:mb-6">
-              <div className="relative">
-                <Avatar
+                <div className="relative">
+                  <Avatar
                     src={
-                      userDetails?.profileImageUrl ||
-                      (userDetails?.profileImage
+                      user?.profileImageUrl ||
+                      (user?.profileImage
                         ? `${
                             import.meta.env.VITE_API_URL
-                          }/${userDetails.profileImage.replace(/\\/g, "/")}`
+                          }/${user.profileImage.replace(/\\/g, "/")}`
                         : undefined) ||
                       "/default-avatar.png"
                     }
-                    alt={`${userDetails?.firstName} ${userDetails?.lastName}`}
-                  sx={{
+                    alt={`${user?.firstName} ${user?.lastName}`}
+                    sx={{
                       width: { xs: 100, sm: 120 },
                       height: { xs: 100, sm: 120 },
-                    mb: 2,
-                    border: "4px solid #fff",
-                    boxShadow: "0 0 20px rgba(0,0,0,0.1)",
-                    cursor: canEditProfile ? "pointer" : "default",
+                      mb: 2,
+                      border: "4px solid #fff",
+                      boxShadow: "0 0 20px rgba(0,0,0,0.1)",
+                      cursor: canEditProfile ? "pointer" : "default",
                       backgroundColor: "#e5e7eb",
-                  }}
-                  onClick={canEditProfile ? handleImageClick : undefined}
+                    }}
+                    onClick={canEditProfile ? handleImageClick : undefined}
                   >
-                    {!userDetails?.profileImageUrl &&
-                      !userDetails?.profileImage &&
-                      `${userDetails?.firstName?.[0]}${userDetails?.lastName?.[0]}`}
+                    {!user?.profileImageUrl &&
+                      !user?.profileImage &&
+                      `${user?.firstName?.[0]}${user?.lastName?.[0]}`}
                   </Avatar>
 
-                {canEditProfile && (
-                  <>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleImageUpload}
-                      accept="image/jpeg,image/png,image/gif"
-                      style={{ display: "none" }}
-                    />
-                    <Tooltip title="Update Photo">
-                      <IconButton
-                        size="small"
-                        className="absolute bottom-0 right-0 bg-green-50 hover:bg-green-100 shadow-md"
-                        sx={{
-                          border: "2px solid #fff",
-                          "&:hover": {
-                            backgroundColor: "#f0fdf4",
-                          },
+                  {canEditProfile && (
+                    <>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            handleImageUpload(e.target.files[0]);
+                          }
                         }}
-                        onClick={handleImageClick}
-                        disabled={isUploading}
-                      >
-                        {isUploading ? (
+                        accept="image/jpeg,image/png,image/gif"
+                        style={{ display: "none" }}
+                      />
+                      <Tooltip title="Update Photo">
+                        <IconButton
+                          size="small"
+                          className="absolute bottom-0 right-0 bg-green-50 hover:bg-green-100 shadow-md"
+                          sx={{
+                            border: "2px solid #fff",
+                            "&:hover": {
+                              backgroundColor: "#f0fdf4",
+                            },
+                          }}
+                          onClick={handleImageClick}
+                          disabled={isUploading}
+                        >
+                          {isUploading ? (
                             <CircularProgress
                               size={16}
                               className="text-green-600"
                             />
-                        ) : (
-                          <EditIcon className="text-green-600 w-4 h-4" />
-                        )}
-                      </IconButton>
-                    </Tooltip>
-                  </>
-                )}
-              </div>
-              <Typography
-                variant="h5"
+                          ) : (
+                            <EditIcon className="text-green-600 w-4 h-4" />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+                    </>
+                  )}
+                </div>
+                <Typography
+                  variant="h5"
                   className="text-gray-800 font-semibold mt-4 text-base sm:text-lg md:text-xl text-center"
-              >
-                  {userDetails?.firstName} {userDetails?.lastName}
-              </Typography>
+                >
+                  {user?.firstName} {user?.lastName}
+                </Typography>
                 <Typography
                   variant="body2"
                   className="text-gray-500 text-sm sm:text-base"
                 >
-                  {userDetails?.role}
-              </Typography>
-            </Box>
+                  {user?.role}
+                </Typography>
+              </Box>
 
               <Divider className="my-3 sm:my-4" />
 
               <Box className="space-y-3 sm:space-y-4">
                 <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
                   <EmailIcon className="text-green-600 text-base sm:text-lg" />
-                <div>
+                  <div>
                     <Typography
                       variant="caption"
                       className="text-gray-500 text-xs sm:text-sm"
                     >
-                    Email
-                  </Typography>
+                      Email
+                    </Typography>
                     <Typography
                       variant="body2"
                       className="text-gray-700 text-sm sm:text-base break-all"
                     >
-                      {userDetails?.email}
-                  </Typography>
+                      {user?.email}
+                    </Typography>
+                  </div>
                 </div>
-              </div>
 
                 <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
                   <PhoneIcon className="text-green-600 text-base sm:text-lg" />
-                <div>
+                  <div>
                     <Typography
                       variant="caption"
                       className="text-gray-500 text-xs sm:text-sm"
                     >
-                    Phone
-                  </Typography>
+                      Phone
+                    </Typography>
                     <Typography
                       variant="body2"
                       className="text-gray-700 text-sm sm:text-base"
                     >
-                      {userDetails?.phone}
-                  </Typography>
+                      {user?.phone}
+                    </Typography>
+                  </div>
                 </div>
-              </div>
 
                 <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
                   <LocationIcon className="text-green-600 text-base sm:text-lg" />
-                <div>
+                  <div>
                     <Typography
                       variant="caption"
                       className="text-gray-500 text-xs sm:text-sm"
                     >
                       Address
-                  </Typography>
+                    </Typography>
                     <Typography
                       variant="body2"
                       className="text-gray-700 text-sm sm:text-base"
                     >
-                      {userDetails?.personalDetails?.address?.street},
-                      {userDetails?.personalDetails?.address?.city},
-                      {userDetails?.personalDetails?.address?.state}
-                  </Typography>
+                      {user?.personalDetails?.address?.street},
+                      {user?.personalDetails?.address?.city},
+                      {user?.personalDetails?.address?.state}
+                    </Typography>
+                  </div>
                 </div>
-              </div>
 
                 {canEditProfile && (
                   <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
@@ -422,8 +430,8 @@ export default function UserProfile() {
                         variant="body2"
                         className="text-gray-700 text-sm sm:text-base"
                       >
-                        {userDetails?.bankDetails?.bankName} -{" "}
-                        {userDetails?.bankDetails?.accountNumber}
+                        {user?.bankDetails?.bankName} -{" "}
+                        {user?.bankDetails?.accountNumber}
                       </Typography>
                     </div>
                   </div>
@@ -431,48 +439,48 @@ export default function UserProfile() {
 
                 <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
                   <EmergencyIcon className="text-green-600 text-base sm:text-lg" />
-                        <div>
-                          <Typography
-                            variant="caption"
+                  <div>
+                    <Typography
+                      variant="caption"
                       className="text-gray-500 text-xs sm:text-sm"
-                          >
+                    >
                       Emergency Contact
-                          </Typography>
+                    </Typography>
                     <Typography
                       variant="body2"
                       className="text-gray-700 text-sm sm:text-base"
                     >
-                      {userDetails?.emergencyContact?.name} (
-                      {userDetails?.emergencyContact?.relationship})
+                      {user?.emergencyContact?.name} (
+                      {user?.emergencyContact?.relationship})
                       <br />
-                      {userDetails?.emergencyContact?.phone}
-                          </Typography>
-                        </div>
-                      </div>
+                      {user?.emergencyContact?.phone}
+                    </Typography>
+                  </div>
+                </div>
 
                 <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
                   <BadgeIcon className="text-green-600 text-base sm:text-lg" />
-                        <div>
-                          <Typography
-                            variant="caption"
+                  <div>
+                    <Typography
+                      variant="caption"
                       className="text-gray-500 text-xs sm:text-sm"
-                          >
+                    >
                       Personal Information
-                          </Typography>
+                    </Typography>
                     <Typography
                       variant="body2"
                       className="text-gray-700 text-sm sm:text-base"
                     >
-                      {userDetails?.personalDetails?.middleName && (
+                      {user?.personalDetails?.middleName && (
                         <div>
-                          Middle Name: {userDetails.personalDetails.middleName}
+                          Middle Name: {user.personalDetails.middleName}
                         </div>
                       )}
                       <div>
                         Date of Birth:{" "}
-                        {userDetails?.personalDetails?.dateOfBirth
+                        {user?.personalDetails?.dateOfBirth
                           ? new Date(
-                              userDetails.personalDetails.dateOfBirth
+                              user.personalDetails.dateOfBirth
                             ).toLocaleDateString("en-US", {
                               day: "numeric",
                               month: "long",
@@ -482,16 +490,16 @@ export default function UserProfile() {
                       </div>
                       <div>
                         Marital Status:{" "}
-                        {userDetails?.personalDetails?.maritalStatus
-                          ? userDetails.personalDetails.maritalStatus
+                        {user?.personalDetails?.maritalStatus
+                          ? user.personalDetails.maritalStatus
                               .charAt(0)
                               .toUpperCase() +
-                            userDetails.personalDetails.maritalStatus.slice(1)
+                            user.personalDetails.maritalStatus.slice(1)
                           : "Not set"}
                       </div>
                       <div>
                         Nationality:{" "}
-                        {userDetails?.personalDetails?.nationality || "Not set"}
+                        {user?.personalDetails?.nationality || "Not set"}
                       </div>
                     </Typography>
                   </div>
@@ -510,13 +518,13 @@ export default function UserProfile() {
                       variant="body2"
                       className="text-gray-700 text-sm sm:text-base"
                     >
-                      {userDetails?.personalDetails?.address ? (
+                      {user?.personalDetails?.address ? (
                         <>
-                          {userDetails.personalDetails.address.street},<br />
-                          {userDetails.personalDetails.address.city},<br />
-                          {userDetails.personalDetails.address.state},<br />
-                          {userDetails.personalDetails.address.country}{" "}
-                          {userDetails.personalDetails.address.zipCode}
+                          {user.personalDetails.address.street},<br />
+                          {user.personalDetails.address.city},<br />
+                          {user.personalDetails.address.state},<br />
+                          {user.personalDetails.address.country}{" "}
+                          {user.personalDetails.address.zipCode}
                         </>
                       ) : (
                         "Address not set"
@@ -533,12 +541,15 @@ export default function UserProfile() {
             {renderRoleSpecificInfo()}
 
             <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-300 border border-gray-100">
-              <Typography
-                variant="h6"
-                className="text-gray-800 font-semibold mb-4 sm:mb-6 text-base sm:text-lg"
-              >
-                Employment Details
-              </Typography>
+              <Box className="flex items-center space-x-2 mb-4">
+                <BadgeIcon className="text-green-600" />
+                <Typography
+                  variant="h6"
+                  className="text-gray-800 font-semibold"
+                >
+                  Employment Details
+                </Typography>
+              </Box>
 
               {/* Replace inner Grid with flex */}
               <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
@@ -558,14 +569,15 @@ export default function UserProfile() {
                           variant="body2"
                           className="text-gray-700 text-sm sm:text-base"
                         >
-                          {userDetails?.dateJoined
-                            ? new Date(
-                                userDetails.dateJoined
-                              ).toLocaleDateString("en-US", {
-                                day: "numeric",
-                                month: "long",
-                                year: "numeric",
-                              })
+                          {user?.dateJoined
+                            ? new Date(user.dateJoined).toLocaleDateString(
+                                "en-US",
+                                {
+                                  day: "numeric",
+                                  month: "long",
+                                  year: "numeric",
+                                }
+                              )
                             : "Not set"}
                         </Typography>
                       </div>
@@ -584,7 +596,7 @@ export default function UserProfile() {
                           variant="body2"
                           className="text-gray-700 text-sm sm:text-base"
                         >
-                          {userDetails?.position || "Not set"}
+                          {user?.position || "Not set"}
                         </Typography>
                       </div>
                     </div>
@@ -602,30 +614,30 @@ export default function UserProfile() {
                           variant="body2"
                           className="text-gray-700 text-sm sm:text-base"
                         >
-                          {userDetails?.gradeLevel || "Not set"}
+                          {user?.gradeLevel || "Not set"}
                         </Typography>
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
-                      <BadgeIcon className="text-green-600 text-base sm:text-lg" />
-                      <div>
+                    <div className="flex items-center space-x-2 sm:space-x-3 p-4 bg-gray-50 shadow-sm rounded-lg hover:bg-gray-100 transition-colors duration-200">
+                      <BadgeIcon className="text-green-600 text-lg sm:text-xl" />
+                      <div className="truncate">
                         <Typography
                           variant="caption"
-                          className="text-gray-500 text-xs sm:text-sm"
+                          className="text-gray-500 text-xs sm:text-sm font-medium"
                         >
                           Employee ID
                         </Typography>
                         <Typography
                           variant="body2"
-                          className="text-gray-700 text-sm sm:text-base"
+                          className="text-gray-800 text-sm sm:text-base font-semibold truncate"
                         >
-                          {userDetails?.employeeId || "Not set"}
+                          {user?.employeeId || "Not set"}
                         </Typography>
                       </div>
                     </div>
-                      </div>
-                    </div>
+                  </div>
+                </div>
 
                 {/* Right column */}
                 <div className="w-full sm:w-1/2">
@@ -643,7 +655,7 @@ export default function UserProfile() {
                           variant="body2"
                           className="text-gray-700 text-sm sm:text-base"
                         >
-                          {userDetails?.workLocation || "Not set"}
+                          {user?.workLocation || "Not set"}
                         </Typography>
                       </div>
                     </div>
@@ -651,7 +663,7 @@ export default function UserProfile() {
                     <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-green-50 rounded-lg transition-colors duration-200">
                       <CircleIcon
                         className={`${getStatusColor(
-                          userDetails?.status
+                          user?.status
                         )} animate-pulse`}
                         sx={{ fontSize: "12px" }}
                       />
@@ -665,11 +677,11 @@ export default function UserProfile() {
                         <Typography
                           variant="body2"
                           className={`${getStatusColor(
-                            userDetails?.status
+                            user?.status
                           )} font-medium text-sm sm:text-base`}
                         >
-                          {userDetails?.status?.charAt(0).toUpperCase() +
-                            userDetails?.status?.slice(1) || "Not set"}
+                          {user?.status?.charAt(0).toUpperCase() +
+                            user?.status?.slice(1) || "Not set"}
                         </Typography>
                       </div>
                     </div>
@@ -687,14 +699,11 @@ export default function UserProfile() {
                           variant="body2"
                           className="text-gray-700 text-sm sm:text-base"
                         >
-                          {userDetails?.lastLogin
-                            ? new Date(userDetails.lastLogin).toLocaleString(
-                                "en-US",
-                                {
-                                  dateStyle: "medium",
-                                  timeStyle: "short",
-                                }
-                              )
+                          {user?.lastLogin
+                            ? new Date(user.lastLogin).toLocaleString("en-US", {
+                                dateStyle: "medium",
+                                timeStyle: "short",
+                              })
                             : "Not available"}
                         </Typography>
                       </div>
@@ -713,9 +722,7 @@ export default function UserProfile() {
                           variant="body2"
                           className="text-gray-700 text-sm sm:text-base"
                         >
-                          {userDetails?.isEmailVerified
-                            ? "Verified"
-                            : "Not Verified"}
+                          {user?.isEmailVerified ? "Verified" : "Not Verified"}
                         </Typography>
                       </div>
                     </div>
@@ -723,9 +730,18 @@ export default function UserProfile() {
                 </div>
               </div>
             </Card>
-                    </div>
-                  </div>
-                )}
+
+            {/* Qualifications */}
+            {renderQualifications()}
+
+            {/* Next of Kin */}
+            {renderNextOfKin()}
+
+            {/* Onboarding Status */}
+            {renderOnboardingStatus()}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

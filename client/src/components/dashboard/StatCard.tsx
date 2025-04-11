@@ -20,10 +20,17 @@ const StatCard = ({
   color = "blue",
 }: StatCardProps) => {
   const colorClasses = {
-    blue: "border-blue-500 hover:border-blue-600",
-    green: "border-green-500 hover:border-green-600",
-    red: "border-red-500 hover:border-red-600",
-    yellow: "border-yellow-500 hover:border-yellow-600",
+    blue: "border-blue-500 hover:border-blue-600 bg-blue-50",
+    green: "border-green-500 hover:border-green-600 bg-green-50",
+    red: "border-red-500 hover:border-red-600 bg-red-50",
+    yellow: "border-yellow-500 hover:border-yellow-600 bg-yellow-50",
+  };
+
+  const iconColorClasses = {
+    blue: "text-blue-600 bg-blue-100",
+    green: "text-green-600 bg-green-100",
+    red: "text-red-600 bg-red-100",
+    yellow: "text-yellow-600 bg-yellow-100",
   };
 
   return (
@@ -40,20 +47,15 @@ const StatCard = ({
     >
       <Link to={href}>
         <div
-          className={`bg-white p-6 rounded-xl shadow-lg border-l-4 ${colorClasses[color]} 
-                        transform transition-all duration-300 hover:shadow-2xl`}
+          className={`p-6 rounded-xl shadow-sm border-l-4 ${colorClasses[color]} flex items-center justify-between w-64 h-32`}
         >
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h2 className="text-sm font-medium text-gray-600">{name}</h2>
-              <div className="mt-2 flex items-baseline">
-                <p className="text-3xl font-semibold text-gray-900">{value}</p>
-              </div>
-              <p className="mt-1 text-sm text-gray-500">{subtext}</p>
-            </div>
-            <div className={`p-3 rounded-full bg-${color}-100`}>
-              <Icon className={`h-6 w-6 text-${color}-600`} />
-            </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-gray-800">{name}</h3>
+            <p className="text-2xl font-bold text-gray-900">{value}</p>
+            <p className="text-sm text-gray-600">{subtext}</p>
+          </div>
+          <div className={`p-3 rounded-full ${iconColorClasses[color]}`}>
+            <Icon className="w-6 h-6" />
           </div>
         </div>
       </Link>

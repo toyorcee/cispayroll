@@ -6,7 +6,7 @@ import UserModel, {
   OffboardingStatus,
 } from "../models/User.js";
 import { ApiError } from "../utils/errorHandler.js";
-import { EmailService } from "./emailService.js";
+import { EmailService } from "./EmailService.js";
 import { v4 as uuidv4 } from "uuid";
 import DepartmentModel from "../models/Department.js";
 

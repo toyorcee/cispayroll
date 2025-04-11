@@ -19,6 +19,10 @@ import { AllowanceService } from "../services/AllowanceService.js";
 import { BonusService } from "../services/BonusService.js";
 import Allowance from "../models/Allowance.js";
 import Notification from "../models/Notification.js";
+import {
+  NotificationService,
+  NOTIFICATION_TYPES,
+} from "../services/NotificationService.js";
 import { DepartmentService } from "../services/departmentService.js";
 import { DeductionType, DeductionScope } from "../models/Deduction.js";
 import Payment from "../models/Payment.js";
@@ -28,8 +32,6 @@ import { AuditAction, AuditEntity } from "../models/Audit.js";
 import { PaymentStatus } from "../models/Payment.js";
 import generatePayslipPDF from "../utils/pdfGenerator.js";
 import { EmailService } from "../services/EmailService.js";
-import Payroll from "../models/Payroll.js";
-import { NotificationService } from "../services/NotificationService.js";
 
 const asObjectId = (id) => new Types.ObjectId(id);
 
@@ -582,6 +584,8 @@ export class SuperAdminController {
         approvalFlow: {
           submittedBy: req.user.id,
           submittedAt: new Date(),
+          status: PAYROLL_STATUS.DRAFT,
+          remarks: "Initial payroll creation",
         },
         status: PAYROLL_STATUS.DRAFT,
         payment: {
@@ -619,6 +623,22 @@ export class SuperAdminController {
         populatedPayroll.department = populatedPayroll.employee.department;
         await populatedPayroll.save();
       }
+
+      // Create notification for the employee
+      console.log(`🔔 Creating notification for employee: ${employee}`);
+      await NotificationService.createPayrollNotification(
+        populatedPayroll.employee._id,
+        NOTIFICATION_TYPES.PAYROLL_CREATED,
+        populatedPayroll
+      );
+
+      // Create notification for the super admin
+      console.log(`🔔 Creating notification for super admin: ${req.user.id}`);
+      await NotificationService.createPayrollNotification(
+        req.user.id,
+        NOTIFICATION_TYPES.PAYROLL_DRAFT_CREATED,
+        populatedPayroll
+      );
 
       res.status(201).json({
         success: true,
@@ -1696,9 +1716,9 @@ export class SuperAdminController {
       });
 
       // Create notification for employee
-      await Notification.createPayrollNotification(
-        payroll.employee,
-        "PAYMENT_PROCESSED",
+      await NotificationService.createPayrollNotification(
+        payroll.employee._id,
+        NOTIFICATION_TYPES.PAYROLL_PAID,
         payroll,
         "Your payment has been processed successfully"
       );
@@ -3334,90 +3354,6 @@ export class SuperAdminController {
     }
   }
 
-  static async submitPayroll(req, res, next) {
-    try {
-      const { id } = req.params;
-      const { remarks } = req.body;
-
-      // Check if user has permission to submit payroll
-      if (!req.user.hasPermission(Permission.CREATE_PAYROLL)) {
-        return res.status(403).json({
-          success: false,
-          message: "You don't have permission to submit payrolls",
-        });
-      }
-
-      const payroll = await PayrollModel.findById(id);
-      if (!payroll) {
-        return res.status(404).json({
-          success: false,
-          message: "Payroll not found",
-        });
-      }
-
-      // Check if payroll is in DRAFT status
-      if (payroll.status !== PAYROLL_STATUS.DRAFT) {
-        return res.status(400).json({
-          success: false,
-          message: `Cannot submit payroll in ${payroll.status} status`,
-        });
-      }
-
-      // Update payroll status and submission details
-      payroll.status = PAYROLL_STATUS.PENDING;
-      payroll.approvalFlow = {
-        ...payroll.approvalFlow,
-        submittedBy: req.user._id,
-        submittedAt: new Date(),
-        remarks: remarks || "Payroll submitted for approval",
-      };
-
-      // Save the changes
-      await payroll.save();
-
-      // Get the department admin who needs to approve the payroll
-      const departmentAdmin = await UserModel.findOne({
-        role: UserRole.ADMIN,
-        department: payroll.department,
-        permissions: Permission.APPROVE_PAYROLL,
-      });
-
-      // Get all super admins
-      const superAdmins = await UserModel.find({
-        role: UserRole.SUPER_ADMIN,
-        permissions: Permission.APPROVE_PAYROLL,
-      });
-
-      // Create notifications for department admin if found
-      if (departmentAdmin) {
-        await Notification.createPayrollNotification(
-          departmentAdmin._id,
-          "PAYROLL_SUBMITTED",
-          payroll,
-          remarks
-        );
-      }
-
-      // Create notifications for all super admins
-      for (const superAdmin of superAdmins) {
-        await Notification.createPayrollNotification(
-          superAdmin._id,
-          "PAYROLL_SUBMITTED",
-          payroll,
-          remarks
-        );
-      }
-
-      res.status(200).json({
-        success: true,
-        message: "Payroll submitted successfully",
-        data: payroll,
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-
   // ===== Payment Management Controllers =====
   static async getPaymentHistory(req, res) {
     try {
@@ -3617,6 +3553,22 @@ export class SuperAdminController {
         },
       });
 
+      // Send notification to employee
+      await NotificationService.createPayrollNotification(
+        payroll.employee,
+        NOTIFICATION_TYPES.PAYMENT_FAILED,
+        payroll,
+        req.body.notes
+      );
+
+      // Send notification to admin who processed the payment
+      await NotificationService.createPayrollNotification(
+        req.user._id,
+        NOTIFICATION_TYPES.PAYMENT_FAILED,
+        payroll,
+        req.body.notes
+      );
+
       res.status(200).json({
         success: true,
         message: "Payment marked as failed successfully",
@@ -3664,6 +3616,22 @@ export class SuperAdminController {
         },
       });
 
+      // Send notification to employee
+      await NotificationService.createPayrollNotification(
+        payroll.employee,
+        NOTIFICATION_TYPES.PAYMENT_CANCELLED,
+        payroll,
+        req.body.notes
+      );
+
+      // Send notification to admin who processed the payment
+      await NotificationService.createPayrollNotification(
+        req.user._id,
+        NOTIFICATION_TYPES.PAYMENT_CANCELLED,
+        payroll,
+        req.body.notes
+      );
+
       res.status(200).json({
         success: true,
         message: "Payment cancelled successfully",
@@ -3696,6 +3664,20 @@ export class SuperAdminController {
           status: PAYROLL_STATUS.ARCHIVED,
         },
       });
+
+      // Send notification to employee
+      await NotificationService.createPayrollNotification(
+        payroll.employee,
+        NOTIFICATION_TYPES.PAYMENT_ARCHIVED,
+        payroll
+      );
+
+      // Send notification to admin who processed the payment
+      await NotificationService.createPayrollNotification(
+        req.user._id,
+        NOTIFICATION_TYPES.PAYMENT_ARCHIVED,
+        payroll
+      );
 
       res.status(200).json({
         success: true,
@@ -3816,229 +3798,151 @@ export class SuperAdminController {
     }
   }
 
-  // For handling bulk department submissions
-  static async approveDepartmentPayrolls(req, res, next) {
+  // Process payroll for all employees in a department
+  static async processDepartmentEmployeesPayroll(req, res) {
     try {
-      const { departmentId, month, year, remarks } = req.body;
-
-      // Find all pending payrolls for the department
-      const pendingPayrolls = await PayrollModel.find({
-        department: departmentId,
+      const {
+        departmentId,
         month,
         year,
-        status: PAYROLL_STATUS.PENDING,
-      }).populate("employee");
-
-      if (pendingPayrolls.length === 0) {
-        throw new ApiError(
-          404,
-          "No pending payrolls found for this department"
-        );
-      }
-
-      // Update all payrolls
-      const updatedPayrolls = await Promise.all(
-        pendingPayrolls.map(async (payroll) => {
-          payroll.status = PAYROLL_STATUS.APPROVED;
-          payroll.approvalFlow.push({
-            status: PAYROLL_STATUS.APPROVED,
-            approvedBy: req.user._id,
-            approvedAt: new Date(),
-            remarks,
-          });
-          await payroll.save();
-
-          // Send notification to employee
-          await NotificationService.createPayrollNotification(
-            payroll.employee._id,
-            "PAYROLL_APPROVED",
-            payroll,
-            remarks
-          );
-
-          return payroll;
-        })
-      );
-
-      // Send notification to department admin
-      await NotificationService.createPayrollNotification(
-        pendingPayrolls[0].createdBy,
-        "DEPARTMENT_PAYROLL_APPROVED",
-        { month, year, department: departmentId },
-        remarks
-      );
-
-      res.status(200).json({
-        success: true,
-        message: "Department payrolls approved successfully",
-        data: {
-          approved: updatedPayrolls.length,
-          payrolls: updatedPayrolls,
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  // For handling selective rejection in bulk submissions
-  static async rejectSelectedPayrolls(req, res, next) {
-    try {
-      const { payrollIds, remarks } = req.body;
-
-      // Find all specified payrolls
-      const payrolls = await PayrollModel.find({
-        _id: { $in: payrollIds },
-        status: PAYROLL_STATUS.PENDING,
-      }).populate("employee");
-
-      if (payrolls.length === 0) {
-        throw new ApiError(
-          404,
-          "No pending payrolls found with the specified IDs"
-        );
-      }
-
-      // Update selected payrolls
-      const updatedPayrolls = await Promise.all(
-        payrolls.map(async (payroll) => {
-          payroll.status = PAYROLL_STATUS.REJECTED;
-          payroll.approvalFlow.push({
-            status: PAYROLL_STATUS.REJECTED,
-            rejectedBy: req.user._id,
-            rejectedAt: new Date(),
-            remarks,
-          });
-          await payroll.save();
-
-          // Send notification to employee
-          await NotificationService.createPayrollNotification(
-            payroll.employee._id,
-            "PAYROLL_REJECTED",
-            payroll,
-            remarks
-          );
-
-          return payroll;
-        })
-      );
-
-      // Group payrolls by department for admin notifications
-      const departmentPayrolls = updatedPayrolls.reduce((acc, payroll) => {
-        const deptId = payroll.department.toString();
-        if (!acc[deptId]) acc[deptId] = [];
-        acc[deptId].push(payroll);
-        return acc;
-      }, {});
-
-      // Send notifications to department admins
-      await Promise.all(
-        Object.entries(departmentPayrolls).map(([deptId, payrolls]) =>
-          NotificationService.createPayrollNotification(
-            payrolls[0].createdBy,
-            "SELECTED_PAYROLLS_REJECTED",
-            {
-              count: payrolls.length,
-              department: deptId,
-              month: payrolls[0].month,
-              year: payrolls[0].year,
-            },
-            remarks
-          )
-        )
-      );
-
-      res.status(200).json({
-        success: true,
-        message: "Selected payrolls rejected successfully",
-        data: {
-          rejected: updatedPayrolls.length,
-          payrolls: updatedPayrolls,
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  // Process payroll for all employees in a department
-  static async processDepartmentEmployeesPayroll(req, res, next) {
-    try {
-      const { departmentId, month, year, frequency } = req.body;
+        frequency = PayrollFrequency.MONTHLY,
+      } = req.body;
+      console.log("🔄 Processing payroll for department:", departmentId);
 
       // Get all active employees in the department
       const employees = await UserModel.find({
         department: departmentId,
-        status: "ACTIVE",
-        role: "EMPLOYEE",
+        status: "active",
+        role: "employee",
       });
 
       if (!employees.length) {
         throw new ApiError(404, "No active employees found in department");
       }
 
-      // Check if any payrolls already exist for this period
-      const existingPayrolls = await PayrollModel.find({
-        department: departmentId,
+      const results = {
+        total: employees.length,
+        processed: 0,
+        skipped: 0,
+        failed: 0,
+        errors: [],
+        successful: [],
+      };
+
+      // Process each employee's payroll
+      for (const employee of employees) {
+        try {
+          // Check if payroll already exists
+          const existingPayroll = await PayrollModel.findOne({
+            employee: employee._id,
         month,
         year,
-        employee: { $in: employees.map((emp) => emp._id) },
-      });
+            frequency,
+            status: {
+              $nin: [PAYROLL_STATUS.REJECTED, PAYROLL_STATUS.CANCELLED],
+            },
+          });
 
-      // Filter out employees who already have payroll
-      const processableEmployees = employees.filter(
-        (emp) =>
-          !existingPayrolls.some(
-            (p) => p.employee.toString() === emp._id.toString()
-          )
-      );
+          if (existingPayroll) {
+            console.log(
+              `⚠️ Payroll already exists for employee ${employee._id}, skipping`
+            );
+            results.skipped++;
+            results.errors.push({
+              employeeId: employee._id,
+              reason: "Payroll already exists for this period",
+            });
+            continue;
+          }
 
-      if (!processableEmployees.length) {
-        throw new ApiError(
-          400,
-          "All employees in this department already have payroll for this period"
-        );
-      }
-
-      // Process payroll for each eligible employee
-      const createdPayrolls = await Promise.all(
-        processableEmployees.map(async (employee) => {
-          const payrollData = await PayrollService.calculatePayrollComponents(
+          // Calculate payroll
+          const payrollData = await PayrollService.calculatePayroll(
             employee._id,
+            employee.salaryGrade,
             month,
             year,
             frequency
           );
 
+          // Create payroll record
           const payroll = await PayrollModel.create({
             ...payrollData,
-            status: PAYROLL_STATUS.DRAFT,
-            createdBy: req.user._id,
+            employee: employee._id,
             department: departmentId,
+            status: PAYROLL_STATUS.DRAFT,
+            processedBy: req.user.id,
+            createdBy: req.user.id,
+            updatedBy: req.user.id,
+            payment: {
+              accountName: "Pending",
+              accountNumber: "Pending",
+              bankName: "Pending",
+            },
+            approvalFlow: {
+              submittedBy: req.user.id,
+              submittedAt: new Date(),
+              status: PAYROLL_STATUS.DRAFT,
+              remarks: "Initial payroll creation",
+            },
           });
 
-          // Send notification to employee
+          // Populate payroll data before sending notifications
+          const populatedPayroll = await PayrollModel.findById(
+            payroll._id
+          ).populate([
+            {
+              path: "employee",
+              select: "firstName lastName employeeId department",
+            },
+            { path: "department", select: "name code" },
+            { path: "salaryGrade", select: "level description" },
+            { path: "processedBy", select: "firstName lastName" },
+            { path: "createdBy", select: "firstName lastName" },
+            { path: "updatedBy", select: "firstName lastName" },
+            { path: "approvalFlow.submittedBy", select: "firstName lastName" },
+          ]);
+
+          // Create notification for the employee
           await NotificationService.createPayrollNotification(
             employee._id,
-            "PAYROLL_CREATED",
-            payroll
+            NOTIFICATION_TYPES.PAYROLL_CREATED,
+            populatedPayroll
           );
 
-          return payroll;
-        })
-      );
+          // Create notification for the super admin
+          await NotificationService.createPayrollNotification(
+            req.user.id,
+            NOTIFICATION_TYPES.PAYROLL_DRAFT_CREATED,
+            populatedPayroll
+          );
 
-      res.status(201).json({
+          results.processed++;
+          results.successful.push({
+            employeeId: employee._id,
+            payrollId: payroll._id,
+          });
+        } catch (error) {
+          console.error(`❌ Error processing employee ${employee._id}:`, error);
+          results.failed++;
+          results.errors.push({
+            employeeId: employee._id,
+            reason: error.message,
+          });
+        }
+      }
+
+      res.status(200).json({
         success: true,
-        message: "Department payrolls created successfully",
-        data: {
-          processed: createdPayrolls.length,
-          skipped: employees.length - createdPayrolls.length,
-          payrolls: createdPayrolls,
-        },
+        message: "Department payroll processing completed",
+        data: results,
       });
     } catch (error) {
-      next(error);
+      console.error("❌ Error in processDepartmentEmployeesPayroll:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to process department payroll",
+        error: error.message,
+      });
     }
   }
 
@@ -4113,7 +4017,7 @@ export class SuperAdminController {
 
               await NotificationService.createPayrollNotification(
                 employee._id,
-                "PAYROLL_CREATED",
+                NOTIFICATION_TYPES.PAYROLL_CREATED,
                 payroll
               );
 
@@ -4138,7 +4042,7 @@ export class SuperAdminController {
       // Notify super admin of completion
       await NotificationService.createPayrollNotification(
         req.user._id,
-        "BULK_PAYROLL_PROCESSED",
+        NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED,
         {
           month,
           year,
@@ -4154,6 +4058,152 @@ export class SuperAdminController {
         data: {
           results,
           errors,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // For handling bulk department submissions
+  static async approveDepartmentPayrolls(req, res, next) {
+    try {
+      const { departmentId, month, year, remarks } = req.body;
+
+      // Find all pending payrolls for the department
+      const pendingPayrolls = await PayrollModel.find({
+        department: departmentId,
+        month,
+        year,
+        status: PAYROLL_STATUS.PENDING,
+      }).populate("employee");
+
+      if (pendingPayrolls.length === 0) {
+        throw new ApiError(
+          404,
+          "No pending payrolls found for this department"
+        );
+      }
+
+      // Update all payrolls
+      const updatedPayrolls = await Promise.all(
+        pendingPayrolls.map(async (payroll) => {
+          payroll.status = PAYROLL_STATUS.APPROVED;
+          payroll.approvalFlow.push({
+            status: PAYROLL_STATUS.APPROVED,
+            approvedBy: req.user._id,
+            approvedAt: new Date(),
+            remarks,
+          });
+          await payroll.save();
+
+          // Send notification to employee
+          await NotificationService.createPayrollNotification(
+            payroll.employee._id,
+            NOTIFICATION_TYPES.PAYROLL_APPROVED,
+            payroll,
+            remarks
+          );
+
+          return payroll;
+        })
+      );
+
+      // Send notification to department admin
+      await NotificationService.createPayrollNotification(
+        pendingPayrolls[0].createdBy,
+        NOTIFICATION_TYPES.DEPARTMENT_PAYROLL_APPROVED,
+        { month, year, department: departmentId },
+        remarks
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Department payrolls approved successfully",
+        data: {
+          approved: updatedPayrolls.length,
+          payrolls: updatedPayrolls,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // For handling selective rejection in bulk submissions
+  static async rejectSelectedPayrolls(req, res, next) {
+    try {
+      const { payrollIds, remarks } = req.body;
+
+      // Find all specified payrolls
+      const payrolls = await PayrollModel.find({
+        _id: { $in: payrollIds },
+        status: PAYROLL_STATUS.PENDING,
+      }).populate("employee");
+
+      if (payrolls.length === 0) {
+        throw new ApiError(
+          404,
+          "No pending payrolls found with the specified IDs"
+        );
+      }
+
+      // Update selected payrolls
+      const updatedPayrolls = await Promise.all(
+        payrolls.map(async (payroll) => {
+          payroll.status = PAYROLL_STATUS.REJECTED;
+          payroll.approvalFlow.push({
+            status: PAYROLL_STATUS.REJECTED,
+            rejectedBy: req.user._id,
+            rejectedAt: new Date(),
+            remarks,
+          });
+          await payroll.save();
+
+          // Send notification to employee
+          await NotificationService.createPayrollNotification(
+            payroll.employee._id,
+            NOTIFICATION_TYPES.PAYROLL_REJECTED,
+            payroll,
+            remarks
+          );
+
+          return payroll;
+        })
+      );
+
+      // Group payrolls by department for notifications
+      const payrollsByDepartment = {};
+      updatedPayrolls.forEach((payroll) => {
+        if (!payrollsByDepartment[payroll.department._id]) {
+          payrollsByDepartment[payroll.department._id] = [];
+        }
+        payrollsByDepartment[payroll.department._id].push(payroll);
+      });
+
+      // Send notifications to department admins
+      for (const [departmentId, departmentPayrolls] of Object.entries(
+        payrollsByDepartment
+      )) {
+        await NotificationService.createPayrollNotification(
+          departmentPayrolls[0].createdBy,
+          NOTIFICATION_TYPES.SELECTED_PAYROLLS_REJECTED,
+          {
+            month: departmentPayrolls[0].month,
+            year: departmentPayrolls[0].year,
+            department: departmentId,
+            count: departmentPayrolls.length,
+          },
+          remarks
+        );
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Selected payrolls rejected successfully",
+        data: {
+          rejected: updatedPayrolls.length,
+          payrolls: updatedPayrolls,
         },
       });
     } catch (error) {

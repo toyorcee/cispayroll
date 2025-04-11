@@ -40,6 +40,14 @@ interface AuthContextType {
   isAdmin: () => boolean;
   isUser: () => boolean;
   updateUser: (user: User) => void;
+  // Password management functions
+  forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (token: string, newPassword: string) => Promise<void>;
+  updatePassword: (
+    currentPassword: string,
+    newPassword: string
+  ) => Promise<void>;
+  checkPasswordStatus: () => Promise<{ requiresChange: boolean }>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
@@ -213,6 +221,84 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(updatedUser);
   };
 
+  // Password management functions
+  const forgotPassword = async (email: string): Promise<void> => {
+    try {
+      const response = await axios.post("/api/password/forgot", { email });
+
+      console.log(
+        "✅ Frontend: Password reset request successful:",
+        response.data
+      );
+      toast.success("Password reset instructions sent to your email");
+    } catch (error) {
+      console.error("❌ Frontend: Forgot password error:", error);
+      if (axios.isAxiosError(error)) {
+        toast.error(
+          error.response?.data?.message || "Failed to process your request"
+        );
+      } else {
+        toast.error("An unexpected error occurred");
+      }
+      throw error;
+    }
+  };
+
+  const resetPassword = async (
+    token: string,
+    newPassword: string
+  ): Promise<void> => {
+    try {
+      await axios.post("/api/password/reset", { token, newPassword });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      if (axios.isAxiosError(error)) {
+        toast.error(
+          error.response?.data?.message || "Failed to reset your password"
+        );
+      } else {
+        toast.error("An unexpected error occurred");
+      }
+      throw error;
+    }
+  };
+
+  const updatePassword = async (
+    currentPassword: string,
+    newPassword: string
+  ): Promise<void> => {
+    try {
+      await axios.post("/api/password/update", {
+        currentPassword,
+        newPassword,
+      });
+      toast.success("Password updated successfully");
+    } catch (error) {
+      console.error("Update password error:", error);
+      if (axios.isAxiosError(error)) {
+        toast.error(
+          error.response?.data?.message || "Failed to update your password"
+        );
+      } else {
+        toast.error("An unexpected error occurred");
+      }
+      throw error;
+    }
+  };
+
+  const checkPasswordStatus = async (): Promise<{
+    requiresChange: boolean;
+  }> => {
+    try {
+      const { data } = await axios.get("/api/password/status");
+      return data;
+    } catch (error) {
+      console.error("Check password status error:", error);
+      // Default to not requiring change on error
+      return { requiresChange: false };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -231,6 +317,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdmin,
         isUser,
         updateUser,
+        // Password management functions
+        forgotPassword,
+        resetPassword,
+        updatePassword,
+        checkPasswordStatus,
       }}
     >
       {children}

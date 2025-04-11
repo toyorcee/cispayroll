@@ -1,4 +1,4 @@
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   TbCurrencyDollar,
@@ -10,10 +10,10 @@ import {
   TbCurrencyReal,
   TbCurrencyRubel,
 } from "react-icons/tb";
-import { useAuth } from "../../context/AuthContext";
-import { useState, useEffect } from "react";
-import { toast } from "react-toastify";
+import { useState } from "react";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { useAuth } from "../../context/AuthContext";
+import { toast } from "react-toastify";
 
 const PeopleMaxIcon = () => (
   <svg
@@ -42,14 +42,16 @@ const PeopleMaxIcon = () => (
   </svg>
 );
 
-export default function SignIn() {
-  const location = useLocation();
-  const { signIn } = useAuth();
+export default function UpdatePassword() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const { updatePassword } = useAuth();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const currencies = [
     TbCurrencyDollar,
@@ -62,57 +64,37 @@ export default function SignIn() {
     TbCurrencyRubel,
   ];
 
-  useEffect(() => {
-    // Show success message if coming from registration
-    if (location.state?.message) {
-      toast.success(location.state.message);
-    }
-  }, [location]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (newPassword !== confirmPassword) {
+      // Error will be handled by the toast in the updatePassword function
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await signIn(email, password);
-      toast.success("Successfully signed in!", {
-        position: "top-right",
-        autoClose: 2000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        style: {
-          backgroundColor: "#ffffff",
-          color: "#1f2937",
-          border: "1px solid #e5e7eb",
-          borderRadius: "0.5rem",
-          boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-        },
-      });
-      navigate("/home");
-    } catch (err) {
-      console.error("Login error:", err);
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Invalid email/username or password",
+      await updatePassword(currentPassword, newPassword);
+      // Show success message and redirect to dashboard
+      toast.success(
+        "Password updated successfully! Redirecting to dashboard...",
         {
           position: "top-right",
-          autoClose: 3000,
+          autoClose: 2000,
           hideProgressBar: false,
           closeOnClick: true,
           pauseOnHover: true,
           draggable: true,
-          style: {
-            backgroundColor: "#ffffff",
-            color: "#1f2937",
-            border: "1px solid #e5e7eb",
-            borderRadius: "0.5rem",
-            boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-          },
         }
       );
+
+      // Redirect to dashboard after a short delay
+      setTimeout(() => {
+        navigate("/pms/dashboard");
+      }, 2000);
+    } catch (error) {
+      console.error("Update password error:", error);
     } finally {
       setLoading(false);
     }
@@ -173,8 +155,11 @@ export default function SignIn() {
           </Link>
 
           <h2 className="mt-4 text-2xl font-bold tracking-tight text-gray-900">
-            Sign in to your account
+            Update Password
           </h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Enter your current password and choose a new one.
+          </p>
         </motion.div>
 
         <motion.div
@@ -186,51 +171,29 @@ export default function SignIn() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label
-                  htmlFor="email"
+                  htmlFor="currentPassword"
                   className="block text-sm font-medium text-gray-700"
                 >
-                  Email or Username
-                </label>
-                <div className="mt-1">
-                  <input
-                    id="email"
-                    name="email"
-                    type="text"
-                    autoComplete="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="block w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-green-500 focus:outline-none focus:ring-green-500"
-                    placeholder="Enter your email or username"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Password
+                  Current Password
                 </label>
                 <div className="mt-1 relative">
                   <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
+                    id="currentPassword"
+                    name="currentPassword"
+                    type={showCurrentPassword ? "text" : "password"}
                     autoComplete="current-password"
                     required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
                     className="block w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-green-500 focus:outline-none focus:ring-green-500 pr-10"
-                    placeholder="Enter your password"
+                    placeholder="Enter your current password"
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                     className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 cursor-pointer"
                   >
-                    {showPassword ? (
+                    {showCurrentPassword ? (
                       <FaEyeSlash className="h-5 w-5" />
                     ) : (
                       <FaEye className="h-5 w-5" />
@@ -239,29 +202,69 @@ export default function SignIn() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
+              <div>
+                <label
+                  htmlFor="newPassword"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  New Password
+                </label>
+                <div className="mt-1 relative">
                   <input
-                    id="remember-me"
-                    name="remember-me"
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                    id="newPassword"
+                    name="newPassword"
+                    type={showNewPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    required
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="block w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-green-500 focus:outline-none focus:ring-green-500 pr-10"
+                    placeholder="Enter your new password"
                   />
-                  <label
-                    htmlFor="remember-me"
-                    className="ml-2 block text-sm text-gray-900"
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 cursor-pointer"
                   >
-                    Remember me
-                  </label>
+                    {showNewPassword ? (
+                      <FaEyeSlash className="h-5 w-5" />
+                    ) : (
+                      <FaEye className="h-5 w-5" />
+                    )}
+                  </button>
                 </div>
+              </div>
 
-                <div className="text-sm">
-                  <Link
-                    to="/auth/forgot-password"
-                    className="font-medium text-green-600 hover:text-green-500"
+              <div>
+                <label
+                  htmlFor="confirmPassword"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Confirm New Password
+                </label>
+                <div className="mt-1 relative">
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="block w-full appearance-none rounded-lg border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-green-500 focus:outline-none focus:ring-green-500 pr-10"
+                    placeholder="Confirm your new password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 cursor-pointer"
                   >
-                    Forgot password?
-                  </Link>
+                    {showConfirmPassword ? (
+                      <FaEyeSlash className="h-5 w-5" />
+                    ) : (
+                      <FaEye className="h-5 w-5" />
+                    )}
+                  </button>
                 </div>
               </div>
 
@@ -274,12 +277,24 @@ export default function SignIn() {
                            focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 
                            transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  {loading ? "Signing in..." : "Sign in"}
+                  {loading ? "Updating..." : "Update Password"}
                 </button>
               </div>
             </form>
           </div>
         </motion.div>
+
+        <div className="mt-6 text-center">
+          <p className="text-sm text-gray-600">
+            Changed your mind?{" "}
+            <Link
+              to="/dashboard"
+              className="font-medium text-green-600 hover:text-green-500"
+            >
+              Return to Dashboard
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -1,105 +1,172 @@
 import React from "react";
+import { motion } from "framer-motion";
 import {
   FaCheckCircle,
-  FaSpinner,
   FaExclamationTriangle,
+  FaTimesCircle,
 } from "react-icons/fa";
 
 interface SuccessAnimationProps {
-  type: "single" | "multiple" | "department";
+  type: "success" | "error" | "warning";
+  message: string;
   results?: {
     total: number;
     processed: number;
     skipped: number;
     failed: number;
+    errors?: Array<{
+      employeeId: string;
+      employeeName: string;
+      reason: string;
+      details: string;
+    }>;
   };
-  isProcessing?: boolean;
-  error?: string;
+  onClose: () => void;
 }
 
-export const SuccessAnimation: React.FC<SuccessAnimationProps> = ({
+const SuccessAnimation: React.FC<SuccessAnimationProps> = ({
   type,
+  message,
   results,
-  isProcessing = false,
-  error,
+  onClose,
 }) => {
-  const getMessage = () => {
-    if (error) {
-      return "Payroll Processing Failed";
-    }
-
-    if (isProcessing) {
-      return "Processing Payroll...";
-    }
-
-    if (!results) {
-      return "Payroll Processed Successfully!";
-    }
-
+  const getIcon = () => {
     switch (type) {
-      case "single":
-        return "Single Employee Payroll Processed Successfully!";
-      case "multiple":
-        return `Successfully processed ${results.processed} out of ${results.total} employees`;
-      case "department":
-        return `Department Payroll Processed: ${results.processed} processed, ${results.skipped} skipped, ${results.failed} failed`;
+      case "success":
+        return <FaCheckCircle className="w-16 h-16 text-green-500" />;
+      case "error":
+        return <FaTimesCircle className="w-16 h-16 text-red-500" />;
+      case "warning":
+        return <FaExclamationTriangle className="w-16 h-16 text-yellow-500" />;
       default:
-        return "Payroll Processed Successfully!";
+        return null;
     }
   };
 
-  const getDetails = () => {
-    if (error) {
-      return (
-        <div className="mt-4 text-sm text-red-600">
-          <p className="mb-1">{error}</p>
-          <p>
-            Please try again with different parameters or contact support if the
-            issue persists.
-          </p>
-        </div>
-      );
+  const getBackgroundColor = () => {
+    switch (type) {
+      case "success":
+        return "bg-green-50";
+      case "error":
+        return "bg-red-50";
+      case "warning":
+        return "bg-yellow-50";
+      default:
+        return "bg-gray-50";
     }
+  };
 
-    if (!results || isProcessing) return null;
-
-    return (
-      <div className="mt-4 text-sm text-gray-600">
-        {results.skipped > 0 && (
-          <p className="mb-1">
-            <span className="font-medium">{results.skipped}</span> employees
-            skipped (already processed)
-          </p>
-        )}
-        {results.failed > 0 && (
-          <p className="mb-1">
-            <span className="font-medium">{results.failed}</span> employees
-            failed to process
-          </p>
-        )}
-        {results.processed > 0 && (
-          <p>
-            <span className="font-medium">{results.processed}</span> employees
-            processed successfully
-          </p>
-        )}
-      </div>
-    );
+  const getTextColor = () => {
+    switch (type) {
+      case "success":
+        return "text-green-800";
+      case "error":
+        return "text-red-800";
+      case "warning":
+        return "text-yellow-800";
+      default:
+        return "text-gray-800";
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="text-center p-8 bg-white rounded-lg shadow-xl max-w-md">
-        {error ? (
-          <FaExclamationTriangle className="mx-auto h-16 w-16 text-red-500 animate-pulse" />
-        ) : isProcessing ? (
-          <FaSpinner className="mx-auto h-16 w-16 text-blue-500 animate-spin" />
-        ) : (
-          <FaCheckCircle className="mx-auto h-16 w-16 text-green-500 animate-bounce" />
-        )}
-        <p className="mt-4 text-lg font-medium text-gray-900">{getMessage()}</p>
-        {getDetails()}
+    <motion.div
+      initial={{ opacity: 0, scale: 0.5 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.5 }}
+      className={`fixed inset-0 flex items-center justify-center z-50 ${getBackgroundColor()}`}
+    >
+      <div className="bg-white p-8 rounded-lg shadow-xl max-w-2xl w-full mx-4">
+        <div className="flex flex-col items-center">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 0.5 }}
+          >
+            {getIcon()}
+          </motion.div>
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className={`mt-4 text-2xl font-bold ${getTextColor()}`}
+          >
+            {message}
+          </motion.h2>
+
+          {results && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="mt-6 w-full"
+            >
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <p className="text-sm text-green-600">Processed</p>
+                  <p className="text-2xl font-bold text-green-700">
+                    {results.processed}
+                  </p>
+                </div>
+                <div className="bg-yellow-50 p-4 rounded-lg">
+                  <p className="text-sm text-yellow-600">Skipped</p>
+                  <p className="text-2xl font-bold text-yellow-700">
+                    {results.skipped}
+                  </p>
+                </div>
+                <div className="bg-red-50 p-4 rounded-lg">
+                  <p className="text-sm text-red-600">Failed</p>
+                  <p className="text-2xl font-bold text-red-700">
+                    {results.failed}
+                  </p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Total</p>
+                  <p className="text-2xl font-bold text-gray-700">
+                    {results.total}
+                  </p>
+                </div>
+              </div>
+
+              {results.errors && results.errors.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                    Error Details
+                  </h3>
+                  <div className="max-h-60 overflow-y-auto">
+                    {results.errors.map((error, index) => (
+                      <div
+                        key={index}
+                        className="bg-red-50 p-4 rounded-lg mb-2"
+                      >
+                        <p className="font-medium text-red-800">
+                          {error.employeeName}
+                        </p>
+                        <p className="text-sm text-red-600">{error.reason}</p>
+                        <p className="text-xs text-red-500 mt-1">
+                          {error.details}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            onClick={onClose}
+            className={`mt-6 px-6 py-2 rounded-md ${getTextColor()} bg-white border-2 border-current hover:bg-opacity-10 hover:bg-current transition-colors`}
+          >
+            Close
+          </motion.button>
+        </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
+
+export default SuccessAnimation;

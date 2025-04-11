@@ -164,6 +164,9 @@ export const Permission = {
   SUBMIT_FEEDBACK: "SUBMIT_FEEDBACK",
   VIEW_OWN_FEEDBACK: "VIEW_OWN_FEEDBACK",
   MANAGE_FEEDBACK: "MANAGE_FEEDBACK",
+
+  // New permission for ADMIN role
+  SUBMIT_PAYROLL: "SUBMIT_PAYROLL",
 };
 
 export const UserLifecycleState = {
@@ -505,6 +508,12 @@ const UserSchema = new Schema(
     lastPasswordAttempt: {
       type: Date,
     },
+    resetPasswordToken: {
+      type: String,
+    },
+    resetPasswordExpires: {
+      type: Date,
+    },
     deductionPreferences: {
       statutory: {
         // Default statutory deductions
@@ -771,7 +780,6 @@ UserSchema.pre("save", function (next) {
           Permission.VIEW_REPORTS,
           Permission.VIEW_ALL_PAYSLIPS,
           Permission.VIEW_DEPARTMENT_PAYSLIPS,
-          Permission.VIEW_OWN_PAYSLIP,
           Permission.PROCESS_PAYMENT,
           Permission.MARK_PAYMENT_FAILED,
           Permission.VIEW_PAYMENT_HISTORY,
@@ -784,10 +792,10 @@ UserSchema.pre("save", function (next) {
 
           // Basic Permissions
           Permission.VIEW_PERSONAL_INFO,
+          Permission.EDIT_PERSONAL_INFO,
           Permission.REQUEST_LEAVE,
           Permission.VIEW_OWN_LEAVE,
           Permission.CANCEL_OWN_LEAVE,
-          Permission.VIEW_OWN_PAYSLIP,
 
           // Employee Lifecycle Management
           Permission.MANAGE_ONBOARDING,
@@ -842,7 +850,8 @@ UserSchema.pre("save", function (next) {
           Permission.MANAGE_NOTIFICATIONS,
           Permission.MANAGE_INTEGRATIONS,
           Permission.MANAGE_DOCUMENTS,
-          Permission.EDIT_PERSONAL_INFO,
+          Permission.UPDATE_PROFILE,
+          Permission.CHANGE_PASSWORD,
 
           Permission.VIEW_DISCIPLINARY_RECORDS,
           Permission.MANAGE_DISCIPLINARY_ACTIONS,
@@ -892,6 +901,7 @@ UserSchema.pre("save", function (next) {
           Permission.EDIT_PAYROLL,
           Permission.DELETE_PAYROLL,
           Permission.SUBMIT_PAYROLL,
+          Permission.APPROVE_PAYROLL,
           Permission.VIEW_DEPARTMENT_PAYROLL,
           Permission.GENERATE_PAYSLIP,
           Permission.VIEW_REPORTS,
@@ -907,10 +917,10 @@ UserSchema.pre("save", function (next) {
 
           // Basic Permissions
           Permission.VIEW_PERSONAL_INFO,
+          Permission.EDIT_PERSONAL_INFO,
           Permission.REQUEST_LEAVE,
           Permission.VIEW_OWN_LEAVE,
           Permission.CANCEL_OWN_LEAVE,
-          Permission.VIEW_OWN_PAYSLIP,
 
           // Employee Lifecycle Management
           Permission.VIEW_ONBOARDING,

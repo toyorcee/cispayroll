@@ -22,6 +22,30 @@ export const PayrollFrequency = {
   ANNUAL: "annual",
 };
 
+// Approval levels and related constants
+export const APPROVAL_LEVELS = {
+  DEPARTMENT_HEAD: "DEPARTMENT_HEAD",
+  HR_MANAGER: "HR_MANAGER",
+  FINANCE_DIRECTOR: "FINANCE_DIRECTOR",
+  SUPER_ADMIN: "SUPER_ADMIN",
+};
+
+export const APPROVAL_ORDER = [
+  APPROVAL_LEVELS.DEPARTMENT_HEAD,
+  APPROVAL_LEVELS.HR_MANAGER,
+  APPROVAL_LEVELS.FINANCE_DIRECTOR,
+  APPROVAL_LEVELS.SUPER_ADMIN,
+];
+
+// Helper function to get next approval level
+export const getNextApprovalLevel = (currentLevel) => {
+  const currentIndex = APPROVAL_ORDER.indexOf(currentLevel);
+  if (currentIndex === -1 || currentIndex === APPROVAL_ORDER.length - 1) {
+    return null;
+  }
+  return APPROVAL_ORDER[currentIndex + 1];
+};
+
 // Schema Definition
 const PayrollSchema = new Schema(
   {
@@ -186,16 +210,49 @@ const PayrollSchema = new Schema(
       default: PAYROLL_STATUS.DRAFT,
       required: [true, "Status is required"],
     },
+    // Enhanced approval flow with multi-level support
     approvalFlow: {
+      // Current approval level
+      currentLevel: {
+        type: String,
+        enum: Object.values(APPROVAL_LEVELS),
+      },
+      // History of all approval actions
+      history: [
+        {
+          level: {
+            type: String,
+            enum: Object.values(APPROVAL_LEVELS),
+            required: true,
+          },
+          status: {
+            type: String,
+            enum: ["PENDING", "APPROVED", "REJECTED"],
+            required: true,
+          },
+          action: {
+            type: String,
+            enum: ["SUBMIT", "APPROVE", "REJECT", "RETURN"],
+            required: true,
+          },
+          user: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+          },
+          timestamp: {
+            type: Date,
+            default: Date.now,
+          },
+          remarks: String,
+        },
+      ],
+      // Legacy fields for backward compatibility
       submittedBy: {
         type: Schema.Types.ObjectId,
         ref: "User",
-        required: [true, "Submitter is required"],
       },
-      submittedAt: {
-        type: Date,
-        required: [true, "Submission date is required"],
-      },
+      submittedAt: Date,
       processingStartedBy: {
         type: Schema.Types.ObjectId,
         ref: "User",
@@ -404,6 +461,110 @@ PayrollSchema.methods.calculateTotals = function () {
   };
 
   return this.totals;
+};
+
+// New methods for approval flow
+PayrollSchema.methods.submitForApproval = function (user, remarks) {
+  if (this.status !== PAYROLL_STATUS.DRAFT) {
+    throw new Error("Only draft payrolls can be submitted for approval");
+  }
+
+  this.status = PAYROLL_STATUS.PENDING;
+  this.approvalFlow.currentLevel = APPROVAL_LEVELS.DEPARTMENT_HEAD;
+
+  // Add to approval history
+  this.approvalFlow.history.push({
+    level: APPROVAL_LEVELS.DEPARTMENT_HEAD,
+    status: "PENDING",
+    action: "SUBMIT",
+    user: user._id,
+    timestamp: new Date(),
+    remarks: remarks || "Submitted for department head approval",
+  });
+
+  // Update legacy fields
+  this.approvalFlow.submittedBy = user._id;
+  this.approvalFlow.submittedAt = new Date();
+  this.approvalFlow.remarks = remarks;
+
+  return this;
+};
+
+PayrollSchema.methods.approve = function (user, remarks) {
+  if (this.status !== PAYROLL_STATUS.PENDING) {
+    throw new Error("Only pending payrolls can be approved");
+  }
+
+  const currentLevel = this.approvalFlow.currentLevel;
+  const nextLevel = getNextApprovalLevel(currentLevel);
+
+  // Add current approval to history
+  this.approvalFlow.history.push({
+    level: currentLevel,
+    status: "APPROVED",
+    action: "APPROVE",
+    user: user._id,
+    timestamp: new Date(),
+    remarks,
+  });
+
+  if (nextLevel) {
+    // Move to next approval level
+    this.approvalFlow.currentLevel = nextLevel;
+  } else {
+    // Final approval
+    this.status = PAYROLL_STATUS.APPROVED;
+    this.approvalFlow.approvedBy = user._id;
+    this.approvalFlow.approvedAt = new Date();
+  }
+
+  return this;
+};
+
+PayrollSchema.methods.reject = function (user, remarks) {
+  if (this.status !== PAYROLL_STATUS.PENDING) {
+    throw new Error("Only pending payrolls can be rejected");
+  }
+
+  this.status = PAYROLL_STATUS.REJECTED;
+
+  // Add rejection to history
+  this.approvalFlow.history.push({
+    level: this.approvalFlow.currentLevel,
+    status: "REJECTED",
+    action: "REJECT",
+    user: user._id,
+    timestamp: new Date(),
+    remarks,
+  });
+
+  // Update legacy fields
+  this.approvalFlow.rejectedBy = user._id;
+  this.approvalFlow.rejectedAt = new Date();
+
+  return this;
+};
+
+PayrollSchema.methods.returnForRevision = function (user, remarks) {
+  if (this.status !== PAYROLL_STATUS.PENDING) {
+    throw new Error("Only pending payrolls can be returned for revision");
+  }
+
+  // Add return action to history
+  this.approvalFlow.history.push({
+    level: this.approvalFlow.currentLevel,
+    status: "PENDING",
+    action: "RETURN",
+    user: user._id,
+    timestamp: new Date(),
+    remarks,
+  });
+
+  // Move back to draft status
+  this.status = PAYROLL_STATUS.DRAFT;
+  this.approvalFlow.currentLevel = null;
+
+  return this;
 };
 
 // Indexes

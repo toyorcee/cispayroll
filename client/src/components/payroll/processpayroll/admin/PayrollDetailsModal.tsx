@@ -4,6 +4,7 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  Tooltip,
 } from "@mui/material";
 import { PayrollData } from "../../../../types/payroll";
 
@@ -111,6 +112,31 @@ const PayrollDetailsModal = ({
               >
                 {payroll.status}
               </span>
+            </div>
+
+            <div className="bg-white p-4 rounded-lg shadow-sm">
+              <h3 className="font-semibold text-green-600 mb-3">
+                Approval History
+              </h3>
+              <div className="space-y-2">
+                {payroll.approvalFlow?.history?.map((entry, index) => (
+                  <div key={index} className="border-b pb-2 last:border-b-0">
+                    <p className="text-sm font-medium">
+                      {entry.action} by {entry.level}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(entry.timestamp).toLocaleString()}
+                    </p>
+                    {entry.remarks && (
+                      <Tooltip title={entry.remarks} arrow placement="top">
+                        <p className="text-sm text-gray-600 cursor-help truncate">
+                          Remarks: {entry.remarks}
+                        </p>
+                      </Tooltip>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

@@ -3,9 +3,7 @@ import { Dialog } from "@headlessui/react";
 import {
   FaTimes,
   FaSpinner,
-  FaCheck,
   FaSearch,
-  FaUser,
   FaIdCard,
   FaBriefcase,
 } from "react-icons/fa";
@@ -15,8 +13,8 @@ import { salaryStructureService } from "../../../../services/salaryStructureServ
 import { adminPayrollService } from "../../../../services/adminPayrollService";
 import { toast } from "react-toastify";
 import { useQueryClient } from "@tanstack/react-query";
-import { SuccessAnimation } from "./SuccessAnimation";
-import { useNotifications } from "../../../shared/DashboardLayout";
+import SuccessAnimation from "./SuccessAnimation";
+import { useNotifications } from "../../../shared/DashboardLayout"; 
 
 interface SingleEmployeeProcessModalProps {
   isOpen: boolean;
@@ -81,6 +79,7 @@ const SingleEmployeeProcessModal = ({
 
   // Add state for form submission
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Add state for success animation
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
@@ -170,7 +169,6 @@ const SingleEmployeeProcessModal = ({
     },
   });
 
-  // Filter employees based on search term
   const filteredEmployees =
     employees?.filter((employee) => {
       const searchLower = searchTerm.toLowerCase();
@@ -293,9 +291,7 @@ const SingleEmployeeProcessModal = ({
     }
 
     setIsSubmitting(true);
-    setShowSuccessAnimation(true);
-    setIsProcessing(true);
-    setErrorMessage(undefined);
+    setIsLoading(true);
 
     try {
       if (selectedEmployees.length === 1) {
@@ -307,12 +303,6 @@ const SingleEmployeeProcessModal = ({
           frequency: formData.frequency,
           salaryGrade: employee.salaryGrade?._id,
         });
-        setProcessingResults(result);
-
-        // Wait for animation to complete (4 seconds)
-        await new Promise((resolve) => setTimeout(resolve, 4000));
-
-        toast.success("Payroll processed successfully");
 
         // Check for new notifications after payroll creation
         console.log(
@@ -322,6 +312,9 @@ const SingleEmployeeProcessModal = ({
 
         queryClient.invalidateQueries({ queryKey: ["payrolls"] });
         queryClient.invalidateQueries({ queryKey: ["notifications"] });
+
+        // Add back the success toast
+        toast.success("Payroll processed successfully");
       } else {
         const result =
           await adminPayrollService.processMultipleEmployeesPayroll({
@@ -330,14 +323,8 @@ const SingleEmployeeProcessModal = ({
             year: formData.year,
             frequency: formData.frequency,
           });
-        setProcessingResults(result);
 
-        // Wait for animation to complete (4 seconds)
-        await new Promise((resolve) => setTimeout(resolve, 4000));
-
-        toast.success("Payroll processed successfully for multiple employees");
-
-        // Check for new notifications after payroll creation
+        // Check for new notifications after multiple payroll creation
         console.log(
           "🔔 Checking for new notifications after multiple payroll creation..."
         );
@@ -346,16 +333,16 @@ const SingleEmployeeProcessModal = ({
         // Invalidate queries to refresh the data
         queryClient.invalidateQueries({ queryKey: ["payrolls"] });
         queryClient.invalidateQueries({ queryKey: ["notifications"] });
+
+        // Add back the success toast
+        toast.success("Payroll processed successfully for multiple employees");
       }
 
       // Close the modal and trigger success callback
-      setIsProcessing(false);
-      setShowSuccessAnimation(false);
-      onSuccess?.();
       onClose();
+      onSuccess?.();
     } catch (error: any) {
       console.error("Error processing payroll:", error);
-      setIsProcessing(false);
 
       // Handle specific error cases
       if (error.response?.data?.message) {
@@ -397,6 +384,7 @@ const SingleEmployeeProcessModal = ({
       }, 5000);
     } finally {
       setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
@@ -729,10 +717,10 @@ const SingleEmployeeProcessModal = ({
       {/* Success Animation */}
       {showSuccessAnimation && (
         <SuccessAnimation
-          type={selectedEmployees.length === 1 ? "single" : "multiple"}
+          type={errorMessage ? "error" : "success"}
+          message={errorMessage || "Payroll processed successfully"}
           results={processingResults}
-          isProcessing={isProcessing}
-          error={errorMessage}
+          onClose={() => setShowSuccessAnimation(false)}
         />
       )}
     </Dialog>

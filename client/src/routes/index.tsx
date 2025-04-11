@@ -68,6 +68,9 @@ const SignUp = lazy(() => import("../pages/auth/SignUp"));
 const CompleteRegistration = lazy(
   () => import("../pages/auth/CompleteRegistration")
 );
+const ForgotPassword = lazy(() => import("../pages/auth/ForgotPassword"));
+const ResetPassword = lazy(() => import("../pages/auth/ResetPassword"));
+const UpdatePassword = lazy(() => import("../pages/auth/UpdatePassword"));
 
 // LazyRoute component
 function LazyRoute({
@@ -481,8 +484,8 @@ export const routes: RouteConfig[] = [
     path: "profile",
     label: "My Profile",
     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-    permissions: [Permission.VIEW_PERSONAL_INFO],
-    requireAllPermissions: true,
+    permissions: [Permission.VIEW_PERSONAL_INFO, Permission.EDIT_PERSONAL_INFO],
+    requireAllPermissions: false,
     element: <UserProfile />,
   },
   {
@@ -526,6 +529,24 @@ export const router = createBrowserRouter([
             path: "complete-registration/:token",
             element: (
               <LazyRoute component={CompleteRegistration} skeletonType="auth" />
+            ),
+          },
+          {
+            path: "forgot-password",
+            element: (
+              <LazyRoute component={ForgotPassword} skeletonType="auth" />
+            ),
+          },
+          {
+            path: "reset-password",
+            element: (
+              <LazyRoute component={ResetPassword} skeletonType="auth" />
+            ),
+          },
+          {
+            path: "update-password",
+            element: (
+              <LazyRoute component={UpdatePassword} skeletonType="auth" />
             ),
           },
         ],

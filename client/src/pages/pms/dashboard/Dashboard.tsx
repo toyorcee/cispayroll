@@ -9,7 +9,15 @@ import { employeeService } from "../../../services/employeeService";
 import StatCard from "../../../components/dashboard/StatCard";
 import { departmentService } from "../../../services/departmentService";
 import DepartmentStats from "../../../components/dashboard/DepartmentStats";
-import { FaUsers, FaUserTie, FaUserPlus } from "react-icons/fa";
+import {
+  FaUsers,
+  FaUserTie,
+  FaUserPlus,
+  FaCalendarAlt,
+  FaClock,
+  FaBell,
+} from "react-icons/fa";
+import { getUnreadNotificationCount } from "../../../services/notificationService";
 
 // Lazy load chart components
 const LineChart = lazy(() => import("../../../components/charts/LineChart"));
@@ -23,30 +31,63 @@ const ChartLoading = () => (
   </div>
 );
 
+// Add clock component
+const Clock = () => {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const options: Intl.DateTimeFormatOptions = {
+    weekday: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZone: "Africa/Lagos",
+  };
+  const timeString = time.toLocaleTimeString("en-US", options);
+  const dateString = time.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  return (
+    <div className="flex items-center space-x-4 text-green-600 text-sm font-bold">
+      <FaCalendarAlt className="text-lg" />
+      <div>{dateString}</div>
+      <FaClock className="text-lg" />
+      <div>{timeString}</div>
+    </div>
+  );
+};
+
+// Add loading state for stat cards
+const StatCardSkeleton = () => (
+  <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-gray-200 animate-pulse">
+    <div className="flex items-center justify-between">
+      <div className="flex-1">
+        <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+        <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
+        <div className="h-4 bg-gray-200 rounded w-32"></div>
+      </div>
+      <div className="p-3 rounded-full bg-gray-100">
+        <div className="h-6 w-6 bg-gray-200 rounded"></div>
+      </div>
+    </div>
+  </div>
+);
+
 export default function Dashboard() {
   const { user, hasPermission, hasAnyPermission } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [dashboardStats, setDashboardStats] = useState<
     DashboardStats | undefined
   >(undefined);
-
-  // Add refs for each chart section
-  const distributionRef = useRef(null);
-  const pieChartRef = useRef(null);
-  const lineChartRef = useRef(null);
-
-  const isDistributionInView = useInView(distributionRef, {
-    amount: 0.1,
-    margin: "100px 0px 0px 0px",
-  });
-  const isPieChartInView = useInView(pieChartRef, {
-    amount: 0.1,
-    margin: "100px 0px 0px 0px",
-  });
-  const isLineChartInView = useInView(lineChartRef, {
-    amount: 0.1,
-    margin: "100px 0px 0px 0px",
-  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
 
   // Only fetch the appropriate chart stats based on user role
   const { data: chartStatsData } =
@@ -59,30 +100,20 @@ export default function Dashboard() {
       ? departmentService.useGetAdminDepartmentChartStats()
       : { data: null };
 
-  // For admin/user specific stats
-  // const { data: roleStats } = departmentService.useGetRoleSpecificStats(
-  //   user?.role.toLowerCase() || "",
-  //   hasPermission(Permission.VIEW_ALL_DEPARTMENTS)
-  //     ? (typeof user?.department === "object"
-  //         ? user.department._id
-  //         : user?.department) || ""
-  //     : user?._id || ""
-  // );
-
   // Pie Chart - Department Size Distribution (percentage)
   const pieChartData = chartStatsData
     ? {
         labels: chartStatsData.departmentDistribution.labels.map(
           (label, index) => {
-          const value =
+            const value =
               chartStatsData.departmentDistribution.datasets[0].data[index];
-          const total =
+            const total =
               chartStatsData.departmentDistribution.datasets[0].data.reduce(
-              (a, b) => a + b,
-              0
-            );
-          const percentage = ((value / total) * 100).toFixed(1);
-          return `${label} (${percentage}%)`;
+                (a, b) => a + b,
+                0
+              );
+            const percentage = ((value / total) * 100).toFixed(1);
+            return `${label} (${percentage}%)`;
           }
         ),
         datasets: [
@@ -231,12 +262,19 @@ export default function Dashboard() {
     const fetchDashboardData = async () => {
       try {
         setError(null);
-        const stats = await employeeService.getDashboardStats();
+        setIsLoading(true);
+        const [stats, unreadCount] = await Promise.all([
+          employeeService.getDashboardStats(),
+          getUnreadNotificationCount(),
+        ]);
         setDashboardStats(stats);
+        setUnreadNotifications(unreadCount);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load dashboard data"
         );
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -247,7 +285,6 @@ export default function Dashboard() {
   const getAdminStatCards = () => {
     if (!adminChartStatsData) return [];
 
-    // Extract data from admin chart stats
     const departmentSize =
       adminChartStatsData.departmentStats.datasets[0].data.reduce(
         (sum, val) => sum + val,
@@ -255,27 +292,20 @@ export default function Dashboard() {
       );
     const roleDistribution =
       adminChartStatsData.roleDistribution.datasets[0].data;
-    const monthlyGrowth = adminChartStatsData.monthlyGrowth.datasets[0].data;
-
-    // Calculate total growth
-    const totalGrowth = monthlyGrowth.reduce((sum, val) => sum + val, 0);
+    const totalGrowth =
+      adminChartStatsData.monthlyGrowth.datasets[0].data.reduce(
+        (sum, val) => sum + val,
+        0
+      );
 
     return [
       {
-        name: "Department Size",
+        name: "Total Employees",
         value: departmentSize.toString(),
-        subtext: "Total Employees",
+        subtext: "Including Admins and Staff",
         icon: FaUsers,
         href: "/employees",
         color: "blue" as const,
-      },
-      {
-        name: "Administrative Staff",
-        value: roleDistribution[0]?.toString() || "0",
-        subtext: "Admin Users",
-        icon: FaUserTie,
-        href: "/employees",
-        color: "green" as const,
       },
       {
         name: "Monthly Growth",
@@ -286,33 +316,25 @@ export default function Dashboard() {
         color: "yellow" as const,
       },
       {
-        name: "Active Staff",
-        value: (
-          departmentSize - (monthlyGrowth[monthlyGrowth.length - 1] || 0)
-        ).toString(),
-        subtext: "Currently Working",
-        icon: FaUsers,
-        href: "/employees",
-        color: "blue" as const,
+        name: "Unread Notifications",
+        value: unreadNotifications.toString(),
+        subtext: "Notifications",
+        icon: FaBell,
+        href: "/notifications",
+        color: "red" as const,
       },
     ];
   };
 
   // Render different charts based on permissions
   const renderPermissionBasedCharts = () => {
-    // Check if user is an admin
     const isAdmin = user?.role === "ADMIN";
 
-    // Admin view - prioritize this over superadmin view
     if (isAdmin) {
-      // Use the admin chart data we created earlier
       if (adminChartStatsData) {
         return (
           <>
-            <div
-              ref={pieChartRef}
-              className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]"
-            >
+            <div className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]">
               <h2 className="text-lg font-semibold mb-4">
                 Department Size Distribution
               </h2>
@@ -320,10 +342,7 @@ export default function Dashboard() {
                 {adminPieChartData && <PieChart data={adminPieChartData} />}
               </Suspense>
             </div>
-            <div
-              ref={distributionRef}
-              className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]"
-            >
+            <div className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]">
               <h2 className="text-lg font-semibold mb-4">
                 Employee Role Distribution
               </h2>
@@ -331,10 +350,7 @@ export default function Dashboard() {
                 {adminBarChartData && <BarChart data={adminBarChartData} />}
               </Suspense>
             </div>
-            <div
-              ref={lineChartRef}
-              className="bg-white p-6 rounded-lg shadow-lg min-h-[400px] col-span-2"
-            >
+            <div className="bg-white p-6 rounded-lg shadow-lg min-h-[400px] col-span-2">
               <h2 className="text-lg font-semibold mb-4">Monthly Growth</h2>
               <Suspense fallback={<ChartLoading />}>
                 {adminLineChartData && <LineChart data={adminLineChartData} />}
@@ -344,7 +360,6 @@ export default function Dashboard() {
         );
       }
 
-      // Fallback if adminChartStats is not available
       return (
         <div className="col-span-2 row-span-2">
           <DepartmentStats />
@@ -352,34 +367,46 @@ export default function Dashboard() {
       );
     }
 
-    // Superadmin view - only if not an admin
     if (hasPermission(Permission.VIEW_ALL_DEPARTMENTS) && !isAdmin) {
       return (
         <>
-          <div
-            ref={pieChartRef}
-            className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]"
-          >
+          <div className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]">
             <h2 className="text-lg font-semibold mb-4">
               Department Size Distribution
             </h2>
             <Suspense fallback={<ChartLoading />}>
-              {isPieChartInView && pieChartData && (
-                <PieChart data={pieChartData} />
-              )}
+              {pieChartData && <PieChart data={pieChartData} />}
             </Suspense>
           </div>
-          <div
-            ref={distributionRef}
-            className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]"
-          >
+          <div className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]">
             <h2 className="text-lg font-semibold mb-4">
               Employee Role Distribution
             </h2>
             <Suspense fallback={<ChartLoading />}>
-              {isDistributionInView && barChartData && (
-                <BarChart data={barChartData} />
-              )}
+              {barChartData && <BarChart data={barChartData} />}
+            </Suspense>
+          </div>
+        </>
+      );
+    }
+
+    if (user?.role === UserRole.USER) {
+      return (
+        <>
+          <div className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]">
+            <h2 className="text-lg font-semibold mb-4">
+              Department Size Distribution
+            </h2>
+            <Suspense fallback={<ChartLoading />}>
+              {pieChartData && <PieChart data={pieChartData} />}
+            </Suspense>
+          </div>
+          <div className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]">
+            <h2 className="text-lg font-semibold mb-4">
+              Employee Role Distribution
+            </h2>
+            <Suspense fallback={<ChartLoading />}>
+              {barChartData && <BarChart data={barChartData} />}
             </Suspense>
           </div>
         </>
@@ -409,6 +436,9 @@ export default function Dashboard() {
       </motion.div>
     );
   }
+  <Suspense fallback={<ChartLoading />}>
+    {renderPermissionBasedCharts()}
+  </Suspense>;
 
   return (
     <GlobalErrorBoundary>
@@ -416,27 +446,45 @@ export default function Dashboard() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className="space-y-6 w-full overflow-x-hidden"
+        className="space-y-6 w-full overflow-x-hidden bg-gradient-to-br from-gray-50 to-white min-h-screen p-6"
       >
         {/* Welcome Section */}
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.3 }}
-          className="mb-6"
+          className="mb-8 bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center"
         >
-          <h4 className="text-2xl font-semibold text-gray-800">
-            Welcome back, {user?.firstName}!
-          </h4>
-          <p className="mt-1 text-sm text-gray-600">
-            {getRoleSpecificWelcomeMessage(user?.role)}
-          </p>
+          <div>
+            <h4 className="text-2xl font-semibold text-gray-800">
+              Welcome back, {user?.firstName}!
+            </h4>
+            <p className="mt-1 text-sm text-gray-600">
+              {getRoleSpecificWelcomeMessage(user?.role)}
+            </p>
+          </div>
+          <Clock />
         </motion.div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {user?.role === UserRole.ADMIN && adminChartStatsData
-            ? getAdminStatCards().map((stat, index) => (
+          {isLoading
+            ? // Show loading skeletons while data is loading
+              Array(4)
+                .fill(0)
+                .map((_, index) => (
+                  <motion.div
+                    key={`skeleton-${index}`}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                  >
+                    <StatCardSkeleton />
+                  </motion.div>
+                ))
+            : user?.role === UserRole.ADMIN && adminChartStatsData
+            ? // Admin stats
+              getAdminStatCards().map((stat, index) => (
                 <motion.div
                   key={stat.name}
                   initial={{ opacity: 0, y: 20 }}
@@ -452,28 +500,31 @@ export default function Dashboard() {
                   />
                 </motion.div>
               ))
-            : getRoleStats(user?.role, dashboardStats).map((stat, index) => (
-            <motion.div
-              key={stat.name}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <StatCard
-                {...stat}
-                icon={stat.icon}
-                subtext={stat.subtext}
-                href={stat.href}
-                color={stat.color}
-              />
-            </motion.div>
-          ))}
+            : // Other roles stats
+              getRoleStats(user?.role, dashboardStats).map((stat, index) => (
+                <motion.div
+                  key={stat.name}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                >
+                  <StatCard
+                    {...stat}
+                    icon={stat.icon}
+                    subtext={stat.subtext}
+                    href={stat.href}
+                    color={stat.color}
+                  />
+                </motion.div>
+              ))}
         </div>
 
         {/* Charts Section */}
-        <div className="min-h-[500px] p-6">
+        <div className="min-h-[500px]">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {renderPermissionBasedCharts()}
+            <Suspense fallback={<ChartLoading />}>
+              {renderPermissionBasedCharts()}
+            </Suspense>
           </div>
 
           {/* Department Overview Line Chart - Show for users with department view permission */}
@@ -482,20 +533,15 @@ export default function Dashboard() {
             Permission.MANAGE_DEPARTMENT_USERS,
           ]) &&
             user?.role !== UserRole.ADMIN && (
-            <div
-              ref={lineChartRef}
-              className="bg-white p-6 rounded-lg shadow-lg min-h-[400px] mb-6"
-            >
-              <h2 className="text-lg font-semibold mb-4">
-                Department Overview
-              </h2>
-              <Suspense fallback={<ChartLoading />}>
-                {isLineChartInView && lineChartData && (
-                  <LineChart data={lineChartData} />
-                )}
-              </Suspense>
-            </div>
-          )}
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[400px] mb-6">
+                <h2 className="text-lg font-semibold mb-4 text-gray-800">
+                  Department Overview
+                </h2>
+                <Suspense fallback={<ChartLoading />}>
+                  {lineChartData && <LineChart data={lineChartData} />}
+                </Suspense>
+              </div>
+            )}
         </div>
       </motion.div>
     </GlobalErrorBoundary>

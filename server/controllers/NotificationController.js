@@ -81,6 +81,19 @@ class NotificationController {
       data: { notification },
     });
   });
+
+  // Method to get unread notification count
+  static getUnreadCount = asyncHandler(async (req, res) => {
+    const unreadCount = await Notification.countDocuments({
+      recipient: req.user._id,
+      read: false,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: { unreadCount },
+    });
+  });
 }
 
 export default NotificationController;

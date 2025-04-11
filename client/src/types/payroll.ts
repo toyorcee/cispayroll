@@ -386,6 +386,15 @@ export interface PayrollData {
     paidBy?: string;
     paidAt?: string;
     remarks?: string;
+    currentLevel?: string;
+    history?: Array<{
+      level: string;
+      status: string;
+      action: string;
+      user: string;
+      timestamp: string;
+      remarks: string;
+    }>;
   };
   createdAt: string;
   updatedAt: string;

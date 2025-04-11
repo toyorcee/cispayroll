@@ -2,18 +2,17 @@ import { Router } from "express";
 import {
   requireAuth,
   requirePermission,
-  requireRole,
 } from "../middleware/authMiddleware.js";
 import { RegularUserController } from "../controllers/RegularUserController.js";
-import { Permission, UserRole } from "../models/User.js";
+import { Permission } from "../models/User.js";
 
 const router = Router();
 
 // Apply base middleware
 router.use(requireAuth);
-router.use(requireRole([UserRole.USER]));
 
 // ===== Profile Management Routes =====
+// These routes are accessible to all authenticated users with the right permissions
 router.get(
   "/profile",
   requirePermission([Permission.VIEW_PERSONAL_INFO]),

@@ -12,6 +12,7 @@ export const ALL_PERMISSIONS = {
   MANAGE_DEPARTMENT_PAYROLL: "manage_department_payroll",
   VIEW_DEPARTMENT_REPORTS: "view_department_reports",
   APPROVE_LEAVE: "approve_leave",
+  SUBMIT_PAYROLL: "submit_payroll",
 
   // User level
   VIEW_PERSONAL_INFO: "view_personal_info",
@@ -30,6 +31,7 @@ export const rolePermissions = {
     ALL_PERMISSIONS.MANAGE_DEPARTMENT_PAYROLL,
     ALL_PERMISSIONS.VIEW_DEPARTMENT_REPORTS,
     ALL_PERMISSIONS.APPROVE_LEAVE,
+    ALL_PERMISSIONS.SUBMIT_PAYROLL,
     // Super Admin has all permissions
     ...Object.values(ALL_PERMISSIONS),
   ],
@@ -38,6 +40,7 @@ export const rolePermissions = {
     ALL_PERMISSIONS.MANAGE_DEPARTMENT_PAYROLL,
     ALL_PERMISSIONS.VIEW_DEPARTMENT_REPORTS,
     ALL_PERMISSIONS.APPROVE_LEAVE,
+    ALL_PERMISSIONS.SUBMIT_PAYROLL,
     // Admin also has user permissions
     ALL_PERMISSIONS.VIEW_PERSONAL_INFO,
     ALL_PERMISSIONS.VIEW_OWN_PAYSLIPS,

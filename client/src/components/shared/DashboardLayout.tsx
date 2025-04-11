@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from "react";
-// import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState, useRef, createContext, useContext } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Outlet } from "react-router-dom";
 import { FaBars, FaMoneyCheckAlt, FaSearch } from "react-icons/fa";
 import { useNavigation } from "../../context/NavigationContext";
@@ -10,9 +10,6 @@ import {
   NotificationBell,
   NotificationBellRef,
 } from "../notifications/NotificationBell";
-
-// Create a context to expose the notification check function
-import { createContext, useContext } from "react";
 
 interface NotificationContextType {
   checkForNewNotifications: () => Promise<void>;
@@ -28,6 +25,7 @@ export default function DashboardLayout() {
   const { isSidebarOpen, setIsSidebarOpen } = useNavigation();
   const [searchQuery, setSearchQuery] = useState("");
   const notificationBellRef = useRef<NotificationBellRef>(null);
+  const navigate = useNavigate();
 
   // Function to check for new notifications
   const checkForNewNotifications = async () => {
@@ -62,26 +60,29 @@ export default function DashboardLayout() {
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
         <header className="bg-white shadow-sm fixed top-0 left-0 right-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="w-full px-0">
             <div className="flex justify-between h-16">
               {/* Left section with menu button and logo */}
               <div className="flex items-center">
                 <button
                   onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500"
+                  className="p-0 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500 ml-0"
                 >
                   <FaBars className="h-6 w-6" />
                 </button>
-                <div className="ml-4 flex-shrink-0 flex items-center">
+                <div
+                  className="ml-2 flex-shrink-0 flex items-center cursor-pointer hover:bg-gray-100 rounded-md px-2 py-1 transition-colors"
+                  onClick={() => navigate("/home")}
+                >
                   <FaMoneyCheckAlt className="h-8 w-8 text-green-600" />
                   <span className="ml-2 text-xl font-bold text-gray-900">
-                    CIS Payroll
+                    Payroll
                   </span>
                 </div>
               </div>
 
               {/* Right section with notifications and profile */}
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 mr-2">
                 <button className="md:hidden p-2 hover:bg-green-50 rounded-full">
                   <FaSearch className="w-5 h-5 text-gray-600" />
                 </button>
@@ -93,7 +94,7 @@ export default function DashboardLayout() {
         </header>
 
         {/* Fixed Sidebar */}
-        <div className="fixed top-16 left-0 h-[calc(100vh-4rem)] z-40">
+        <div className="fixed top-16 left-0 h-[calc(100vh-4rem)] z-40 shadow-lg">
           <AnimatePresence>
             {isSidebarOpen && (
               <motion.div
@@ -115,7 +116,7 @@ export default function DashboardLayout() {
             isSidebarOpen ? "lg:pl-64" : ""
           }`}
         >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
             <Outlet />
           </div>
         </main>

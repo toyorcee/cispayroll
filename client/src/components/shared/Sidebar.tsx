@@ -17,7 +17,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { FaTimes } from "react-icons/fa";
 import { ProfileMenu } from "./ProfileMenu";
 import { useAuth } from "../../context/AuthContext";
-import { UserRole } from "../../types/auth";
+import { UserRole, Permission } from "../../types/auth";
 import { menuItems } from "../../context/NavigationContext";
 import {
   NavigationItem,
@@ -74,24 +74,33 @@ export function Sidebar() {
   }, [location.pathname, setIsSidebarOpen]);
 
   const filteredNavigation = menuItems.filter((item: NavigationItem) => {
-    // Super Admin sees everything except personal views
+    // SUPER_ADMIN has access to everything except personal views that require specific permissions
     if (hasRole(UserRole.SUPER_ADMIN)) {
+      // Only check permissions for personal views
       if (
         item.name === "My Allowances" ||
         item.name === "My Deductions" ||
-        item.name === "My Bonus"
+        item.name === "My Bonus" ||
+        item.name === "My Payslips"
       ) {
-        return false;
+        const permissionMap = {
+          "My Payslips": Permission.VIEW_OWN_PAYSLIP,
+          "My Allowances": Permission.VIEW_OWN_ALLOWANCES,
+          "My Deductions": Permission.VIEW_OWN_DEDUCTIONS,
+          "My Bonus": Permission.VIEW_OWN_BONUS,
+        };
+        return hasPermission(
+          permissionMap[item.name as keyof typeof permissionMap]
+        );
       }
       return true;
     }
 
-    // Check roles
+    // For non-SUPER_ADMIN users, check roles and permissions
     if (item.roles && !item.roles.some((role) => hasRole(role))) {
       return false;
     }
 
-    // Check permissions
     if (item.permissions) {
       return item.permissions.some((permission) => hasPermission(permission));
     }
@@ -103,25 +112,33 @@ export function Sidebar() {
     if (!subItems) return [];
 
     return subItems.filter((subItem: NavigationSubItem) => {
-      // Super Admin sees all subitems except personal views
+      // SUPER_ADMIN has access to everything except personal views
       if (hasRole(UserRole.SUPER_ADMIN)) {
+        // Only check permissions for personal views
         if (
           subItem.name === "My Allowances" ||
           subItem.name === "My Deductions" ||
-          subItem.name === "My Bonus"
+          subItem.name === "My Bonus" ||
+          subItem.name === "My Payslips"
         ) {
-          return false;
+          const permissionMap = {
+            "My Payslips": Permission.VIEW_OWN_PAYSLIP,
+            "My Allowances": Permission.VIEW_OWN_ALLOWANCES,
+            "My Deductions": Permission.VIEW_OWN_DEDUCTIONS,
+            "My Bonus": Permission.VIEW_OWN_BONUS,
+          };
+          return hasPermission(
+            permissionMap[subItem.name as keyof typeof permissionMap]
+          );
         }
         return true;
       }
 
-      // For non-super admin users, check roles and permissions normally
-      // Check roles
+      // For non-SUPER_ADMIN users, check roles and permissions
       if (subItem.roles && !subItem.roles.some((role) => hasRole(role))) {
         return false;
       }
 
-      // Check permissions
       if (subItem.permissions) {
         return subItem.permissions.some((permission) =>
           hasPermission(permission)
@@ -160,7 +177,7 @@ export function Sidebar() {
         id="sidebar"
         className={`${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 h-[calc(100vh-4rem)] top-16`}
+        } fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 h-[calc(100vh-4rem)] top-16 shadow-md`}
       >
         {/* Close button for mobile */}
         <div className="lg:hidden absolute right-2 top-2">
@@ -174,7 +191,7 @@ export function Sidebar() {
         </div>
 
         <nav className="h-full flex flex-col relative z-10">
-          <div className="flex-1 px-4 py-6 lg:py-4 overflow-y-auto">
+          <div className="flex-1 px-2 py-4 lg:py-3 overflow-y-auto">
             {filteredNavigation.map((item: NavigationItem) => {
               // Only render items that the user has permission to see
               const filteredSubItems = getFilteredChildren(item.subItems);
@@ -185,10 +202,10 @@ export function Sidebar() {
               }
 
               return (
-                <div key={item.name} className="mb-2">
+                <div key={item.name} className="mb-1">
                   <Link
                     to={item.href}
-                    className={`nav-link group flex items-center px-3 py-3 lg:py-2 text-sm font-medium rounded-md transition-all duration-150 ${
+                    className={`nav-link group flex items-center px-3 py-2.5 lg:py-2 text-sm font-medium rounded-md transition-all duration-150 ${
                       location.pathname === item.href
                         ? "active bg-green-50 text-green-700"
                         : "hover:bg-green-50/50 text-gray-700 hover:text-green-700"
@@ -216,7 +233,7 @@ export function Sidebar() {
                           animate={{ opacity: 1, height: "auto" }}
                           exit={{ opacity: 0, height: 0 }}
                           transition={{ duration: 0.2 }}
-                          className="pl-8 mt-2 space-y-1"
+                          className="pl-6 mt-1 space-y-1"
                         >
                           {(() => {
                             const filteredSubItems = getFilteredChildren(

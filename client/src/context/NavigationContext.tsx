@@ -469,7 +469,7 @@ export const menuItems: NavigationItem[] = [
     href: "/pms/profile",
     icon: UserIcon,
     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-    permissions: [Permission.VIEW_PERSONAL_INFO],
+    permissions: [Permission.VIEW_PERSONAL_INFO, Permission.EDIT_PERSONAL_INFO],
   },
 ].map((item) => {
   return item;

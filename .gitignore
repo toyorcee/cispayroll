@@ -1,33 +1,57 @@
 # Node modules
 node_modules/
+**/node_modules/
 
 # Environment variables
 .env
+**/.env
 
 # Logs
 logs/
 *.log
+**/logs/
+**/*.log
 
 # Build files
 dist/
 build/
+**/dist/
+**/build/
 
 # Vite cache
 .cache/
+**/.cache/
 
 # IDE/Editor files
 .vscode/
 .idea/
+**/.vscode/
+**/.idea/
 
 # OS files
 .DS_Store
 Thumbs.db
+**/.DS_Store
+**/Thumbs.db
 
-# Frontend-specific (inside server/client)
-server/client/node_modules/
-server/client/dist/
-server/client/.env
+# Frontend-specific
+client/node_modules/
+client/dist/
+client/.env
+client/.cache/
+
+# Backend-specific
+server/node_modules/
+server/dist/
+server/.env
+server/logs/
 
 # Uploads
 server/uploads/*
 !server/uploads/.gitkeep
+
+# Temporary files
+*.tmp
+*.temp
+**/*.tmp
+**/*.temp 

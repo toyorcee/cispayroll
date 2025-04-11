@@ -850,8 +850,8 @@ export class PayrollService {
 
       // Combine all deductions
       const allDeductions = [
-        ...standardDeductions.statutory,
-        ...standardDeductions.voluntary,
+          ...standardDeductions.statutory,
+          ...standardDeductions.voluntary,
         ...departmentDeductions.departmentSpecific,
       ];
 
@@ -924,7 +924,7 @@ export class PayrollService {
         employee: employee._id,
         basicSalary: salaryGrade.basicSalary,
         allowances: salaryGrade.allowances,
-        deductions: {
+          deductions: {
           statutory: statutoryDeductions,
           voluntary: voluntaryDeductions,
           departmentSpecific: departmentSpecificDeductions,

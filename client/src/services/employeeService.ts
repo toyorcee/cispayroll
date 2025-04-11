@@ -1,5 +1,5 @@
 import axios from "axios";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   Employee,
   EmployeeFilters,
@@ -18,7 +18,9 @@ import { UserRole } from "../types/auth";
 import { DashboardStats } from "../data/dashboardData";
 import { salaryStructureService } from "./salaryStructureService";
 import { mapEmployeeToDetails } from "../utils/mappers";
+import { useAuth } from "../context/AuthContext";
 
+// Moved BASE_URL declaration to the top
 const BASE_URL = "http://localhost:5000/api";
 
 // Set default axios config to always include credentials
@@ -794,20 +796,34 @@ export const employeeService = {
 
     // Get user by ID
     getUserById: async (userId: string) => {
+      console.log(
+        `LOG: Attempting fetch via adminService.getUserById for [${userId}]`
+      );
       try {
-        const response = await axios.get(`${BASE_URL}/admin/users/${userId}`);
-        if (!response.data.success) {
-          throw new Error(response.data.message || "Failed to fetch user");
+        const response = await axios.get(
+          `${BASE_URL}/super-admin/users/${userId}`
+        );
+        if (!response.data.success || !response.data.user) {
+          throw new Error(
+            response.data.message || `Admin: Failed to fetch user ${userId}`
+          );
         }
+        console.log(
+          `LOG: Successfully fetched via adminService.getUserById for [${userId}]`
+        );
         return response.data.user;
       } catch (error) {
-        console.error("Error fetching user:", error);
+        console.error(
+          `LOG ERROR in adminService.getUserById for [${userId}]:`,
+          error
+        );
         throw error;
       }
     },
 
-    // React Query hook for getting user by ID
-    useGetUserById: (userId: string | undefined) => {
+    // Renamed to be more specific
+    useGetUserByIdForAdmin: (userId: string | undefined) => {
+      console.log(`LOG: useGetUserByIdForAdmin called for [${userId}]`);
       return useQuery({
         queryKey: ["admin", "user", userId],
         queryFn: () => {
@@ -840,30 +856,101 @@ export const employeeService = {
     }
   },
 
-  getUserById: async (userId: string) => {
+  // --- Profile Management ---
+  getUserProfile: async () => {
+    console.log("LOG: Fetching user profile");
     try {
-      const response = await axios.get(
-        `${BASE_URL}/super-admin/users/${userId}`
-      );
-      if (!response.data.success) {
-        throw new Error(response.data.message || "Failed to fetch user");
+      // Always use the /users/profile endpoint - it handles all roles correctly
+      const response = await axios.get(`${BASE_URL}/users/profile`);
+      console.log("LOG: Profile response:", response.data);
+
+      if (!response.data.success || !response.data.user) {
+        console.error("LOG ERROR: Invalid response format:", response.data);
+        throw new Error("Failed to fetch user profile data");
       }
+
+      console.log(
+        "LOG: Successfully fetched user profile for role:",
+        response.data.user.role
+      );
       return response.data.user;
     } catch (error) {
-      console.error("Error fetching user:", error);
+      console.error("LOG ERROR in getUserProfile:", error);
+      if (axios.isAxiosError(error)) {
+        console.error("LOG ERROR details:", {
+          status: error.response?.status,
+          data: error.response?.data,
+          url: error.config?.url,
+        });
+      }
       throw error;
     }
   },
 
-  useGetUserById: (userId: string | undefined) => {
+  // --- Hook for fetching user profiles ---
+  useGetUserProfile: () => {
+    const { user: authUser, loading: authLoading } = useAuth();
+
     return useQuery({
-      queryKey: ["user", userId],
-      queryFn: () => {
-        if (!userId) throw new Error("User ID is required");
-        return employeeService.getUserById(userId);
+      queryKey: ["userProfile"],
+      queryFn: () => employeeService.getUserProfile(),
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes
+      enabled: !authLoading && !!authUser,
+    });
+  },
+
+  // --- Profile Image Upload ---
+  updateProfileImage: async (file: File): Promise<{ profileImage: string }> => {
+    console.log("LOG: Uploading profile image");
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const response = await axios.post(
+        `${BASE_URL}/employees/profile/image`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to update profile image"
+        );
+      }
+
+      console.log("LOG: Successfully uploaded profile image");
+      return { profileImage: response.data.profileImage };
+    } catch (error) {
+      console.error("LOG ERROR in updateProfileImage:", error);
+      if (axios.isAxiosError(error)) {
+        console.error("LOG ERROR details:", {
+          status: error.response?.status,
+          data: error.response?.data,
+          url: error.config?.url,
+        });
+      }
+      throw error;
+    }
+  },
+
+  // --- Hook for profile image upload ---
+  useUpdateProfileImage: () => {
+    const queryClient = useQueryClient();
+    const { refreshUser } = useAuth();
+
+    return useMutation({
+      mutationFn: (file: File) => employeeService.updateProfileImage(file),
+      onSuccess: async () => {
+        // Invalidate profile queries to refetch with new image
+        await queryClient.invalidateQueries({ queryKey: ["userProfile"] });
+        // Refresh the user data in the auth context
+        await refreshUser();
       },
-      enabled: !!userId, // Only run query if userId exists
-      staleTime: 5 * 60 * 1000,
     });
   },
 };
