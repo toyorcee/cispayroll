@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { NOTIFICATION_TYPES } from "../services/NotificationService.js";
 
 const notificationSchema = new mongoose.Schema({
   recipient: {
@@ -9,7 +10,7 @@ const notificationSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ["payroll", "approval", "system", "error"],
+    enum: [...Object.values(NOTIFICATION_TYPES), "PAYROLL_PENDING_APPROVAL"],
   },
   title: {
     type: String,

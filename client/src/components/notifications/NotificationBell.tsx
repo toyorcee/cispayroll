@@ -22,6 +22,7 @@ interface Notification {
     employeeName?: string;
     departmentName?: string;
     departmentCode?: string;
+    forceRefresh?: boolean;
   };
   createdAt: string;
   read: boolean;
@@ -121,7 +122,7 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
 
                 // Special logging for payroll notifications
                 if (
-                  notification.type === "PAYROLL_CREATED" ||
+                  notification.type === "PAYROLL_DRAFT_CREATED" ||
                   notification.type === "PAYROLL_UPDATED" ||
                   notification.type === "PAYROLL_APPROVED" ||
                   notification.type === "PAYROLL_REJECTED"

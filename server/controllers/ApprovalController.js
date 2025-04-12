@@ -235,7 +235,16 @@ class ApprovalController {
     try {
       const { id } = req.params;
       const { remarks } = req.body;
+      console.log("🔍 Starting HR Manager approval process for payroll:", id);
+      console.log("📝 Remarks:", remarks);
+
       const admin = await UserModel.findById(req.user.id);
+      console.log("👤 Admin details:", {
+        id: admin._id,
+        name: `${admin.firstName} ${admin.lastName}`,
+        position: admin.position,
+        department: admin.department,
+      });
 
       if (!admin) {
         throw new ApiError(404, "Admin not found");
@@ -243,6 +252,12 @@ class ApprovalController {
 
       // Get the payroll
       const payroll = await PayrollModel.findById(id).populate("employee");
+      console.log("📊 Payroll details:", {
+        id: payroll._id,
+        employee: `${payroll.employee.firstName} ${payroll.employee.lastName}`,
+        status: payroll.status,
+        currentLevel: payroll.approvalFlow?.currentLevel,
+      });
 
       if (!payroll) {
         throw new ApiError(404, "Payroll not found");
@@ -278,7 +293,7 @@ class ApprovalController {
         );
       }
 
-      // Check if the admin has the correct position - using the working check from AdminController
+      // Check if the admin has the correct position
       const adminPosition = admin.position?.toLowerCase() || "";
       const isHRManager = [
         "hr manager",
@@ -294,43 +309,89 @@ class ApprovalController {
         );
       }
 
+      console.log("✅ All validation checks passed, proceeding with approval");
+
       // Update the payroll approval flow
       const updatedPayroll =
         await BaseApprovalController.updatePayrollApprovalFlow(
           payroll,
           APPROVAL_LEVELS.HR_MANAGER,
           admin,
-          true
+          true,
+          remarks
         );
+      console.log("✅ Payroll approval flow updated successfully");
 
       // Find the next approver (Finance Director)
       const nextApprover = await BaseApprovalController.findNextApprover(
         APPROVAL_LEVELS.HR_MANAGER,
         updatedPayroll
       );
+      console.log(
+        "👥 Next approver details:",
+        nextApprover
+          ? {
+              id: nextApprover._id,
+              name: `${nextApprover.firstName} ${nextApprover.lastName}`,
+              position: nextApprover.position,
+            }
+          : "No next approver found"
+      );
 
-      // Create notification for the next approver
-      if (nextApprover) {
-        await BaseApprovalController.createApprovalNotification(
-          nextApprover,
+      // Create notifications for all stakeholders
+      const notificationPromises = [];
+
+      // 1. Notify the employee
+      notificationPromises.push(
+        NotificationService.createNotification(
+          updatedPayroll.employee,
+          "PAYROLL_APPROVED",
+          updatedPayroll.employee,
           updatedPayroll,
-          APPROVAL_LEVELS.HR_MANAGER
+          remarks || "Your payroll has been approved by HR Manager",
+          { currentLevel: APPROVAL_LEVELS.HR_MANAGER }
+        )
+      );
+
+      // 2. Notify the next approver (Finance Director)
+      if (nextApprover) {
+        notificationPromises.push(
+          NotificationService.createNotification(
+            nextApprover._id,
+            "PAYROLL_SUBMITTED",
+            admin,
+            updatedPayroll,
+            remarks || "New payroll pending your approval as Finance Director"
+          )
         );
       }
 
-      // Create notification for the employee
-      await BaseApprovalController.createApprovalNotification(
-        payroll.employee,
-        updatedPayroll,
-        APPROVAL_LEVELS.HR_MANAGER
+      // 3. Notify the HR Manager (self-notification)
+      console.log("🔍 Creating HR Manager self-notification with options:", {
+        currentLevel: APPROVAL_LEVELS.HR_MANAGER,
+        employee: updatedPayroll.employee,
+        payroll: updatedPayroll,
+      });
+      notificationPromises.push(
+        NotificationService.createNotification(
+          admin._id,
+          "PAYROLL_APPROVED",
+          updatedPayroll.employee,
+          updatedPayroll,
+          remarks ||
+            "You have successfully approved this payroll and it is now pending Finance Director approval",
+          {
+            data: {
+              approvalLevel: APPROVAL_LEVELS.HR_MANAGER, // Hard-code as HR_MANAGER
+            },
+          }
+        )
       );
 
-      // Create notification for the HR Manager about their own action
-      await BaseApprovalController.createApprovalNotification(
-        admin,
-        updatedPayroll,
-        APPROVAL_LEVELS.HR_MANAGER
-      );
+      // Send all notifications
+      await Promise.all(notificationPromises);
+
+      console.log("🎉 HR Manager approval process completed successfully");
 
       res.status(200).json({
         success: true,
@@ -347,6 +408,7 @@ class ApprovalController {
         },
       });
     } catch (error) {
+      console.error("❌ Error in HR Manager approval process:", error);
       next(error);
     }
   }
@@ -469,6 +531,7 @@ class ApprovalController {
   static async approveAsFinanceDirector(req, res, next) {
     try {
       const { id } = req.params;
+      const { remarks } = req.body;
       const admin = await UserModel.findById(req.user.id);
 
       if (!admin) {
@@ -508,7 +571,7 @@ class ApprovalController {
 
       // Check if the admin is in the Finance department
       const financeDepartment = await DepartmentModel.findOne({
-        name: "Finance and Accounting",
+        name: { $in: ["Finance and Accounting", "Finance", "Financial"] },
         status: "active",
       });
 
@@ -548,7 +611,8 @@ class ApprovalController {
           payroll,
           APPROVAL_LEVELS.FINANCE_DIRECTOR,
           admin,
-          true
+          true,
+          remarks
         );
 
       // Find the next approver (Super Admin)
@@ -564,7 +628,38 @@ class ApprovalController {
           updatedPayroll,
           APPROVAL_LEVELS.FINANCE_DIRECTOR
         );
+
+        // Also create a notification for the employee
+        await NotificationService.createPayrollNotification(
+          payroll.employee._id,
+          NOTIFICATION_TYPES.PAYROLL_APPROVED,
+          updatedPayroll,
+          remarks || "Your payroll has been approved by Finance Director"
+        );
       }
+
+      // Create self-notification for the Finance Director
+      console.log(
+        "🔍 Creating Finance Director self-notification with options:",
+        {
+          currentLevel: APPROVAL_LEVELS.FINANCE_DIRECTOR,
+          employee: updatedPayroll.employee,
+          payroll: updatedPayroll,
+        }
+      );
+      await NotificationService.createNotification(
+        admin._id,
+        "PAYROLL_APPROVED",
+        updatedPayroll.employee,
+        updatedPayroll,
+        remarks ||
+          "You have successfully approved this payroll and it is now pending Super Admin approval",
+        {
+          data: {
+            approvalLevel: APPROVAL_LEVELS.FINANCE_DIRECTOR, // Hard-code as FINANCE_DIRECTOR
+          },
+        }
+      );
 
       return res.status(200).json({
         success: true,
@@ -783,11 +878,21 @@ class ApprovalController {
       );
 
       // Create notification for the Super Admin about their own action
+      console.log("🔍 Creating Super Admin self-notification with options:", {
+        currentLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+        employee: updatedPayroll.employee,
+        payroll: updatedPayroll,
+      });
       await NotificationService.createPayrollNotification(
         admin._id,
         NOTIFICATION_TYPES.PAYROLL_COMPLETED,
         updatedPayroll,
-        remarks || "You approved this payroll as the final approver."
+        remarks || "You approved this payroll as the final approver.",
+        {
+          data: {
+            approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN, // Hard-code as SUPER_ADMIN
+          },
+        }
       );
 
       return res.status(200).json({

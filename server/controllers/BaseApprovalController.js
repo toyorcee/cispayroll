@@ -92,7 +92,7 @@ class BaseApprovalController {
       } else if (nextLevel === APPROVAL_LEVELS.FINANCE_DIRECTOR) {
         // Find Finance department
         const financeDepartment = await DepartmentModel.findOne({
-          name: { $in: ["Finance", "Financial"] },
+          name: { $in: ["Finance", "Finance and Accounting", "Accounting"] },
           status: "active",
         });
 
@@ -105,7 +105,7 @@ class BaseApprovalController {
           nextApprover = await UserModel.findOne({
             department: financeDepartment._id,
             position: {
-              $regex: "head of finance|finance director|finance head",
+              $regex: "finance director|head of finance|finance head",
               $options: "i",
             },
             status: "active",
@@ -122,9 +122,9 @@ class BaseApprovalController {
           console.log("❌ Finance department not found");
         }
       } else if (nextLevel === APPROVAL_LEVELS.SUPER_ADMIN) {
-        // Find Super Admin - using case-insensitive search
+        // Find Super Admin
         nextApprover = await UserModel.findOne({
-          role: { $regex: "super_admin", $options: "i" },
+          role: { $regex: new RegExp("^super_admin$", "i") },
           status: "active",
         });
 
@@ -139,8 +139,8 @@ class BaseApprovalController {
 
       return nextApprover;
     } catch (error) {
-      console.error("Error finding next approver:", error);
-      throw new ApiError(500, "Error finding next approver");
+      console.error("❌ Error finding next approver:", error);
+      throw error;
     }
   }
 
@@ -161,9 +161,9 @@ class BaseApprovalController {
 
       // Use the NotificationService instead of direct model creation
       const notification = await NotificationService.createPayrollNotification(
-        nextApprover._id,
-        NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
         payroll,
+        NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
+        nextApprover,
         `Your payroll requires ${currentLevel} approval`
       );
 
@@ -192,9 +192,9 @@ class BaseApprovalController {
 
       // Use the NotificationService instead of direct model creation
       const notification = await NotificationService.createPayrollNotification(
-        employee._id,
-        NOTIFICATION_TYPES.PAYROLL_REJECTED,
         payroll,
+        NOTIFICATION_TYPES.PAYROLL_REJECTED,
+        employee,
         reason
       );
 
@@ -303,9 +303,9 @@ class BaseApprovalController {
       // Notify the employee
       notificationPromises.push(
         NotificationService.createPayrollNotification(
-          payroll.employee._id,
-          isApproved ? "PAYROLL_APPROVED" : "PAYROLL_REJECTED",
           payroll,
+          isApproved ? "PAYROLL_APPROVED" : "PAYROLL_REJECTED",
+          payroll.employee,
           isApproved
             ? `Your payroll has been ${statusMessage.toLowerCase()}`
             : `Your payroll was rejected by ${currentLevel.replace(
@@ -321,9 +321,9 @@ class BaseApprovalController {
         if (nextApprover) {
           notificationPromises.push(
             NotificationService.createPayrollNotification(
-              nextApprover._id,
-              "PAYROLL_PENDING_APPROVAL",
               payroll,
+              "PAYROLL_PENDING_APPROVAL",
+              nextApprover,
               `New payroll pending your approval as ${nextLevel.replace(
                 /_/g,
                 " "
@@ -339,9 +339,9 @@ class BaseApprovalController {
       if (nextLevel === "COMPLETED") {
         notificationPromises.push(
           NotificationService.createPayrollNotification(
-            payroll.employee._id,
-            "PAYROLL_COMPLETED",
             payroll,
+            "PAYROLL_COMPLETED",
+            payroll.employee,
             `Your payroll for ${payroll.month} ${
               payroll.year
             } has been fully approved and is ready for processing. Net Amount: ₦${payroll.totals.netPay.toLocaleString()}`

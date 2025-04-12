@@ -23,6 +23,7 @@ import {
   NotificationService,
   NOTIFICATION_TYPES,
 } from "../services/NotificationService.js";
+import BaseApprovalController from "./BaseApprovalController.js";
 
 // Define the order of approval levels
 const APPROVAL_ORDER = [
@@ -541,222 +542,194 @@ export class AdminController {
   }
 
   // Approve payroll
-  static async approvePayroll(req, res, next) {
+  static async approvePayroll(req, res) {
     try {
-      const { id } = req.params;
-      const { action, remarks } = req.body;
-      const admin = await UserModel.findById(req.user.id);
-
-      console.log(`\n🔍 Starting payroll approval process for ID: ${id}`);
-      console.log(
-        `👤 Approver: ${admin.firstName} ${admin.lastName} (${admin.position})`
-      );
-      console.log(`🏢 Department: ${admin.department?.name || "Not assigned"}`);
-      console.log(
-        `📝 Action: ${action}, Remarks: ${remarks || "None provided"}`
-      );
+      const { payrollId } = req.params;
+      const { remarks } = req.body;
+      const userId = req.user._id;
 
       // Get the payroll
-      const payroll = await PayrollModel.findOne({
-        _id: id,
-        department: admin.department,
-      }).populate("employee", "firstName lastName email department");
-
+      const payroll = await PayrollModel.findById(payrollId);
       if (!payroll) {
-        console.error(`❌ Payroll not found for ID: ${id}`);
-        throw new ApiError(404, "Payroll not found in your department");
+        throw new ApiError(404, "Payroll not found");
       }
 
-      console.log(`\n📊 Payroll Details:`);
-      console.log(
-        `- Employee: ${payroll.employee.firstName} ${payroll.employee.lastName}`
-      );
-      console.log(`- Status: ${payroll.status}`);
-      console.log(
-        `- Current Level: ${payroll.approvalFlow?.currentLevel || "Not set"}`
-      );
-
-      if (payroll.status !== PAYROLL_STATUS.PENDING) {
-        console.error(`❌ Invalid payroll status: ${payroll.status}`);
-        throw new ApiError(
-          400,
-          "Only pending payrolls can be approved/rejected"
-        );
+      // Get the current user's role and department
+      const user = await UserModel.findById(userId);
+      if (!user) {
+        throw new ApiError(404, "User not found");
       }
 
-      // Get current approval level
-      const currentLevel = payroll.approvalFlow?.currentLevel;
-      console.log(`\n🔐 Current Approval Level: ${currentLevel}`);
+      // Determine the current approval level
+      let currentLevel;
 
-      // Check if user has permission to approve at current level
-      const hasPermission = checkApprovalPermission(admin, currentLevel);
-      console.log(`\n🔑 Permission Check:`);
-      console.log(`- Has Permission: ${hasPermission}`);
-      console.log(`- User Position: ${admin.position}`);
-      console.log(`- User Role: ${admin.role}`);
-
-      if (!hasPermission) {
-        console.error(`❌ Permission denied for user: ${admin._id}`);
-        throw new ApiError(
-          403,
-          "You don't have permission to approve at this level"
-        );
-      }
-
-      // Get next approval level
-      const nextLevel = getNextApprovalLevel(currentLevel);
-      console.log(`\n⏭️ Next Approval Level: ${nextLevel || "COMPLETED"}`);
-
-      // Update payroll status and approval flow
-      if (action === "APPROVE") {
-        console.log(`\n✅ Processing approval...`);
-
-        if (!nextLevel) {
-          console.log(`🎉 Final approval - marking as COMPLETED`);
-          payroll.status = PAYROLL_STATUS.APPROVED;
-          payroll.approvalFlow.currentLevel = "COMPLETED";
+      // If payroll is in DRAFT status, determine the first approval level based on user's role
+      if (payroll.status === "DRAFT") {
+        if (user.role === "department_head") {
+          currentLevel = "DEPARTMENT_HEAD";
+        } else if (user.role === "hr_manager") {
+          currentLevel = "HR_MANAGER";
+        } else if (user.role === "finance_director") {
+          currentLevel = "FINANCE_DIRECTOR";
+        } else if (user.role === "super_admin") {
+          currentLevel = "SUPER_ADMIN";
         } else {
-          console.log(`⏳ Moving to next level: ${nextLevel}`);
-          payroll.approvalFlow.currentLevel = nextLevel;
+          throw new ApiError(403, "You are not authorized to approve payrolls");
         }
+
+        // Initialize the approval flow for DRAFT payrolls
+        payroll.approvalFlow = {
+          currentLevel: currentLevel,
+          history: [],
+          submittedBy: user._id,
+          submittedAt: new Date(),
+          remarks: remarks || "Initial payroll approval",
+        };
 
         // Add to approval history
         payroll.approvalFlow.history.push({
           level: currentLevel,
-          status: PAYROLL_STATUS.PENDING,
-          action: "APPROVE",
-          user: admin._id,
+          status: "APPROVED",
+          user: user._id,
           timestamp: new Date(),
           remarks: remarks || `Approved by ${currentLevel.replace(/_/g, " ")}`,
         });
 
-        console.log(`\n📝 Approval History Updated:`);
-        console.log(`- Level: ${currentLevel}`);
-        console.log(`- Action: APPROVE`);
-        console.log(`- User: ${admin._id}`);
-        console.log(`- Remarks: ${remarks || "None provided"}`);
+        // Determine the next approval level
+        let nextLevel = null;
+        switch (currentLevel) {
+          case APPROVAL_LEVELS.DEPARTMENT_HEAD:
+            nextLevel = APPROVAL_LEVELS.HR_MANAGER;
+            break;
+          case APPROVAL_LEVELS.HR_MANAGER:
+            nextLevel = APPROVAL_LEVELS.FINANCE_DIRECTOR;
+            break;
+          case APPROVAL_LEVELS.FINANCE_DIRECTOR:
+            nextLevel = APPROVAL_LEVELS.SUPER_ADMIN;
+            break;
+          case APPROVAL_LEVELS.SUPER_ADMIN:
+            nextLevel = "COMPLETED";
+            break;
+          default:
+            throw new ApiError(400, "Invalid approval level");
+        }
 
-        // Create notifications for all stakeholders
-        const notificationPromises = [];
-
-        // Notify the employee
-        console.log(`\n🔔 Creating employee notification...`);
-        notificationPromises.push(
-          NotificationService.createPayrollNotification(
-            payroll.employee._id,
-            "PAYROLL_APPROVED",
-            payroll,
-            remarks || `Approved by ${currentLevel.replace(/_/g, " ")}`
-          )
-        );
-
-        // Notify the admin
-        console.log(`\n🔔 Creating admin notification...`);
-        notificationPromises.push(
-          NotificationService.createPayrollNotification(
-            admin._id,
-            "PAYROLL_APPROVED",
-            payroll,
-            remarks || `Approved by ${currentLevel.replace(/_/g, " ")}`
-          )
-        );
-
-        // If there's a next level, notify the next approver
-        if (nextLevel) {
-          console.log(`\n🔔 Creating next approver notification...`);
-          let nextApprover;
-
-          if (nextLevel === APPROVAL_LEVELS.HR_MANAGER) {
-            const hrDepartment = await DepartmentModel.findOne({
-              name: { $in: ["Human Resources", "HR"] },
-              status: "active",
-            });
-            if (hrDepartment) {
-              nextApprover = await UserModel.findOne({
-                department: hrDepartment._id,
-                position: {
-                  $in: [
-                    "Head of Human Resources",
-                    "HR Manager",
-                    "HR Head",
-                    "Human Resources Manager",
-                    "HR Director",
-                  ],
-                },
-                status: "active",
-              });
-            }
-          } else if (nextLevel === APPROVAL_LEVELS.FINANCE_DIRECTOR) {
-            console.log("🔍 Looking for Finance Director approver...");
-
-            // Find the Finance and Accounting department
-            const financeDepartment = await DepartmentModel.findOne({
-              name: "Finance and Accounting",
-              status: "active",
-            });
-
-            if (financeDepartment) {
-              console.log(
-                `✅ Found Finance and Accounting department: ${financeDepartment.name} (${financeDepartment._id})`
-              );
-
-              // Find the Head of Finance in this department
-              nextApprover = await UserModel.findOne({
-                department: financeDepartment._id,
-                position: {
-                  $regex: new RegExp("head of finance", "i"),
-                },
-                status: "active",
-              });
-
-              if (nextApprover) {
-                console.log(
-                  `✅ Found Finance Director: ${nextApprover.firstName} ${nextApprover.lastName}`
-                );
-              } else {
-                console.log(
-                  "❌ No Finance Director found in Finance and Accounting department"
-                );
-              }
-            } else {
-              console.log("❌ Finance and Accounting department not found");
-            }
-          } else if (nextLevel === APPROVAL_LEVELS.SUPER_ADMIN) {
-            nextApprover = await UserModel.findOne({
-              role: "SUPER_ADMIN",
-              status: "active",
-            });
-          }
-
-          if (nextApprover) {
-            notificationPromises.push(
-              NotificationService.createPayrollNotification(
-                nextApprover._id,
-                "PAYROLL_PENDING_APPROVAL",
-                payroll,
-                `Pending approval at ${nextLevel.replace(/_/g, " ")} level`
-              )
-            );
-          }
+        // Update payroll status
+        if (nextLevel === "COMPLETED") {
+          payroll.status = PAYROLL_STATUS.APPROVED;
+        } else {
+          payroll.status = PAYROLL_STATUS.PENDING;
+          payroll.approvalFlow.currentLevel = nextLevel;
         }
 
         // Save the payroll
         await payroll.save();
 
-        // Send all notifications
-        await Promise.all(notificationPromises);
+        // Find the next approver
+        const nextApprover = await BaseApprovalController.findNextApprover(
+          currentLevel,
+          payroll
+        );
 
-        console.log(`\n✅ Payroll approval completed successfully`);
+        // Create notification for the employee
+        await NotificationService.createNotification({
+          recipient: payroll.employee,
+          type: "PAYROLL_APPROVED",
+          title: "Payroll Approved",
+          message: `Your payroll for ${payroll.month} ${payroll.year} has been approved by ${user.firstName} ${user.lastName}`,
+          data: {
+            payrollId: payroll._id,
+            approvedBy: user._id,
+            level: currentLevel,
+          },
+        });
+
+        // Create notification for the next approver if there is one
+        if (nextApprover) {
+          await NotificationService.createNotification({
+            recipient: nextApprover._id,
+            type: "PAYROLL_PENDING_APPROVAL",
+            title: "Payroll Pending Approval",
+            message: `A payroll for ${payroll.employee.firstName} ${payroll.employee.lastName} is pending your approval`,
+            data: {
+              payrollId: payroll._id,
+              employeeId: payroll.employee._id,
+              level: nextApprover.role,
+            },
+          });
+        }
+
+        res.json({
+          success: true,
+          message: "Payroll approved successfully",
+          data: payroll,
+        });
+      } else {
+        // For non-DRAFT payrolls, use the existing approval flow
+        currentLevel = payroll.approvalFlow?.currentLevel;
+        if (!currentLevel) {
+          throw new ApiError(
+            403,
+            "You are not authorized to approve this payroll"
+          );
+        }
+
+        // Find the next approver
+        const nextApprover = await BaseApprovalController.findNextApprover(
+          currentLevel,
+          payroll
+        );
+
+        // Update the payroll approval flow
+        const updatedPayroll =
+          await BaseApprovalController.updatePayrollApprovalFlow(
+            payroll,
+            currentLevel,
+            true,
+            remarks,
+            user
+          );
+
+        // Create notification for the employee
+        await NotificationService.createNotification({
+          recipient: payroll.employee,
+          type: "PAYROLL_APPROVED",
+          title: "Payroll Approved",
+          message: `Your payroll for ${payroll.month} ${payroll.year} has been approved by ${user.firstName} ${user.lastName}`,
+          data: {
+            payrollId: payroll._id,
+            approvedBy: user._id,
+            level: currentLevel,
+          },
+        });
+
+        // Create notification for the next approver if there is one
+        if (nextApprover) {
+          await NotificationService.createNotification({
+            recipient: nextApprover._id,
+            type: "PAYROLL_PENDING_APPROVAL",
+            title: "Payroll Pending Approval",
+            message: `A payroll for ${payroll.employee.firstName} ${payroll.employee.lastName} is pending your approval`,
+            data: {
+              payrollId: payroll._id,
+              employeeId: payroll.employee._id,
+              level: nextApprover.role,
+            },
+          });
+        }
+
+        res.json({
+          success: true,
+          message: "Payroll approved successfully",
+          data: updatedPayroll,
+        });
       }
-
-      res.status(200).json({
-        success: true,
-        message: "Payroll approved successfully",
-        data: payroll,
-      });
     } catch (error) {
-      console.error(`\n❌ Error in approvePayroll:`, error);
-      next(error);
+      console.error("Error approving payroll:", error);
+      res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || "Error approving payroll",
+      });
     }
   }
 
@@ -1057,27 +1030,38 @@ export class AdminController {
   // Submit payroll for approval
   static async submitPayroll(req, res, next) {
     try {
+      console.log("🔄 Starting payroll submission process");
       const { id } = req.params;
       const { remarks, frequency } = req.body;
       const admin = await UserModel.findById(req.user.id);
+      console.log(
+        `👤 Admin submitting payroll: ${admin.firstName} ${admin.lastName} (${admin._id})`
+      );
 
       // Get the payroll
       const payroll = await PayrollModel.findOne({
         _id: id,
         department: admin.department,
-      });
+      }).populate("employee");
 
       if (!payroll) {
+        console.error("❌ Payroll not found in department");
         throw new ApiError(404, "Payroll not found in your department");
       }
 
+      console.log(
+        `📋 Found payroll: ID=${payroll._id}, Status=${payroll.status}`
+      );
+
       if (payroll.status !== PAYROLL_STATUS.DRAFT) {
+        console.error("❌ Invalid payroll status for submission");
         throw new ApiError(400, "Only draft payrolls can be submitted");
       }
 
       // Update frequency if provided, otherwise keep existing
       if (frequency) {
         if (!Object.values(PayrollFrequency).includes(frequency)) {
+          console.error("❌ Invalid payroll frequency");
           throw new ApiError(400, "Invalid payroll frequency");
         }
         payroll.frequency = frequency;
@@ -1100,6 +1084,9 @@ export class AdminController {
 
       // If no exact match, try a more flexible approach
       if (!departmentHead) {
+        console.log(
+          "⚠️ No exact department head match found, trying flexible search"
+        );
         const allDepartmentUsers = await UserModel.find({
           department: admin.department,
           status: "active",
@@ -1113,10 +1100,11 @@ export class AdminController {
 
         if (potentialHead) {
           console.log(
-            `Found department head: ${potentialHead.firstName} ${potentialHead.lastName}`
+            `✅ Found department head: ${potentialHead.firstName} ${potentialHead.lastName}`
           );
           departmentHead = potentialHead;
         } else {
+          console.error("❌ No department head found");
           throw new ApiError(
             404,
             "No department head found for your department"
@@ -1146,36 +1134,13 @@ export class AdminController {
           })
         : null;
 
-      // Get Finance Director (Head of Finance) - using a more reliable approach
-      const financeDepartment = await DepartmentModel.findOne({
-        name: { $in: ["Finance", "Financial"] },
-        status: "active",
-      });
-
-      const financeDirector = financeDepartment
-        ? await UserModel.findOne({
-            department: financeDepartment._id,
-            position: {
-              $in: [
-                "Head of Finance",
-                "Finance Director",
-                "Finance Head",
-                "Finance Manager",
-                "Financial Manager",
-              ],
-            },
-            status: "active",
-          })
-        : null;
-
-      // Get super admins
-      const superAdmins = await UserModel.find({
-        role: "SUPER_ADMIN",
-        status: "active",
-      });
-
-      // Update payroll status and add to approval flow
-      payroll.status = PAYROLL_STATUS.PENDING;
+      if (hrManager) {
+        console.log(
+          `✅ Found HR Manager: ${hrManager.firstName} ${hrManager.lastName}`
+        );
+      } else {
+        console.log("⚠️ No HR Manager found");
+      }
 
       // Special case for HR department - skip Department Head level
       const isHRDepartment =
@@ -1185,6 +1150,12 @@ export class AdminController {
       const initialApprovalLevel = isHRDepartment
         ? APPROVAL_LEVELS.HR_MANAGER
         : APPROVAL_LEVELS.DEPARTMENT_HEAD;
+
+      console.log(`📊 Initial approval level: ${initialApprovalLevel}`);
+      console.log(`🏢 Is HR Department: ${isHRDepartment}`);
+
+      // Update payroll status and add to approval flow
+      payroll.status = PAYROLL_STATUS.PENDING;
 
       payroll.approvalFlow = {
         currentLevel: initialApprovalLevel,
@@ -1202,84 +1173,85 @@ export class AdminController {
                 .toLowerCase()} approval`,
           },
         ],
+        submittedBy: admin._id,
+        submittedAt: new Date(),
+        remarks:
+          remarks ||
+          `Submitted for ${initialApprovalLevel
+            .replace(/_/g, " ")
+            .toLowerCase()} approval`,
       };
 
       await payroll.save();
+      console.log("✅ Payroll status updated to PENDING");
 
-      // Create a map to track notifications by user ID to avoid duplicates
-      const notificationMap = new Map();
-
-      // Helper function to add a notification to the map
-      const addNotification = (userId, role) => {
-        if (!userId) return;
-
-        const userIdStr = userId.toString();
-        if (!notificationMap.has(userIdStr)) {
-          notificationMap.set(userIdStr, {
-            userId,
-            roles: [role],
-            customMessage: `Submitted for ${role.toLowerCase()} approval`,
-          });
-        } else {
-          // User already has a notification, just add the role
-          const existing = notificationMap.get(userIdStr);
-          existing.roles.push(role);
-          // Update message to include all roles
-          existing.customMessage = `Submitted for ${existing.roles
-            .join(" and ")
-            .toLowerCase()} approval`;
-        }
-      };
-
-      // Add notifications for all stakeholders
-      if (departmentHead) {
-        addNotification(departmentHead._id, "Department Head");
-      }
-
-      if (hrManager) {
-        addNotification(hrManager._id, "HR Manager");
-      }
-
-      if (financeDirector) {
-        addNotification(financeDirector._id, "Finance Director");
-      }
-
-      // Add notifications for super admins
-      superAdmins.forEach((superAdmin) => {
-        addNotification(superAdmin._id, "Super Admin");
-      });
-
-      // Add notification for employee
-      addNotification(payroll.employee, "Employee");
-
-      // Create notifications from the map
+      // Create notifications for all stakeholders
+      console.log("🔔 Creating notifications for stakeholders");
       const notificationPromises = [];
 
-      notificationMap.forEach((notification, userId) => {
-        console.log(
-          `Creating notification for user ${userId} with roles: ${notification.roles.join(
-            ", "
-          )}`
-        );
+      // Notify the employee
+      console.log(
+        `📬 Creating notification for employee: ${payroll.employee.firstName} ${payroll.employee.lastName}`
+      );
+      notificationPromises.push(
+        NotificationService.createPayrollNotification(
+          payroll,
+          "PAYROLL_SUBMITTED",
+          payroll.employee,
+          "Your payroll has been submitted for approval"
+        )
+      );
 
+      // Get the next approver based on the initial approval level
+      let nextApprover = null;
+      let nextApproverRole = "";
+
+      if (initialApprovalLevel === APPROVAL_LEVELS.DEPARTMENT_HEAD) {
+        nextApprover = departmentHead;
+        nextApproverRole = "Department Head";
+      } else if (initialApprovalLevel === APPROVAL_LEVELS.HR_MANAGER) {
+        nextApprover = hrManager;
+        nextApproverRole = "HR Manager";
+      }
+
+      // Check if the next approver is the same as the submitting admin
+      const isSelfApproval =
+        nextApprover && nextApprover._id.toString() === admin._id.toString();
+
+      // Only notify the next approver if they're different from the submitting admin
+      if (nextApprover && !isSelfApproval) {
+        console.log(
+          `📬 Creating notification for ${nextApproverRole}: ${nextApprover.firstName} ${nextApprover.lastName}`
+        );
         notificationPromises.push(
           NotificationService.createPayrollNotification(
-            notification.userId,
-            NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
             payroll,
-            remarks || notification.customMessage
+            "PAYROLL_PENDING_APPROVAL",
+            nextApprover,
+            `New payroll submission for ${payroll.employee.firstName} ${payroll.employee.lastName} (${payroll.employee.department.name}) for ${payroll.month}/${payroll.year} requires your approval as ${nextApproverRole}`
           )
         );
-      });
+      } else if (isSelfApproval) {
+        console.log(
+          `ℹ️ Skipping notification for ${nextApproverRole} as they are the submitting admin`
+        );
+      }
 
-      await Promise.all(notificationPromises);
+      // Send all notifications
+      console.log("📤 Sending notifications...");
+      const results = await Promise.all(notificationPromises);
+      console.log(
+        "✅ Notifications sent successfully:",
+        results.map((r) => r?._id)
+      );
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
-        message: "Payroll submitted successfully for approval",
+        message: "Payroll submitted successfully",
         data: payroll,
       });
     } catch (error) {
+      console.error(`❌ Error submitting payroll: ${error.message}`);
       next(error);
     }
   }
@@ -2890,20 +2862,38 @@ export class AdminController {
 
       console.log(`✅ Payroll created with ID: ${payroll._id}`);
 
-      // Create notification for the employee using NotificationService
-      console.log(`🔔 Creating notification for employee: ${employeeId}`);
-      await NotificationService.createPayrollNotification(
-        employeeId,
-        "PAYROLL_CREATED",
-        payroll
+      // Create notification based on recipient role
+      console.log(`🔔 Creating notifications for payroll creation`);
+      console.log(
+        `📬 Creating notification for employee: ${employee.firstName} ${employee.lastName}`
+      );
+      console.log(
+        `📬 Creating notification for admin: ${admin.firstName} ${admin.lastName}`
       );
 
-      // Create notification for the admin
-      console.log(`🔔 Creating notification for admin: ${admin._id}`);
-      await NotificationService.createPayrollNotification(
-        admin._id,
-        "PAYROLL_DRAFT_CREATED",
-        payroll
+      // Create notifications for both employee and admin
+      const notificationPromises = [
+        // Notify the employee
+        NotificationService.createPayrollNotification(
+          payroll,
+          "PAYROLL_DRAFT_CREATED",
+          employee,
+          "Payroll has been created for your review"
+        ),
+        // Notify the admin
+        NotificationService.createPayrollNotification(
+          payroll,
+          "PAYROLL_DRAFT_CREATED",
+          admin,
+          "You have created a draft payroll"
+        ),
+      ];
+
+      console.log("📤 Sending notifications...");
+      const results = await Promise.all(notificationPromises);
+      console.log(
+        "✅ Notifications sent successfully:",
+        results.map((r) => r?._id)
       );
 
       console.log(
@@ -3026,7 +3016,7 @@ export class AdminController {
             console.log(`🔔 Creating notification for employee: ${employeeId}`);
             await NotificationService.createPayrollNotification(
               employeeId,
-              "PAYROLL_CREATED",
+              "PAYROLL_DRAFT_CREATED",
               payroll
             );
 
@@ -3235,7 +3225,7 @@ export class AdminController {
           console.log(`🔔 Creating notification for employee: ${employee._id}`);
           await NotificationService.createPayrollNotification(
             employee._id,
-            "PAYROLL_CREATED",
+            "PAYROLL_DRAFT_CREATED",
             payroll
           );
 
@@ -3412,11 +3402,6 @@ export class AdminController {
           console.log(`🔄 Updating payroll status to PENDING: ${payroll._id}`);
 
           // Special case for HR department - skip Department Head level
-          const hrDepartment = await DepartmentModel.findOne({
-            name: { $in: ["Human Resources", "HR"] },
-            status: "active",
-          });
-
           const isHRDepartment =
             hrDepartment &&
             admin.department.toString() === hrDepartment._id.toString();
@@ -3427,6 +3412,8 @@ export class AdminController {
 
           // Update payroll status and add to approval flow
           payroll.status = PAYROLL_STATUS.PENDING;
+
+          // Set approval flow with a single history entry
           payroll.approvalFlow = {
             currentLevel: initialApprovalLevel,
             history: [
@@ -3443,21 +3430,14 @@ export class AdminController {
                     .toLowerCase()} approval`,
               },
             ],
-          };
-
-          // Add to approval history with all required fields
-          payroll.approvalFlow.history.push({
-            level: initialApprovalLevel,
-            status: PAYROLL_STATUS.PENDING,
-            action: "SUBMIT",
-            user: admin._id,
-            timestamp: new Date(),
+            submittedBy: admin._id,
+            submittedAt: new Date(),
             remarks:
               remarks ||
               `Submitted for ${initialApprovalLevel
                 .replace(/_/g, " ")
                 .toLowerCase()} approval`,
-          });
+          };
 
           return payroll.save();
         })
@@ -4016,34 +3996,43 @@ export class AdminController {
       const updatePromises = payrolls.map(async (payroll) => {
         console.log(`🔄 Updating payroll status to PENDING: ${payroll._id}`);
 
+        // Special case for HR department - skip Department Head level
+        const isHRDepartment =
+          hrDepartment &&
+          admin.department.toString() === hrDepartment._id.toString();
+
+        const initialApprovalLevel = isHRDepartment
+          ? APPROVAL_LEVELS.HR_MANAGER
+          : APPROVAL_LEVELS.DEPARTMENT_HEAD;
+
         // Update payroll status and add to approval flow
         payroll.status = PAYROLL_STATUS.PENDING;
+
+        // Set approval flow with a single history entry
         payroll.approvalFlow = {
-          currentLevel: APPROVAL_LEVELS.DEPARTMENT_HEAD,
+          currentLevel: initialApprovalLevel,
           history: [
             {
-              level: APPROVAL_LEVELS.DEPARTMENT_HEAD,
+              level: initialApprovalLevel,
               status: PAYROLL_STATUS.PENDING,
               action: "SUBMIT",
               user: admin._id,
               timestamp: new Date(),
-              remarks: remarks || "Submitted for department head approval",
+              remarks:
+                remarks ||
+                `Submitted for ${initialApprovalLevel
+                  .replace(/_/g, " ")
+                  .toLowerCase()} approval`,
             },
           ],
           submittedBy: admin._id,
           submittedAt: new Date(),
-          remarks: remarks || "Submitted for department head approval",
+          remarks:
+            remarks ||
+            `Submitted for ${initialApprovalLevel
+              .replace(/_/g, " ")
+              .toLowerCase()} approval`,
         };
-
-        // Add to approval history with all required fields
-        payroll.approvalFlow.history.push({
-          level: APPROVAL_LEVELS.DEPARTMENT_HEAD,
-          status: PAYROLL_STATUS.PENDING,
-          action: "SUBMIT",
-          user: admin._id,
-          timestamp: new Date(),
-          remarks: remarks || "Submitted for department head approval",
-        });
 
         return payroll.save();
       });

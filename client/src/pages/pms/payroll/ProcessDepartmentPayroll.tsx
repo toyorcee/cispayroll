@@ -37,6 +37,15 @@ import PayrollTable, {
   Payroll,
 } from "../../../components/payroll/processpayroll/admin/PayrollTable";
 import approvalService from "../../../services/approvalService";
+import { Box, Tab, Tabs, Button } from "@mui/material";
+import ApprovalTimeline from "../../../components/payroll/processpayroll/admin/ApprovalTimeline";
+import PayrollDashboard from "../../../components/payroll/processpayroll/admin/PayrollDashboard";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+} from "@mui/material";
 
 interface SummaryCardProps {
   icon: React.ReactNode;
@@ -158,6 +167,8 @@ const ProcessDepartmentPayroll = () => {
 
   const currentUserId = user?._id;
 
+  const [activeTab, setActiveTab] = useState(0);
+
   useEffect(() => {
     if (payrollProcessed) {
       queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
@@ -194,8 +205,8 @@ const ProcessDepartmentPayroll = () => {
   });
 
   const submitMutation = useMutation({
-    mutationFn: (payrollId: string) =>
-      adminPayrollService.submitPayroll(payrollId),
+    mutationFn: (data: { payrollId: string; remarks?: string }) =>
+      adminPayrollService.submitPayroll(data.payrollId, data.remarks),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
       queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] });
@@ -214,13 +225,14 @@ const ProcessDepartmentPayroll = () => {
     setShowSubmitDialog(true);
   };
 
-  const handleViewDetails = (payroll: PayrollData) => {
-    // Close all other modals first
-    setShowRejectDialog(false);
-
-    // Then set the selected payroll and show details modal
-    setSelectedPayroll(payroll);
-    setShowDetailsModal(true);
+  const handleViewDetails = (payroll: Payroll) => {
+    const payrollData = payrollsData?.data?.payrolls.find(
+      (p: PayrollData) => p._id === payroll._id
+    );
+    if (payrollData) {
+      setSelectedPayroll(payrollData);
+      setShowDetailsModal(true);
+    }
   };
 
   const handlePageChange = (newPage: number) => {
@@ -322,14 +334,8 @@ const ProcessDepartmentPayroll = () => {
     }
   };
 
-  const handleSelectPayroll = (payrollId: string) => {
-    setSelectedPayrollIds((prev) => {
-      if (prev.includes(payrollId)) {
-        return prev.filter((id) => id !== payrollId);
-      } else {
-        return [...prev, payrollId];
-      }
-    });
+  const handleSelectPayroll = (selectedIds: string[]) => {
+    setSelectedPayrollIds(selectedIds);
   };
 
   const handleSelectAll = () => {
@@ -362,7 +368,10 @@ const ProcessDepartmentPayroll = () => {
   const handleConfirmSubmit = async () => {
     try {
       if (submitDialogData.type === "single" && submitDialogData.payrollId) {
-        await submitMutation.mutateAsync(submitDialogData.payrollId);
+        await submitMutation.mutateAsync({
+          payrollId: submitDialogData.payrollId,
+          remarks: submitDialogData.remarks,
+        });
         toast.success("Payroll submitted for approval");
       } else if (submitDialogData.type === "bulk") {
         const result = await adminPayrollService.submitBulkPayrolls({
@@ -508,8 +517,8 @@ const ProcessDepartmentPayroll = () => {
   });
 
   // Add handler functions
-  const handleReject = (payrollId: string) => {
-    setRejectingPayrollId(payrollId);
+  const handleReject = (payroll: Payroll) => {
+    setRejectingPayrollId(payroll._id);
     setRejectDialogData({ remarks: "" });
     setShowRejectDialog(true);
   };
@@ -584,19 +593,26 @@ const ProcessDepartmentPayroll = () => {
     }
   };
 
-  const handleProcessPayment = async (payrollId: string) => {
-    setProcessingPayrollId(payrollId);
+  const handleProcessPayment = (payroll: Payroll) => {
+    setProcessingPayrollId(payroll._id);
     try {
-      await processPaymentMutation.mutateAsync(payrollId);
-      setProcessingPayrollId(null);
+      processPaymentMutation.mutate(payroll._id);
     } catch (error) {
       console.error("Error processing payment:", error);
-      setProcessingPayrollId(null);
     }
   };
 
-  const handleApprove = async (payrollId: string) => {
-    setApprovingPayrollId(payrollId);
+  const handleSubmitForApproval = (payroll: Payroll) => {
+    setSubmitDialogData({
+      type: "single",
+      payrollId: payroll._id,
+      remarks: "",
+    });
+    setShowSubmitDialog(true);
+  };
+
+  const handleApprove = (payroll: Payroll) => {
+    setApprovingPayrollId(payroll._id);
     setApproveDialogData({ remarks: "" });
     setShowApproveDialog(true);
   };
@@ -620,52 +636,65 @@ const ProcessDepartmentPayroll = () => {
       // Determine which approval method to use based on the current approval level
       let response;
 
-      switch (payroll.approvalFlow?.currentLevel) {
-        case "DEPARTMENT_HEAD":
-          response = await approvalService.approveAsDepartmentHead(
-            approvingPayrollId,
-            approveDialogData.remarks
-          );
-          break;
-        case "HR_MANAGER":
-          response = await approvalService.approveAsHRManager(
-            approvingPayrollId,
-            approveDialogData.remarks
-          );
-          break;
-        case "FINANCE_DIRECTOR":
-          response = await approvalService.approveAsFinanceDirector(
-            approvingPayrollId,
-            approveDialogData.remarks
-          );
-          break;
-        case "SUPER_ADMIN":
-          response = await approvalService.approveAsSuperAdmin(
-            approvingPayrollId,
-            approveDialogData.remarks
-          );
-          break;
-        default:
-          toast.error("Invalid approval level");
-          return;
-      }
+      try {
+        switch (payroll.approvalFlow?.currentLevel) {
+          case "DEPARTMENT_HEAD":
+            response = await approvalService.approveAsDepartmentHead(
+              approvingPayrollId,
+              approveDialogData.remarks
+            );
+            break;
+          case "HR_MANAGER":
+            response = await approvalService.approveAsHRManager(
+              approvingPayrollId,
+              approveDialogData.remarks
+            );
+            break;
+          case "FINANCE_DIRECTOR":
+            response = await approvalService.approveAsFinanceDirector(
+              approvingPayrollId,
+              approveDialogData.remarks
+            );
+            break;
+          case "SUPER_ADMIN":
+            response = await approvalService.approveAsSuperAdmin(
+              approvingPayrollId,
+              approveDialogData.remarks
+            );
+            break;
+          default:
+            toast.error("Invalid approval level");
+            return;
+        }
 
-      // Refresh the payrolls data
-      queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
-      queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] });
+        // Refresh the payrolls data
+        queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
+        queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] });
 
-      setShowApproveDialog(false);
-      setApprovingPayrollId(null);
-      setApproveDialogData({ remarks: "" });
+        setShowApproveDialog(false);
+        setApprovingPayrollId(null);
+        setApproveDialogData({ remarks: "" });
 
-      // Use the backend's success message
-      toast.success(response.message);
+        // Use the backend's success message
+        toast.success(response.message);
 
-      // If there's a next approver, show additional information
-      if (response.data?.nextApprover) {
-        toast.info(
-          `Next approver: ${response.data.nextApprover.name} (${response.data.nextApprover.position})`
-        );
+        // If there's a next approver, show additional information
+        if (response.data?.nextApprover && response.data.nextApprover.name) {
+          toast.info(
+            `Next approver: ${response.data.nextApprover.name} (${response.data.nextApprover.position})`
+          );
+        }
+      } catch (error: any) {
+        // Handle specific error cases
+        if (error.response?.status === 403) {
+          toast.error("You don't have permission to approve at this level");
+        } else if (error.response?.status === 400) {
+          toast.error(
+            error.response.data.message || "Invalid approval request"
+          );
+        } else {
+          throw error; // Re-throw other errors to be caught by outer catch
+        }
       }
     } catch (error: any) {
       console.error("Error approving payroll:", error);
@@ -780,91 +809,119 @@ const ProcessDepartmentPayroll = () => {
   });
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">
-          Department Payrolls
+    <Box sx={{ width: "100%" }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
+        <h1 className="text-2xl font-semibold text-gray-900">
+          Process Department Payroll
         </h1>
-        <p className="text-gray-600 mt-1">
-          Manage and process payrolls for your department
-        </p>
-      </div>
-
-      {canProcessPayroll && (
-        <div className="flex justify-end mb-6">
-          <button
+        {canProcessPayroll && (
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<FaPlus />}
             onClick={() => setShowSingleProcessModal(true)}
-            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors cursor-pointer"
           >
-            <FaPlus className="mr-2" />
-            Process Payroll
-          </button>
-        </div>
+            Create Payroll
+          </Button>
+        )}
+      </Box>
+      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
+        <Tabs
+          value={activeTab}
+          onChange={(e, newValue) => setActiveTab(newValue)}
+        >
+          <Tab label="Payroll List" />
+          <Tab label="Dashboard" />
+        </Tabs>
+      </Box>
+
+      {activeTab === 0 ? (
+        <>
+          <PayrollTable
+            payrolls={convertedPayrolls}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onView={handleViewDetails}
+            onEdit={handleViewDetails}
+            onDelete={handleViewDetails}
+            onSubmitForApproval={handleSubmitForApproval}
+            onProcessPayment={handleProcessPayment}
+            selectedPayrolls={selectedPayrollIds}
+            onSelectionChange={handleSelectPayroll}
+            loading={isLoading}
+            error={error}
+          />
+        </>
+      ) : (
+        <PayrollDashboard payrolls={convertedPayrolls} />
       )}
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard
-          icon={<FaMoneyBill className="h-6 w-6 text-green-600" />}
-          title={`Total Payroll Amount (${
-            payrollStats?.PAID || 0
-          } paid payrolls)`}
-          value={new Intl.NumberFormat("en-NG", {
-            style: "currency",
-            currency: "NGN",
-          }).format(payrollStats?.totalAmount || 0)}
-        />
-
-        <SummaryCard
-          icon={<FaFileAlt className="h-6 w-6 text-yellow-600" />}
-          title="Pending Payrolls"
-          value={payrollStats?.PENDING?.toString() || "0"}
-        />
-
-        <SummaryCard
-          icon={<FaCheck className="h-6 w-6 text-green-600" />}
-          title="Approved Payrolls"
-          value={payrollStats?.APPROVED?.toString() || "0"}
-        />
-
-        <SummaryCard
-          icon={<FaTimes className="h-6 w-6 text-red-600" />}
-          title="Rejected Payrolls"
-          value={payrollStats?.REJECTED?.toString() || "0"}
-        />
-
-        <SummaryCard
-          icon={<FaMoneyBill className="h-6 w-6 text-purple-600" />}
-          title="Paid Payrolls"
-          value={payrollStats?.PAID?.toString() || "0"}
-        />
-
-        <SummaryCard
-          icon={<FaFileAlt className="h-6 w-6 text-blue-600" />}
-          title="Total Payrolls"
-          value={payrollStats?.total?.toString() || "0"}
-        />
-      </div>
-
-      <div className="mt-6">
-        <PayrollTable
-          payrolls={convertedPayrolls}
-          loading={isLoading}
-          error={error ? String(error) : null}
-          selectedPayrolls={selectedPayrollIds}
-          onSelectPayroll={handleSelectPayroll}
-          onSelectAllPayrolls={handleSelectAll}
-          onViewDetails={(payroll) => {
-            const payrollData = payrolls.find((p) => p._id === payroll._id);
-            if (payrollData) {
-              handleViewDetails(payrollData);
-            }
-          }}
-          onSubmitForApproval={(payroll) => handleSubmit(payroll._id)}
-          onApprove={(payroll) => handleApprove(payroll._id)}
-          onReject={(payroll) => handleReject(payroll._id)}
-          onProcessPayment={(payroll) => handleProcessPayment(payroll._id)}
-        />
-      </div>
+      {/* Approval Dialog */}
+      <Dialog
+        open={Boolean(approvingPayrollId)}
+        onClose={() => setApprovingPayrollId(null)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Approve Payroll</DialogTitle>
+        <DialogContent>
+          {approvingPayrollId && (
+            <Box sx={{ mt: 2 }}>
+              <ApprovalTimeline
+                steps={[
+                  { level: "Department Head", status: "completed" },
+                  {
+                    level: "HR Manager",
+                    status:
+                      payrolls.find((p) => p._id === approvingPayrollId)
+                        ?.approvalFlow?.currentLevel === "HR_MANAGER"
+                        ? "pending"
+                        : "completed",
+                  },
+                  {
+                    level: "Finance Director",
+                    status:
+                      payrolls.find((p) => p._id === approvingPayrollId)
+                        ?.approvalFlow?.currentLevel === "FINANCE_DIRECTOR"
+                        ? "pending"
+                        : "completed",
+                  },
+                  {
+                    level: "Super Admin",
+                    status:
+                      payrolls.find((p) => p._id === approvingPayrollId)
+                        ?.approvalFlow?.currentLevel === "SUPER_ADMIN"
+                        ? "pending"
+                        : "completed",
+                  },
+                ]}
+                currentLevel={
+                  payrolls.find((p) => p._id === approvingPayrollId)
+                    ?.approvalFlow?.currentLevel || ""
+                }
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setApprovingPayrollId(null)}>Cancel</Button>
+          <Button
+            onClick={handleConfirmApprove}
+            variant="contained"
+            color="primary"
+            disabled={isApproving}
+          >
+            {isApproving ? "Approving..." : "Approve"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Payroll Details Modal */}
       {selectedPayroll && (
@@ -996,75 +1053,7 @@ const ProcessDepartmentPayroll = () => {
           </div>
         </div>
       )}
-
-      {/* Approve Dialog */}
-      {showApproveDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Approve Payroll</h3>
-            <p className="mb-4">
-              {(typeof user?.department === "object" &&
-                user?.department?.name === "Human Resources") ||
-              (typeof user?.department === "object" &&
-                user?.department?.name === "HR") ||
-              (typeof user?.department === "string" &&
-                (user?.department === "Human Resources" ||
-                  user?.department === "HR"))
-                ? "Are you sure you want to approve this payroll as HR Manager?"
-                : "Are you sure you want to approve this payroll as Department Head?"}
-            </p>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Remarks (Optional)
-              </label>
-              <textarea
-                className="w-full p-2 border rounded-md"
-                rows={3}
-                value={approveDialogData.remarks}
-                onChange={(e) =>
-                  setApproveDialogData((prev) => ({
-                    ...prev,
-                    remarks: e.target.value,
-                  }))
-                }
-                placeholder="Add any remarks for the approval..."
-                disabled={isApproving}
-              />
-            </div>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowApproveDialog(false);
-                  setApprovingPayrollId(null);
-                  setApproveDialogData({ remarks: "" });
-                }}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
-                disabled={isApproving}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmApprove}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center"
-                disabled={isApproving}
-              >
-                {isApproving ? (
-                  <>
-                    <FaSpinner className="mr-2 animate-spin" />
-                    Approving...
-                  </>
-                ) : (
-                  <>
-                    <FaCheck className="mr-2" />
-                    Approve
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </Box>
   );
 };
 

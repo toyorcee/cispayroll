@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   TableContainer,
   Table,
@@ -15,6 +15,12 @@ import {
   Typography,
   CircularProgress,
   Checkbox,
+  TextField,
+  InputAdornment,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
 } from "@mui/material";
 import {
   Visibility as VisibilityIcon,
@@ -22,6 +28,10 @@ import {
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
   Payment as PaymentIcon,
+  Search,
+  FilterList,
+  ArrowUpward,
+  ArrowDownward,
 } from "@mui/icons-material";
 import { formatCurrency, formatDate } from "../../../../utils/formatters";
 
@@ -56,33 +66,39 @@ export interface Payroll {
 
 interface PayrollTableProps {
   payrolls: Payroll[];
-  loading: boolean;
-  error: string | null;
-  selectedPayrolls: string[];
-  onSelectPayroll: (payrollId: string) => void;
-  onSelectAllPayrolls: (payrollIds: string[]) => void;
-  onViewDetails: (payroll: Payroll) => void;
-  onSubmitForApproval: (payroll: Payroll) => void;
   onApprove: (payroll: Payroll) => void;
   onReject: (payroll: Payroll) => void;
-  onProcessPayment: (payroll: Payroll) => void;
+  onView: (payroll: Payroll) => void;
+  onEdit: (payroll: Payroll) => void;
+  onDelete: (payroll: Payroll) => void;
+  onSubmitForApproval?: (payroll: Payroll) => void;
+  onProcessPayment?: (payroll: Payroll) => void;
+  selectedPayrolls: string[];
+  onSelectionChange: (selectedIds: string[]) => void;
+  loading?: boolean;
+  error?: string | null;
 }
 
 const PayrollTable: React.FC<PayrollTableProps> = ({
   payrolls,
-  loading,
-  error,
-  selectedPayrolls,
-  onSelectPayroll,
-  onSelectAllPayrolls,
-  onViewDetails,
-  onSubmitForApproval,
   onApprove,
   onReject,
+  onView,
+  onEdit,
+  onDelete,
+  onSubmitForApproval,
   onProcessPayment,
+  selectedPayrolls,
+  onSelectionChange,
+  loading,
+  error,
 }) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sortField, setSortField] = useState<keyof Payroll>("createdAt");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
@@ -114,20 +130,146 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
 
   const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
-      const newSelectedPayrolls = payrolls.map((payroll) => payroll._id);
-      onSelectAllPayrolls(newSelectedPayrolls);
+      const newSelectedPayrolls = filteredAndSortedPayrolls.map(
+        (payroll) => payroll._id
+      );
+      onSelectionChange(newSelectedPayrolls);
     } else {
-      onSelectAllPayrolls([]);
+      onSelectionChange([]);
     }
+  };
+
+  const handleSelectPayroll = (payrollId: string) => {
+    const newSelectedPayrolls = selectedPayrolls.includes(payrollId)
+      ? selectedPayrolls.filter((id) => id !== payrollId)
+      : [...selectedPayrolls, payrollId];
+    onSelectionChange(newSelectedPayrolls);
   };
 
   const formatApprovalLevel = (level: string | undefined) => {
     if (!level) return "N/A";
 
+    // Special case for COMPLETED level
+    if (level === "COMPLETED") return "Completed";
+
     return level
       .split("_")
       .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
       .join(" ");
+  };
+
+  const getApprovalLevelColor = (payroll: Payroll) => {
+    // If status is COMPLETED, use success color
+    if (payroll.status === "COMPLETED") return "success";
+
+    // If status is PENDING, use warning color
+    if (payroll.status === "PENDING") return "warning";
+
+    // Default color
+    return "default";
+  };
+
+  // Filter and sort payrolls
+  const filteredAndSortedPayrolls = useMemo(() => {
+    let result = [...payrolls];
+
+    // Apply search filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      result = result.filter((payroll) => {
+        // Check employee name - first name and last name separately
+        if (payroll.employee.firstName.toLowerCase().includes(searchLower))
+          return true;
+        if (payroll.employee.lastName.toLowerCase().includes(searchLower))
+          return true;
+
+        // Check full name
+        const fullName =
+          `${payroll.employee.firstName} ${payroll.employee.lastName}`.toLowerCase();
+        if (fullName.includes(searchLower)) return true;
+
+        // Check employee email
+        if (payroll.employee.email.toLowerCase().includes(searchLower))
+          return true;
+
+        // Check month/year
+        const monthYear = `${payroll.month}/${payroll.year}`;
+        if (monthYear.includes(searchTerm)) return true;
+
+        // Check status
+        if (payroll.status.toLowerCase().includes(searchLower)) return true;
+
+        // Check approval level
+        if (
+          payroll.approvalFlow?.currentLevel
+            ?.toLowerCase()
+            .includes(searchLower)
+        )
+          return true;
+
+        // Check amounts
+        if (payroll.totalEarnings.toString().includes(searchTerm)) return true;
+        if (payroll.totalDeductions.toString().includes(searchTerm))
+          return true;
+        if (payroll.netPay.toString().includes(searchTerm)) return true;
+
+        return false;
+      });
+    }
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      result = result.filter((payroll) => {
+        // For "PENDING" status, include payrolls that are pending at any level
+        if (statusFilter === "PENDING") {
+          return payroll.status === "PENDING";
+        }
+        // For other statuses, match exactly
+        return payroll.status === statusFilter;
+      });
+    }
+
+    // Apply sorting
+    result.sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+
+      if (sortField === "createdAt" || sortField === "updatedAt") {
+        return sortDirection === "asc"
+          ? new Date(aValue as string).getTime() -
+              new Date(bValue as string).getTime()
+          : new Date(bValue as string).getTime() -
+              new Date(aValue as string).getTime();
+      }
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        return sortDirection === "asc"
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+
+      return 0;
+    });
+
+    return result;
+  }, [payrolls, searchTerm, statusFilter, sortField, sortDirection]);
+
+  const handleSort = (field: keyof Payroll) => {
+    if (field === sortField) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const getSortIcon = (field: keyof Payroll) => {
+    if (field !== sortField) return null;
+    return sortDirection === "asc" ? (
+      <ArrowUpward fontSize="small" />
+    ) : (
+      <ArrowDownward fontSize="small" />
+    );
   };
 
   if (loading) {
@@ -171,6 +313,36 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
 
   return (
     <Paper sx={{ width: "100%", overflow: "hidden" }}>
+      <Box sx={{ p: 2, display: "flex", gap: 2, alignItems: "center" }}>
+        <TextField
+          size="small"
+          placeholder="Search employees..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search />
+              </InputAdornment>
+            ),
+          }}
+          sx={{ width: 300 }}
+        />
+        <FormControl size="small" sx={{ minWidth: 200 }}>
+          <InputLabel>Status</InputLabel>
+          <Select
+            value={statusFilter}
+            label="Status"
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <MenuItem value="all">All Statuses</MenuItem>
+            <MenuItem value="PENDING">Pending</MenuItem>
+            <MenuItem value="APPROVED">Approved</MenuItem>
+            <MenuItem value="REJECTED">Rejected</MenuItem>
+            <MenuItem value="PAID">Paid</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
       <TableContainer sx={{ maxHeight: 440 }}>
         <Table stickyHeader aria-label="payroll table">
           <TableHead>
@@ -179,28 +351,76 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                 <Checkbox
                   indeterminate={
                     selectedPayrolls.length > 0 &&
-                    selectedPayrolls.length < payrolls.length
+                    selectedPayrolls.length < filteredAndSortedPayrolls.length
                   }
                   checked={
-                    payrolls.length > 0 &&
-                    selectedPayrolls.length === payrolls.length
+                    filteredAndSortedPayrolls.length > 0 &&
+                    selectedPayrolls.length === filteredAndSortedPayrolls.length
                   }
-                  onChange={handleSelectAllClick}
+                  onChange={(event) => {
+                    if (event.target.checked) {
+                      onSelectionChange(
+                        filteredAndSortedPayrolls.map((p) => p._id)
+                      );
+                    } else {
+                      onSelectionChange([]);
+                    }
+                  }}
                 />
               </TableCell>
-              <TableCell>Employee</TableCell>
-              <TableCell>Period</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Approval Level</TableCell>
-              <TableCell align="right">Total Earnings</TableCell>
-              <TableCell align="right">Total Deductions</TableCell>
-              <TableCell align="right">Net Pay</TableCell>
-              <TableCell>Created</TableCell>
+              <TableCell
+                onClick={() => handleSort("employee")}
+                sx={{ cursor: "pointer" }}
+              >
+                Employee {getSortIcon("employee")}
+              </TableCell>
+              <TableCell
+                onClick={() => handleSort("month")}
+                sx={{ cursor: "pointer" }}
+              >
+                Month {getSortIcon("month")}
+              </TableCell>
+              <TableCell
+                onClick={() => handleSort("year")}
+                sx={{ cursor: "pointer" }}
+              >
+                Year {getSortIcon("year")}
+              </TableCell>
+              <TableCell
+                onClick={() => handleSort("status")}
+                sx={{ cursor: "pointer" }}
+              >
+                Status {getSortIcon("status")}
+              </TableCell>
+              <TableCell
+                onClick={() => handleSort("totalEarnings")}
+                sx={{ cursor: "pointer" }}
+              >
+                Earnings {getSortIcon("totalEarnings")}
+              </TableCell>
+              <TableCell
+                onClick={() => handleSort("totalDeductions")}
+                sx={{ cursor: "pointer" }}
+              >
+                Deductions {getSortIcon("totalDeductions")}
+              </TableCell>
+              <TableCell
+                onClick={() => handleSort("netPay")}
+                sx={{ cursor: "pointer" }}
+              >
+                Net Pay {getSortIcon("netPay")}
+              </TableCell>
+              <TableCell
+                onClick={() => handleSort("createdAt")}
+                sx={{ cursor: "pointer" }}
+              >
+                Created {getSortIcon("createdAt")}
+              </TableCell>
               <TableCell align="center">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {payrolls
+            {filteredAndSortedPayrolls
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
               .map((payroll) => (
                 <TableRow
@@ -211,7 +431,7 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={selectedPayrolls.includes(payroll._id)}
-                      onChange={() => onSelectPayroll(payroll._id)}
+                      onChange={() => handleSelectPayroll(payroll._id)}
                     />
                   </TableCell>
                   <TableCell>
@@ -231,15 +451,16 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                         label={formatApprovalLevel(
                           payroll.approvalFlow?.currentLevel
                         )}
-                        color="warning"
+                        color={getApprovalLevelColor(payroll)}
                         size="small"
+                        icon={<FilterList fontSize="small" />}
                       />
                     ) : (
                       <Chip
                         label={formatApprovalLevel(
                           payroll.approvalFlow?.currentLevel
                         )}
-                        color="default"
+                        color={getApprovalLevelColor(payroll)}
                         size="small"
                       />
                     )}
@@ -256,10 +477,7 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                   <TableCell>{formatDate(payroll.createdAt)}</TableCell>
                   <TableCell align="center">
                     <Tooltip title="View Details">
-                      <IconButton
-                        size="small"
-                        onClick={() => onViewDetails(payroll)}
-                      >
+                      <IconButton size="small" onClick={() => onView(payroll)}>
                         <VisibilityIcon />
                       </IconButton>
                     </Tooltip>
@@ -267,7 +485,7 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                       <Tooltip title="Submit for Approval">
                         <IconButton
                           size="small"
-                          onClick={() => onSubmitForApproval(payroll)}
+                          onClick={() => onSubmitForApproval?.(payroll)}
                         >
                           <SendIcon />
                         </IconButton>
@@ -297,7 +515,7 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                       <Tooltip title="Process Payment">
                         <IconButton
                           size="small"
-                          onClick={() => onProcessPayment(payroll)}
+                          onClick={() => onProcessPayment?.(payroll)}
                         >
                           <PaymentIcon color="primary" />
                         </IconButton>
@@ -312,7 +530,7 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
       <TablePagination
         rowsPerPageOptions={[5, 10, 25]}
         component="div"
-        count={payrolls.length}
+        count={filteredAndSortedPayrolls.length}
         rowsPerPage={rowsPerPage}
         page={page}
         onPageChange={handleChangePage}

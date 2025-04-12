@@ -630,17 +630,17 @@ export class SuperAdminController {
       // Create notification for the employee
       console.log(`🔔 Creating notification for employee: ${employee}`);
       await NotificationService.createPayrollNotification(
-        populatedPayroll.employee._id,
-        NOTIFICATION_TYPES.PAYROLL_CREATED,
-        populatedPayroll
+        populatedPayroll,
+        NOTIFICATION_TYPES.PAYROLL_DRAFT_CREATED,
+        populatedPayroll.employee
       );
 
       // Create notification for the super admin
       console.log(`🔔 Creating notification for super admin: ${req.user.id}`);
       await NotificationService.createPayrollNotification(
-        req.user.id,
+        populatedPayroll,
         NOTIFICATION_TYPES.PAYROLL_DRAFT_CREATED,
-        populatedPayroll
+        req.user
       );
 
       res.status(201).json({
