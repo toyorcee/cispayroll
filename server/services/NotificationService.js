@@ -648,25 +648,41 @@ export class NotificationService {
 
     switch (type) {
       case NOTIFICATION_TYPES.PAYROLL_APPROVED:
-        if (currentLevel === APPROVAL_LEVELS.HR_MANAGER) {
+        // Get approvalLevel from data.approvalLevel or data.data.approvalLevel
+        const level =
+          data.approvalLevel || (data.data && data.data.approvalLevel);
+        console.log("🔍 PAYROLL_APPROVED level check:", {
+          level,
+          isHRManager: level === APPROVAL_LEVELS.HR_MANAGER,
+          isFinanceDirector: level === APPROVAL_LEVELS.FINANCE_DIRECTOR,
+        });
+
+        if (level === APPROVAL_LEVELS.HR_MANAGER) {
+          console.log("✅ Using HR Manager message template");
           return {
             title: "Payroll Approved",
-            message: `Payroll for ${employee.firstName} ${employee.lastName} (${payrollPeriod}) has been approved by you and is now pending the next approval.`,
+            message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved by you and is now pending the next approval.`,
           };
-        } else if (currentLevel === APPROVAL_LEVELS.FINANCE_DIRECTOR) {
+        } else if (level === APPROVAL_LEVELS.FINANCE_DIRECTOR) {
+          console.log("✅ Using Finance Director message template");
           return {
             title: "Payroll Approved",
-            message: `Payroll for ${employee.firstName} ${employee.lastName} (${payrollPeriod}) has been approved by you and is now pending the next approval.`,
+            message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved by you and is now pending the next approval.`,
           };
-        } else if (currentLevel === APPROVAL_LEVELS.DEPARTMENT_HEAD) {
+        } else if (level === APPROVAL_LEVELS.DEPARTMENT_HEAD) {
           return {
             title: "Payroll Approved",
-            message: `Payroll for ${employee.firstName} ${employee.lastName} (${payrollPeriod}) has been approved by you and is now pending the next approval.`,
+            message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved by you and is now pending the next approval.`,
           };
-        } else if (currentLevel === APPROVAL_LEVELS.SUPER_ADMIN) {
+        } else if (level === APPROVAL_LEVELS.SUPER_ADMIN) {
           return {
             title: "Payroll Approved",
-            message: `Payroll for ${employee.firstName} ${employee.lastName} (${payrollPeriod}) has been approved by you and is now pending the next approval.`,
+            message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved by you and is now pending the next approval.`,
+          };
+        } else {
+          return {
+            title: "Payroll Approved",
+            message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved by you and is now pending the next approval.`,
           };
         }
         break;
