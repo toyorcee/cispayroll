@@ -4430,9 +4430,13 @@ export class SuperAdminController {
         failed: 0,
         errors: [],
         successful: [],
-        validationErrors: validationErrors, // Include validation errors
-        details: [], // Track status of each employee
+        validationErrors: validationErrors,
+        details: [],
       };
+
+      const processedPayrolls = [];
+      const skippedEmployees = [];
+      const failedEmployees = [];
 
       // Process each employee's payroll
       for (const { employeeId, salaryGradeId } of employeeSalaryGrades) {
@@ -4454,10 +4458,7 @@ export class SuperAdminController {
               `⚠️ Payroll already exists for employee ${employeeId}, skipping`
             );
             results.skipped++;
-            results.errors.push({
-              employeeId,
-              reason: "Payroll already exists for this period",
-            });
+            skippedEmployees.push(employeeId);
             results.details.push({
               employeeId,
               status: "SKIPPED",
@@ -4480,7 +4481,7 @@ export class SuperAdminController {
             // Create payroll record
             const payroll = await PayrollModel.create({
               ...payrollData,
-              status: PAYROLL_STATUS.PROCESSING, // Set to PROCESSING for super admin
+              status: PAYROLL_STATUS.PROCESSING,
               processedBy: superAdminId,
               createdBy: superAdminId,
               updatedBy: superAdminId,
@@ -4490,37 +4491,17 @@ export class SuperAdminController {
                 bankName: "Pending",
               },
               approvalFlow: {
-                currentLevel: APPROVAL_LEVELS.PROCESSING, // Set to PROCESSING
+                currentLevel: APPROVAL_LEVELS.PROCESSING,
                 history: [],
                 submittedBy: superAdminId,
                 submittedAt: new Date(),
-                status: PAYROLL_STATUS.PROCESSING, // Set to PROCESSING
+                status: PAYROLL_STATUS.PROCESSING,
                 remarks: "Initial payroll creation",
               },
             });
 
             console.log(`✅ Payroll created with ID: ${payroll._id}`);
-
-            // Create notification for the employee
-            console.log(`🔔 Creating notification for employee: ${employeeId}`);
-            await NotificationService.createPayrollNotification(
-              payroll,
-              NOTIFICATION_TYPES.PAYROLL_PROCESSING_STARTED,
-              req.user,
-              "Payroll processing started"
-            );
-
-            // Create notification for the super admin
-            console.log(
-              `🔔 Creating notification for super admin: ${superAdminId}`
-            );
-            await NotificationService.createPayrollNotification(
-              payroll,
-              NOTIFICATION_TYPES.PAYROLL_PROCESSING_STARTED,
-              req.user,
-              "Payroll processing started"
-            );
-
+            processedPayrolls.push(payroll);
             results.processed++;
             results.successful.push({
               employeeId,
@@ -4540,10 +4521,7 @@ export class SuperAdminController {
               `❌ Failed to calculate payroll for employee ${employeeId}`
             );
             results.failed++;
-            results.errors.push({
-              employeeId,
-              reason: "Failed to calculate payroll",
-            });
+            failedEmployees.push(employeeId);
             results.details.push({
               employeeId,
               status: "FAILED",
@@ -4555,15 +4533,75 @@ export class SuperAdminController {
             `❌ Error processing employee ${employeeId}: ${error.message}`
           );
           results.failed++;
-          results.errors.push({
-            employeeId,
-            reason: error.message || "Unknown error occurred",
-          });
+          failedEmployees.push(employeeId);
           results.details.push({
             employeeId,
             status: "FAILED",
             reason: error.message || "Unknown error occurred",
           });
+        }
+      }
+
+      // Create a single consolidated notification for the super admin
+      if (
+        processedPayrolls.length > 0 ||
+        skippedEmployees.length > 0 ||
+        failedEmployees.length > 0
+      ) {
+        try {
+          console.log("🔔 Creating consolidated notification for super admin");
+
+          // Get employee details for the notification
+          const employeeDetails = await Promise.all(
+            processedPayrolls.map(async (payroll) => {
+              const employee = await UserModel.findById(payroll.employee);
+              return {
+                id: payroll._id,
+                employeeId: payroll.employee,
+                employeeName: employee
+                  ? `${employee.firstName} ${employee.lastName}`
+                  : "Unknown Employee",
+                status: payroll.status,
+              };
+            })
+          );
+
+          const notificationData = {
+            month,
+            year,
+            frequency,
+            totalProcessed: processedPayrolls.length,
+            totalSkipped: skippedEmployees.length,
+            totalFailed: failedEmployees.length,
+            processedPayrolls: employeeDetails,
+            skippedEmployees,
+            failedEmployees,
+            validationErrors,
+          };
+
+          // Create notification for super admin
+          await NotificationService.createNotification(
+            req.user._id,
+            NOTIFICATION_TYPES.MULTIPLE_PAYROLL_PROCESSING_SUMMARY,
+            req.user,
+            null,
+            `Processed ${processedPayrolls.length} payrolls${
+              skippedEmployees.length > 0
+                ? `, ${skippedEmployees.length} skipped`
+                : ""
+            }${
+              failedEmployees.length > 0
+                ? `, ${failedEmployees.length} failed`
+                : ""
+            }`,
+            notificationData
+          );
+
+          console.log("✅ Consolidated notification created for super admin");
+        } catch (notificationError) {
+          console.error(
+            `❌ Error creating notification: ${notificationError.message}`
+          );
         }
       }
 
