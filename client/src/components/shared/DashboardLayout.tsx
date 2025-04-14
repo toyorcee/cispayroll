@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef, createContext, useContext } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Outlet } from "react-router-dom";
 import { FaBars, FaMoneyCheckAlt, FaSearch } from "react-icons/fa";
 import { useNavigation } from "../../context/NavigationContext";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sidebar } from "./Sidebar";
-import { ProfileMenu } from "./ProfileMenu";
+import { Sidebar } from "./Sidebar"; 
+import { ProfileMenu } from "./PayrollMenu"; 
 import {
   NotificationBell,
   NotificationBellRef,

@@ -413,10 +413,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Process Department Payroll - Only for ADMIN
   if (path.includes("/department-process")) {
-    // Strictly check if user is an ADMIN (not SUPER_ADMIN)
-    if (user.role !== UserRole.ADMIN) {
+    const allowedRoles = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
+    if (!allowedRoles.includes(user.role)) {
       toast.error(
-        "Access denied: Process Department Payroll is only available for Department Admins"
+        "Access denied: Process Department Payroll is only available for Department Admins and Super Admins"
       );
       return <Navigate to="/pms/dashboard" replace />;
     }

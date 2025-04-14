@@ -2,6 +2,10 @@ import { ApiError } from "../utils/errorHandler.js";
 import { Types } from "mongoose";
 import { PAYROLL_STATUS, PayrollFrequency } from "../models/Payroll.js";
 import mongoose from "mongoose";
+import UserModel from "../models/User.js";
+import SalaryGrade from "../models/SalaryStructure.js";
+import { UserRole } from "../models/User.js";
+import Payroll from "../models/Payroll.js";
 
 // Keep this comprehensive validation for super admin payroll creation
 export const validatePayrollCreate = (req, res, next) => {
@@ -253,6 +257,99 @@ export const validateBulkPayrollCreate = (req, res, next) => {
     console.log("✅ Bulk payroll validation passed");
     next();
   } catch (error) {
+    next(error);
+  }
+};
+
+export const validateSuperAdminSingleEmployeePayroll = (req, res, next) => {
+  try {
+    console.log(
+      "🔍 Validating super admin single employee payroll data:",
+      req.body
+    );
+    const { employeeId, departmentId, month, year, frequency, salaryGrade } =
+      req.body;
+
+    // Check required fields
+    if (!employeeId || !departmentId || !month || !year || !salaryGrade) {
+      throw new ApiError(400, "Missing required fields");
+    }
+
+    // Validate month (1-12)
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      throw new ApiError(400, "Month must be between 1 and 12");
+    }
+
+    // Validate year (reasonable range: 1900-2100)
+    if (!Number.isInteger(year) || year < 1900 || year > 2100) {
+      throw new ApiError(400, `Year must be between 1900 and 2100`);
+    }
+
+    // Validate ObjectIds
+    if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+      throw new ApiError(400, "Invalid employee ID");
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(departmentId)) {
+      throw new ApiError(400, "Invalid department ID");
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(salaryGrade)) {
+      throw new ApiError(400, "Invalid salary grade ID");
+    }
+
+    // Validate frequency if provided
+    if (frequency && !Object.values(PayrollFrequency).includes(frequency)) {
+      throw new ApiError(400, "Invalid payroll frequency");
+    }
+
+    console.log("✅ Super admin single employee payroll validation passed");
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const validateSuperAdminMultipleEmployeesPayroll = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    console.log("🔍 Validating super admin multiple payroll data:", req.body);
+    const {
+      departmentId,
+      month,
+      year,
+      frequency = PayrollFrequency.MONTHLY,
+    } = req.body;
+
+    // Validate required fields
+    if (!departmentId || !month || !year) {
+      throw new ApiError(400, "Department ID, month, and year are required");
+    }
+
+    // Validate month (1-12)
+    const monthNum = parseInt(month);
+    if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+      throw new ApiError(400, "Month must be between 1 and 12");
+    }
+
+    // Validate year (1900-2100)
+    const yearNum = parseInt(year);
+    if (isNaN(yearNum) || yearNum < 1900 || yearNum > 2100) {
+      throw new ApiError(400, "Invalid year");
+    }
+
+    // Validate department ID format
+    if (!Types.ObjectId.isValid(departmentId)) {
+      throw new ApiError(400, "Invalid department ID format");
+    }
+
+    console.log("✅ Super admin multiple payroll validation passed");
+    next();
+  } catch (error) {
+    console.error("❌ Super admin multiple payroll validation failed:", error);
     next(error);
   }
 };

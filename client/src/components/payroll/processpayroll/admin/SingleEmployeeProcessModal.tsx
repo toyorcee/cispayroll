@@ -11,10 +11,13 @@ import { useQuery } from "@tanstack/react-query";
 import { adminEmployeeService } from "../../../../services/adminEmployeeService";
 import { salaryStructureService } from "../../../../services/salaryStructureService";
 import { adminPayrollService } from "../../../../services/adminPayrollService";
+import { departmentService } from "../../../../services/departmentService";
 import { toast } from "react-toastify";
 import { useQueryClient } from "@tanstack/react-query";
 import SuccessAnimation from "./SuccessAnimation";
-import { useNotifications } from "../../../shared/DashboardLayout"; 
+import { useNotifications } from "../../../shared/DashboardLayout";
+import { useAuth } from "../../../../context/AuthContext";
+import { UserRole } from "../../../../types/auth";
 
 interface SingleEmployeeProcessModalProps {
   isOpen: boolean;
@@ -25,6 +28,7 @@ interface SingleEmployeeProcessModalProps {
     year: number;
     frequency: string;
     salaryGrade?: string;
+    departmentId: string;
   }) => void;
   onSuccess?: () => void;
 }
@@ -45,17 +49,27 @@ interface DepartmentEmployee {
   status: string;
 }
 
+// Update the interface for getDepartmentEmployees parameters
+interface GetDepartmentEmployeesParams {
+  departmentId?: string;
+  page?: number;
+  limit?: number;
+  status?: string;
+}
+
 const SingleEmployeeProcessModal = ({
   isOpen,
   onClose,
   onSubmit,
   onSuccess,
 }: SingleEmployeeProcessModalProps) => {
+  const { isSuperAdmin } = useAuth();
   const [formData, setFormData] = useState({
     employeeIds: [] as string[],
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
     frequency: "monthly",
+    departmentId: "",
   });
 
   // Add search state
@@ -91,6 +105,13 @@ const SingleEmployeeProcessModal = ({
 
   const { checkForNewNotifications } = useNotifications();
 
+  // Fetch departments for Super Admin
+  const { data: departments, isLoading: departmentsLoading } = useQuery({
+    queryKey: ["departments"],
+    queryFn: departmentService.getAllDepartments,
+    enabled: isSuperAdmin(),
+  });
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -114,20 +135,28 @@ const SingleEmployeeProcessModal = ({
     isLoading: employeesLoading,
     refetch,
   } = useQuery<any, Error, DepartmentEmployee[]>({
-    queryKey: ["departmentEmployees", employeeLimit],
+    queryKey: ["departmentEmployees", formData.departmentId, employeeLimit],
     queryFn: async () => {
       console.log("Fetching employees with params:", {
+        departmentId: formData.departmentId,
         limit: employeeLimit,
         page: 1,
-        // No status filter to get all employees
       });
+
+      // If Super Admin, require department selection
+      if (isSuperAdmin() && !formData.departmentId) {
+        console.log("Super Admin must select department first");
+        return { users: [] };
+      }
+
       const result = await adminEmployeeService.getDepartmentEmployees({
-        limit: employeeLimit,
-        page: 1,
+        departmentId: formData.departmentId,
+        userRole: isSuperAdmin() ? UserRole.SUPER_ADMIN : UserRole.ADMIN,
       });
       console.log("Fetched employees response:", result);
       return result;
     },
+    enabled: !isSuperAdmin() || Boolean(formData.departmentId), // Only enable if not Super Admin or department selected
     select: (data) => {
       console.log("Selected data:", data);
       if (data.users && Array.isArray(data.users)) {
@@ -290,10 +319,17 @@ const SingleEmployeeProcessModal = ({
       return;
     }
 
+    if (isSuperAdmin() && !formData.departmentId) {
+      toast.error("Please select a department first");
+      return;
+    }
+
     setIsSubmitting(true);
     setIsLoading(true);
 
     try {
+      const userRole = isSuperAdmin() ? UserRole.SUPER_ADMIN : UserRole.ADMIN;
+
       if (selectedEmployees.length === 1) {
         const employee = selectedEmployees[0];
         const result = await adminPayrollService.processSingleEmployeePayroll({
@@ -302,51 +338,54 @@ const SingleEmployeeProcessModal = ({
           year: formData.year,
           frequency: formData.frequency,
           salaryGrade: employee.salaryGrade?._id,
+          departmentId: formData.departmentId,
+          userRole,
         });
 
-        // Check for new notifications after payroll creation
-        console.log(
-          "🔔 Checking for new notifications after payroll creation..."
-        );
+        console.log("🔄 Single employee payroll processed:", result);
+        console.log("🔔 Checking for new notifications...");
         await checkForNewNotifications();
 
         queryClient.invalidateQueries({ queryKey: ["payrolls"] });
         queryClient.invalidateQueries({ queryKey: ["notifications"] });
 
-        // Add back the success toast
         toast.success("Payroll processed successfully");
       } else {
         const result =
-          await adminPayrollService.processMultipleEmployeesPayroll({
-            employeeIds: selectedEmployees.map((employee) => employee._id),
-            month: formData.month,
-            year: formData.year,
-            frequency: formData.frequency,
-          });
+          await adminPayrollService.processMultipleEmployeesPayroll(
+            {
+              employeeIds: selectedEmployees.map((employee) => employee._id),
+              month: formData.month,
+              year: formData.year,
+              frequency: formData.frequency,
+            },
+            userRole
+          );
 
-        // Check for new notifications after multiple payroll creation
-        console.log(
-          "🔔 Checking for new notifications after multiple payroll creation..."
-        );
+        console.log("🔄 Multiple employees payroll processed:", result);
+        console.log("🔔 Checking for new notifications...");
         await checkForNewNotifications();
 
-        // Invalidate queries to refresh the data
         queryClient.invalidateQueries({ queryKey: ["payrolls"] });
         queryClient.invalidateQueries({ queryKey: ["notifications"] });
 
-        // Add back the success toast
-        toast.success("Payroll processed successfully for multiple employees");
+        toast.success(
+          `Payroll processed successfully for ${selectedEmployees.length} employees`
+        );
       }
 
-      // Close the modal and trigger success callback
-      onClose();
-      onSuccess?.();
+      // Show success animation and close modal
+      setShowSuccessAnimation(true);
+      setTimeout(() => {
+        setShowSuccessAnimation(false);
+        onClose();
+        onSuccess?.();
+      }, 1500);
     } catch (error: any) {
-      console.error("Error processing payroll:", error);
+      console.error("❌ Error processing payroll:", error);
 
       // Handle specific error cases
       if (error.response?.data?.message) {
-        // Server returned a specific error message
         const errorMsg = error.response.data.message;
         setErrorMessage(errorMsg);
         toast.error(errorMsg);
@@ -354,7 +393,6 @@ const SingleEmployeeProcessModal = ({
         error.message?.includes("duplicate key error") ||
         error.message?.includes("already exists")
       ) {
-        // Duplicate payroll error - provide a more user-friendly message
         const monthName = new Date(0, formData.month - 1).toLocaleString(
           "default",
           { month: "long" }
@@ -363,29 +401,31 @@ const SingleEmployeeProcessModal = ({
           selectedEmployees.length === 1
             ? selectedEmployees[0].fullName
             : "one or more selected employees"
-        } for ${monthName} ${formData.year}. 
-        Please select a different month/year or update the existing payroll.`;
+        } for ${monthName} ${
+          formData.year
+        }. Please select a different month/year or update the existing payroll.`;
         setErrorMessage(errorMsg);
         toast.error(errorMsg);
       } else if (error.message?.includes("Failed to calculate payroll")) {
-        // Payroll calculation error
         setErrorMessage(error.message);
         toast.error(error.message);
       } else {
-        // Generic error
         const errorMsg = "Failed to process payroll. Please try again later.";
         setErrorMessage(errorMsg);
         toast.error(errorMsg);
       }
-
-      // Keep the error animation visible for a few seconds
-      setTimeout(() => {
-        setShowSuccessAnimation(false);
-      }, 5000);
     } finally {
       setIsSubmitting(false);
       setIsLoading(false);
     }
+  };
+
+  // Handle department change
+  const handleDepartmentChange = (departmentId: string) => {
+    setFormData((prev) => ({ ...prev, departmentId }));
+    // Clear selected employees when department changes
+    setSelectedEmployees([]);
+    setFormData((prev) => ({ ...prev, employeeIds: [] }));
   };
 
   return (
@@ -411,6 +451,39 @@ const SingleEmployeeProcessModal = ({
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto p-4">
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Department Selection for Super Admin */}
+              {isSuperAdmin() && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Select Department
+                  </label>
+                  <select
+                    value={formData.departmentId}
+                    onChange={(e) => handleDepartmentChange(e.target.value)}
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                    disabled={departmentsLoading}
+                  >
+                    <option value="">
+                      {departmentsLoading
+                        ? "Loading departments..."
+                        : "Select a department"}
+                    </option>
+                    {departments?.map((dept: any) => (
+                      <option key={dept._id} value={dept._id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Show message if Super Admin hasn't selected department */}
+              {isSuperAdmin() && !formData.departmentId && (
+                <div className="text-center py-4 text-gray-500">
+                  Please select a department to view employees
+                </div>
+              )}
+
               {/* Employee Selection */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

@@ -13,6 +13,8 @@ import {
   validatePayrollApproval,
   validatePayrollRejection,
   validateBulkPayrollCreate,
+  validateSuperAdminSingleEmployeePayroll,
+  validateSuperAdminMultipleEmployeesPayroll,
 } from "../middleware/payrollValidation.js";
 
 const router = Router();
@@ -87,6 +89,25 @@ router.delete(
   "/users/:id",
   requirePermission([Permission.DELETE_USER]),
   SuperAdminController.deleteUser
+);
+
+// ===== Department Management Routes =====
+router.get(
+  "/departments",
+  requirePermission([Permission.VIEW_ALL_DEPARTMENTS]),
+  SuperAdminController.getAllDepartments
+);
+
+router.get(
+  "/departments/:id",
+  requirePermission([Permission.VIEW_ALL_DEPARTMENTS]),
+  SuperAdminController.getDepartmentById
+);
+
+router.get(
+  "/departments/:departmentId/employees",
+  requirePermission([Permission.VIEW_ALL_USERS]),
+  SuperAdminController.getDepartmentEmployees
 );
 
 // ===== Payroll Management Routes =====
@@ -563,6 +584,20 @@ router.post(
   requirePermission([Permission.CREATE_PAYROLL]),
   validateBulkPayrollCreate,
   SuperAdminController.processAllDepartmentsPayroll
+);
+
+// Add route for processing single employee payroll
+router.post(
+  "/payroll/process-single-employee",
+  validateSuperAdminSingleEmployeePayroll,
+  SuperAdminController.processSingleEmployeePayroll
+);
+
+// Add route for processing multiple employees payroll
+router.post(
+  "/payroll/process-multiple",
+  validateSuperAdminMultipleEmployeesPayroll,
+  SuperAdminController.processMultipleEmployeesPayroll
 );
 
 export default router;

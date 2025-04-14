@@ -382,7 +382,7 @@ class ApprovalController {
             "You have successfully approved this payroll and it is now pending Finance Director approval",
           {
             data: {
-              approvalLevel: APPROVAL_LEVELS.HR_MANAGER, // Hard-code as HR_MANAGER
+              approvalLevel: APPROVAL_LEVELS.HR_MANAGER, 
             },
           }
         )

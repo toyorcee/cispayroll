@@ -12,6 +12,7 @@ export const PAYROLL_STATUS = {
   CANCELLED: "CANCELLED", // Cancelled by admin
   FAILED: "FAILED", // Payment failed
   ARCHIVED: "ARCHIVED", // Archived after completion
+  COMPLETED: "COMPLETED", // Completed by Super Admin
 };
 
 export const PayrollFrequency = {

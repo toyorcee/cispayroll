@@ -46,6 +46,7 @@ import {
   DialogContent,
   DialogActions,
 } from "@mui/material";
+import TableSkeleton from "../../../components/skeletons/TableSkeleton";
 
 interface SummaryCardProps {
   icon: React.ReactNode;
@@ -75,6 +76,16 @@ interface Department {
   _id: string;
   name: string;
   code: string;
+}
+
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: {
+      message?: string;
+    };
+  };
+  message: string;
 }
 
 const ProcessDepartmentPayroll = () => {
@@ -182,23 +193,23 @@ const ProcessDepartmentPayroll = () => {
   };
 
   const {
-    data: payrollsData,
-    isLoading,
-    error,
-  } = useQuery<AdminPayrollResponse>({
-    queryKey: ["adminPayrolls"],
-    queryFn: () => adminPayrollService.getDepartmentPayrolls(),
+    data: payrolls,
+    isLoading: isPayrollsLoading,
+    error: payrollsError,
+  } = useQuery({
+    queryKey: ["departmentPayrolls"],
+    queryFn: () => adminPayrollService.getDepartmentPayrolls(user?.role),
   });
 
   const { data: payrollPeriods, isLoading: isPeriodsLoading } = useQuery({
     queryKey: ["departmentPayrollPeriods"],
-    queryFn: () => adminPayrollService.getPayrollPeriods(),
+    queryFn: () => adminPayrollService.getPayrollPeriods(user?.role),
   });
 
   const { data: payrollStats, isLoading: isStatsLoading } = useQuery({
     queryKey: ["departmentPayrollStats"],
     queryFn: () => {
-      return adminPayrollService.getPayrollStats().then((stats) => {
+      return adminPayrollService.getPayrollStats(user?.role).then((stats) => {
         return stats;
       });
     },
@@ -206,7 +217,11 @@ const ProcessDepartmentPayroll = () => {
 
   const submitMutation = useMutation({
     mutationFn: (data: { payrollId: string; remarks?: string }) =>
-      adminPayrollService.submitPayroll(data.payrollId, data.remarks),
+      adminPayrollService.submitPayroll(
+        data.payrollId,
+        user?.role,
+        data.remarks
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
       queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] });
@@ -226,7 +241,7 @@ const ProcessDepartmentPayroll = () => {
   };
 
   const handleViewDetails = (payroll: Payroll) => {
-    const payrollData = payrollsData?.data?.payrolls.find(
+    const payrollData = payrolls?.data?.payrolls.find(
       (p: PayrollData) => p._id === payroll._id
     );
     if (payrollData) {
@@ -339,9 +354,9 @@ const ProcessDepartmentPayroll = () => {
   };
 
   const handleSelectAll = () => {
-    if (!payrollsData?.data?.payrolls) return;
+    if (!payrolls?.data?.payrolls) return;
 
-    const draftPayrolls = payrollsData.data.payrolls
+    const draftPayrolls = payrolls.data.payrolls
       .filter((p: PayrollData) => p.status === PayrollStatus.DRAFT)
       .map((p: PayrollData) => p._id);
 
@@ -530,7 +545,7 @@ const ProcessDepartmentPayroll = () => {
       setIsRejecting(true);
 
       // Get the payroll to determine the current approval level
-      const payroll = payrollsData?.data?.payrolls.find(
+      const payroll = payrolls?.data?.payrolls.find(
         (p) => p._id === rejectingPayrollId
       );
 
@@ -623,8 +638,7 @@ const ProcessDepartmentPayroll = () => {
     try {
       setIsApproving(true);
 
-      // Get the payroll to determine the current approval level
-      const payroll = payrollsData?.data?.payrolls.find(
+      const payroll = payrolls?.data?.payrolls.find(
         (p) => p._id === approvingPayrollId
       );
 
@@ -633,7 +647,6 @@ const ProcessDepartmentPayroll = () => {
         return;
       }
 
-      // Determine which approval method to use based on the current approval level
       let response;
 
       try {
@@ -684,58 +697,47 @@ const ProcessDepartmentPayroll = () => {
             `Next approver: ${response.data.nextApprover.name} (${response.data.nextApprover.position})`
           );
         }
-      } catch (error: any) {
-        // Handle specific error cases
-        if (error.response?.status === 403) {
+      } catch (error) {
+        const apiError = error as ApiError;
+        if (apiError.response?.status === 403) {
           toast.error("You don't have permission to approve at this level");
-        } else if (error.response?.status === 400) {
+        } else if (apiError.response?.status === 400) {
           toast.error(
-            error.response.data.message || "Invalid approval request"
+            apiError.response.data?.message || "Invalid approval request"
           );
         } else {
-          throw error; // Re-throw other errors to be caught by outer catch
+          throw error;
         }
       }
-    } catch (error: any) {
-      console.error("Error approving payroll:", error);
-      // Use the backend's error message if available
+    } catch (error) {
+      const apiError = error as ApiError;
+      console.error("Error approving payroll:", apiError);
       const errorMessage =
-        error.response?.data?.message || "Failed to approve payroll";
+        apiError.response?.data?.message || "Failed to approve payroll";
       toast.error(errorMessage);
     } finally {
       setIsApproving(false);
     }
   };
 
-  const isLoadingCombined = isPeriodsLoading || isStatsLoading || isLoading;
+  const isLoadingCombined =
+    isPeriodsLoading || isStatsLoading || isPayrollsLoading;
 
-  const payrolls = payrollsData?.data?.payrolls ?? [];
+  const payrollsData = payrolls?.data?.payrolls ?? [];
 
-  // Helper function to check if department is HR
+  // Improve type safety for department checking
   const isHRDepartment = (
-    department: string | { _id: string; name: string; code: string } | undefined
+    department: { _id: string; name: string; code: string } | string | undefined
   ): boolean => {
     if (!department) return false;
 
-    // If department is a string (ID)
-    if (typeof department === "string") {
-      const deptLower = department.toLowerCase();
-      return (
-        deptLower === "hr" ||
-        deptLower === "human resources" ||
-        deptLower.includes("hr") ||
-        deptLower.includes("human resources")
-      );
-    }
+    const getDepartmentName = (dept: typeof department): string => {
+      if (typeof dept === "string") return dept;
+      return dept.name;
+    };
 
-    // If department is an object
-    const deptNameLower = department.name.toLowerCase();
-    return (
-      deptNameLower === "hr" ||
-      deptNameLower === "human resources" ||
-      deptNameLower.includes("hr") ||
-      deptNameLower.includes("human resources")
-    );
+    const deptName = getDepartmentName(department).toLowerCase();
+    return ["hr", "human resources"].some((term) => deptName.includes(term));
   };
 
   // Special case for HR department
@@ -762,51 +764,61 @@ const ProcessDepartmentPayroll = () => {
 
   if (isLoadingCombined) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <FaSpinner className="w-8 h-8 text-blue-500 animate-spin" />
+      <div className="p-4">
+        <TableSkeleton />
       </div>
     );
   }
 
-  if (error) {
+  if (payrollsError) {
     return (
-      <div className="flex items-center justify-center h-64 text-red-500">
-        Error loading payrolls
+      <div className="p-4 text-center">
+        <div className="bg-red-50 p-4 rounded-lg">
+          <FaExclamationTriangle className="mx-auto text-4xl text-red-600 mb-2" />
+          <p className="text-red-600 font-medium">Failed to load payrolls</p>
+          <p className="text-red-500 text-sm mt-1">
+            {payrollsError instanceof Error
+              ? payrollsError.message
+              : "An unexpected error occurred"}
+          </p>
+        </div>
       </div>
     );
   }
 
   // Convert PayrollData to Payroll for the PayrollTable component
-  const convertedPayrolls: Payroll[] = payrolls.map((payroll: PayrollData) => {
-    // Create the base payroll object
-    const convertedPayroll: Payroll = {
-      _id: payroll._id,
-      employee: {
-        _id: payroll.employee._id,
-        firstName: payroll.employee.firstName,
-        lastName: payroll.employee.lastName,
-        email: payroll.employee.employeeId, // Use employeeId as email since it's not available
-      },
-      month: payroll.month,
-      year: payroll.year,
-      status: payroll.status,
-      totalEarnings: payroll.earnings.totalEarnings || 0,
-      totalDeductions: payroll.deductions.totalDeductions || 0,
-      netPay: payroll.totals.netPay || 0,
-      createdAt: payroll.createdAt,
-      updatedAt: payroll.updatedAt,
-    };
-
-    // Add approvalFlow if it exists
-    if (payroll.approvalFlow) {
-      convertedPayroll.approvalFlow = {
-        currentLevel: payroll.approvalFlow.currentLevel || "",
-        history: payroll.approvalFlow.history || [],
+  const convertedPayrolls: Payroll[] = payrollsData.map(
+    (payroll: PayrollData) => {
+      // Create the base payroll object
+      const convertedPayroll: Payroll = {
+        _id: payroll._id,
+        employee: {
+          _id: payroll.employee._id,
+          firstName: payroll.employee.firstName,
+          lastName: payroll.employee.lastName,
+          email: payroll.employee.employeeId, // Use employeeId as email since it's not available
+        },
+        month: payroll.month,
+        year: payroll.year,
+        status: payroll.status,
+        totalEarnings: payroll.earnings.totalEarnings || 0,
+        totalDeductions: payroll.deductions.totalDeductions || 0,
+        netPay: payroll.totals.netPay || 0,
+        createdAt: payroll.createdAt,
+        updatedAt: payroll.updatedAt,
       };
-    }
 
-    return convertedPayroll;
-  });
+      // Add approvalFlow if it exists
+      if (payroll.approvalFlow) {
+        convertedPayroll.approvalFlow = {
+          currentLevel: payroll.approvalFlow.currentLevel || "",
+          history: payroll.approvalFlow.history || [],
+        };
+      }
+
+      return convertedPayroll;
+    }
+  );
 
   return (
     <Box sx={{ width: "100%" }}>
@@ -855,8 +867,8 @@ const ProcessDepartmentPayroll = () => {
             onProcessPayment={handleProcessPayment}
             selectedPayrolls={selectedPayrollIds}
             onSelectionChange={handleSelectPayroll}
-            loading={isLoading}
-            error={error}
+            loading={isPayrollsLoading}
+            error={payrollsError}
           />
         </>
       ) : (
@@ -880,7 +892,7 @@ const ProcessDepartmentPayroll = () => {
                   {
                     level: "HR Manager",
                     status:
-                      payrolls.find((p) => p._id === approvingPayrollId)
+                      payrollsData.find((p) => p._id === approvingPayrollId)
                         ?.approvalFlow?.currentLevel === "HR_MANAGER"
                         ? "pending"
                         : "completed",
@@ -888,7 +900,7 @@ const ProcessDepartmentPayroll = () => {
                   {
                     level: "Finance Director",
                     status:
-                      payrolls.find((p) => p._id === approvingPayrollId)
+                      payrollsData.find((p) => p._id === approvingPayrollId)
                         ?.approvalFlow?.currentLevel === "FINANCE_DIRECTOR"
                         ? "pending"
                         : "completed",
@@ -896,14 +908,14 @@ const ProcessDepartmentPayroll = () => {
                   {
                     level: "Super Admin",
                     status:
-                      payrolls.find((p) => p._id === approvingPayrollId)
+                      payrollsData.find((p) => p._id === approvingPayrollId)
                         ?.approvalFlow?.currentLevel === "SUPER_ADMIN"
                         ? "pending"
                         : "completed",
                   },
                 ]}
                 currentLevel={
-                  payrolls.find((p) => p._id === approvingPayrollId)
+                  payrollsData.find((p) => p._id === approvingPayrollId)
                     ?.approvalFlow?.currentLevel || ""
                 }
               />

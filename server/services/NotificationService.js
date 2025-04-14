@@ -29,6 +29,7 @@ export const NOTIFICATION_TYPES = {
   PAYMENT_FAILED: "PAYMENT_FAILED",
   PAYMENT_CANCELLED: "PAYMENT_CANCELLED",
   PAYMENT_ARCHIVED: "PAYMENT_ARCHIVED",
+  PAYROLL_PENDING_APPROVAL: "PAYROLL_PENDING_APPROVAL",
 
   // New notification types for more comprehensive coverage
   PAYROLL_PROCESSING_STARTED: "PAYROLL_PROCESSING_STARTED",
@@ -254,8 +255,8 @@ export class NotificationService {
           totalAllowances: payrollData?.totalAllowances || 0,
           totalDeductions: payrollData?.totalDeductions || 0,
           netPay: payrollData?.netPay || 0,
-          currentLevel: payrollData?.approvalFlow?.currentLevel,
-          nextApprovalLevel: payrollData?.approvalFlow?.nextLevel,
+          // currentLevel: payrollData?.approvalFlow?.currentLevel,
+          // nextApprovalLevel: payrollData?.approvalFlow?.nextLevel,
           approvalHistory: payrollData?.approvalFlow?.history || [],
           actionButtons: this.getActionButtons(type, payrollData),
           statusColor: this.getStatusColor(payrollData?.status),
@@ -300,17 +301,19 @@ export class NotificationService {
       // Create notifications array to store all notifications
       const notifications = [];
 
-      // 1. Notify the employee
-      const employeeNotification = await this.createNotification(
-        employee._id,
-        type,
-        employee,
-        payroll,
-        remarks,
-        data
-      );
-      if (employeeNotification) {
-        notifications.push(employeeNotification);
+      // 1. Notify the employee (skip for draft payrolls)
+      if (type !== "PAYROLL_DRAFT_CREATED") {
+        const employeeNotification = await this.createNotification(
+          employee._id,
+          type,
+          employee,
+          payroll,
+          remarks,
+          data
+        );
+        if (employeeNotification) {
+          notifications.push(employeeNotification);
+        }
       }
 
       // 2. Notify the HR Manager
@@ -638,13 +641,9 @@ export class NotificationService {
 
     const employeeName = employee
       ? `${employee.firstName} ${employee.lastName}`
-      : "Unknown Employee";
-    const payrollPeriod = payroll
-      ? `${payroll.month}/${payroll.year}`
-      : "Unknown Period";
-    const netPay = payroll?.netPay
-      ? `₦${payroll.netPay.toLocaleString()}`
-      : "Unknown Amount";
+      : "";
+    const payrollPeriod = payroll ? `${payroll.month}/${payroll.year}` : "";
+    const netPay = payroll?.netPay ? `₦${payroll.netPay.toLocaleString()}` : "";
 
     switch (type) {
       case NOTIFICATION_TYPES.PAYROLL_APPROVED:
@@ -896,9 +895,7 @@ export class NotificationService {
       case NOTIFICATION_TYPES.MULTIPLE_PAYROLL_PROCESSING_SUMMARY:
         return {
           title: "Multiple Payroll Processing Summary",
-          message: `Multiple payroll processing summary for ${payrollPeriod}: ${
-            remarks || "No summary provided"
-          }`,
+          message: remarks || "Multiple payroll processing completed",
         };
       case NOTIFICATION_TYPES.PAYROLL_ERROR_NO_GRADE_LEVEL:
         return {
@@ -942,6 +939,13 @@ export class NotificationService {
         return {
           title: "Payroll Fully Approved",
           message: `Payroll for ${employeeName} (${payrollPeriod}) has been fully approved and is ready for processing.`,
+        };
+      case NOTIFICATION_TYPES.PAYROLL_PENDING_APPROVAL:
+        return {
+          title: "Payroll Pending Approval",
+          message: `Payroll for ${employeeName} (${payrollPeriod}) is pending approval${
+            nextLevel ? ` from ${nextLevel}` : ""
+          }.`,
         };
       default:
         // Fallback for any unknown notification type

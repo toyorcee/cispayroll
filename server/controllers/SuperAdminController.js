@@ -413,12 +413,7 @@ export class SuperAdminController {
   // ===== Department Management =====
   static async getAllDepartments(req, res) {
     try {
-      const { page = 1, limit = 10, search, status } = req.query;
-      const filter = {
-        ...(search && { search }),
-        ...(status && { status }),
-      };
-
+      const { page = 1, limit = 10, ...filter } = req.query;
       const departments = await DepartmentService.getAllDepartments(
         parseInt(page),
         parseInt(limit),
@@ -429,6 +424,21 @@ export class SuperAdminController {
         success: true,
         data: departments.data,
         pagination: departments.pagination,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async getDepartmentById(req, res) {
+    try {
+      const { id } = req.params;
+      const department = await DepartmentService.getDepartmentById(id);
+
+      res.status(200).json({
+        success: true,
+        data: department,
       });
     } catch (error) {
       const { statusCode, message } = handleError(error);
@@ -3852,107 +3862,68 @@ export class SuperAdminController {
         failed: 0,
         errors: [],
         successful: [],
+        skippedDetails: [],
+        failedDetails: [],
+        processedDetails: [],
       };
 
       // Process each employee's payroll
       for (const employee of employees) {
         try {
-          // Check if payroll already exists
+          // Check if payroll already exists for this period
           const existingPayroll = await PayrollModel.findOne({
-            employee: employee._id,
+            employeeId: employee._id,
             month,
             year,
-            frequency,
-            status: {
-              $nin: [PAYROLL_STATUS.REJECTED, PAYROLL_STATUS.CANCELLED],
-            },
+            status: { $in: ["DRAFT", "PENDING", "APPROVED", "COMPLETED"] },
           });
 
           if (existingPayroll) {
-            console.log(
-              `⚠️ Payroll already exists for employee ${employee._id}, skipping`
-            );
             results.skipped++;
-            results.errors.push({
-              employeeId: employee._id,
-              reason: "Payroll already exists for this period",
-            });
+            results.skippedDetails.push(
+              `${employee.firstName} ${employee.lastName} (${employee.employeeId})`
+            );
             continue;
           }
 
           // Calculate payroll
-          const payrollData = await PayrollService.calculatePayroll(
-            employee._id,
-            employee.salaryGrade,
-            month,
-            year,
-            frequency
-          );
+          const payroll = await calculatePayroll(employee, month, year);
 
-          // Create payroll record
-          const payroll = await PayrollModel.create({
-            ...payrollData,
-            employee: employee._id,
-            department: departmentId,
-            status: PAYROLL_STATUS.DRAFT,
-            processedBy: req.user.id,
-            createdBy: req.user.id,
-            updatedBy: req.user.id,
-            payment: {
-              accountName: "Pending",
-              accountNumber: "Pending",
-              bankName: "Pending",
-            },
-            approvalFlow: {
-              submittedBy: req.user.id,
-              submittedAt: new Date(),
-              status: PAYROLL_STATUS.DRAFT,
-              remarks: "Initial payroll creation",
-            },
+          // Create payroll record with COMPLETED status since it's at Super Admin level
+          const newPayroll = await PayrollModel.create({
+            ...payroll,
+            employeeId: employee._id,
+            departmentId: department._id,
+            status: "COMPLETED", // Set as COMPLETED since it's at Super Admin level
+            approvalLevel: "SUPER_ADMIN",
+            approvedBy: req.user._id,
+            approvedAt: new Date(),
           });
 
-          // Populate payroll data before sending notifications
-          const populatedPayroll = await PayrollModel.findById(
-            payroll._id
-          ).populate([
+          // Send notification to employee
+          await NotificationService.createPayrollNotification(
+            newPayroll,
+            NOTIFICATION_TYPES.PAYROLL_COMPLETED,
+            req.user,
+            "Your payroll has been processed and is ready for payment.",
             {
-              path: "employee",
-              select: "firstName lastName employeeId department",
-            },
-            { path: "department", select: "name code" },
-            { path: "salaryGrade", select: "level description" },
-            { path: "processedBy", select: "firstName lastName" },
-            { path: "createdBy", select: "firstName lastName" },
-            { path: "updatedBy", select: "firstName lastName" },
-            { path: "approvalFlow.submittedBy", select: "firstName lastName" },
-          ]);
-
-          // Create notification for the employee
-          await NotificationService.createPayrollNotification(
-            employee._id,
-            NOTIFICATION_TYPES.PAYROLL_CREATED,
-            populatedPayroll
-          );
-
-          // Create notification for the super admin
-          await NotificationService.createPayrollNotification(
-            req.user.id,
-            NOTIFICATION_TYPES.PAYROLL_DRAFT_CREATED,
-            populatedPayroll
+              approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+            }
           );
 
           results.processed++;
-          results.successful.push({
-            employeeId: employee._id,
-            payrollId: payroll._id,
-          });
+          results.processedDetails.push(
+            `${employee.firstName} ${employee.lastName} (${employee.employeeId})`
+          );
         } catch (error) {
-          console.error(`❌ Error processing employee ${employee._id}:`, error);
+          console.error(
+            `Error processing payroll for employee ${employee.employeeId}:`,
+            error
+          );
           results.failed++;
-          results.errors.push({
-            employeeId: employee._id,
-            reason: error.message,
-          });
+          results.failedDetails.push(
+            `${employee.firstName} ${employee.lastName} (${employee.employeeId}): ${error.message}`
+          );
         }
       }
 
@@ -4232,6 +4203,305 @@ export class SuperAdminController {
         },
       });
     } catch (error) {
+      next(error);
+    }
+  }
+
+  // Process single employee payroll
+  static async processSingleEmployeePayroll(req, res, next) {
+    try {
+      console.log("🔄 Processing single employee payroll:", req.body);
+      const { employeeId, departmentId, month, year, frequency, salaryGrade } =
+        req.body;
+
+      console.log(
+        `👤 Super Admin processing payroll for employee: ${employeeId}`
+      );
+
+      // Get employee
+      const employee = await UserModel.findOne({
+        _id: employeeId,
+        department: departmentId,
+        status: "active",
+      });
+
+      if (!employee) {
+        console.error(`❌ Employee not found or not active: ${employeeId}`);
+        throw new ApiError(404, "Employee not found or not active");
+      }
+
+      console.log(
+        `👤 Employee found: ${employee.firstName} ${employee.lastName} (${employee._id})`
+      );
+
+      // Calculate payroll using the salary grade from request body
+      console.log(
+        `🧮 Calculating payroll for employee ${employeeId} with salary grade ${salaryGrade}`
+      );
+      const payrollData = await PayrollService.calculatePayroll(
+        employeeId,
+        salaryGrade,
+        month,
+        year,
+        frequency.toLowerCase()
+      );
+
+      console.log(
+        `✅ Payroll calculated successfully. Net pay: ${payrollData.totals.netPay}`
+      );
+
+      // Create payroll with correct approvalFlow structure
+      const payroll = await PayrollModel.create({
+        ...payrollData,
+        employee: employeeId,
+        department: departmentId,
+        status: "COMPLETED", // Changed from DRAFT to COMPLETED
+        createdBy: req.user._id,
+        updatedBy: req.user._id,
+        processedBy: req.user._id,
+        payment: {
+          accountName: "Pending",
+          accountNumber: "Pending",
+          bankName: "Pending",
+        },
+        approvalFlow: {
+          currentLevel: APPROVAL_LEVELS.DRAFT,
+          history: [],
+          submittedBy: req.user._id,
+          submittedAt: new Date(),
+          status: PAYROLL_STATUS.DRAFT,
+          remarks: "Initial payroll creation",
+        },
+      });
+
+      console.log(`✅ Payroll created with ID: ${payroll._id}`);
+
+      // Create notification for super admin only
+      await NotificationService.createPayrollNotification(
+        payroll,
+        "PAYROLL_DRAFT_CREATED",
+        req.user,
+        "You have created a draft payroll"
+      );
+
+      return res.status(201).json({
+        success: true,
+        message: "Payroll processed successfully",
+        data: payroll,
+      });
+    } catch (error) {
+      console.error(`❌ Error processing payroll: ${error.message}`);
+      next(error);
+    }
+  }
+
+  // Process multiple employees payroll
+  static async processMultipleEmployeesPayroll(req, res, next) {
+    try {
+      const { departmentId, month, year, frequency } = req.body;
+
+      // Validate department
+      const department = await DepartmentModel.findById(departmentId);
+      if (!department) {
+        throw new ApiError(404, "Department not found");
+      }
+
+      // Get all active employees from the department
+      const employees = await UserModel.find({
+        department: departmentId,
+        status: "active",
+      });
+
+      if (!employees.length) {
+        throw new ApiError(404, "No active employees found in the department");
+      }
+
+      // Initialize results object
+      const results = {
+        total: employees.length,
+        processed: 0,
+        skipped: 0,
+        failed: 0,
+        errors: [],
+        successful: [],
+      };
+
+      // Process each employee's payroll
+      for (const employee of employees) {
+        try {
+          // Check if payroll already exists with any of these statuses
+          const existingPayroll = await PayrollModel.findOne({
+            employee: employee._id,
+            month,
+            year,
+            frequency,
+            status: {
+              $in: [
+                PAYROLL_STATUS.DRAFT,
+                PAYROLL_STATUS.PENDING,
+                PAYROLL_STATUS.APPROVED,
+                PAYROLL_STATUS.COMPLETED,
+              ],
+            },
+          });
+
+          if (existingPayroll) {
+            console.log(
+              `⚠️ Payroll already exists for employee ${employee._id}, skipping`
+            );
+            results.skipped++;
+            results.errors.push({
+              employeeId: employee._id,
+              reason: "Payroll already exists for this period",
+            });
+            continue;
+          }
+
+          // Get the employee's salary grade based on their grade level
+          if (!employee.gradeLevel) {
+            console.log(
+              `⚠️ Employee ${employee._id} does not have a grade level assigned, skipping`
+            );
+            results.skipped++;
+            results.errors.push({
+              employeeId: employee._id,
+              reason: "Employee does not have a grade level assigned",
+            });
+            continue;
+          }
+
+          // Find the corresponding salary grade
+          const salaryGrade = await SalaryGrade.findOne({
+            level: employee.gradeLevel,
+            isActive: true,
+          });
+
+          if (!salaryGrade) {
+            console.log(
+              `⚠️ No active salary grade found for level ${employee.gradeLevel}, skipping`
+            );
+            results.skipped++;
+            results.errors.push({
+              employeeId: employee._id,
+              reason: `No active salary grade found for level ${employee.gradeLevel}`,
+            });
+            continue;
+          }
+
+          // Calculate payroll using the found salary grade
+          const payrollData = await PayrollService.calculatePayroll(
+            employee._id,
+            salaryGrade._id,
+            month,
+            year,
+            frequency
+          );
+
+          // Create payroll record
+          const payroll = await PayrollModel.create({
+            ...payrollData,
+            employee: employee._id,
+            department: departmentId,
+            status: "COMPLETED",
+            processedBy: req.user.id,
+            createdBy: req.user.id,
+            updatedBy: req.user.id,
+            payment: {
+              accountName: "Pending",
+              accountNumber: "Pending",
+              bankName: "Pending",
+            },
+            approvalFlow: {
+              currentLevel: APPROVAL_LEVELS.COMPLETED,
+              history: [],
+              submittedBy: req.user.id,
+              submittedAt: new Date(),
+              status: PAYROLL_STATUS.COMPLETED,
+              remarks: "Initial payroll creation",
+            },
+          });
+
+          // Populate payroll data before sending notifications
+          const populatedPayroll = await PayrollModel.findById(
+            payroll._id
+          ).populate([
+            {
+              path: "employee",
+              select: "firstName lastName employeeId department",
+            },
+            { path: "department", select: "name code" },
+            { path: "salaryGrade", select: "level description" },
+            { path: "processedBy", select: "firstName lastName" },
+            { path: "createdBy", select: "firstName lastName" },
+            { path: "updatedBy", select: "firstName lastName" },
+            { path: "approvalFlow.submittedBy", select: "firstName lastName" },
+          ]);
+
+          // Create notification for the employee
+          await NotificationService.createPayrollNotification(
+            employee._id,
+            NOTIFICATION_TYPES.PAYROLL_CREATED,
+            populatedPayroll
+          );
+
+          // Create notification for the super admin
+          await NotificationService.createPayrollNotification(
+            req.user.id,
+            NOTIFICATION_TYPES.PAYROLL_DRAFT_CREATED,
+            populatedPayroll
+          );
+
+          results.processed++;
+          results.successful.push({
+            employeeId: employee._id,
+            payrollId: payroll._id,
+          });
+        } catch (error) {
+          console.error(`❌ Error processing employee ${employee._id}:`, error);
+          results.failed++;
+          results.errors.push({
+            employeeId: employee._id,
+            reason: error.message,
+          });
+        }
+      }
+
+      // Create summary notification
+      if (results.processed > 0) {
+        const periodString = `${new Date(year, month - 1).toLocaleString(
+          "default",
+          { month: "long" }
+        )} ${year}`;
+        const bellSummary = `${results.processed} employee(s) processed for ${periodString}`;
+        const detailedMessage = `Processed ${results.processed} payroll(s) for ${periodString}`;
+        const detailedInfo = {
+          processed: results.processed,
+          skipped: results.skipped,
+          failed: results.failed,
+          period: periodString,
+        };
+
+        // Send notification to super admin with summary
+        await NotificationService.createNotification(
+          req.user._id,
+          "MULTIPLE_PAYROLL_PROCESSING_SUMMARY",
+          null,
+          null,
+          bellSummary,
+          {
+            ...detailedInfo,
+            detailedMessage,
+          }
+        );
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Multiple employee payrolls processed",
+        data: results,
+      });
+    } catch (error) {
+      console.error(`❌ Error processing multiple payrolls: ${error.message}`);
       next(error);
     }
   }

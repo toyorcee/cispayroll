@@ -1,9 +1,16 @@
 import axios from "axios";
 import { toast } from "react-toastify";
 import { Employee } from "../types/employee";
+import { UserRole } from "../types/auth";
 
 // Use the same BASE_URL pattern as adminPayrollService
 const BASE_URL = "http://localhost:5000/api/admin";
+const SUPER_ADMIN_BASE_URL = "http://localhost:5000/api/super-admin";
+
+// Helper function to determine if user is Super Admin
+const isSuperAdmin = (userRole?: string): boolean => {
+  return userRole === UserRole.SUPER_ADMIN;
+};
 
 export interface DepartmentEmployeeResponse {
   success: boolean;
@@ -17,14 +24,18 @@ export interface DepartmentEmployeeResponse {
 
 export const adminEmployeeService = {
   // Get all employees in admin's department
-  getDepartmentEmployees: async (params?: {
-    page?: number;
-    limit?: number;
-    status?: string;
+  getDepartmentEmployees: async (data: {
+    departmentId: string;
+    userRole?: string;
   }): Promise<DepartmentEmployeeResponse> => {
     try {
-      const response = await axios.get(`${BASE_URL}/employees`, {
-        params,
+      // Use different endpoint for Super Admin
+      const endpoint = isSuperAdmin(data.userRole)
+        ? `${SUPER_ADMIN_BASE_URL}/active-employees?department=${data.departmentId}`
+        : `${BASE_URL}/employees/department/${data.departmentId}`;
+
+      console.log("Making request to:", endpoint); // Debug log
+      const response = await axios.get(endpoint, {
         withCredentials: true,
       });
 
@@ -32,9 +43,24 @@ export const adminEmployeeService = {
         throw new Error(response.data.message || "Failed to fetch employees");
       }
 
+      // Transform the response for Super Admin to match the expected format
+      if (isSuperAdmin(data.userRole)) {
+        return {
+          success: true,
+          data: response.data.data.filter(
+            (emp: any) => emp.department?._id === data.departmentId
+          ),
+          pagination: {
+            total: response.data.data.length,
+            page: 1,
+            pages: 1,
+          },
+        };
+      }
+
       return response.data;
     } catch (error: any) {
-      console.error("Error fetching department employees:", error);
+      console.error("Error in getDepartmentEmployees:", error);
       toast.error(
         error.response?.data?.message || "Failed to fetch department employees"
       );

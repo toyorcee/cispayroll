@@ -775,6 +775,8 @@ UserSchema.pre("save", function (next) {
           Permission.EDIT_PAYROLL,
           Permission.DELETE_PAYROLL,
           Permission.VIEW_ALL_PAYROLL,
+          Permission.VIEW_DEPARTMENT_PAYROLL,
+          Permission.SUBMIT_PAYROLL,
           Permission.APPROVE_PAYROLL,
           Permission.GENERATE_PAYSLIP,
           Permission.VIEW_REPORTS,

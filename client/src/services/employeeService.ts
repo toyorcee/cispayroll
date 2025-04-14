@@ -556,7 +556,10 @@ export const employeeService = {
 
   getAllEmployees: async (filters?: EmployeeFilters) => {
     try {
-      console.log("Fetching employees from:", `${BASE_URL}/super-admin/users`);
+      console.log(
+        "🔍 Super Admin Service: Fetching employees from:",
+        `${BASE_URL}/super-admin/users`
+      );
       const defaultFilters = {
         page: 1,
         limit: 10,
@@ -566,10 +569,10 @@ export const employeeService = {
       const response = await axios.get(`${BASE_URL}/super-admin/users`, {
         params: defaultFilters,
       });
-      console.log("Employees response:", response.data);
+      console.log("✅ Super Admin Service: Employees response:", response.data);
       return response.data;
     } catch (error) {
-      console.error("Error fetching employees:", error);
+      console.error("❌ Super Admin Service: Error fetching employees:", error);
       throw error;
     }
   },
@@ -648,7 +651,7 @@ export const employeeService = {
     getAllEmployees: async (filters?: EmployeeFilters) => {
       try {
         console.log(
-          "Fetching employees from admin endpoint:",
+          "🔍 Admin Service: Fetching employees from:",
           `${BASE_URL}/admin/employees`
         );
         const defaultFilters = {
@@ -660,10 +663,10 @@ export const employeeService = {
         const response = await axios.get(`${BASE_URL}/admin/employees`, {
           params: defaultFilters,
         });
-        console.log("Admin employees response:", response.data);
+        console.log("✅ Admin Service: Employees response:", response.data);
         return response.data;
       } catch (error) {
-        console.error("Error fetching employees from admin endpoint:", error);
+        console.error("❌ Admin Service: Error fetching employees:", error);
         throw error;
       }
     },

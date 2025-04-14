@@ -256,10 +256,10 @@ export const routes: RouteConfig[] = [
         requireAllPermissions: false,
         element: <ProcessPayroll />,
       },
-      {
+          {
         path: "department-process",
         label: "Process Department Payroll",
-        roles: [UserRole.ADMIN],
+        roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN],
         permissions: [
           Permission.CREATE_PAYROLL,
           Permission.EDIT_PAYROLL,

@@ -15,7 +15,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaTimes } from "react-icons/fa";
-import { ProfileMenu } from "./ProfileMenu";
+import { ProfileMenu } from "./PayrollMenu"; 
 import { useAuth } from "../../context/AuthContext";
 import { UserRole, Permission } from "../../types/auth";
 import { menuItems } from "../../context/NavigationContext";

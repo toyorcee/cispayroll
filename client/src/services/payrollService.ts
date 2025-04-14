@@ -138,27 +138,12 @@ export const payrollService = {
     payrollId: string,
     remarks?: string
   ): Promise<ApprovalResponse> => {
-    try {
-      const response = await axios.patch(
-        `${BASE_URL}/payroll/${payrollId}/approve`,
-        { remarks },
-        { headers: { "Content-Type": "application/json" } }
-      );
-
-      if (!response.data.success) {
-        throw new Error(response.data.message || "Failed to approve payroll");
-      }
-
-      toast.success("Payroll approved successfully");
-      return response.data;
-    } catch (error) {
-      console.error("❌ Error approving payroll:", error);
-      const errorMessage =
-        (error as { response?: { data?: { message?: string } } })?.response
-          ?.data?.message || "Failed to approve payroll";
-      toast.error(errorMessage);
-      throw new Error(errorMessage);
-    }
+    const response = await axios.patch(
+      `http://localhost:5000/api/approvals/super-admin/${payrollId}/approve`,
+      { remarks },
+      { headers: { "Content-Type": "application/json" } }
+    );
+    return response.data;
   },
 
   rejectPayroll: async (

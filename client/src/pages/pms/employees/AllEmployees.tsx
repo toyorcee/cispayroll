@@ -7,10 +7,7 @@ import {
   FaTimes,
   FaSpinner,
 } from "react-icons/fa";
-import {
-  Employee,
-  EmployeeFilters,
-} from "../../../types/employee";
+import { Employee, EmployeeFilters } from "../../../types/employee";
 import { Status } from "../../../types/common";
 import { useAuth } from "../../../context/AuthContext";
 import { UserRole, Permission } from "../../../types/auth";

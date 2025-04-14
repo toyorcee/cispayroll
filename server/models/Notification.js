@@ -10,7 +10,7 @@ const notificationSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: [...Object.values(NOTIFICATION_TYPES), "PAYROLL_PENDING_APPROVAL"],
+    enum: Object.values(NOTIFICATION_TYPES),
   },
   title: {
     type: String,
