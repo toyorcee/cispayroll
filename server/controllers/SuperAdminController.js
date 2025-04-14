@@ -4410,7 +4410,13 @@ export class SuperAdminController {
   static async processMultipleEmployeesPayroll(req, res, next) {
     try {
       console.log("🔄 Processing multiple employees payroll:", req.body);
-      const { month, year, frequency, employeeSalaryGrades } = req.body;
+      const {
+        month,
+        year,
+        frequency,
+        employeeSalaryGrades,
+        validationErrors = [],
+      } = req.body;
       const superAdminId = req.user.id;
 
       console.log(
@@ -4424,6 +4430,8 @@ export class SuperAdminController {
         failed: 0,
         errors: [],
         successful: [],
+        validationErrors: validationErrors, // Include validation errors
+        details: [], // Track status of each employee
       };
 
       // Process each employee's payroll
@@ -4450,6 +4458,11 @@ export class SuperAdminController {
               employeeId,
               reason: "Payroll already exists for this period",
             });
+            results.details.push({
+              employeeId,
+              status: "SKIPPED",
+              reason: "Payroll already exists for this period",
+            });
             continue;
           }
 
@@ -4467,7 +4480,7 @@ export class SuperAdminController {
             // Create payroll record
             const payroll = await PayrollModel.create({
               ...payrollData,
-              status: PAYROLL_STATUS.DRAFT,
+              status: PAYROLL_STATUS.PROCESSING, // Set to PROCESSING for super admin
               processedBy: superAdminId,
               createdBy: superAdminId,
               updatedBy: superAdminId,
@@ -4477,11 +4490,11 @@ export class SuperAdminController {
                 bankName: "Pending",
               },
               approvalFlow: {
-                currentLevel: APPROVAL_LEVELS.DRAFT,
+                currentLevel: APPROVAL_LEVELS.PROCESSING, // Set to PROCESSING
                 history: [],
                 submittedBy: superAdminId,
                 submittedAt: new Date(),
-                status: PAYROLL_STATUS.DRAFT,
+                status: PAYROLL_STATUS.PROCESSING, // Set to PROCESSING
                 remarks: "Initial payroll creation",
               },
             });
@@ -4491,9 +4504,10 @@ export class SuperAdminController {
             // Create notification for the employee
             console.log(`🔔 Creating notification for employee: ${employeeId}`);
             await NotificationService.createPayrollNotification(
-              employeeId,
-              "PAYROLL_DRAFT_CREATED",
-              payroll
+              payroll,
+              NOTIFICATION_TYPES.PAYROLL_PROCESSING_STARTED,
+              req.user,
+              "Payroll processing started"
             );
 
             // Create notification for the super admin
@@ -4501,14 +4515,20 @@ export class SuperAdminController {
               `🔔 Creating notification for super admin: ${superAdminId}`
             );
             await NotificationService.createPayrollNotification(
-              superAdminId,
-              "PAYROLL_DRAFT_CREATED",
-              payroll
+              payroll,
+              NOTIFICATION_TYPES.PAYROLL_PROCESSING_STARTED,
+              req.user,
+              "Payroll processing started"
             );
 
             results.processed++;
             results.successful.push({
               employeeId,
+              payrollId: payroll._id,
+            });
+            results.details.push({
+              employeeId,
+              status: "SUCCESS",
               payrollId: payroll._id,
             });
 
@@ -4524,6 +4544,11 @@ export class SuperAdminController {
               employeeId,
               reason: "Failed to calculate payroll",
             });
+            results.details.push({
+              employeeId,
+              status: "FAILED",
+              reason: "Failed to calculate payroll",
+            });
           }
         } catch (error) {
           console.error(
@@ -4534,6 +4559,11 @@ export class SuperAdminController {
             employeeId,
             reason: error.message || "Unknown error occurred",
           });
+          results.details.push({
+            employeeId,
+            status: "FAILED",
+            reason: error.message || "Unknown error occurred",
+          });
         }
       }
 
@@ -4542,10 +4572,16 @@ export class SuperAdminController {
       console.log(`- Successfully processed: ${results.processed}`);
       console.log(`- Skipped: ${results.skipped}`);
       console.log(`- Failed: ${results.failed}`);
+      if (validationErrors.length > 0) {
+        console.log(`- Validation errors: ${validationErrors.length}`);
+      }
 
       res.status(200).json({
         success: true,
-        message: "Multiple employee payrolls processed",
+        message:
+          validationErrors.length > 0
+            ? `Processed ${results.processed} payrolls (${validationErrors.length} failed validation)`
+            : `Processed ${results.processed} payrolls`,
         data: results,
       });
     } catch (error) {
