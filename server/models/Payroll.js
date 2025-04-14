@@ -8,6 +8,7 @@ export const PAYROLL_STATUS = {
   PROCESSING: "PROCESSING", // Being reviewed by admin
   APPROVED: "APPROVED", // Approved by admin
   REJECTED: "REJECTED", // Rejected by admin
+  PENDING_PAYMENT: "PENDING_PAYMENT", // Payment initiated, waiting for processing
   PAID: "PAID", // Payment processed
   CANCELLED: "CANCELLED", // Cancelled by admin
   FAILED: "FAILED", // Payment failed

@@ -163,6 +163,27 @@ interface StatusBreakdown {
   totalNetPay: number;
 }
 
+interface Statistics {
+  totalPayrolls: number;
+  processingPayrolls: number;
+  completedPayrolls: number;
+  failedPayrolls: number;
+  approvedPayrolls: number;
+  paidPayrolls: number;
+  pendingPaymentPayrolls: number;
+  processingRate: number;
+  completionRate: number;
+  failureRate: number;
+  approvalRate: number;
+  paymentRate: number;
+  pendingPaymentRate: number;
+  totalAmountApproved: number;
+  totalAmountPaid: number;
+  totalAmountPending: number;
+  totalAmountProcessing: number;
+  totalAmountPendingPayment: number;
+}
+
 export default function ProcessPayroll() {
   const [selectedPayslip, setSelectedPayslip] = useState<Payslip | null>(null);
   const [showPayslipModal, setShowPayslipModal] = useState(false);
@@ -227,6 +248,7 @@ export default function ProcessPayroll() {
           },
         };
       });
+      queryClient.invalidateQueries({ queryKey: ["payrollStatistics"] });
       toast.success("Payment initiated successfully");
     },
     onError: (error: Error) => {
@@ -237,18 +259,27 @@ export default function ProcessPayroll() {
   const markAsPaidMutation = useMutation({
     mutationFn: (payrollId: string) => payrollService.markAsPaid(payrollId),
     onSuccess: (data, payrollId) => {
-      queryClient.setQueryData(["payrolls"], (oldData: any) => {
-        if (!oldData) return oldData;
+      queryClient.setQueryData(["payrolls", filters], (oldData: any) => {
+        if (!oldData?.data?.payrolls) return oldData;
         return {
           ...oldData,
-          data: oldData.data.map((payroll: any) =>
-            payroll._id === payrollId ? { ...payroll, status: "PAID" } : payroll
-          ),
+          data: {
+            ...oldData.data,
+            payrolls: oldData.data.payrolls.map((payroll: PayrollData) =>
+              payroll._id === payrollId
+                ? { ...payroll, status: PayrollStatus.PAID }
+                : payroll
+            ),
+          },
         };
       });
+
+      queryClient.invalidateQueries({ queryKey: ["payrolls", filters] });
+      queryClient.invalidateQueries({ queryKey: ["payrollStatistics"] });
       toast.success("Payment marked as completed successfully");
     },
     onError: (error: any) => {
+      queryClient.invalidateQueries({ queryKey: ["payrolls", filters] });
       toast.error(error.message || "Failed to mark payment as completed");
     },
   });
@@ -256,20 +287,27 @@ export default function ProcessPayroll() {
   const markAsFailedMutation = useMutation({
     mutationFn: (payrollId: string) => payrollService.markAsFailed(payrollId),
     onSuccess: (data, payrollId) => {
-      queryClient.setQueryData(["payrolls"], (oldData: any) => {
-        if (!oldData) return oldData;
+      queryClient.setQueryData(["payrolls", filters], (oldData: any) => {
+        if (!oldData?.data?.payrolls) return oldData;
         return {
           ...oldData,
-          data: oldData.data.map((payroll: any) =>
-            payroll._id === payrollId
-              ? { ...payroll, status: "FAILED" }
-              : payroll
-          ),
+          data: {
+            ...oldData.data,
+            payrolls: oldData.data.payrolls.map((payroll: PayrollData) =>
+              payroll._id === payrollId
+                ? { ...payroll, status: PayrollStatus.FAILED }
+                : payroll
+            ),
+          },
         };
       });
+
+      queryClient.invalidateQueries({ queryKey: ["payrolls", filters] });
+      queryClient.invalidateQueries({ queryKey: ["payrollStatistics"] });
       toast.success("Payment marked as failed successfully");
     },
     onError: (error: any) => {
+      queryClient.invalidateQueries({ queryKey: ["payrolls", filters] });
       toast.error(error.message || "Failed to mark payment as failed");
     },
   });
@@ -287,6 +325,11 @@ export default function ProcessPayroll() {
   const { isLoading: isStatsLoading } = useQuery<PayrollStats>({
     queryKey: ["payrollStats"],
     queryFn: () => payrollService.getPayrollStats(),
+  });
+
+  const { data: statistics } = useQuery<Statistics>({
+    queryKey: ["payrollStatistics"],
+    queryFn: () => payrollService.getProcessingStatistics(),
   });
 
   const handleFilterChange = (
@@ -813,6 +856,9 @@ export default function ProcessPayroll() {
       // Submit the payroll
       await payrollService.submitPayroll(payrollId);
 
+      // Invalidate statistics after submitting payroll
+      queryClient.invalidateQueries({ queryKey: ["payrollStatistics"] });
+
       // Show success toast
       toast.success("Payroll submitted for approval successfully");
     } catch (error) {
@@ -1001,36 +1047,20 @@ export default function ProcessPayroll() {
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <SummaryCard
           icon={<FaMoneyBill className="h-6 w-6 text-green-600" />}
-          title="Total Payroll Amount"
-          value={formatCurrency(
-            payrollsData?.data?.summary?.frequencyTotals?.reduce(
-              (sum: number, freq: FrequencyTotal) =>
-                sum + (freq.totalNetPay || 0),
-              0
-            ) || 0
-          )}
+          title="Total Amount Paid"
+          value={formatCurrency(statistics?.totalAmountPaid)}
         />
 
         <SummaryCard
           icon={<FaFileAlt className="h-6 w-6 text-yellow-600" />}
-          title="Drafts to Process"
-          value={
-            payrollsData?.data?.payrolls
-              ?.filter(
-                (payroll: PayrollData) => payroll.status === PayrollStatus.DRAFT
-              )
-              .length.toString() || "0"
-          }
+          title="Processing Payrolls"
+          value={statistics?.processingPayrolls?.toString() || "0"}
         />
 
         <SummaryCard
           icon={<FaExclamationTriangle className="h-6 w-6 text-orange-600" />}
-          title="Pending Reviews"
-          value={
-            payrollsData?.data?.summary?.statusBreakdown
-              ?.find((status: StatusBreakdown) => status._id === "PENDING")
-              ?.count.toString() || "0"
-          }
+          title="Pending Payment"
+          value={statistics?.pendingPaymentPayrolls?.toString() || "0"}
         />
       </div>
 
@@ -1039,185 +1069,67 @@ export default function ProcessPayroll() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">
-            Monthly Payroll Distribution
+            Payroll Status Distribution
           </h3>
-          <LineChart
+          <PieChart
             data={{
-              labels: Array.from(
-                new Set(
-                  payrollsData?.data?.payrolls?.map((payroll: PayrollData) => {
-                    const date = new Date(payroll.processedDate || new Date());
-                    return `${date.toLocaleString("default", {
-                      month: "short",
-                    })}/${date.getFullYear()}`;
-                  }) || []
-                )
-              ).sort() as string[],
+              labels: [
+                "Paid",
+                "Processing",
+                "Pending Payment",
+                "Failed",
+                "Approved",
+              ],
               datasets: [
                 {
-                  label: "Paid Amount",
-                  data: Array.from<string>(
-                    new Set<string>(
-                      payrollsData?.data?.payrolls?.map(
-                        (p: PayrollData) =>
-                          `${new Date(
-                            p.processedDate || new Date()
-                          ).getMonth()}-${new Date(
-                            p.processedDate || new Date()
-                          ).getFullYear()}`
-                      ) || []
-                    )
-                  ).map((monthYear: string) => {
-                    const [month, year] = monthYear.split("-");
-                    return (
-                      payrollsData?.data?.payrolls
-                        ?.filter(
-                          (p: PayrollData) =>
-                            new Date(p.processedDate || new Date())
-                              .getMonth()
-                              .toString() === month &&
-                            new Date(p.processedDate || new Date())
-                              .getFullYear()
-                              .toString() === year &&
-                            p.status === PayrollStatus.PAID
-                        )
-                        .reduce(
-                          (sum: number, p: PayrollData) =>
-                            sum + (p.totals.netPay || 0),
-                          0
-                        ) || 0
-                    );
-                  }),
-                  borderColor: "rgb(34, 197, 94)",
-                  backgroundColor: "rgba(34, 197, 94, 0.2)",
-                  tension: 0.4,
-                },
-                {
-                  label: "Approved Amount",
-                  data: Array.from<string>(
-                    new Set<string>(
-                      payrollsData?.data?.payrolls?.map(
-                        (p: PayrollData) =>
-                          `${new Date(
-                            p.processedDate || new Date()
-                          ).getMonth()}-${new Date(
-                            p.processedDate || new Date()
-                          ).getFullYear()}`
-                      ) || []
-                    )
-                  ).map((monthYear: string) => {
-                    const [month, year] = monthYear.split("-");
-                    return (
-                      payrollsData?.data?.payrolls
-                        ?.filter(
-                          (p: PayrollData) =>
-                            new Date(p.processedDate || new Date())
-                              .getMonth()
-                              .toString() === month &&
-                            new Date(p.processedDate || new Date())
-                              .getFullYear()
-                              .toString() === year &&
-                            p.status === PayrollStatus.APPROVED
-                        )
-                        .reduce(
-                          (sum: number, p: PayrollData) =>
-                            sum + (p.totals.netPay || 0),
-                          0
-                        ) || 0
-                    );
-                  }),
-                  borderColor: "rgb(59, 130, 246)",
-                  backgroundColor: "rgba(59, 130, 246, 0.2)",
-                  tension: 0.4,
-                },
-                {
-                  label: "Rejected Amount",
-                  data: Array.from<string>(
-                    new Set<string>(
-                      payrollsData?.data?.payrolls?.map(
-                        (p: PayrollData) =>
-                          `${new Date(
-                            p.processedDate || new Date()
-                          ).getMonth()}-${new Date(
-                            p.processedDate || new Date()
-                          ).getFullYear()}`
-                      ) || []
-                    )
-                  ).map((monthYear: string) => {
-                    const [month, year] = monthYear.split("-");
-                    return (
-                      payrollsData?.data?.payrolls
-                        ?.filter(
-                          (p: PayrollData) =>
-                            new Date(p.processedDate || new Date())
-                              .getMonth()
-                              .toString() === month &&
-                            new Date(p.processedDate || new Date())
-                              .getFullYear()
-                              .toString() === year &&
-                            p.status === PayrollStatus.REJECTED
-                        )
-                        .reduce(
-                          (sum: number, p: PayrollData) =>
-                            sum + (p.totals.netPay || 0),
-                          0
-                        ) || 0
-                    );
-                  }),
-                  borderColor: "rgb(239, 68, 68)",
-                  backgroundColor: "rgba(239, 68, 68, 0.2)",
-                  tension: 0.4,
+                  data: [
+                    statistics?.paidPayrolls || 0,
+                    statistics?.processingPayrolls || 0,
+                    statistics?.pendingPaymentPayrolls || 0,
+                    statistics?.failedPayrolls || 0,
+                    statistics?.approvedPayrolls || 0,
+                  ],
+                  backgroundColor: [
+                    "#42A5F5", // Blue for Paid
+                    "#FFA726", // Orange for Processing
+                    "#7E57C2", // Purple for Pending Payment
+                    "#EF5350", // Red for Failed
+                    "#66BB6A", // Green for Approved
+                  ],
+                  borderColor: ["white", "white", "white", "white", "white"],
+                  borderWidth: 2,
                 },
               ],
-            }}
-            options={{
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {
-                  position: "bottom" as const,
-                },
-                tooltip: {
-                  callbacks: {
-                    label: function (context: any) {
-                      return `${context.dataset.label}: ${formatCurrency(
-                        context.parsed.y
-                      )}`;
-                    },
-                  },
-                },
-              },
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  ticks: {
-                    callback: function (value: any) {
-                      return formatCurrency(value);
-                    },
-                  },
-                },
-              },
             }}
           />
         </div>
 
-        <div ref={statusDistRef} className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-4">Status Distribution</h3>
-          {isStatusDistInView && <PieChart data={statusDistributionData} />}
-        </div>
-
         <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-4">
-            Employee Count by Period
-          </h3>
-          <BarChart data={employeeTrendsData} />
-        </div>
-
-        <div ref={monthlyCompRef} className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-4">
-            Monthly Payroll Comparison
-          </h3>
-          {isMonthlyCompInView && <BarChart data={monthlyComparisonData} />}
+          <h3 className="text-lg font-semibold mb-4">Amount Distribution</h3>
+          <BarChart
+            data={{
+              labels: ["Paid", "Pending Payment", "Processing", "Approved"],
+              datasets: [
+                {
+                  label: "Amount",
+                  data: [
+                    statistics?.totalAmountPaid || 0,
+                    statistics?.totalAmountPendingPayment || 0,
+                    statistics?.totalAmountProcessing || 0,
+                    statistics?.totalAmountApproved || 0,
+                  ],
+                  backgroundColor: [
+                    "#42A5F5", // Blue for Paid
+                    "#7E57C2", // Purple for Pending Payment
+                    "#FFA726", // Orange for Processing
+                    "#66BB6A", // Green for Approved
+                  ],
+                  borderColor: ["white", "white", "white", "white"],
+                  borderWidth: 2,
+                },
+              ],
+            }}
+          />
         </div>
       </div>
 
@@ -1277,6 +1189,7 @@ export default function ProcessPayroll() {
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ["payrollPeriods"] });
           queryClient.invalidateQueries({ queryKey: ["payrollStats"] });
+          queryClient.invalidateQueries({ queryKey: ["payrollStatistics"] });
         }}
         editData={selectedPayrollForEdit}
       />

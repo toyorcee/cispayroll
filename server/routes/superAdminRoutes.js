@@ -146,6 +146,20 @@ router.get(
   SuperAdminController.getFilteredPayrolls
 );
 
+// Get processing statistics
+router.get(
+  "/payroll/processing-statistics",
+  requirePermission([Permission.VIEW_PAYROLL_STATS]),
+  SuperAdminController.getProcessingStatistics
+);
+
+// Get payroll by ID
+router.get(
+  "/payroll/:payrollId",
+  requirePermission([Permission.VIEW_PAYROLL]),
+  SuperAdminController.getPayrollById
+);
+
 // View payslip
 router.get(
   "/payroll/:payrollId/view",
@@ -158,12 +172,6 @@ router.post(
   "/payroll/:payrollId/email",
   requirePermission([Permission.VIEW_OWN_PAYSLIP]),
   SuperAdminController.sendPayslipEmail
-);
-
-router.get(
-  "/payroll/:id",
-  requirePermission([Permission.VIEW_ALL_PAYROLL]),
-  SuperAdminController.getPayrollById
 );
 
 // Update payroll (only allowed for DRAFT status)
@@ -605,13 +613,6 @@ router.post(
   "/payroll/process-multiple",
   validateSuperAdminMultipleEmployeesPayroll,
   SuperAdminController.processMultipleEmployeesPayroll
-);
-
-// Get processing statistics
-router.get(
-  "/payroll/processing-statistics",
-  requirePermission([Permission.VIEW_PAYROLL_STATS]),
-  SuperAdminController.getProcessingStatistics
 );
 
 export default router;

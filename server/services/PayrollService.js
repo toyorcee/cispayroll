@@ -1039,32 +1039,86 @@ export class PayrollService {
 
   static async getProcessingStatistics() {
     try {
+      // Basic counts
       const totalPayrolls = await PayrollModel.countDocuments();
       const processingPayrolls = await PayrollModel.countDocuments({
-        status: "processing",
+        status: PAYROLL_STATUS.PROCESSING,
       });
       const completedPayrolls = await PayrollModel.countDocuments({
-        status: "completed",
+        status: PAYROLL_STATUS.COMPLETED,
       });
       const failedPayrolls = await PayrollModel.countDocuments({
-        status: "failed",
+        status: PAYROLL_STATUS.FAILED,
+      });
+      const approvedPayrolls = await PayrollModel.countDocuments({
+        status: PAYROLL_STATUS.APPROVED,
+      });
+      const paidPayrolls = await PayrollModel.countDocuments({
+        status: PAYROLL_STATUS.PAID,
+      });
+      const pendingPaymentPayrolls = await PayrollModel.countDocuments({
+        status: PAYROLL_STATUS.PENDING_PAYMENT,
       });
 
+      // Calculate rates
       const processingRate =
         totalPayrolls > 0 ? (processingPayrolls / totalPayrolls) * 100 : 0;
       const completionRate =
         totalPayrolls > 0 ? (completedPayrolls / totalPayrolls) * 100 : 0;
       const failureRate =
         totalPayrolls > 0 ? (failedPayrolls / totalPayrolls) * 100 : 0;
+      const approvalRate =
+        totalPayrolls > 0 ? (approvedPayrolls / totalPayrolls) * 100 : 0;
+      const paymentRate =
+        totalPayrolls > 0 ? (paidPayrolls / totalPayrolls) * 100 : 0;
+      const pendingPaymentRate =
+        totalPayrolls > 0 ? (pendingPaymentPayrolls / totalPayrolls) * 100 : 0;
+
+      // Calculate total amounts
+      const totalAmountApproved = await PayrollModel.aggregate([
+        { $match: { status: PAYROLL_STATUS.APPROVED } },
+        { $group: { _id: null, total: { $sum: "$totals.netPay" } } },
+      ]);
+
+      const totalAmountPaid = await PayrollModel.aggregate([
+        { $match: { status: PAYROLL_STATUS.PAID } },
+        { $group: { _id: null, total: { $sum: "$totals.netPay" } } },
+      ]);
+
+      const totalAmountPending = await PayrollModel.aggregate([
+        { $match: { status: PAYROLL_STATUS.PENDING } },
+        { $group: { _id: null, total: { $sum: "$totals.netPay" } } },
+      ]);
+
+      const totalAmountProcessing = await PayrollModel.aggregate([
+        { $match: { status: PAYROLL_STATUS.PROCESSING } },
+        { $group: { _id: null, total: { $sum: "$totals.netPay" } } },
+      ]);
+
+      const totalAmountPendingPayment = await PayrollModel.aggregate([
+        { $match: { status: PAYROLL_STATUS.PENDING_PAYMENT } },
+        { $group: { _id: null, total: { $sum: "$totals.netPay" } } },
+      ]);
 
       return {
         totalPayrolls,
         processingPayrolls,
         completedPayrolls,
         failedPayrolls,
+        approvedPayrolls,
+        paidPayrolls,
+        pendingPaymentPayrolls,
         processingRate,
         completionRate,
         failureRate,
+        approvalRate,
+        paymentRate,
+        pendingPaymentRate,
+        totalAmountApproved: totalAmountApproved[0]?.total || 0,
+        totalAmountPaid: totalAmountPaid[0]?.total || 0,
+        totalAmountPending: totalAmountPending[0]?.total || 0,
+        totalAmountProcessing: totalAmountProcessing[0]?.total || 0,
+        totalAmountPendingPayment: totalAmountPendingPayment[0]?.total || 0,
       };
     } catch (error) {
       console.error("Error calculating processing statistics:", error);

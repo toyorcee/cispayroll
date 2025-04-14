@@ -3606,6 +3606,12 @@ export class SuperAdminController {
         { new: true, runValidators: true }
       );
 
+      if (!updated) {
+        throw new ApiError(500, "Failed to update payroll status");
+      }
+
+      console.log("Updated payroll status:", updated.status);
+
       // Create payment record
       await Payment.create({
         payrollId: payroll._id,
@@ -4584,116 +4590,93 @@ export class SuperAdminController {
   static async initiatePayment(req, res) {
     try {
       const { id } = req.params;
-      const { notes } = req.body;
+      const { method, bankDetails, notes } = req.body;
 
       console.log("🔍 Starting payment initiation for payroll ID:", id);
       console.log("👤 Initiator:", req.user.firstName, req.user.lastName);
 
-      const payroll = await PayrollModel.findById(id);
+      // Find and populate the payroll with employee data
+      const payroll = await PayrollModel.findById(id)
+        .populate("employee", "firstName lastName")
+        .populate("department", "name code");
+
       if (!payroll) {
         throw new ApiError(404, "Payroll not found");
       }
 
-      // Check if payment is already initiated
-      if (payroll.status === PAYROLL_STATUS.PENDING_PAYMENT) {
+      // Validate payroll status
+      if (payroll.status !== PAYROLL_STATUS.PROCESSING) {
         throw new ApiError(
           400,
-          "Payment has already been initiated for this payroll"
+          "Only processing payrolls can be initiated for payment"
         );
       }
 
-      // Check if payment is already completed
-      if (
-        payroll.status === PAYROLL_STATUS.PAID ||
-        payroll.status === PAYROLL_STATUS.FAILED
-      ) {
-        throw new ApiError(
-          400,
-          "Payment has already been processed for this payroll"
-        );
-      }
+      // Generate payment reference
+      const paymentReference = `PAY-${Date.now()}`;
 
-      // Update payroll status and approval flow
-      const updatedPayroll = {
-        ...payroll.toObject(),
-        status: PAYROLL_STATUS.PENDING_PAYMENT,
-        approvalFlow: {
-          ...payroll.approvalFlow,
-          currentLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-          history: [
-            ...(payroll.approvalFlow.history || []),
-            {
-              level: APPROVAL_LEVELS.SUPER_ADMIN,
-              status: "APPROVED",
-              user: req.user._id,
-              action: "APPROVE",
-              updatedBy: req.user._id,
-              updatedAt: new Date(),
-              remarks: notes || "Payment initiated",
-            },
-          ],
-          submittedBy: req.user._id,
-          submittedAt: new Date(),
-          status: PAYROLL_STATUS.PENDING_PAYMENT,
-          remarks: notes || "Payment initiated",
-        },
-      };
-
-      // Update the payroll with all required fields
-      const updated = await PayrollModel.findByIdAndUpdate(
+      // Update payroll status and payment details
+      const updatedPayroll = await PayrollModel.findByIdAndUpdate(
         id,
-        { $set: updatedPayroll },
-        { new: true, runValidators: true }
-      );
-
-      // Create payment record
-      await Payment.create({
-        payrollId: payroll._id,
-        employeeId: payroll.employee,
-        amount: payroll.totals.netPay,
-        status: PaymentStatus.PENDING,
-        processedBy: req.user._id,
-        processedAt: new Date(),
-        paymentMethod: "BANK_TRANSFER",
-        reference: `PAY-${Date.now()}`,
-        bankDetails: payroll.payment,
-        notes: notes || "Payment initiated",
-      });
-
-      // Create audit log
-      await Audit.create({
-        user: req.user._id,
-        action: AuditAction.PROCESS,
-        entity: AuditEntity.PAYROLL,
-        entityId: payroll._id,
-        performedBy: req.user._id,
-        details: {
-          previousStatus: payroll.status,
-          newStatus: PAYROLL_STATUS.PENDING_PAYMENT,
-          amount: payroll.totals.netPay,
-          notes: notes || "Payment initiated",
+        {
+          status: PAYROLL_STATUS.PENDING_PAYMENT,
+          payment: {
+            amount: payroll.totalAmount,
+            method: method || "BANK_TRANSFER",
+            reference: paymentReference,
+            bankDetails: bankDetails || {
+              bankName: "Pending",
+              accountNumber: "Pending",
+              accountName: "Pending",
+            },
+            notes: notes || "Payment initiated",
+          },
+          approvalFlow: {
+            ...payroll.approvalFlow,
+            currentLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+            history: [
+              ...(payroll.approvalFlow.history || []),
+              {
+                level: APPROVAL_LEVELS.SUPER_ADMIN,
+                status: "APPROVED",
+                user: req.user._id,
+                action: "APPROVE",
+                updatedBy: req.user._id,
+                updatedAt: new Date(),
+                remarks: notes || "Payment initiated",
+              },
+            ],
+            submittedBy: req.user._id,
+            submittedAt: new Date(),
+            status: PAYROLL_STATUS.PENDING_PAYMENT,
+          },
         },
-      });
+        { new: true }
+      ).populate("employee", "firstName lastName");
+
+      if (!updatedPayroll) {
+        throw new ApiError(500, "Failed to update payroll status");
+      }
 
       // Create notification for employee
       console.log(
         "📬 Creating notification for employee:",
-        payroll.employee._id
+        updatedPayroll.employee._id
       );
       await NotificationService.createPayrollNotification(
-        payroll.employee._id,
+        updatedPayroll,
         NOTIFICATION_TYPES.PAYROLL_PENDING_PAYMENT,
-        payroll,
+        updatedPayroll.employee,
         "Your payment is pending processing"
       );
 
       // Create notification for super admin
       console.log("📬 Creating notification for super admin:", req.user._id);
       await NotificationService.createPayrollNotification(
-        req.user._id,
+        updatedPayroll,
         NOTIFICATION_TYPES.PAYROLL_PENDING_PAYMENT,
-        payroll,
-        `Employee ${payroll.employee.firstName} ${payroll.employee.lastName}'s payroll is pending payment`
+        req.user,
+        `Employee ${updatedPayroll.employee.firstName} ${updatedPayroll.employee.lastName}'s payroll is pending payment`
       );
 
       // Create notification for accountant
@@ -4702,33 +4685,31 @@ export class SuperAdminController {
       for (const accountant of accountants) {
         console.log("📬 Sending notification to accountant:", accountant._id);
         await NotificationService.createPayrollNotification(
-          accountant._id,
+          updatedPayroll,
           NOTIFICATION_TYPES.PAYROLL_PENDING_PAYMENT,
-          payroll,
-          "A new payment is pending your review"
+          accountant,
+          `Employee ${updatedPayroll.employee.firstName} ${updatedPayroll.employee.lastName}'s payroll is pending payment`
         );
       }
 
-      // Send success response
-      res.status(200).json({
+      // Return success response
+      return res.status(200).json({
         success: true,
         message: "Payment initiated successfully",
         data: {
-          payrollId: updated._id,
-          status: PAYROLL_STATUS.PENDING_PAYMENT,
-          payment: {
-            amount: updated.totals.netPay,
-            method: "BANK_TRANSFER",
-            reference: `PAY-${Date.now()}`,
-            bankDetails: payroll.payment,
-            notes: notes || "Payment initiated",
-          },
+          payrollId: updatedPayroll._id,
+          status: updatedPayroll.status,
+          payment: updatedPayroll.payment,
         },
       });
     } catch (error) {
       console.error("❌ Error in initiatePayment:", error);
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
+      console.error("Error details:", error);
+      return res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || "Failed to initiate payment",
+        error: error.message,
+      });
     }
   }
 
@@ -4831,9 +4812,9 @@ export class SuperAdminController {
       // Create notification for the super admin
       console.log("📬 Creating notification for super admin:", user._id);
       await NotificationService.createPayrollNotification(
-        user._id,
-        NOTIFICATION_TYPES.PAYROLL_PAID,
         payroll,
+        NOTIFICATION_TYPES.PAYROLL_PAID,
+        user,
         "Payment marked as completed successfully"
       );
 
@@ -4844,9 +4825,9 @@ export class SuperAdminController {
           payroll.employee._id
         );
         await NotificationService.createPayrollNotification(
-          payroll.employee._id,
-          NOTIFICATION_TYPES.PAYROLL_PAID,
           payroll,
+          NOTIFICATION_TYPES.PAYROLL_PAID,
+          payroll.employee,
           "Your payment has been processed successfully"
         );
       }
@@ -4857,9 +4838,9 @@ export class SuperAdminController {
       for (const accountant of accountants) {
         console.log("📬 Sending notification to accountant:", accountant._id);
         await NotificationService.createPayrollNotification(
-          accountant._id,
-          NOTIFICATION_TYPES.PAYROLL_PAID,
           payroll,
+          NOTIFICATION_TYPES.PAYROLL_PAID,
+          accountant,
           "A payment has been marked as completed"
         );
       }
@@ -4882,6 +4863,23 @@ export class SuperAdminController {
     } catch (error) {
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async getProcessingStatistics(req, res) {
+    try {
+      const stats = await PayrollService.getProcessingStatistics();
+      res.json({
+        success: true,
+        data: stats,
+      });
+    } catch (error) {
+      console.error("Error getting processing statistics:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to get processing statistics",
+        error: error.message,
+      });
     }
   }
 }
