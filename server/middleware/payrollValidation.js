@@ -313,15 +313,24 @@ export const validateSuperAdminMultipleEmployeesPayroll = async (
   try {
     console.log("🔍 Validating super admin multiple payroll data:", req.body);
     const {
-      departmentId,
+      employeeIds,
       month,
       year,
       frequency = PayrollFrequency.MONTHLY,
     } = req.body;
 
     // Validate required fields
-    if (!departmentId || !month || !year) {
-      throw new ApiError(400, "Department ID, month, and year are required");
+    if (
+      !employeeIds ||
+      !Array.isArray(employeeIds) ||
+      employeeIds.length === 0 ||
+      !month ||
+      !year
+    ) {
+      throw new ApiError(
+        400,
+        "Employee IDs array, month, and year are required"
+      );
     }
 
     // Validate month (1-12)
@@ -336,9 +345,72 @@ export const validateSuperAdminMultipleEmployeesPayroll = async (
       throw new ApiError(400, "Invalid year");
     }
 
-    // Validate department ID format
-    if (!Types.ObjectId.isValid(departmentId)) {
-      throw new ApiError(400, "Invalid department ID format");
+    // Validate each employee ID format
+    for (const employeeId of employeeIds) {
+      if (!Types.ObjectId.isValid(employeeId)) {
+        throw new ApiError(400, `Invalid employee ID format: ${employeeId}`);
+      }
+    }
+
+    // Validate frequency if provided
+    if (frequency && !Object.values(PayrollFrequency).includes(frequency)) {
+      throw new ApiError(400, "Invalid payroll frequency");
+    }
+
+    // Validate each employee exists and has a grade level
+    const employees = await UserModel.find({ _id: { $in: employeeIds } });
+
+    if (employees.length !== employeeIds.length) {
+      throw new ApiError(400, "One or more employees not found");
+    }
+
+    // Check each employee has a grade level and get their salary grades
+    const employeeSalaryGrades = [];
+    const errors = [];
+
+    for (const employee of employees) {
+      if (!employee.gradeLevel) {
+        errors.push(
+          `Employee ${employee.employeeId} does not have a grade level assigned`
+        );
+        continue;
+      }
+
+      // Find the corresponding salary grade
+      const salaryGrade = await SalaryGrade.findOne({
+        level: employee.gradeLevel,
+        isActive: true,
+      });
+
+      if (!salaryGrade) {
+        errors.push(
+          `No active salary grade found for level ${employee.gradeLevel}`
+        );
+        continue;
+      }
+
+      employeeSalaryGrades.push({
+        employeeId: employee._id,
+        salaryGradeId: salaryGrade._id,
+      });
+    }
+
+    // If we have errors but also have some valid employees, add the valid ones to the request
+    if (errors.length > 0) {
+      if (employeeSalaryGrades.length === 0) {
+        // If no valid employees, throw an error with all the issues
+        throw new ApiError(400, `Validation failed: ${errors.join(", ")}`);
+      } else {
+        // If we have some valid employees, add them to the request and add errors to the response
+        req.body.employeeSalaryGrades = employeeSalaryGrades;
+        req.body.validationErrors = errors;
+        console.log(
+          `⚠️ Partial validation: ${errors.length} employees failed validation, ${employeeSalaryGrades.length} passed`
+        );
+      }
+    } else {
+      // All employees passed validation
+      req.body.employeeSalaryGrades = employeeSalaryGrades;
     }
 
     console.log("✅ Super admin multiple payroll validation passed");
