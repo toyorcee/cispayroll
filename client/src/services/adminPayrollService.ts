@@ -21,6 +21,27 @@ export interface AdminPayrollStats {
   PAID: number;
 }
 
+export interface AdminPayrollProcessingStats {
+  totalPayrolls: number;
+  processingPayrolls: number;
+  completedPayrolls: number;
+  failedPayrolls: number;
+  approvedPayrolls: number;
+  paidPayrolls: number;
+  pendingPaymentPayrolls: number;
+  processingRate: number;
+  completionRate: number;
+  failureRate: number;
+  approvalRate: number;
+  paymentRate: number;
+  pendingPaymentRate: number;
+  totalAmountApproved: number;
+  totalAmountPaid: number;
+  totalAmountPending: number;
+  totalAmountProcessing: number;
+  totalAmountPendingPayment: number;
+}
+
 export interface AdminPayroll {
   _id: string;
   employee: {
@@ -143,7 +164,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/periods`
         : `${BASE_URL}/payroll/periods`;
 
-      console.log("Making request to:", endpoint); // Debug log
+      console.log("Making request to:", endpoint); 
       const response = await axios.get(endpoint, { withCredentials: true });
 
       if (!response.data.success) {
@@ -173,7 +194,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/${payrollId}`
         : `${BASE_URL}/payroll/${payrollId}`;
 
-      console.log("Making request to:", endpoint); // Debug log
+      console.log("Making request to:", endpoint); 
       const response = await axios.get(endpoint, { withCredentials: true });
 
       if (!response.data.success) {
@@ -442,7 +463,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/submit-bulk`
         : `${BASE_URL}/payroll/submit-bulk`;
 
-      console.log("Making request to:", endpoint); // Debug log
+      console.log("Making request to:", endpoint); 
       const response = await axios.post(endpoint, data, {
         withCredentials: true,
       });
@@ -626,6 +647,38 @@ export const adminPayrollService = {
     } catch (error: any) {
       console.error("Error processing payroll:", error);
       toast.error(error.response?.data?.message || "Failed to process payroll");
+      throw error;
+    }
+  },
+
+  getProcessingStatistics: async (
+    userRole?: string,
+    timestamp?: number
+  ): Promise<AdminPayrollProcessingStats> => {
+    try {
+      // Use different endpoint for Super Admin
+      const endpoint = isSuperAdmin(userRole)
+        ? `${SUPER_ADMIN_BASE_URL}/payroll/processing-statistics`
+        : `${BASE_URL}/payroll/processing-statistics`;
+
+      // Add timestamp to prevent caching
+      const url = timestamp ? `${endpoint}?t=${timestamp}` : endpoint;
+
+      console.log("Making request to:", url); // Debug log
+      const response = await axios.get(url, { withCredentials: true });
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to fetch processing statistics"
+        );
+      }
+
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Error fetching processing statistics:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch processing statistics"
+      );
       throw error;
     }
   },

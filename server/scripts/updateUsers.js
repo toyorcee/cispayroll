@@ -8,47 +8,58 @@ dotenv.config();
 
 async function updateUserPermissions() {
   try {
-    console.log("🔄 Starting permission update...");
+    console.log("🔄 Starting permission update for all ADMIN users...");
 
     // Connect to MongoDB
     await mongoose.connect(process.env.MONGO_URI);
     console.log("📡 Connected to MongoDB");
 
-    // Find the super admin account
-    const superAdmin = await User.findById("67ee91aa24f31a737df7c1ef");
-
-    if (!superAdmin) {
-      console.log("❌ Super Admin user not found");
-      return;
-    }
-
-    console.log(
-      `Found user: ${superAdmin.fullName} (${superAdmin.employeeId})`
-    );
-    console.log("Current permissions:", superAdmin.permissions);
+    // Find all users with ADMIN role
+    const adminUsers = await User.find({ role: "ADMIN" });
+    console.log(`Found ${adminUsers.length} admin users`);
 
     // Get all available permissions from the Permission enum
     const allPermissions = Object.values(Permission);
 
-    // Add any missing permissions
-    const missingPermissions = allPermissions.filter(
-      (permission) => !superAdmin.permissions.includes(permission)
-    );
+    let updatedCount = 0;
+    for (const admin of adminUsers) {
+      console.log(`\nProcessing user: ${admin.fullName} (${admin.employeeId})`);
+      console.log("Current permissions:", admin.permissions);
 
-    if (missingPermissions.length > 0) {
-      superAdmin.permissions = [
-        ...new Set([...superAdmin.permissions, ...missingPermissions]),
-      ];
-      await superAdmin.save();
-      console.log("✅ Added missing permissions:", missingPermissions);
-    } else {
-      console.log("ℹ️ Super Admin already has all permissions");
+      // Add any missing permissions
+      const missingPermissions = allPermissions.filter(
+        (permission) => !admin.permissions.includes(permission)
+      );
+
+      if (missingPermissions.length > 0) {
+        const updatedPermissions = [
+          ...new Set([...admin.permissions, ...missingPermissions]),
+        ];
+
+        // Use findOneAndUpdate to avoid password validation
+        const result = await User.findOneAndUpdate(
+          { _id: admin._id },
+          { $set: { permissions: updatedPermissions } },
+          { new: true }
+        );
+
+        if (result) {
+          console.log("✅ Added missing permissions:", missingPermissions);
+          console.log("Updated permissions:", result.permissions);
+          updatedCount++;
+        } else {
+          console.log("❌ Failed to update permissions for user");
+        }
+      } else {
+        console.log("ℹ️ User already has all permissions");
+      }
     }
 
-    console.log("Updated permissions:", superAdmin.permissions);
-    console.log("✨ Update completed successfully!");
+    console.log(
+      `\n✨ Update completed successfully! Updated ${updatedCount} users`
+    );
   } catch (error) {
-    console.error("❌ Error updating user:", error);
+    console.error("❌ Error updating users:", error);
     process.exit(1);
   } finally {
     // Close the MongoDB connection

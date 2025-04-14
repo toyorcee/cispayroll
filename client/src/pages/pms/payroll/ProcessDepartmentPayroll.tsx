@@ -39,7 +39,7 @@ import PayrollTable, {
 import approvalService from "../../../services/approvalService";
 import { Box, Tab, Tabs, Button } from "@mui/material";
 import ApprovalTimeline from "../../../components/payroll/processpayroll/admin/ApprovalTimeline";
-import PayrollDashboard from "../../../components/payroll/processpayroll/admin/PayrollDashboard";
+import PayrollDashboard from "../../../components/payroll/processpayroll/PayrollDashboard";
 import {
   Dialog,
   DialogTitle,
@@ -180,6 +180,13 @@ const ProcessDepartmentPayroll = () => {
 
   const [activeTab, setActiveTab] = useState(0);
 
+  // Add statistics query
+  const { data: processingStats } = useQuery({
+    queryKey: ["payrollProcessingStats"],
+    queryFn: () => adminPayrollService.getProcessingStatistics(user?.role),
+    enabled: !!user?.role,
+  });
+
   useEffect(() => {
     if (payrollProcessed) {
       queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
@@ -260,6 +267,7 @@ const ProcessDepartmentPayroll = () => {
     year: number;
     frequency: string;
     salaryGrade?: string;
+    departmentId: string;
   }) => {
     setIsProcessing(true);
     setProcessingType(data.employeeIds.length === 1 ? "single" : "multiple");
@@ -270,10 +278,12 @@ const ProcessDepartmentPayroll = () => {
         const singleResult =
           await adminPayrollService.processSingleEmployeePayroll({
             employeeId: data.employeeIds[0],
+            departmentId: data.departmentId,
             month: data.month,
             year: data.year,
             frequency: data.frequency,
             salaryGrade: data.salaryGrade,
+            userRole: user?.role,
           });
 
         // Use the result to set processing results
@@ -306,9 +316,11 @@ const ProcessDepartmentPayroll = () => {
         const multipleResult =
           await adminPayrollService.processMultipleEmployeesPayroll({
             employeeIds: data.employeeIds,
+            departmentId: data.departmentId,
             month: data.month,
             year: data.year,
             frequency: data.frequency,
+            userRole: user?.role,
           });
 
         setProcessingResults(multipleResult);
@@ -872,7 +884,10 @@ const ProcessDepartmentPayroll = () => {
           />
         </>
       ) : (
-        <PayrollDashboard payrolls={convertedPayrolls} />
+        <PayrollDashboard
+          payrolls={convertedPayrolls}
+          processingStats={processingStats?.data}
+        />
       )}
 
       {/* Approval Dialog */}

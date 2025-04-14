@@ -605,13 +605,13 @@ export class AdminController {
         let nextLevel = null;
         switch (currentLevel) {
           case APPROVAL_LEVELS.DEPARTMENT_HEAD:
-        nextLevel = APPROVAL_LEVELS.HR_MANAGER;
+            nextLevel = APPROVAL_LEVELS.HR_MANAGER;
             break;
           case APPROVAL_LEVELS.HR_MANAGER:
-        nextLevel = APPROVAL_LEVELS.FINANCE_DIRECTOR;
+            nextLevel = APPROVAL_LEVELS.FINANCE_DIRECTOR;
             break;
           case APPROVAL_LEVELS.FINANCE_DIRECTOR:
-        nextLevel = APPROVAL_LEVELS.SUPER_ADMIN;
+            nextLevel = APPROVAL_LEVELS.SUPER_ADMIN;
             break;
           case APPROVAL_LEVELS.SUPER_ADMIN:
             nextLevel = "COMPLETED";
@@ -629,7 +629,7 @@ export class AdminController {
         }
 
         // Save the payroll
-      await payroll.save();
+        await payroll.save();
 
         // Find the next approver
         const nextApprover = await BaseApprovalController.findNextApprover(
@@ -689,7 +689,7 @@ export class AdminController {
         // Update the payroll approval flow
         const updatedPayroll =
           await BaseApprovalController.updatePayrollApprovalFlow(
-              payroll,
+            payroll,
             currentLevel,
             true,
             remarks,
@@ -716,12 +716,12 @@ export class AdminController {
             type: "PAYROLL_PENDING_APPROVAL",
             title: "Payroll Pending Approval",
             message: `A payroll for ${payroll.employee.firstName} ${payroll.employee.lastName} is pending your approval`,
-        data: {
+            data: {
               payrollId: payroll._id,
               employeeId: payroll.employee._id,
               level: nextApprover.role,
-        },
-      });
+            },
+          });
         }
 
         res.json({
@@ -786,8 +786,8 @@ export class AdminController {
       // Notify the employee
       notificationPromises.push(
         NotificationService.createPayrollNotification(
-        payroll.employee._id,
-        NOTIFICATION_TYPES.PAYROLL_REJECTED,
+          payroll.employee._id,
+          NOTIFICATION_TYPES.PAYROLL_REJECTED,
           {
             _id: payroll._id,
             month: payroll.month,
@@ -809,12 +809,12 @@ export class AdminController {
       // Notify the admin who rejected
       notificationPromises.push(
         NotificationService.createPayrollNotification(
-        admin._id,
+          admin._id,
           NOTIFICATION_TYPES.PAYROLL_REJECTED,
-        {
+          {
             _id: payroll._id,
-          month: payroll.month,
-          year: payroll.year,
+            month: payroll.month,
+            year: payroll.year,
             status: PAYROLL_STATUS.REJECTED,
             approvalFlow: payroll.approvalFlow,
             employee: {
@@ -1199,9 +1199,9 @@ export class AdminController {
       console.log(
         `📬 Creating notification for employee: ${payroll.employee.firstName} ${payroll.employee.lastName}`
       );
-        notificationPromises.push(
-          NotificationService.createPayrollNotification(
-            payroll,
+      notificationPromises.push(
+        NotificationService.createPayrollNotification(
+          payroll,
           "PAYROLL_SUBMITTED",
           payroll.employee,
           "Your payroll has been submitted for approval"
@@ -1367,6 +1367,23 @@ export class AdminController {
       });
     } catch (error) {
       next(error);
+    }
+  }
+
+  static async getProcessingStatistics(req, res) {
+    try {
+      const stats = await PayrollService.getProcessingStatistics();
+      res.json({
+        success: true,
+        data: stats,
+      });
+    } catch (error) {
+      console.error("Error getting processing statistics:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to get processing statistics",
+        error: error.message,
+      });
     }
   }
 
@@ -2882,7 +2899,7 @@ export class AdminController {
         // Notify the employee
         NotificationService.createPayrollNotification(
           payroll,
-        "PAYROLL_DRAFT_CREATED",
+          "PAYROLL_DRAFT_CREATED",
           employee,
           "Payroll has been created for your review"
         ),
@@ -3770,10 +3787,10 @@ export class AdminController {
       // Update each payroll
       for (const payroll of payrolls) {
         // Update payroll status and add to approval history
-          payroll.status = PAYROLL_STATUS.REJECTED;
+        payroll.status = PAYROLL_STATUS.REJECTED;
         payroll.approvalFlow.history.push({
           level: payroll.approvalFlow.currentLevel,
-            status: PAYROLL_STATUS.REJECTED,
+          status: PAYROLL_STATUS.REJECTED,
           action: "REJECT",
           user: admin._id,
           timestamp: new Date(),
@@ -3784,7 +3801,7 @@ export class AdminController {
         payroll.approvalFlow.rejectedBy = admin._id;
         payroll.approvalFlow.rejectedAt = new Date();
 
-          await payroll.save();
+        await payroll.save();
 
         // Notify each employee
         notificationPromises.push(
@@ -3849,7 +3866,7 @@ export class AdminController {
       // Notify the admin who rejected
       notificationPromises.push(
         NotificationService.createPayrollNotification(
-        admin._id,
+          admin._id,
           NOTIFICATION_TYPES.DEPARTMENT_PAYROLL_REJECTED,
           {
             department: departmentId,

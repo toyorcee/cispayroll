@@ -104,15 +104,69 @@ const SingleEmployeeProcessModal = ({
   );
 
   const { checkForNewNotifications } = useNotifications();
+  const { user } = useAuth();
 
-  // Fetch departments for Super Admin
+  const queryClient = useQueryClient();
+
+  // Fetch admin's department when modal opens
+  useEffect(() => {
+    const fetchAdminDepartment = async () => {
+      if (!isSuperAdmin() && isOpen) {
+        try {
+          if (user && user.department) {
+            const departmentId =
+              typeof user.department === "string"
+                ? user.department
+                : user.department._id;
+
+            setFormData((prev) => ({
+              ...prev,
+              departmentId: departmentId,
+            }));
+
+            const employeesResponse = await fetch(
+              `http://localhost:5000/api/admin/departments/${departmentId}/employees`,
+              {
+                credentials: "include",
+              }
+            );
+            const employeesData = await employeesResponse.json();
+
+            if (employeesData.success && employeesData.employees) {
+              const formattedEmployees = employeesData.employees.map(
+                (emp: any) => ({
+                  _id: emp._id,
+                  firstName: emp.firstName,
+                  lastName: emp.lastName,
+                  employeeId: emp.employeeId,
+                  fullName: emp.fullName,
+                  position: emp.position,
+                  status: emp.status,
+                  salaryGrade: emp.salaryGrade,
+                })
+              );
+
+              queryClient.setQueryData(
+                ["departmentEmployees", departmentId, employeeLimit],
+                { users: formattedEmployees }
+              );
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching admin's data:", error);
+        }
+      }
+    };
+
+    fetchAdminDepartment();
+  }, [isOpen, isSuperAdmin, queryClient, employeeLimit, user]);
+
   const { data: departments, isLoading: departmentsLoading } = useQuery({
     queryKey: ["departments"],
     queryFn: departmentService.getAllDepartments,
     enabled: isSuperAdmin(),
   });
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -129,7 +183,6 @@ const SingleEmployeeProcessModal = ({
     };
   }, []);
 
-  // Fetch employees from department
   const {
     data: employees,
     isLoading: employeesLoading,
@@ -143,9 +196,8 @@ const SingleEmployeeProcessModal = ({
         page: 1,
       });
 
-      // If Super Admin, require department selection
-      if (isSuperAdmin() && !formData.departmentId) {
-        console.log("Super Admin must select department first");
+      if (!formData.departmentId) {
+        console.log("Department ID is required");
         return { users: [] };
       }
 
@@ -156,7 +208,7 @@ const SingleEmployeeProcessModal = ({
       console.log("Fetched employees response:", result);
       return result;
     },
-    enabled: !isSuperAdmin() || Boolean(formData.departmentId), // Only enable if not Super Admin or department selected
+    enabled: !isSuperAdmin() || Boolean(formData.departmentId),
     select: (data) => {
       console.log("Selected data:", data);
       if (data.users && Array.isArray(data.users)) {
@@ -310,8 +362,6 @@ const SingleEmployeeProcessModal = ({
     }
   };
 
-  const queryClient = useQueryClient();
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEmployees.length) {
@@ -346,8 +396,10 @@ const SingleEmployeeProcessModal = ({
         console.log("🔔 Checking for new notifications...");
         await checkForNewNotifications();
 
+        // Invalidate queries to refresh data
         queryClient.invalidateQueries({ queryKey: ["payrolls"] });
         queryClient.invalidateQueries({ queryKey: ["notifications"] });
+        queryClient.invalidateQueries({ queryKey: ["departmentEmployees"] });
 
         toast.success("Payroll processed successfully");
       } else {
@@ -366,8 +418,10 @@ const SingleEmployeeProcessModal = ({
         console.log("🔔 Checking for new notifications...");
         await checkForNewNotifications();
 
+        // Invalidate queries to refresh data
         queryClient.invalidateQueries({ queryKey: ["payrolls"] });
         queryClient.invalidateQueries({ queryKey: ["notifications"] });
+        queryClient.invalidateQueries({ queryKey: ["departmentEmployees"] });
 
         toast.success(
           `Payroll processed successfully for ${selectedEmployees.length} employees`
@@ -379,7 +433,10 @@ const SingleEmployeeProcessModal = ({
       setTimeout(() => {
         setShowSuccessAnimation(false);
         onClose();
-        onSuccess?.();
+        // Call the onSuccess callback to refresh the parent component
+        if (onSuccess) {
+          onSuccess();
+        }
       }, 1500);
     } catch (error: any) {
       console.error("❌ Error processing payroll:", error);

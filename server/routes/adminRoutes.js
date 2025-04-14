@@ -94,6 +94,12 @@ router.get(
 );
 
 router.get(
+  "/payroll/processing-statistics",
+  requirePermission([Permission.VIEW_PAYROLL_STATS]),
+  AdminController.getProcessingStatistics
+);
+
+router.get(
   "/payroll/history/:employeeId",
   requirePermission([Permission.VIEW_DEPARTMENT_PAYROLL]),
   validateEmployeePayrollHistory,

@@ -29,38 +29,37 @@ export const adminEmployeeService = {
     userRole?: string;
   }): Promise<DepartmentEmployeeResponse> => {
     try {
+      // Validate departmentId
+      if (!data.departmentId) {
+        throw new Error("Department ID is required");
+      }
+
       // Use different endpoint for Super Admin
       const endpoint = isSuperAdmin(data.userRole)
-        ? `${SUPER_ADMIN_BASE_URL}/active-employees?department=${data.departmentId}`
-        : `${BASE_URL}/employees/department/${data.departmentId}`;
+        ? `${SUPER_ADMIN_BASE_URL}/departments/${data.departmentId}/employees`
+        : `${BASE_URL}/departments/${data.departmentId}/employees`;
 
-      console.log("Making request to:", endpoint); // Debug log
+      console.log("🚀 Making request to endpoint:", endpoint);
+      console.log("🔍 Request data:", data);
+
       const response = await axios.get(endpoint, {
         withCredentials: true,
       });
+
+      console.log("✅ Response received:", response.data);
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to fetch employees");
       }
 
-      // Transform the response for Super Admin to match the expected format
-      if (isSuperAdmin(data.userRole)) {
-        return {
-          success: true,
-          data: response.data.data.filter(
-            (emp: any) => emp.department?._id === data.departmentId
-          ),
-          pagination: {
-            total: response.data.data.length,
-            page: 1,
-            pages: 1,
-          },
-        };
-      }
-
       return response.data;
     } catch (error: any) {
-      console.error("Error in getDepartmentEmployees:", error);
+      console.error("❌ Error in getDepartmentEmployees:", {
+        error,
+        status: error.response?.status,
+        message: error.response?.data?.message,
+        endpoint: error.config?.url,
+      });
       toast.error(
         error.response?.data?.message || "Failed to fetch department employees"
       );

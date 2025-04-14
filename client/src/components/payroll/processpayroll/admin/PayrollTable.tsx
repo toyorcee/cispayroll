@@ -34,6 +34,7 @@ import {
   ArrowDownward,
 } from "@mui/icons-material";
 import { formatCurrency, formatDate } from "../../../../utils/formatters";
+import { PayrollStatus } from "../../../../types/payroll";
 
 export interface Payroll {
   _id: string;
@@ -112,17 +113,29 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
   };
 
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "draft":
+    switch (status) {
+      case PayrollStatus.DRAFT:
         return "default";
-      case "pending":
+      case PayrollStatus.PENDING:
         return "warning";
-      case "approved":
-        return "success";
-      case "rejected":
-        return "error";
-      case "paid":
+      case PayrollStatus.PROCESSING:
         return "info";
+      case PayrollStatus.APPROVED:
+        return "success";
+      case PayrollStatus.REJECTED:
+        return "error";
+      case PayrollStatus.PENDING_PAYMENT:
+        return "warning";
+      case PayrollStatus.PAID:
+        return "success";
+      case PayrollStatus.CANCELLED:
+        return "error";
+      case PayrollStatus.FAILED:
+        return "error";
+      case PayrollStatus.ARCHIVED:
+        return "default";
+      case PayrollStatus.COMPLETED:
+        return "success";
       default:
         return "default";
     }
@@ -336,17 +349,25 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <MenuItem value="all">All Statuses</MenuItem>
-            <MenuItem value="PENDING">Pending</MenuItem>
-            <MenuItem value="APPROVED">Approved</MenuItem>
-            <MenuItem value="REJECTED">Rejected</MenuItem>
-            <MenuItem value="PAID">Paid</MenuItem>
+            {Object.entries(PayrollStatus).map(([key, value]) => (
+              <MenuItem key={key} value={value}>
+                {key
+                  .split("_")
+                  .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
+                  .join(" ")}
+              </MenuItem>
+            ))}
           </Select>
         </FormControl>
       </Box>
       <TableContainer sx={{ maxHeight: 440 }}>
         <Table stickyHeader aria-label="payroll table">
           <TableHead>
-            <TableRow>
+            <TableRow
+              sx={{
+                "& th": { fontWeight: 700, borderBottom: "2px solid #2e7d32" },
+              }}
+            >
               <TableCell padding="checkbox">
                 <Checkbox
                   indeterminate={
@@ -357,15 +378,7 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                     filteredAndSortedPayrolls.length > 0 &&
                     selectedPayrolls.length === filteredAndSortedPayrolls.length
                   }
-                  onChange={(event) => {
-                    if (event.target.checked) {
-                      onSelectionChange(
-                        filteredAndSortedPayrolls.map((p) => p._id)
-                      );
-                    } else {
-                      onSelectionChange([]);
-                    }
-                  }}
+                  onChange={handleSelectAllClick}
                 />
               </TableCell>
               <TableCell
@@ -378,13 +391,7 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                 onClick={() => handleSort("month")}
                 sx={{ cursor: "pointer" }}
               >
-                Month {getSortIcon("month")}
-              </TableCell>
-              <TableCell
-                onClick={() => handleSort("year")}
-                sx={{ cursor: "pointer" }}
-              >
-                Year {getSortIcon("year")}
+                Period {getSortIcon("month")}
               </TableCell>
               <TableCell
                 onClick={() => handleSort("status")}
@@ -394,19 +401,19 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
               </TableCell>
               <TableCell
                 onClick={() => handleSort("totalEarnings")}
-                sx={{ cursor: "pointer" }}
+                sx={{ cursor: "pointer", textAlign: "right" }}
               >
                 Earnings {getSortIcon("totalEarnings")}
               </TableCell>
               <TableCell
                 onClick={() => handleSort("totalDeductions")}
-                sx={{ cursor: "pointer" }}
+                sx={{ cursor: "pointer", textAlign: "right" }}
               >
                 Deductions {getSortIcon("totalDeductions")}
               </TableCell>
               <TableCell
                 onClick={() => handleSort("netPay")}
-                sx={{ cursor: "pointer" }}
+                sx={{ cursor: "pointer", textAlign: "right" }}
               >
                 Net Pay {getSortIcon("netPay")}
               </TableCell>
@@ -445,26 +452,6 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                       size="small"
                     />
                   </TableCell>
-                  <TableCell>
-                    {payroll.status === "PENDING" ? (
-                      <Chip
-                        label={formatApprovalLevel(
-                          payroll.approvalFlow?.currentLevel
-                        )}
-                        color={getApprovalLevelColor(payroll)}
-                        size="small"
-                        icon={<FilterList fontSize="small" />}
-                      />
-                    ) : (
-                      <Chip
-                        label={formatApprovalLevel(
-                          payroll.approvalFlow?.currentLevel
-                        )}
-                        color={getApprovalLevelColor(payroll)}
-                        size="small"
-                      />
-                    )}
-                  </TableCell>
                   <TableCell align="right">
                     {formatCurrency(payroll.totalEarnings)}
                   </TableCell>
@@ -476,51 +463,61 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                   </TableCell>
                   <TableCell>{formatDate(payroll.createdAt)}</TableCell>
                   <TableCell align="center">
-                    <Tooltip title="View Details">
-                      <IconButton size="small" onClick={() => onView(payroll)}>
-                        <VisibilityIcon />
-                      </IconButton>
-                    </Tooltip>
-                    {payroll.status.toLowerCase() === "draft" && (
-                      <Tooltip title="Submit for Approval">
+                    <Box
+                      sx={{ display: "flex", justifyContent: "center", gap: 1 }}
+                    >
+                      <Tooltip title="View Details">
                         <IconButton
                           size="small"
-                          onClick={() => onSubmitForApproval?.(payroll)}
+                          onClick={() => onView(payroll)}
                         >
-                          <SendIcon />
+                          <VisibilityIcon />
                         </IconButton>
                       </Tooltip>
-                    )}
-                    {payroll.status.toLowerCase() === "pending" && (
-                      <>
-                        <Tooltip title="Approve">
+                      {payroll.status === "DRAFT" && onSubmitForApproval && (
+                        <Tooltip title="Submit for Approval">
                           <IconButton
                             size="small"
-                            onClick={() => onApprove(payroll)}
+                            onClick={() => onSubmitForApproval(payroll)}
                           >
-                            <CheckCircleIcon color="success" />
+                            <SendIcon />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Reject">
+                      )}
+                      {payroll.status === "PENDING" && (
+                        <>
+                          <Tooltip title="Approve">
+                            <IconButton
+                              size="small"
+                              onClick={() => onApprove(payroll)}
+                              color="success"
+                            >
+                              <CheckCircleIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Reject">
+                            <IconButton
+                              size="small"
+                              onClick={() => onReject(payroll)}
+                              color="error"
+                            >
+                              <CancelIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      )}
+                      {payroll.status === "APPROVED" && onProcessPayment && (
+                        <Tooltip title="Process Payment">
                           <IconButton
                             size="small"
-                            onClick={() => onReject(payroll)}
+                            onClick={() => onProcessPayment(payroll)}
+                            color="primary"
                           >
-                            <CancelIcon color="error" />
+                            <PaymentIcon />
                           </IconButton>
                         </Tooltip>
-                      </>
-                    )}
-                    {payroll.status.toLowerCase() === "approved" && (
-                      <Tooltip title="Process Payment">
-                        <IconButton
-                          size="small"
-                          onClick={() => onProcessPayment?.(payroll)}
-                        >
-                          <PaymentIcon color="primary" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
+                      )}
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}

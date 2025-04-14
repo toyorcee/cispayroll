@@ -912,6 +912,7 @@ UserSchema.pre("save", function (next) {
           Permission.MARK_PAYMENT_FAILED,
           Permission.VIEW_PAYMENT_HISTORY,
           Permission.MANAGE_PAYMENT_METHODS,
+          Permission.VIEW_PAYROLL_STATS,
 
           // Leave Management
           Permission.APPROVE_LEAVE,
