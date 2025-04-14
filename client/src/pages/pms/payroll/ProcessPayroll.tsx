@@ -14,6 +14,7 @@ import {
   FaEdit,
   FaHistory,
   FaReceipt,
+  FaFileInvoiceDollar,
 } from "react-icons/fa";
 import {
   PayrollStatus,
@@ -33,7 +34,6 @@ import PayslipDetail from "../../../components/payroll/processpayroll/PayslipDet
 import { BarChart, LineChart, PieChart } from "../../../components/charts";
 import { useInView } from "framer-motion";
 import PayrollHistoryModal from "../../../components/payroll/processpayroll/PayrollHistoryModal";
-import PayrollPeriodModal from "../../../components/payroll/processpayroll/PayrollPeriodModal";
 import {
   TableContainer,
   Table,
@@ -42,6 +42,8 @@ import {
   TableRow,
   TableCell,
   Paper,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
 import { RunPayrollModal } from "../../../components/payroll/processpayroll/RunPayrollModal";
 
@@ -53,6 +55,10 @@ const statusColors: Record<PayrollStatus, string> = {
   [PayrollStatus.REJECTED]: "bg-red-100 text-red-800",
   [PayrollStatus.PAID]: "bg-purple-100 text-purple-800",
   [PayrollStatus.CANCELLED]: "bg-gray-100 text-gray-800",
+  [PayrollStatus.FAILED]: "bg-red-100 text-red-800",
+  [PayrollStatus.ARCHIVED]: "bg-gray-100 text-gray-800",
+  [PayrollStatus.COMPLETED]: "bg-green-100 text-green-800",
+  [PayrollStatus.PENDING_PAYMENT]: "bg-orange-100 text-orange-800",
 };
 
 const statusLabels: Record<PayrollStatus, string> = {
@@ -63,6 +69,10 @@ const statusLabels: Record<PayrollStatus, string> = {
   [PayrollStatus.REJECTED]: "Rejected",
   [PayrollStatus.PAID]: "Paid",
   [PayrollStatus.CANCELLED]: "Cancelled",
+  [PayrollStatus.FAILED]: "Failed",
+  [PayrollStatus.ARCHIVED]: "Archived",
+  [PayrollStatus.COMPLETED]: "Completed",
+  [PayrollStatus.PENDING_PAYMENT]: "Pending Payment",
 };
 
 const formatCurrency = (amount: number | undefined) => {
@@ -162,7 +172,6 @@ export default function ProcessPayroll() {
   } | null>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedEmployeeHistory, setSelectedEmployeeHistory] = useState(null);
-  const [showPeriodModal, setShowPeriodModal] = useState(false);
   const [showRunPayrollModal, setShowRunPayrollModal] = useState(false);
   const [showApproveConfirm, setShowApproveConfirm] = useState(false);
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
@@ -201,13 +210,67 @@ export default function ProcessPayroll() {
   });
 
   const processPaymentMutation = useMutation({
-    mutationFn: (payrollId: string) => payrollService.processPayment(payrollId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["payrolls", filters] });
+    mutationFn: (payrollId: string) =>
+      payrollService.initiatePayment(payrollId),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["payrolls", filters], (oldData: any) => {
+        if (!oldData?.data?.payrolls) return oldData;
+        return {
+          ...oldData,
+          data: {
+            ...oldData.data,
+            payrolls: oldData.data.payrolls.map((payroll: PayrollData) =>
+              payroll._id === data.payrollId
+                ? { ...payroll, status: "PENDING_PAYMENT" }
+                : payroll
+            ),
+          },
+        };
+      });
+      toast.success("Payment initiated successfully");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to initiate payment");
+    },
+  });
+
+  const markAsPaidMutation = useMutation({
+    mutationFn: (payrollId: string) => payrollService.markAsPaid(payrollId),
+    onSuccess: (data, payrollId) => {
+      queryClient.setQueryData(["payrolls"], (oldData: any) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data.map((payroll: any) =>
+            payroll._id === payrollId ? { ...payroll, status: "PAID" } : payroll
+          ),
+        };
+      });
+      toast.success("Payment marked as completed successfully");
     },
     onError: (error: any) => {
-      console.error("Failed to process payment:", error);
-      toast.error(error.message || "Failed to process payment");
+      toast.error(error.message || "Failed to mark payment as completed");
+    },
+  });
+
+  const markAsFailedMutation = useMutation({
+    mutationFn: (payrollId: string) => payrollService.markAsFailed(payrollId),
+    onSuccess: (data, payrollId) => {
+      queryClient.setQueryData(["payrolls"], (oldData: any) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data.map((payroll: any) =>
+            payroll._id === payrollId
+              ? { ...payroll, status: "FAILED" }
+              : payroll
+          ),
+        };
+      });
+      toast.success("Payment marked as failed successfully");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to mark payment as failed");
     },
   });
 
@@ -241,15 +304,14 @@ export default function ProcessPayroll() {
     setFilters((prev) => ({ ...prev, page: newPage }));
   };
 
-  const handleViewPayslip = async (employeeId: string) => {
+  const handleViewPayslip = async (payrollId: string) => {
     try {
-      setShowPeriodModal(false);
-      const payslip = await payrollService.viewPayslip(employeeId);
-      setSelectedPayslip(payslip);
+      const payslipData = await payrollService.viewPayslip(payrollId);
+      setSelectedPayslip(payslipData);
       setShowPayslipModal(true);
-    } catch {
-      toast.error("Failed to fetch payslip");
-      setShowPeriodModal(true);
+    } catch (error) {
+      console.error("Failed to fetch payslip:", error);
+      toast.error("Failed to fetch payslip details");
     }
   };
 
@@ -462,17 +524,35 @@ export default function ProcessPayroll() {
                           className="text-green-600 hover:text-green-800"
                           title="View Payslip"
                         >
-                          <FaReceipt />
+                          <FaFileInvoiceDollar />
                         </button>
                       )}
-                      {payroll.status === PayrollStatus.APPROVED && (
+                      {payroll.status === PayrollStatus.PROCESSING && (
                         <button
                           onClick={() => handleProcessPayment(payroll._id)}
-                          className="text-green-600 hover:text-green-800"
-                          title="Process Payment"
+                          className="flex items-center justify-center p-2 text-green-600 hover:text-white bg-green-50 hover:bg-green-600 rounded-full transition-all duration-200"
+                          title="Initiate Payment"
                         >
-                          <FaMoneyBill />
+                          <FaMoneyBill size={20} />
                         </button>
+                      )}
+                      {payroll.status === PayrollStatus.PENDING_PAYMENT && (
+                        <>
+                          <button
+                            onClick={() => handleMarkAsPaid(payroll._id)}
+                            className="flex items-center justify-center p-2 text-green-600 hover:text-white bg-green-50 hover:bg-green-600 rounded-full transition-all duration-200"
+                            title="Mark as Paid"
+                          >
+                            <FaCheck size={20} />
+                          </button>
+                          <button
+                            onClick={() => handleMarkAsFailed(payroll._id)}
+                            className="flex items-center justify-center p-2 text-red-600 hover:text-white bg-red-50 hover:bg-red-600 rounded-full transition-all duration-200"
+                            title="Mark as Failed"
+                          >
+                            <FaTimes size={20} />
+                          </button>
+                        </>
                       )}
                     </div>
                   </TableCell>
@@ -762,6 +842,14 @@ export default function ProcessPayroll() {
     }
   };
 
+  const handleMarkAsPaid = (payrollId: string) => {
+    markAsPaidMutation.mutate(payrollId);
+  };
+
+  const handleMarkAsFailed = (payrollId: string) => {
+    markAsFailedMutation.mutate(payrollId);
+  };
+
   const statusDistributionData = {
     labels: Object.keys(PayrollStatus),
     datasets: [
@@ -832,6 +920,63 @@ export default function ProcessPayroll() {
     ],
   };
 
+  const renderStatusIcons = (payroll: PayrollData) => {
+    if (payroll.status === "PAID") {
+      return (
+        <Tooltip title="View Payslip">
+          <IconButton
+            size="small"
+            onClick={() => handleViewPayslip(payroll.employee?._id ?? "")}
+            sx={{ color: "success.main" }}
+          >
+            <FaFileInvoiceDollar />
+          </IconButton>
+        </Tooltip>
+      );
+    }
+
+    if (payroll.status === "PENDING_PAYMENT") {
+      return (
+        <>
+          <Tooltip title="Mark as Paid">
+            <IconButton
+              size="small"
+              onClick={() => handleMarkAsPaid(payroll._id)}
+              sx={{ color: "success.main" }}
+            >
+              <FaCheck />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Mark as Failed">
+            <IconButton
+              size="small"
+              onClick={() => handleMarkAsFailed(payroll._id)}
+              sx={{ color: "error.main" }}
+            >
+              <FaTimes />
+            </IconButton>
+          </Tooltip>
+        </>
+      );
+    }
+
+    if (payroll.status === "PROCESSING") {
+      return (
+        <Tooltip title="Process Payment">
+          <IconButton
+            size="small"
+            onClick={() => handleProcessPayment(payroll._id)}
+            sx={{ color: "primary.main" }}
+          >
+            <FaMoneyBill />
+          </IconButton>
+        </Tooltip>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -890,17 +1035,6 @@ export default function ProcessPayroll() {
       </div>
 
       <FiltersSection />
-
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => setShowPeriodModal(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            View All Periods
-          </button>
-        </div>
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-lg shadow">
@@ -1095,7 +1229,6 @@ export default function ProcessPayroll() {
           onClose={() => {
             setShowPayslipModal(false);
             setSelectedPayslip(null);
-            setShowPeriodModal(true);
           }}
           setPayslip={(value) => {
             if (typeof value === "function") {
@@ -1125,13 +1258,6 @@ export default function ProcessPayroll() {
           <EmployeePayrollCharts employeeData={selectedEmployeeData} />
         </div>
       )}
-
-      <PayrollPeriodModal
-        isOpen={showPeriodModal}
-        onClose={() => setShowPeriodModal(false)}
-        onViewHistory={handleViewEmployeeHistory}
-        isLoading={isLoading}
-      />
 
       <PayrollHistoryModal
         isOpen={showHistoryModal}

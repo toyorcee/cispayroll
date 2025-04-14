@@ -189,6 +189,13 @@ router.patch(
   SuperAdminController.updatePayrollStatus
 );
 
+// Initiate payment for processing payrolls (PROCESSING -> PENDING_PAYMENT)
+router.patch(
+  "/payroll/:id/initiate-payment",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  SuperAdminController.initiatePayment
+);
+
 // Approve payroll (PROCESSING/PENDING -> APPROVED)
 router.patch(
   "/payroll/:id/approve",
@@ -205,11 +212,11 @@ router.patch(
   SuperAdminController.rejectPayroll
 );
 
-// Mark payroll as paid (APPROVED -> PAID)
+// Mark payroll as paid (PENDING_PAYMENT -> PAID)
 router.patch(
-  "/payroll/:id/mark-paid",
+  "/payroll/:payrollId/mark-paid",
   requirePermission([Permission.APPROVE_PAYROLL]),
-  SuperAdminController.updatePayrollStatus
+  SuperAdminController.markPaymentPaid
 );
 
 // Process payment for approved payroll
@@ -598,6 +605,13 @@ router.post(
   "/payroll/process-multiple",
   validateSuperAdminMultipleEmployeesPayroll,
   SuperAdminController.processMultipleEmployeesPayroll
+);
+
+// Get processing statistics
+router.get(
+  "/payroll/processing-statistics",
+  requirePermission([Permission.VIEW_PAYROLL_STATS]),
+  SuperAdminController.getProcessingStatistics
 );
 
 export default router;

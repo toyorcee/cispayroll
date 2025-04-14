@@ -357,7 +357,7 @@ export const adminPayrollService = {
   }): Promise<PayrollData> => {
     try {
       const endpoint = isSuperAdmin(data.userRole)
-        ? `${SUPER_ADMIN_BASE_URL}/payroll/process-single`
+        ? `${SUPER_ADMIN_BASE_URL}/payroll/process-single-employee`
         : `${BASE_URL}/payroll/process-single`;
 
       const response = await axios.post(
@@ -379,7 +379,7 @@ export const adminPayrollService = {
         throw new Error(response.data.message || "Failed to process payroll");
       }
 
-      toast.success("Payroll processed successfully");
+      // toast.success("Payroll processed successfully");
       return response.data.data;
     } catch (error: any) {
       console.error("Error in processSingleEmployeePayroll:", error);
@@ -621,7 +621,7 @@ export const adminPayrollService = {
         throw new Error(response.data.message || "Failed to process payroll");
       }
 
-      toast.success("Payroll processed successfully");
+      // toast.success("Payroll processed successfully");
       return response.data.data;
     } catch (error: any) {
       console.error("Error processing payroll:", error);

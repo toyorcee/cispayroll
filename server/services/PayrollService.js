@@ -850,8 +850,8 @@ export class PayrollService {
 
       // Combine all deductions
       const allDeductions = [
-          ...standardDeductions.statutory,
-          ...standardDeductions.voluntary,
+        ...standardDeductions.statutory,
+        ...standardDeductions.voluntary,
         ...departmentDeductions.departmentSpecific,
       ];
 
@@ -924,7 +924,7 @@ export class PayrollService {
         employee: employee._id,
         basicSalary: salaryGrade.basicSalary,
         allowances: salaryGrade.allowances,
-          deductions: {
+        deductions: {
           statutory: statutoryDeductions,
           voluntary: voluntaryDeductions,
           departmentSpecific: departmentSpecificDeductions,
@@ -1034,6 +1034,41 @@ export class PayrollService {
     } catch (error) {
       console.error("❌ Error in createPayroll:", error);
       throw new ApiError(500, `Failed to create payroll: ${error.message}`);
+    }
+  }
+
+  static async getProcessingStatistics() {
+    try {
+      const totalPayrolls = await PayrollModel.countDocuments();
+      const processingPayrolls = await PayrollModel.countDocuments({
+        status: "processing",
+      });
+      const completedPayrolls = await PayrollModel.countDocuments({
+        status: "completed",
+      });
+      const failedPayrolls = await PayrollModel.countDocuments({
+        status: "failed",
+      });
+
+      const processingRate =
+        totalPayrolls > 0 ? (processingPayrolls / totalPayrolls) * 100 : 0;
+      const completionRate =
+        totalPayrolls > 0 ? (completedPayrolls / totalPayrolls) * 100 : 0;
+      const failureRate =
+        totalPayrolls > 0 ? (failedPayrolls / totalPayrolls) * 100 : 0;
+
+      return {
+        totalPayrolls,
+        processingPayrolls,
+        completedPayrolls,
+        failedPayrolls,
+        processingRate,
+        completionRate,
+        failureRate,
+      };
+    } catch (error) {
+      console.error("Error calculating processing statistics:", error);
+      throw error;
     }
   }
 }

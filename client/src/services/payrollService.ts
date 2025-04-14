@@ -399,6 +399,25 @@ export const payrollService = {
     }
   },
 
+  initiatePayment: async (payrollId: string) => {
+    try {
+      const response = await axios.patch(
+        `${BASE_URL}/payroll/${payrollId}/initiate-payment`
+      );
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to initiate payment");
+      }
+      return response.data.data;
+    } catch (error) {
+      console.error("❌ Error initiating payment:", error);
+      const errorMessage =
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || "Failed to initiate payment";
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+  },
+
   // Pending Payrolls
   getPendingPayrolls: async () => {
     try {
@@ -486,6 +505,59 @@ export const payrollService = {
       console.error("❌ Error sending payslip email:", error);
       toast.error("Failed to send payslip email");
       return false;
+    }
+  },
+
+  async getProcessingStatistics() {
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/payroll/processing-statistics`
+      );
+      if (response.data.success) {
+        return response.data.data;
+      }
+      throw new Error(
+        response.data.message || "Failed to get processing statistics"
+      );
+    } catch (error) {
+      console.error("Error getting processing statistics:", error);
+      throw error;
+    }
+  },
+
+  markAsPaid: async (payrollId: string) => {
+    try {
+      const response = await axios.patch(
+        `${BASE_URL}/payroll/${payrollId}/mark-paid`
+      );
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to mark payment as completed"
+        );
+      }
+      return response.data.data;
+    } catch (error: any) {
+      throw new Error(
+        error.response?.data?.message || "Failed to mark payment as completed"
+      );
+    }
+  },
+
+  markAsFailed: async (payrollId: string) => {
+    try {
+      const response = await axios.patch(
+        `${BASE_URL}/payroll/${payrollId}/mark-failed`
+      );
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to mark payment as failed"
+        );
+      }
+      return response.data.data;
+    } catch (error: any) {
+      throw new Error(
+        error.response?.data?.message || "Failed to mark payment as failed"
+      );
     }
   },
 };

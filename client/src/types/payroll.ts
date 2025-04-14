@@ -10,6 +10,7 @@ export enum PayrollStatus {
   FAILED = "FAILED",
   ARCHIVED = "ARCHIVED",
   COMPLETED = "COMPLETED",
+  PENDING_PAYMENT = "PENDING_PAYMENT",
 }
 
 export interface AllowanceWithId extends ISalaryComponent {

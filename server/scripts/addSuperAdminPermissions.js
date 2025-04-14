@@ -27,10 +27,7 @@ async function addSuperAdminPermissions() {
     console.log("Current permissions:", superAdmin.permissions);
 
     // Permissions to add
-    const permissionsToAdd = [
-      Permission.VIEW_DEPARTMENT_PAYROLL,
-      Permission.SUBMIT_PAYROLL,
-    ];
+    const permissionsToAdd = [Permission.VIEW_OWN_PAYSLIP];
 
     // Check if permissions already exist
     const existingPermissions = superAdmin.permissions || [];

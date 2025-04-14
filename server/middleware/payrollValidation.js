@@ -267,11 +267,10 @@ export const validateSuperAdminSingleEmployeePayroll = (req, res, next) => {
       "🔍 Validating super admin single employee payroll data:",
       req.body
     );
-    const { employeeId, departmentId, month, year, frequency, salaryGrade } =
-      req.body;
+    const { employeeId, departmentId, month, year, frequency } = req.body;
 
     // Check required fields
-    if (!employeeId || !departmentId || !month || !year || !salaryGrade) {
+    if (!employeeId || !departmentId || !month || !year) {
       throw new ApiError(400, "Missing required fields");
     }
 
@@ -292,10 +291,6 @@ export const validateSuperAdminSingleEmployeePayroll = (req, res, next) => {
 
     if (!mongoose.Types.ObjectId.isValid(departmentId)) {
       throw new ApiError(400, "Invalid department ID");
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(salaryGrade)) {
-      throw new ApiError(400, "Invalid salary grade ID");
     }
 
     // Validate frequency if provided

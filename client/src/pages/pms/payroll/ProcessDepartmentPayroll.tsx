@@ -298,7 +298,7 @@ const ProcessDepartmentPayroll = () => {
         });
 
         // Show toast after processing is complete
-        toast.success("Payroll processed successfully");
+        // toast.success("Payroll processed successfully");
 
         setPayrollProcessed(true);
         setShowSingleProcessModal(false);
