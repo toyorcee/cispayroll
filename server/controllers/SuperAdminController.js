@@ -716,22 +716,33 @@ export class SuperAdminController {
         query.year = parseInt(year);
       } else if (dateRange) {
         // Handle special date range cases
-        if (dateRange === "last12") {
-          const endDate = new Date();
-          const startDate = new Date();
+        const endDate = new Date();
+        const startDate = new Date();
+
+        if (dateRange === "last3") {
+          startDate.setMonth(startDate.getMonth() - 3);
+        } else if (dateRange === "last6") {
+          startDate.setMonth(startDate.getMonth() - 6);
+        } else if (dateRange === "last12") {
           startDate.setMonth(startDate.getMonth() - 12);
-          query.createdAt = {
-            $gte: startDate,
-            $lte: endDate,
-          };
+        } else if (dateRange === "custom") {
+          startDate.setMonth(startDate.getMonth() - 3);
         } else {
-          // Handle comma-separated date range
-          const [startDate, endDate] = dateRange.split(",");
-          query.createdAt = {
-            $gte: new Date(startDate),
-            $lte: new Date(endDate),
-          };
+          const [startDateStr, endDateStr] = dateRange.split(",");
+          if (startDateStr && endDateStr) {
+            query.createdAt = {
+              $gte: new Date(startDateStr),
+              $lte: new Date(endDateStr),
+            };
+            // Skip the default date range assignment
+            return;
+          }
         }
+
+        query.createdAt = {
+          $gte: startDate,
+          $lte: endDate,
+        };
       }
 
       // Status filtering
@@ -794,6 +805,18 @@ export class SuperAdminController {
             },
             pendingCount: {
               $sum: { $cond: [{ $eq: ["$status", "PENDING"] }, 1, 0] },
+            },
+            pendingPaymentCount: {
+              $sum: { $cond: [{ $eq: ["$status", "PENDING_PAYMENT"] }, 1, 0] },
+            },
+            processingCount: {
+              $sum: { $cond: [{ $eq: ["$status", "PROCESSING"] }, 1, 0] },
+            },
+            rejectedCount: {
+              $sum: { $cond: [{ $eq: ["$status", "REJECTED"] }, 1, 0] },
+            },
+            cancelledCount: {
+              $sum: { $cond: [{ $eq: ["$status", "CANCELLED"] }, 1, 0] },
             },
           },
         },
