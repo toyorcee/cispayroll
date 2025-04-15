@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Grid,
   Card,
@@ -22,23 +22,22 @@ import { Employee, OffboardingStatus } from "../../../types/employee";
 
 export default function Offboarding() {
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchOffboardingEmployees();
-  }, []);
+  // useEffect(() => {
+  //   fetchOffboardingEmployees();
+  // }, []);
 
-  const fetchOffboardingEmployees = async () => {
-    try {
-      setLoading(true);
-      const response = await employeeService.getOffboardingUsers();
-      setEmployees(response.data);
-    } catch (error) {
-      toast.error("Failed to fetch offboarding employees");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // const fetchOffboardingEmployees = async () => {
+  //   try {
+  //     setLoading(true);
+  //     const response = await employeeService.getOffboardingUsers();
+  //     setEmployees(response.data);
+  //   } catch (error) {
+  //     toast.error("Failed to fetch offboarding employees");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
   const getStatusColor = (status?: OffboardingStatus) => {
     switch (status) {
@@ -64,19 +63,11 @@ export default function Offboarding() {
       await employeeService.revertToOnboarding(employeeId);
       toast.success("Employee reverted to onboarding successfully");
       // Refresh the list after successful revert
-      fetchOffboardingEmployees();
+      // fetchOffboardingEmployees();
     } catch (error) {
       toast.error("Failed to revert employee status");
     }
   };
-
-  if (loading) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Typography>Loading...</Typography>
-      </Box>
-    );
-  }
 
   return (
     <Box sx={{ p: 3 }}>

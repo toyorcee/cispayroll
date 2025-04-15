@@ -45,8 +45,15 @@ export function Sidebar() {
   const { hasPermission, hasRole } = useAuth();
   const location = useLocation();
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
-  const { setActiveMenuText, isSidebarOpen, setIsSidebarOpen } =
-    useNavigation();
+  const {
+    setActiveMenuText,
+    isSidebarOpen,
+    setIsSidebarOpen,
+    getAvailableMenus,
+  } = useNavigation();
+
+  // Get the list of available menus from the NavigationContext
+  const availableMenus = getAvailableMenus();
 
   useEffect(() => {
     const activeMainItem = menuItems.find(
@@ -73,51 +80,20 @@ export function Sidebar() {
   }, [location.pathname, setIsSidebarOpen]);
 
   const filteredNavigation = menuItems.filter((item: NavigationItem) => {
-    console.log("Filtering menu item:", item.name);
-
-    // SUPER_ADMIN should not see personal views
-    if (hasRole(UserRole.SUPER_ADMIN)) {
-      // Hide personal views for super admin
-      if (
-        item.name === "My Allowances" ||
-        item.name === "My Deductions" ||
-        item.name === "My Bonus" ||
-        item.name === "My Payslips"
-      ) {
-        console.log("Hiding personal view for super admin:", item.name);
-        return false;
-      }
-      console.log("Super admin can see:", item.name);
+    // Check if the menu is in the available menus list
+    if (availableMenus.includes(item.name)) {
       return true;
     }
 
-    // For non-SUPER_ADMIN users, check roles and permissions
-    if (item.roles && !item.roles.some((role) => hasRole(role))) {
-      console.log("User doesn't have required role for:", item.name);
-      return false;
-    }
-
-    if (item.permissions) {
-      const hasRequiredPermission = item.permissions.some((permission) =>
-        hasPermission(permission)
-      );
-      console.log(
-        `User ${
-          hasRequiredPermission ? "has" : "doesn't have"
-        } required permissions for:`,
-        item.name
-      );
-      return hasRequiredPermission;
-    }
-
-    console.log("No specific permissions required for:", item.name);
-    return true;
+    return false;
   });
 
   const getFilteredChildren = (subItems: NavigationSubItem[] | undefined) => {
     if (!subItems) return [];
 
     return subItems.filter((subItem: NavigationSubItem) => {
+      // For submenu items, we still need to check permissions directly
+      // since they're not included in the availableMenus list
       if (hasRole(UserRole.SUPER_ADMIN)) {
         // Hide personal views for super admin
         if (

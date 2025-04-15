@@ -31,23 +31,18 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
   const getAvailableMenus = () => {
     if (!user || !user.permissions) {
-      console.log("No user or permissions found");
       return [];
     }
 
     // Check for dashboard access first
     if (!user.permissions.includes(Permission.VIEW_DASHBOARD)) {
-      console.log("User doesn't have VIEW_DASHBOARD permission");
       return [];
     }
 
     const availableMenus = ["Dashboard"];
-    console.log("User role:", user.role);
-    console.log("User permissions:", user.permissions);
 
     // For Super Admin, show ALL main menus (not submenus)
     if (user.role === UserRole.SUPER_ADMIN) {
-      console.log("Super Admin detected, showing all menus");
       return [
         "Dashboard",
         "Employees",
@@ -60,7 +55,6 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
     // For Admin, check specific permissions
     if (user.role === UserRole.ADMIN) {
-      console.log("Admin detected, checking permissions");
       if (
         user.permissions.some((p) =>
           [
@@ -140,19 +134,34 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
         Permission.MANAGE_DOCUMENT_SETTINGS,
         Permission.MANAGE_NOTIFICATION_SETTINGS,
       ];
-      console.log("Checking settings permissions:", settingsPermissions);
-      console.log(
-        "User has settings permissions:",
-        settingsPermissions.some((p) => user.permissions.includes(p))
-      );
       if (user.permissions.some((p) => settingsPermissions.includes(p))) {
-        console.log("Adding Settings menu for Admin");
         availableMenus.push("Settings");
       }
     }
 
     if (user.role === UserRole.USER) {
-      console.log("User role detected, checking permissions");
+      // Check for employee-related permissions
+      if (
+        user.permissions.some((p) =>
+          [
+            Permission.VIEW_ALL_USERS,
+            Permission.MANAGE_DEPARTMENT_USERS,
+            Permission.MANAGE_ONBOARDING,
+            Permission.VIEW_ONBOARDING,
+            Permission.MANAGE_OFFBOARDING,
+            Permission.VIEW_OFFBOARDING,
+            Permission.APPROVE_OFFBOARDING,
+            Permission.REQUEST_LEAVE,
+            Permission.VIEW_OWN_LEAVE,
+            Permission.CANCEL_OWN_LEAVE,
+            Permission.APPROVE_LEAVE,
+            Permission.VIEW_TEAM_LEAVE,
+          ].includes(p)
+        )
+      ) {
+        availableMenus.push("Employees");
+      }
+
       if (
         user.permissions.some((p) =>
           [
@@ -164,37 +173,18 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
           ].includes(p)
         )
       ) {
-        console.log("User has payroll permissions, adding Payroll menu");
         availableMenus.push("Payroll");
       }
 
       // Profile
       if (user.permissions.includes(Permission.VIEW_PERSONAL_INFO)) {
-        console.log(
-          "User has VIEW_PERSONAL_INFO permission, adding Profile menu"
-        );
         availableMenus.push("Profile");
       }
 
-      // Settings - Add for User if they have notification settings permission
-      console.log("Checking for MANAGE_NOTIFICATION_SETTINGS permission");
-      console.log(
-        "User has MANAGE_NOTIFICATION_SETTINGS:",
-        user.permissions.includes(Permission.MANAGE_NOTIFICATION_SETTINGS)
-      );
-      if (user.permissions.includes(Permission.MANAGE_NOTIFICATION_SETTINGS)) {
-        console.log(
-          "Adding Settings menu for User with MANAGE_NOTIFICATION_SETTINGS permission"
-        );
-        availableMenus.push("Settings");
-      } else {
-        console.log(
-          "User does NOT have MANAGE_NOTIFICATION_SETTINGS permission"
-        );
-      }
+      // Always add Settings menu for all users
+      availableMenus.push("Settings");
     }
 
-    console.log("Final available menus:", availableMenus);
     return availableMenus;
   };
 
@@ -442,12 +432,7 @@ export const menuItems: NavigationItem[] = [
     href: "/pms/settings",
     icon: CogIcon,
     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-    permissions: [
-      Permission.MANAGE_SYSTEM_SETTINGS,
-      Permission.MANAGE_DEPARTMENT_SETTINGS,
-      Permission.MANAGE_USER_SETTINGS,
-      Permission.MANAGE_PAYROLL_SETTINGS,
-    ],
+    permissions: [],
     requireAllPermissions: false,
     subItems: [
       {
