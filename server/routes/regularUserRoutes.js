@@ -25,19 +25,6 @@ router.put(
   RegularUserController.updateOwnProfile
 );
 
-// ===== Payslip Management Routes =====
-router.get(
-  "/payslips",
-  requirePermission([Permission.VIEW_OWN_PAYSLIP]),
-  RegularUserController.getOwnPayslipById
-);
-
-router.get(
-  "/payslips/:payrollId",
-  requirePermission([Permission.VIEW_OWN_PAYSLIP]),
-  RegularUserController.viewPayslip
-);
-
 // ===== Leave Management Routes =====
 router.get(
   "/leave",

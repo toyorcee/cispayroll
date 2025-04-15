@@ -494,16 +494,14 @@ export const payrollService = {
       );
 
       if (response.data.success) {
-        toast.success("Payslip email sent successfully");
+        toast.success("Payslip sent successfully");
         return true;
       } else {
-        throw new Error(
-          response.data.message || "Failed to send payslip email"
-        );
+        throw new Error(response.data.message || "Failed to send payslip");
       }
     } catch (error) {
-      console.error("❌ Error sending payslip email:", error);
-      toast.error("Failed to send payslip email");
+      console.error("❌ Error sending payslip:", error);
+      toast.error("Failed to send payslip");
       return false;
     }
   },

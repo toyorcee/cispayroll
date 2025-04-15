@@ -543,24 +543,18 @@ export interface Payslip {
   _id: string;
   payslipId: string;
   employee: {
+    id: string;
     name: string;
     employeeId: string;
     department: string;
     salaryGrade: string;
   };
-  paymentDetails: {
-    bankName: string;
-    accountNumber: string;
-    accountName: string;
-  };
   period: {
+    month: number;
+    year: number;
     startDate: string;
     endDate: string;
-    frequency: string;
-    year: number;
-    month: number;
   };
-  status: string;
   earnings: {
     basicSalary: number;
     allowances: {
@@ -569,52 +563,44 @@ export interface Payslip {
         type: string;
         value: number;
         amount: number;
+        _id: string;
       }>;
+      additionalAllowances: any[];
       totalAllowances: number;
     };
-    overtime: {
-      hours: number;
-      rate: number;
-      amount: number;
+    bonuses: {
+      items: any[];
+      totalBonuses: number;
     };
+    totalEarnings: number;
   };
   deductions: {
     tax: {
+      taxableAmount: number;
       taxRate: number;
       amount: number;
     };
     pension: {
+      pensionableAmount: number;
       rate: number;
       amount: number;
     };
     nhf: {
+      pensionableAmount: number;
       rate: number;
       amount: number;
     };
-    others: Array<{
-      name: string;
-      amount: number;
-    }>;
+    loans: any[];
+    others: any[];
     totalDeductions: number;
   };
   totals: {
     grossEarnings: number;
+    totalDeductions: number;
     netPay: number;
   };
-  approvalFlow: {
-    submittedBy: {
-      name: string;
-    };
-    submittedAt: string;
-    approvedBy: {
-      name: string;
-    };
-    approvedAt: string;
-    remarks: string;
-  };
-  timestamps: {
-    createdAt: string;
-  };
+  status: string;
+  processedAt: string;
 }
 
 export interface PayrollFilters {

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { EmployeeController } from "../controllers/EmployeeController.js";
+import { EmployeeController } from "../controllers/employeeController.js";
 import {
   requireAuth,
   requireRole,
@@ -44,14 +44,41 @@ router.put(
 // Payslip routes
 router.get(
   "/payslips",
+  (req, res, next) => {
+    console.log("🔍 GET /employee/payslips route hit");
+    console.log(
+      "🔍 User:",
+      req.user?.id,
+      "Permissions:",
+      req.user?.permissions
+    );
+    next();
+  },
   requirePermission([Permission.VIEW_OWN_PAYSLIP]),
   EmployeeController.getOwnPayslips
 );
 
 router.get(
   "/payslips/:id",
+  (req, res, next) => {
+    console.log("🔍 GET /employee/payslips/:id route hit", req.params.id);
+    next();
+  },
   requirePermission([Permission.VIEW_OWN_PAYSLIP]),
   EmployeeController.getOwnPayslipById
+);
+
+router.get(
+  "/payslips/view/:payrollId",
+  (req, res, next) => {
+    console.log(
+      "🔍 GET /employee/payslips/view/:payrollId route hit",
+      req.params.payrollId
+    );
+    next();
+  },
+  requirePermission([Permission.VIEW_OWN_PAYSLIP]),
+  EmployeeController.viewPayslip
 );
 
 // Leave management routes

@@ -20,6 +20,16 @@ type TableConfig = {
   };
 };
 
+// Format amount with proper Naira symbol and decimal places
+const formatAmount = (amount: number | undefined | null) => {
+  if (amount === undefined || amount === null) return "NGN 0.00";
+  const formattedNumber = new Intl.NumberFormat("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+  return `NGN ${formattedNumber}`;
+};
+
 export const generatePayslipPDF = async (payslip: Payslip) => {
   const doc = new jsPDF();
   let yPos = 20;
@@ -27,7 +37,7 @@ export const generatePayslipPDF = async (payslip: Payslip) => {
   // Add company branding
   doc.setFontSize(24);
   doc.setTextColor(22, 163, 74); // text-green-600
-  doc.text("PEOPLEMAX", 105, yPos, { align: "center" });
+  doc.text("PMS", 105, yPos, { align: "center" });
 
   yPos += 10;
   doc.setFontSize(12);
@@ -40,11 +50,10 @@ export const generatePayslipPDF = async (payslip: Payslip) => {
   // Use the TableConfig type for all table configurations
   const employeeInfoTable: TableConfig = {
     startY: yPos + 10,
-    head: [["Employee Information", "Payment Details"]],
+    head: [["Employee Information"]],
     body: [
       [
         `Employee ID: ${payslip.employee?.employeeId}\nName: ${payslip.employee?.name}\nDept: ${payslip.employee?.department}\nGrade: ${payslip.employee?.salaryGrade}`,
-        `Bank: ${payslip.paymentDetails?.bankName}\nAccount: ${payslip.paymentDetails?.accountNumber}\nName: ${payslip.paymentDetails?.accountName}`,
       ],
     ],
     theme: "grid",
@@ -70,9 +79,7 @@ export const generatePayslipPDF = async (payslip: Payslip) => {
           payslip.period?.startDate
         ).toLocaleDateString()} - ${new Date(
           payslip.period?.endDate
-        ).toLocaleDateString()}\nFrequency: ${
-          payslip.period?.frequency
-        }\nStatus: ${payslip.status}`,
+        ).toLocaleDateString()}\nStatus: ${payslip.status}`,
       ],
     ],
     theme: "grid",
@@ -93,22 +100,16 @@ export const generatePayslipPDF = async (payslip: Payslip) => {
     startY: yPos,
     head: [["Earnings", "Amount"]],
     body: [
-      [
-        "Basic Salary",
-        `₦${payslip.earnings?.basicSalary?.toLocaleString() || "0"}`,
-      ],
+      ["Basic Salary", formatAmount(payslip.earnings?.basicSalary)],
       ...(payslip.earnings?.allowances?.gradeAllowances?.map((a) => [
         `${a.name} ${a.type === "percentage" ? `(${a.value}%)` : ""}`,
-        `₦${a.amount.toLocaleString()}`,
+        formatAmount(a.amount),
       ]) || []),
-      ...(payslip.earnings?.overtime?.amount > 0
-        ? [
-            [
-              `Overtime (${payslip.earnings.overtime.hours}hrs @ ₦${payslip.earnings.overtime.rate}/hr)`,
-              `₦${payslip.earnings.overtime.amount.toLocaleString()}`,
-            ],
-          ]
-        : []),
+      [
+        "Total Allowances",
+        formatAmount(payslip.earnings?.allowances?.totalAllowances),
+      ],
+      ["Total Bonuses", formatAmount(payslip.earnings?.bonuses?.totalBonuses)],
     ],
     theme: "grid",
     headStyles: {
@@ -130,16 +131,24 @@ export const generatePayslipPDF = async (payslip: Payslip) => {
     body: [
       [
         `PAYE Tax (${payslip.deductions?.tax?.taxRate?.toFixed(2)}%)`,
-        `₦${payslip.deductions?.tax?.amount?.toLocaleString() || "0"}`,
+        formatAmount(payslip.deductions?.tax?.amount),
       ],
       [
         `Pension (${payslip.deductions?.pension?.rate}%)`,
-        `₦${payslip.deductions?.pension?.amount?.toLocaleString() || "0"}`,
+        formatAmount(payslip.deductions?.pension?.amount),
       ],
       [
         `NHF (${payslip.deductions?.nhf?.rate}%)`,
-        `₦${payslip.deductions?.nhf?.amount?.toLocaleString() || "0"}`,
+        formatAmount(payslip.deductions?.nhf?.amount),
       ],
+      ...(payslip.deductions?.loans?.map((loan) => [
+        loan.description,
+        formatAmount(loan.amount),
+      ]) || []),
+      ...(payslip.deductions?.others?.map((other) => [
+        other.description,
+        formatAmount(other.amount),
+      ]) || []),
     ],
     theme: "grid",
     headStyles: {
@@ -159,15 +168,9 @@ export const generatePayslipPDF = async (payslip: Payslip) => {
     startY: yPos,
     head: [["Summary", "Amount"]],
     body: [
-      [
-        "Total Earnings",
-        `₦${payslip.totals?.grossEarnings?.toLocaleString() || "0"}`,
-      ],
-      [
-        "Total Deductions",
-        `₦${payslip.deductions?.totalDeductions?.toLocaleString() || "0"}`,
-      ],
-      ["Net Pay", `₦${payslip.totals?.netPay?.toLocaleString() || "0"}`],
+      ["Total Earnings", formatAmount(payslip.totals?.grossEarnings)],
+      ["Total Deductions", formatAmount(payslip.deductions?.totalDeductions)],
+      ["Net Pay", formatAmount(payslip.totals?.netPay)],
     ],
     theme: "grid",
     headStyles: {
@@ -180,36 +183,6 @@ export const generatePayslipPDF = async (payslip: Payslip) => {
   };
 
   autoTable(doc, summaryTable);
-
-  // Approval Information
-  const approvalInfoTable: TableConfig = {
-    startY:
-      (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable
-        .finalY + 10,
-    head: [["Approval Information"]],
-    body: [
-      [
-        `Submitted by: ${
-          payslip.approvalFlow?.submittedBy?.name
-        }\nDate: ${new Date(
-          payslip.approvalFlow?.submittedAt
-        ).toLocaleString()}\n\nApproved by: ${
-          payslip.approvalFlow?.approvedBy?.name
-        }\nDate: ${new Date(
-          payslip.approvalFlow?.approvedAt
-        ).toLocaleString()}\n\nRemarks: ${
-          payslip.approvalFlow?.remarks || "None"
-        }`,
-      ],
-    ],
-    theme: "grid",
-    headStyles: {
-      fillColor: [22, 163, 74],
-      fontSize: 12,
-    },
-  };
-
-  autoTable(doc, approvalInfoTable);
 
   // Footer
   const pageHeight = doc.internal.pageSize.height;

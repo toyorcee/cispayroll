@@ -3820,6 +3820,12 @@ export class SuperAdminController {
   static async sendPayslipEmail(req, res) {
     try {
       const { payrollId } = req.params;
+      const user = req.user;
+
+      // Check permissions
+      if (!user.hasPermission(Permission.VIEW_DEPARTMENT_PAYSLIPS)) {
+        throw new ApiError(403, "You don't have permission to send payslips");
+      }
 
       // Find payroll by _id
       const payroll = await PayrollModel.findById(payrollId)
@@ -3833,6 +3839,17 @@ export class SuperAdminController {
 
       if (!payroll) {
         throw new ApiError(404, "Payslip not found");
+      }
+
+      // Check if user has permission to view this payslip
+      if (
+        user.role === UserRole.ADMIN &&
+        payroll.employee.department.toString() !== user.department.toString()
+      ) {
+        throw new ApiError(
+          403,
+          "You can only send payslips for employees in your department"
+        );
       }
 
       // Prepare data for PDF generation
@@ -3888,16 +3905,34 @@ export class SuperAdminController {
         },
       });
 
+      // Create notification for employee only
+      await NotificationService.createNotification(
+        payroll.employee._id,
+        NOTIFICATION_TYPES.PAYROLL_COMPLETED,
+        payroll.employee,
+        payroll,
+        "Your payslip has been sent to your email and is available in your account"
+      );
+
+      // Create notification for the sender only
+      await NotificationService.createNotification(
+        user._id,
+        NOTIFICATION_TYPES.PAYROLL_COMPLETED,
+        payroll.employee,
+        payroll,
+        `Payslip sent successfully to ${payroll.employee.firstName} ${payroll.employee.lastName}`
+      );
+
       return res.status(200).json({
         success: true,
-        message: "Payslip email sent successfully",
+        message: "Payslip sent successfully",
       });
     } catch (error) {
-      console.error("Error sending payslip email:", error);
+      console.error("Error sending payslip:", error);
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({
         success: false,
-        message: message || "Failed to send payslip email",
+        message: message || "Failed to send payslip",
       });
     }
   }

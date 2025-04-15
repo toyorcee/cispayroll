@@ -163,14 +163,14 @@ router.get(
 // View payslip
 router.get(
   "/payroll/:payrollId/view",
-  requirePermission([Permission.VIEW_OWN_PAYSLIP]),
+  requirePermission([Permission.VIEW_DEPARTMENT_PAYSLIPS]),
   SuperAdminController.viewPayslip
 );
 
 // Send payslip email
 router.post(
   "/payroll/:payrollId/email",
-  requirePermission([Permission.VIEW_OWN_PAYSLIP]),
+  requirePermission([Permission.VIEW_DEPARTMENT_PAYSLIPS]),
   SuperAdminController.sendPayslipEmail
 );
 

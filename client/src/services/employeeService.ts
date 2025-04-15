@@ -956,4 +956,102 @@ export const employeeService = {
       },
     });
   },
+
+  // --- Payslip Management ---
+  getOwnPayslips: async (params?: { page?: number; limit?: number }) => {
+    console.log("🔍 Fetching own payslips with params:", params);
+    try {
+      const response = await axios.get(`${BASE_URL}/employees/payslips`, {
+        params: {
+          page: params?.page || 1,
+          limit: params?.limit || 10,
+        },
+      });
+
+      if (!response.data.success) {
+        console.error("❌ API returned error:", response.data);
+        throw new Error(response.data.message || "Failed to fetch payslips");
+      }
+
+      console.log("✅ Successfully fetched payslips");
+      return response.data;
+    } catch (error) {
+      console.error("❌ Error fetching payslips:", error);
+      if (axios.isAxiosError(error)) {
+        console.error("Axios error details:", {
+          status: error.response?.status,
+          data: error.response?.data,
+          url: error.config?.url,
+        });
+      }
+      throw error;
+    }
+  },
+
+  getOwnPayslipById: async (payslipId: string) => {
+    try {
+      console.log("🔍 Fetching payslip by ID:", payslipId);
+      const response = await axios.get(
+        `${BASE_URL}/employees/payslips/${payslipId}`
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("❌ Error fetching payslip:", error);
+      throw error;
+    }
+  },
+
+  viewPayslip: async (payrollId: string) => {
+    try {
+      console.log("🔍 Viewing payslip for payroll:", payrollId);
+      const response = await axios.get(
+        `${BASE_URL}/employees/payslips/view/${payrollId}`
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("❌ Error viewing payslip:", error);
+      throw error;
+    }
+  },
+
+  // React Query hooks for payslip management
+  useGetOwnPayslips: (options?: {
+    enabled?: boolean;
+    page?: number;
+    limit?: number;
+  }) => {
+    return useQuery({
+      queryKey: ["payslips", "own", options?.page, options?.limit],
+      queryFn: () =>
+        employeeService.getOwnPayslips({
+          page: options?.page,
+          limit: options?.limit,
+        }),
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      enabled: options?.enabled === true, // Only enable if explicitly set to true
+      refetchOnMount: false, // Disable refetching on mount
+      refetchOnWindowFocus: false, // Disable refetching on window focus
+    });
+  },
+
+  useGetOwnPayslipById: (
+    payslipId: string,
+    options?: { enabled?: boolean }
+  ) => {
+    return useQuery({
+      queryKey: ["payslip", payslipId],
+      queryFn: () => employeeService.getOwnPayslipById(payslipId),
+      enabled: options?.enabled !== undefined ? options.enabled : !!payslipId,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+  },
+
+  useViewPayslip: (payrollId: string) => {
+    return useQuery({
+      queryKey: ["payslip", "view", payrollId],
+      queryFn: () => employeeService.viewPayslip(payrollId),
+      enabled: !!payrollId,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+  },
 };

@@ -3,10 +3,10 @@ import { Payslip } from "../../../types/payroll";
 import { FaDownload, FaPrint, FaEnvelope } from "react-icons/fa";
 // import { useAuth } from "../../../context/AuthContext";
 import { generatePayslipPDF } from "../../../utils/pdfGenerator";
-import { PayrollBranding } from "../../shared/PayrollBranding";
+// import { PayrollBranding } from "../../shared/PayrollBranding";
 import { payrollService } from "../../../services/payrollService";
 import { useState } from "react";
-import { toast } from "react-hot-toast";
+import { toast } from "react-toastify";
 
 interface PayslipDetailProps {
   payslip: Payslip;
@@ -15,11 +15,12 @@ interface PayslipDetailProps {
 }
 
 const formatAmount = (amount: number | undefined | null) => {
-  if (amount === undefined || amount === null) return "₦0.00";
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
+  if (amount === undefined || amount === null) return "NGN 0.00";
+  const formattedNumber = new Intl.NumberFormat("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount);
+  return `NGN ${formattedNumber}`;
 };
 
 const PayslipDetail: React.FC<PayslipDetailProps> = ({
@@ -50,7 +51,6 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
   const handlePrint = () => {
     setLoading((prev) => ({ ...prev, print: true }));
     window.print();
-    // Reset print loading state after a short delay
     setTimeout(() => {
       setLoading((prev) => ({ ...prev, print: false }));
     }, 1000);
@@ -89,7 +89,10 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
         {/* Header with Branding and Payslip ID */}
         <div className="border-b border-gray-200 pb-4 sm:pb-6 mb-4 sm:mb-6">
           <div className="mb-4 sm:mb-6">
-            <PayrollBranding className="max-w-[150px] sm:max-w-[200px] mx-auto" />
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-green-700">PMS</h1>
+              <p className="text-sm text-gray-600">Payroll Management System</p>
+            </div>
             <p className="text-center text-xs sm:text-sm text-gray-500 mt-2">
               Ref: {payslip.payslipId}
             </p>
@@ -116,16 +119,14 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
             </div>
             <div>
               <h3 className="text-xs sm:text-sm font-medium text-gray-500">
-                Payment Details
+                Period Information
               </h3>
               <p className="text-xs sm:text-sm text-gray-600">
-                Bank: {payslip.paymentDetails?.bankName}
+                {new Date(payslip.period?.startDate).toLocaleDateString()} -{" "}
+                {new Date(payslip.period?.endDate).toLocaleDateString()}
               </p>
               <p className="text-xs sm:text-sm text-gray-600">
-                Account: {payslip.paymentDetails?.accountNumber}
-              </p>
-              <p className="text-xs sm:text-sm text-gray-600">
-                Name: {payslip.paymentDetails?.accountName}
+                Status: <span className="font-medium">{payslip.status}</span>
               </p>
             </div>
           </div>
@@ -191,9 +192,6 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
                 {new Date(payslip.period?.startDate).toLocaleDateString()} -{" "}
                 {new Date(payslip.period?.endDate).toLocaleDateString()}
               </p>
-              <p className="text-xs sm:text-sm text-gray-600">
-                Frequency: {payslip.period?.frequency}
-              </p>
             </div>
             <div className="text-left sm:text-right">
               <h3 className="text-sm sm:text-base font-semibold text-green-600 mb-1">
@@ -243,17 +241,19 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
               )
             )}
 
-            {payslip.earnings?.overtime?.amount > 0 && (
-              <div className="flex justify-between text-gray-700 text-xs sm:text-sm">
-                <span className="font-medium">
-                  Overtime ({payslip.earnings.overtime.hours}hrs @{" "}
-                  {formatAmount(payslip.earnings.overtime.rate)}/hr)
-                </span>
-                <span className="font-semibold">
-                  {formatAmount(payslip.earnings.overtime.amount)}
-                </span>
-              </div>
-            )}
+            <div className="flex justify-between text-gray-700 text-xs sm:text-sm font-medium pt-2 border-t border-gray-100">
+              <span>Total Allowances</span>
+              <span className="font-semibold">
+                {formatAmount(payslip.earnings?.allowances?.totalAllowances)}
+              </span>
+            </div>
+
+            <div className="flex justify-between text-gray-700 text-xs sm:text-sm font-medium">
+              <span>Total Bonuses</span>
+              <span className="font-semibold">
+                {formatAmount(payslip.earnings?.bonuses?.totalBonuses)}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -289,6 +289,30 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
                 {formatAmount(payslip.deductions?.nhf?.amount)}
               </span>
             </div>
+
+            {payslip.deductions?.loans?.map((loan, index) => (
+              <div
+                key={index}
+                className="flex justify-between text-gray-700 text-xs sm:text-sm"
+              >
+                <span className="font-medium">{loan.description}</span>
+                <span className="font-semibold text-red-600">
+                  {formatAmount(loan.amount)}
+                </span>
+              </div>
+            ))}
+
+            {payslip.deductions?.others?.map((other, index) => (
+              <div
+                key={index}
+                className="flex justify-between text-gray-700 text-xs sm:text-sm"
+              >
+                <span className="font-medium">{other.description}</span>
+                <span className="font-semibold text-red-600">
+                  {formatAmount(other.amount)}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -324,34 +348,10 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
           </div>
         </div>
 
-        {/* Approval Information */}
-        <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200 text-xs sm:text-sm text-gray-600">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div>
-              <p>Submitted by: {payslip.approvalFlow?.submittedBy?.name}</p>
-              <p>
-                Date:{" "}
-                {new Date(payslip.approvalFlow?.submittedAt).toLocaleString()}
-              </p>
-            </div>
-            <div>
-              <p>Approved by: {payslip.approvalFlow?.approvedBy?.name}</p>
-              <p>
-                Date:{" "}
-                {new Date(payslip.approvalFlow?.approvedAt).toLocaleString()}
-              </p>
-            </div>
-          </div>
-          <p className="mt-2">Remarks: {payslip.approvalFlow?.remarks}</p>
-        </div>
-
         {/* Footer */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 pt-3 sm:pt-4 mt-4 sm:mt-6 border-t border-gray-200">
           <div className="text-[10px] sm:text-xs text-gray-500">
-            <p>
-              Generated:{" "}
-              {new Date(payslip.timestamps?.createdAt).toLocaleString()}
-            </p>
+            <p>Generated: {new Date().toLocaleString()}</p>
             <p>
               Powered by Century Information Systems |{" "}
               {new Date().getFullYear()}
