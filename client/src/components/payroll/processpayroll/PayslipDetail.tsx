@@ -37,7 +37,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
   const handleDownload = async () => {
     try {
       setLoading((prev) => ({ ...prev, download: true }));
-    await generatePayslipPDF(payslip);
+      await generatePayslipPDF(payslip);
       toast.success("Payslip downloaded successfully!");
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -59,15 +59,15 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
   const handleEmail = async () => {
     try {
       setLoading((prev) => ({ ...prev, email: true }));
-      const success = await payrollService.sendPayslipEmail(payslip.payslipId);
+      const success = await payrollService.sendPayslipEmail(payslip._id);
       if (success) {
         // Update local state to reflect email sent
         setPayslip((prev) => {
           if (!prev) return null;
           return {
-          ...prev,
-          emailSent: true,
-          emailSentAt: new Date(),
+            ...prev,
+            emailSent: true,
+            emailSentAt: new Date(),
           } as Payslip;
         });
       }

@@ -540,6 +540,7 @@ export interface PeriodPayrollResponse {
 }
 
 export interface Payslip {
+  _id: string;
   payslipId: string;
   employee: {
     name: string;

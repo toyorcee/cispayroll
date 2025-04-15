@@ -108,10 +108,13 @@ const SingleEmployeeProcessModal = ({
 
   const queryClient = useQueryClient();
 
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
+
   // Fetch admin's department when modal opens
   useEffect(() => {
     const fetchAdminDepartment = async () => {
       if (!isSuperAdmin() && isOpen) {
+        setIsLoadingEmployees(true);
         try {
           if (user && user.department) {
             const departmentId =
@@ -124,6 +127,21 @@ const SingleEmployeeProcessModal = ({
               departmentId: departmentId,
             }));
 
+            // Check if we already have the data in the cache
+            const cachedData = queryClient.getQueryData([
+              "departmentEmployees",
+              departmentId,
+              employeeLimit,
+            ]);
+
+            if (cachedData) {
+              // Even if we have cached data, keep the spinner visible for a short time
+              setTimeout(() => {
+                setIsLoadingEmployees(false);
+              }, 500);
+              return;
+            }
+
             const employeesResponse = await fetch(
               `http://localhost:5000/api/admin/departments/${departmentId}/employees`,
               {
@@ -133,6 +151,7 @@ const SingleEmployeeProcessModal = ({
             const employeesData = await employeesResponse.json();
 
             if (employeesData.success && employeesData.employees) {
+              // Format the employees data directly from the response
               const formattedEmployees = employeesData.employees.map(
                 (emp: any) => ({
                   _id: emp._id,
@@ -146,14 +165,28 @@ const SingleEmployeeProcessModal = ({
                 })
               );
 
+              // Set the data in the cache
               queryClient.setQueryData(
                 ["departmentEmployees", departmentId, employeeLimit],
                 { users: formattedEmployees }
+              );
+
+              // Set the query options separately
+              queryClient.setQueryDefaults(
+                ["departmentEmployees", departmentId, employeeLimit],
+                {
+                  staleTime: 5 * 60 * 1000,
+                  gcTime: 30 * 60 * 1000,
+                }
               );
             }
           }
         } catch (error) {
           console.error("Error fetching admin's data:", error);
+        } finally {
+          setTimeout(() => {
+            setIsLoadingEmployees(false);
+          }, 500);
         }
       }
     };
@@ -211,6 +244,26 @@ const SingleEmployeeProcessModal = ({
     enabled: !isSuperAdmin() || Boolean(formData.departmentId),
     select: (data) => {
       console.log("Selected data:", data);
+
+      // Handle the direct employees array in the response
+      if (data.employees && Array.isArray(data.employees)) {
+        console.log(
+          "Using employees array from response, count:",
+          data.employees.length
+        );
+        return data.employees.map((emp: any) => ({
+          _id: emp._id,
+          firstName: emp.firstName,
+          lastName: emp.lastName,
+          employeeId: emp.employeeId,
+          fullName: emp.fullName,
+          position: emp.position,
+          status: emp.status,
+          salaryGrade: emp.salaryGrade,
+        }));
+      }
+
+      // Fallback to the old structure if needed
       if (data.users && Array.isArray(data.users)) {
         console.log(
           "Using users array from response, count:",
@@ -404,15 +457,14 @@ const SingleEmployeeProcessModal = ({
         toast.success("Payroll processed successfully");
       } else {
         const result =
-          await adminPayrollService.processMultipleEmployeesPayroll(
-            {
-              employeeIds: selectedEmployees.map((employee) => employee._id),
-              month: formData.month,
-              year: formData.year,
-              frequency: formData.frequency,
-            },
-            userRole
-          );
+          await adminPayrollService.processMultipleEmployeesPayroll({
+            employeeIds: selectedEmployees.map((emp) => emp._id),
+            month: formData.month,
+            year: formData.year,
+            frequency: formData.frequency,
+            departmentId: formData.departmentId,
+            userRole: isSuperAdmin() ? UserRole.SUPER_ADMIN : UserRole.ADMIN,
+          });
 
         console.log("🔄 Multiple employees payroll processed:", result);
         console.log("🔔 Checking for new notifications...");
@@ -423,9 +475,7 @@ const SingleEmployeeProcessModal = ({
         queryClient.invalidateQueries({ queryKey: ["notifications"] });
         queryClient.invalidateQueries({ queryKey: ["departmentEmployees"] });
 
-        toast.success(
-          `Payroll processed successfully for ${selectedEmployees.length} employees`
-        );
+        toast.success("Payroll processed successfully");
       }
 
       // Show success animation and close modal
@@ -623,96 +673,103 @@ const SingleEmployeeProcessModal = ({
                       </span>
                     </div>
 
-                    {showEmployeeList && (
-                      <>
-                        {filteredEmployees.length > 0 ? (
-                          <ul className="py-1">
-                            {filteredEmployees.map((employee) => {
-                              const isSelectable = employee.status === "active";
-                              const isSelected = selectedEmployees.some(
-                                (emp) => emp._id === employee._id
-                              );
+                    {isLoadingEmployees ? (
+                      <div className="flex justify-center items-center h-32">
+                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-500"></div>
+                      </div>
+                    ) : (
+                      showEmployeeList && (
+                        <>
+                          {filteredEmployees.length > 0 ? (
+                            <ul className="py-1">
+                              {filteredEmployees.map((employee) => {
+                                const isSelectable =
+                                  employee.status === "active";
+                                const isSelected = selectedEmployees.some(
+                                  (emp) => emp._id === employee._id
+                                );
 
-                              return (
-                                <li
-                                  key={employee._id}
-                                  className={`px-4 py-2 flex items-center ${
-                                    isSelectable
-                                      ? "hover:bg-green-50"
-                                      : "opacity-60 bg-gray-50"
-                                  }`}
-                                  title={
-                                    !isSelectable
-                                      ? `Cannot process payroll for ${employee.status} employees`
-                                      : ""
-                                  }
-                                >
-                                  {/* Checkbox */}
-                                  <div className="flex-shrink-0 mr-3">
-                                    <input
-                                      type="checkbox"
-                                      checked={isSelected}
-                                      onChange={() =>
-                                        isSelectable &&
-                                        handleCheckboxChange(employee)
-                                      }
-                                      disabled={!isSelectable}
-                                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                                    />
-                                  </div>
+                                return (
+                                  <li
+                                    key={employee._id}
+                                    className={`px-4 py-2 flex items-center ${
+                                      isSelectable
+                                        ? "hover:bg-green-50"
+                                        : "opacity-60 bg-gray-50"
+                                    }`}
+                                    title={
+                                      !isSelectable
+                                        ? `Cannot process payroll for ${employee.status} employees`
+                                        : ""
+                                    }
+                                  >
+                                    {/* Checkbox */}
+                                    <div className="flex-shrink-0 mr-3">
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={() =>
+                                          isSelectable &&
+                                          handleCheckboxChange(employee)
+                                        }
+                                        disabled={!isSelectable}
+                                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                                      />
+                                    </div>
 
-                                  <div className="flex-shrink-0 mr-3">
-                                    <div
-                                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                        isSelectable
-                                          ? "bg-green-100 text-green-600"
-                                          : "bg-gray-100 text-gray-600"
-                                      }`}
-                                    >
-                                      {employee.firstName.charAt(0)}
-                                      {employee.lastName.charAt(0)}
+                                    <div className="flex-shrink-0 mr-3">
+                                      <div
+                                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                          isSelectable
+                                            ? "bg-green-100 text-green-600"
+                                            : "bg-gray-100 text-gray-600"
+                                        }`}
+                                      >
+                                        {employee.firstName.charAt(0)}
+                                        {employee.lastName.charAt(0)}
+                                      </div>
                                     </div>
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="font-medium text-gray-900">
-                                      {employee.fullName}
+                                    <div className="flex-1">
+                                      <div className="font-medium text-gray-900">
+                                        {employee.fullName}
+                                      </div>
+                                      <div className="text-sm text-gray-500 flex items-center">
+                                        <FaIdCard className="mr-1 text-gray-400" />
+                                        {employee.employeeId}
+                                      </div>
+                                      <div className="text-sm text-gray-500 flex items-center">
+                                        <FaBriefcase className="mr-1 text-gray-400" />
+                                        {employee.position}
+                                      </div>
                                     </div>
-                                    <div className="text-sm text-gray-500 flex items-center">
-                                      <FaIdCard className="mr-1 text-gray-400" />
-                                      {employee.employeeId}
+                                    <div className="flex-shrink-0">
+                                      <span
+                                        className={`px-2 py-1 text-xs rounded-full ${
+                                          employee.status === "active"
+                                            ? "bg-green-100 text-green-800"
+                                            : employee.status === "terminated"
+                                            ? "bg-red-100 text-red-800"
+                                            : "bg-yellow-100 text-yellow-800"
+                                        }`}
+                                      >
+                                        {employee.status}
+                                      </span>
                                     </div>
-                                    <div className="text-sm text-gray-500 flex items-center">
-                                      <FaBriefcase className="mr-1 text-gray-400" />
-                                      {employee.position}
-                                    </div>
-                                  </div>
-                                  <div className="flex-shrink-0">
-                                    <span
-                                      className={`px-2 py-1 text-xs rounded-full ${
-                                        employee.status === "active"
-                                          ? "bg-green-100 text-green-800"
-                                          : employee.status === "terminated"
-                                          ? "bg-red-100 text-red-800"
-                                          : "bg-yellow-100 text-yellow-800"
-                                      }`}
-                                    >
-                                      {employee.status}
-                                    </span>
-                                  </div>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        ) : (
-                          <div className="px-4 py-3 text-gray-500 text-center">
-                            No employees found
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          ) : (
+                            <div className="px-4 py-3 text-gray-500 text-center">
+                              No employees found
+                            </div>
+                          )}
+                          <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-500">
+                            Note: Only active employees can be selected for
+                            payroll processing
                           </div>
-                        )}
-                        <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-500">
-                          Note: Only active employees can be selected for
-                          payroll processing
-                        </div>
-                      </>
+                        </>
+                      )
                     )}
                   </div>
                 </div>

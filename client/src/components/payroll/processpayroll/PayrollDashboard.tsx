@@ -34,6 +34,7 @@ import {
 
 interface PayrollDashboardProps {
   payrolls: Payroll[];
+  processingStats?: AdminPayrollProcessingStats;
 }
 
 const STATUS_COLORS = {
@@ -45,12 +46,24 @@ const STATUS_COLORS = {
   pendingPayment: "#0288d1",
 };
 
-const PayrollDashboard: React.FC<PayrollDashboardProps> = ({ payrolls }) => {
+const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
+  payrolls,
+  processingStats: initialProcessingStats,
+}) => {
   const { user } = useAuth();
   const theme = useTheme();
   const [processingStats, setProcessingStats] =
-    useState<AdminPayrollProcessingStats | null>(null);
+    useState<AdminPayrollProcessingStats | null>(
+      initialProcessingStats || null
+    );
   const [loading, setLoading] = useState<boolean>(true);
+  const [chartData, setChartData] = useState<
+    Array<{
+      name: string;
+      value: number;
+      color: string;
+    }>
+  >([]);
 
   const totalPayrolls = payrolls.length;
   const totalAmount = payrolls.reduce((sum, p) => sum + p.netPay, 0);
@@ -60,11 +73,68 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({ payrolls }) => {
       try {
         setLoading(true);
         const timestamp = new Date().getTime();
+        console.log("Fetching processing statistics for role:", user?.role);
+
         const stats = await adminPayrollService.getProcessingStatistics(
           user?.role,
           timestamp
         );
+        console.log("Received processing statistics:", stats);
+
         setProcessingStats(stats);
+
+        // Prepare doughnut chart data
+        const doughnutData = [
+          {
+            name: "Paid",
+            value: stats.paidPayrolls,
+            color: STATUS_COLORS.paid,
+          },
+          {
+            name: "Processing",
+            value: stats.processingPayrolls,
+            color: STATUS_COLORS.processing,
+          },
+          {
+            name: "Pending Payment",
+            value: stats.pendingPaymentPayrolls,
+            color: STATUS_COLORS.pendingPayment,
+          },
+          {
+            name: "Failed",
+            value: stats.failedPayrolls,
+            color: STATUS_COLORS.failed,
+          },
+          {
+            name: "Approved",
+            value: stats.approvedPayrolls,
+            color: STATUS_COLORS.approved,
+          },
+        ];
+
+        // If all values are 0 but totalPayrolls > 0, add a "No Status" entry
+        if (
+          stats.totalPayrolls > 0 &&
+          doughnutData.every((item) => item.value === 0)
+        ) {
+          doughnutData.push({
+            name: "No Status",
+            value: stats.totalPayrolls,
+            color: "#cccccc", // Gray color for no status
+          });
+        } else {
+          // Filter out zero values only if we have some non-zero values
+          const nonZeroData = doughnutData.filter((item) => item.value > 0);
+          if (nonZeroData.length > 0) {
+            doughnutData.length = 0;
+            doughnutData.push(...nonZeroData);
+          }
+        }
+
+        console.log("Prepared doughnut data:", doughnutData);
+        console.log("Doughnut data length:", doughnutData.length);
+
+        setChartData(doughnutData);
       } catch (error) {
         console.error("Error fetching processing statistics:", error);
         toast.error("Failed to fetch processing statistics");
@@ -73,70 +143,84 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({ payrolls }) => {
       }
     };
 
-    fetchProcessingStats();
+    if (!initialProcessingStats) {
+      console.log("No initial stats provided, fetching from API");
+      fetchProcessingStats();
+      const intervalId = setInterval(fetchProcessingStats, 1800000);
+      return () => clearInterval(intervalId);
+    } else {
+      console.log("Using initial processing stats:", initialProcessingStats);
 
-    const intervalId = setInterval(fetchProcessingStats, 1800000);
-
-    return () => clearInterval(intervalId);
-  }, [user?.role]);
-
-  const processingStatusData = processingStats
-    ? [
+      // Handle initial stats for doughnut chart
+      const initialDoughnutData = [
+        {
+          name: "Paid",
+          value: initialProcessingStats.paidPayrolls,
+          color: STATUS_COLORS.paid,
+        },
         {
           name: "Processing",
-          value: processingStats.processingPayrolls,
+          value: initialProcessingStats.processingPayrolls,
           color: STATUS_COLORS.processing,
         },
         {
-          name: "Completed",
-          value: processingStats.completedPayrolls,
-          color: STATUS_COLORS.completed,
+          name: "Pending Payment",
+          value: initialProcessingStats.pendingPaymentPayrolls,
+          color: STATUS_COLORS.pendingPayment,
         },
         {
           name: "Failed",
-          value: processingStats.failedPayrolls,
+          value: initialProcessingStats.failedPayrolls,
           color: STATUS_COLORS.failed,
         },
         {
           name: "Approved",
-          value: processingStats.approvedPayrolls,
+          value: initialProcessingStats.approvedPayrolls,
           color: STATUS_COLORS.approved,
         },
-        {
-          name: "Paid",
-          value: processingStats.paidPayrolls,
-          color: STATUS_COLORS.paid,
-        },
-        {
-          name: "Pending Payment",
-          value: processingStats.pendingPaymentPayrolls,
-          color: STATUS_COLORS.pendingPayment,
-        },
-      ]
-    : [];
+      ];
 
-  // Custom tooltip for pie chart
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <Paper
-          elevation={3}
-          sx={{ p: 2, backgroundColor: "rgba(255, 255, 255, 0.9)" }}
-        >
-          <Typography variant="body2" fontWeight="bold">
-            {payload[0].name}
-          </Typography>
-          <Typography variant="body2">Count: {payload[0].value}</Typography>
-          {payload[0].payload.percentage && (
-            <Typography variant="body2">
-              Percentage: {payload[0].payload.percentage.toFixed(1)}%
-            </Typography>
-          )}
-        </Paper>
-      );
+      // If all values are 0 but totalPayrolls > 0, add a "No Status" entry
+      if (
+        initialProcessingStats.totalPayrolls > 0 &&
+        initialDoughnutData.every((item) => item.value === 0)
+      ) {
+        initialDoughnutData.push({
+          name: "No Status",
+          value: initialProcessingStats.totalPayrolls,
+          color: "#cccccc", // Gray color for no status
+        });
+      } else {
+        // Filter out zero values only if we have some non-zero values
+        const nonZeroData = initialDoughnutData.filter(
+          (item) => item.value > 0
+        );
+        if (nonZeroData.length > 0) {
+          initialDoughnutData.length = 0;
+          initialDoughnutData.push(...nonZeroData);
+        }
+      }
+
+      console.log("Prepared initial doughnut data:", initialDoughnutData);
+      console.log("Initial doughnut data length:", initialDoughnutData.length);
+
+      setChartData(initialDoughnutData);
+      setLoading(false);
     }
-    return null;
-  };
+  }, [user?.role, initialProcessingStats]);
+
+  if (loading) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        height="400px"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ flexGrow: 1, p: 3 }}>
@@ -287,72 +371,64 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({ payrolls }) => {
           </Card>
         </Grid>
 
-        {/* Processing Statistics */}
-        {loading ? (
-          <Grid item xs={12}>
-            <Box sx={{ display: "flex", justifyContent: "center", p: 5 }}>
-              <CircularProgress size={60} />
-            </Box>
-          </Grid>
-        ) : processingStats ? (
-          <>
-            <Grid item xs={12}>
-              <Typography
-                variant="h5"
-                gutterBottom
-                sx={{ mt: 2, mb: 3, fontWeight: "bold" }}
+        {/* Doughnut Chart */}
+        <Grid item xs={12} md={8} sx={{ margin: "0 auto" }}>
+          <Card elevation={3} sx={{ height: "100%", p: 2 }}>
+            <Typography
+              variant="h6"
+              gutterBottom
+              sx={{ fontWeight: "bold", textAlign: "center" }}
+            >
+              Payroll Status Distribution
+            </Typography>
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={450}>
+                <PieChart>
+                  <Pie
+                    data={chartData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={160}
+                    innerRadius={80}
+                    labelLine={false}
+                    label={({ name, percent }) =>
+                      percent > 0.05
+                        ? `${name}: ${(percent * 100).toFixed(0)}%`
+                        : ""
+                    }
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend
+                    verticalAlign="bottom"
+                    height={36}
+                    formatter={(value) => (
+                      <span style={{ color: "#666", fontSize: "0.9em" }}>
+                        {value}
+                      </span>
+                    )}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <Box
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+                height="350px"
               >
-                Processing Statistics
-              </Typography>
-              <Divider sx={{ mb: 3 }} />
-            </Grid>
-
-            <Grid item xs={12} md={8} sx={{ margin: "0 auto" }}>
-              <Card elevation={3} sx={{ height: "100%", p: 2 }}>
-                <Typography
-                  variant="h6"
-                  gutterBottom
-                  sx={{ fontWeight: "bold", textAlign: "center" }}
-                >
-                  Payroll Status Distribution
+                <Typography variant="body1" color="textSecondary">
+                  No payroll data available
                 </Typography>
-                <ResponsiveContainer width="100%" height={450}>
-                  <PieChart>
-                    <Pie
-                      data={processingStatusData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={160}
-                      innerRadius={80}
-                      labelLine={false}
-                      label={({ name, percent }) =>
-                        percent > 0.05
-                          ? `${name}: ${(percent * 100).toFixed(0)}%`
-                          : ""
-                      }
-                    >
-                      {processingStatusData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend
-                      verticalAlign="bottom"
-                      height={36}
-                      formatter={(value) => (
-                        <span style={{ color: "#666", fontSize: "0.9em" }}>
-                          {value}
-                        </span>
-                      )}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </Card>
-            </Grid>
-          </>
-        ) : null}
+              </Box>
+            )}
+          </Card>
+        </Grid>
       </Grid>
     </Box>
   );

@@ -1372,7 +1372,12 @@ export class AdminController {
 
   static async getProcessingStatistics(req, res) {
     try {
-      const stats = await PayrollService.getProcessingStatistics();
+      const admin = await UserModel.findById(req.user.id).select('department');
+      if (!admin?.department) {
+        throw new ApiError(400, "Admin is not assigned to any department");
+      }
+
+      const stats = await PayrollService.getProcessingStatistics(admin.department);
       res.json({
         success: true,
         data: stats,

@@ -164,7 +164,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/periods`
         : `${BASE_URL}/payroll/periods`;
 
-      console.log("Making request to:", endpoint); 
+      console.log("Making request to:", endpoint);
       const response = await axios.get(endpoint, { withCredentials: true });
 
       if (!response.data.success) {
@@ -194,7 +194,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/${payrollId}`
         : `${BASE_URL}/payroll/${payrollId}`;
 
-      console.log("Making request to:", endpoint); 
+      console.log("Making request to:", endpoint);
       const response = await axios.get(endpoint, { withCredentials: true });
 
       if (!response.data.success) {
@@ -232,7 +232,7 @@ export const adminPayrollService = {
         throw new Error(response.data.message || "Failed to submit payroll");
       }
 
-      toast.success("Payroll submitted successfully");
+      // toast.success("Payroll submitted successfully");
       return response.data.data;
     } catch (error: any) {
       console.error("Error submitting payroll:", error);
@@ -463,7 +463,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/submit-bulk`
         : `${BASE_URL}/payroll/submit-bulk`;
 
-      console.log("Making request to:", endpoint); 
+      console.log("Making request to:", endpoint);
       const response = await axios.post(endpoint, data, {
         withCredentials: true,
       });
@@ -589,18 +589,17 @@ export const adminPayrollService = {
   },
 
   // Process multiple employees payroll
-  processMultipleEmployeesPayroll: async (
-    data: {
-      employeeIds: string[];
-      month: number;
-      year: number;
-      frequency: string;
-    },
-    userRole?: string
-  ): Promise<any> => {
+  processMultipleEmployeesPayroll: async (data: {
+    employeeIds: string[];
+    month: number;
+    year: number;
+    frequency: string;
+    departmentId: string;
+    userRole?: string;
+  }): Promise<any> => {
     try {
       // Use different endpoint for Super Admin
-      const endpoint = isSuperAdmin(userRole)
+      const endpoint = isSuperAdmin(data.userRole)
         ? `${SUPER_ADMIN_BASE_URL}/payroll/process-multiple`
         : `${BASE_URL}/payroll/process-multiple`;
 
@@ -664,8 +663,12 @@ export const adminPayrollService = {
       // Add timestamp to prevent caching
       const url = timestamp ? `${endpoint}?t=${timestamp}` : endpoint;
 
-      console.log("Making request to:", url); // Debug log
+      console.log("Making request to:", url);
+      console.log("User role:", userRole);
+      console.log("Is super admin:", isSuperAdmin(userRole));
+
       const response = await axios.get(url, { withCredentials: true });
+      console.log("API response:", response.data);
 
       if (!response.data.success) {
         throw new Error(
@@ -676,6 +679,7 @@ export const adminPayrollService = {
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching processing statistics:", error);
+      console.error("Error details:", error.response?.data);
       toast.error(
         error.response?.data?.message || "Failed to fetch processing statistics"
       );

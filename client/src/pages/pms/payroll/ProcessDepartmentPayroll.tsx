@@ -886,7 +886,7 @@ const ProcessDepartmentPayroll = () => {
       ) : (
         <PayrollDashboard
           payrolls={convertedPayrolls}
-          processingStats={processingStats?.data}
+          processingStats={processingStats}
         />
       )}
 

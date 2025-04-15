@@ -1037,26 +1037,35 @@ export class PayrollService {
     }
   }
 
-  static async getProcessingStatistics() {
+  static async getProcessingStatistics(departmentId = null) {
     try {
+      // Create base query
+      const baseQuery = departmentId ? { department: departmentId } : {};
+
       // Basic counts
-      const totalPayrolls = await PayrollModel.countDocuments();
+      const totalPayrolls = await PayrollModel.countDocuments(baseQuery);
       const processingPayrolls = await PayrollModel.countDocuments({
+        ...baseQuery,
         status: PAYROLL_STATUS.PROCESSING,
       });
       const completedPayrolls = await PayrollModel.countDocuments({
+        ...baseQuery,
         status: PAYROLL_STATUS.COMPLETED,
       });
       const failedPayrolls = await PayrollModel.countDocuments({
+        ...baseQuery,
         status: PAYROLL_STATUS.FAILED,
       });
       const approvedPayrolls = await PayrollModel.countDocuments({
+        ...baseQuery,
         status: PAYROLL_STATUS.APPROVED,
       });
       const paidPayrolls = await PayrollModel.countDocuments({
+        ...baseQuery,
         status: PAYROLL_STATUS.PAID,
       });
       const pendingPaymentPayrolls = await PayrollModel.countDocuments({
+        ...baseQuery,
         status: PAYROLL_STATUS.PENDING_PAYMENT,
       });
 
@@ -1074,29 +1083,29 @@ export class PayrollService {
       const pendingPaymentRate =
         totalPayrolls > 0 ? (pendingPaymentPayrolls / totalPayrolls) * 100 : 0;
 
-      // Calculate total amounts
+      // Calculate total amounts with department filter
       const totalAmountApproved = await PayrollModel.aggregate([
-        { $match: { status: PAYROLL_STATUS.APPROVED } },
+        { $match: { ...baseQuery, status: PAYROLL_STATUS.APPROVED } },
         { $group: { _id: null, total: { $sum: "$totals.netPay" } } },
       ]);
 
       const totalAmountPaid = await PayrollModel.aggregate([
-        { $match: { status: PAYROLL_STATUS.PAID } },
+        { $match: { ...baseQuery, status: PAYROLL_STATUS.PAID } },
         { $group: { _id: null, total: { $sum: "$totals.netPay" } } },
       ]);
 
       const totalAmountPending = await PayrollModel.aggregate([
-        { $match: { status: PAYROLL_STATUS.PENDING } },
+        { $match: { ...baseQuery, status: PAYROLL_STATUS.PENDING } },
         { $group: { _id: null, total: { $sum: "$totals.netPay" } } },
       ]);
 
       const totalAmountProcessing = await PayrollModel.aggregate([
-        { $match: { status: PAYROLL_STATUS.PROCESSING } },
+        { $match: { ...baseQuery, status: PAYROLL_STATUS.PROCESSING } },
         { $group: { _id: null, total: { $sum: "$totals.netPay" } } },
       ]);
 
       const totalAmountPendingPayment = await PayrollModel.aggregate([
-        { $match: { status: PAYROLL_STATUS.PENDING_PAYMENT } },
+        { $match: { ...baseQuery, status: PAYROLL_STATUS.PENDING_PAYMENT } },
         { $group: { _id: null, total: { $sum: "$totals.netPay" } } },
       ]);
 

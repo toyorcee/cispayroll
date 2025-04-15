@@ -35,6 +35,7 @@ import { EmailService } from "../services/EmailService.js";
 import BaseApprovalController, {
   APPROVAL_LEVELS,
 } from "./BaseApprovalController.js";
+import Payroll from "../models/Payroll.js";
 
 const asObjectId = (id) => new Types.ObjectId(id);
 
@@ -1418,6 +1419,7 @@ export class SuperAdminController {
 
       // Format the response with detailed payslip information
       const payslipData = {
+        _id: payroll._id,
         payslipId: `PS${payroll.month}${payroll.year}${payroll.employee.employeeId}`,
         employee: {
           id: payroll.employee._id,
@@ -3817,10 +3819,10 @@ export class SuperAdminController {
 
   static async sendPayslipEmail(req, res) {
     try {
-      const { payslipId } = req.params;
+      const { payrollId } = req.params;
 
-      // Find payroll by payslipId and populate necessary fields
-      const payroll = await Payroll.findOne({ payslipId })
+      // Find payroll by _id
+      const payroll = await PayrollModel.findById(payrollId)
         .populate("employee")
         .populate("department")
         .populate("salaryGrade")
@@ -3879,15 +3881,12 @@ export class SuperAdminController {
       );
 
       // Update payroll record to mark email as sent
-      await Payroll.findOneAndUpdate(
-        { payslipId },
-        {
-          $set: {
-            emailSent: true,
-            emailSentAt: new Date(),
-          },
-        }
-      );
+      await PayrollModel.findByIdAndUpdate(payrollId, {
+        $set: {
+          emailSent: true,
+          emailSentAt: new Date(),
+        },
+      });
 
       return res.status(200).json({
         success: true,
