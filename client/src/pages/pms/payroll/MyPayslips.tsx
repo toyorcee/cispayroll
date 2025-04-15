@@ -146,7 +146,7 @@ export default function MyPayslipsPage() {
           <button
             onClick={handleRefreshPayslips}
             disabled={loading.refresh}
-            className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+            className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded cursor-pointer"
           >
             <FiRefreshCw
               className={`${loading.refresh ? "animate-spin" : ""}`}
@@ -165,7 +165,7 @@ export default function MyPayslipsPage() {
             </p>
             <button
               onClick={handleRefreshPayslips}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium"
+              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-medium cursor-pointer"
             >
               Load My Payslips
             </button>
@@ -220,7 +220,7 @@ export default function MyPayslipsPage() {
                         <div className="flex space-x-2">
                           <button
                             onClick={() => handleViewPayslip(payslip)}
-                            className="p-2 text-blue-500 hover:bg-blue-50 rounded"
+                            className="p-2 text-blue-500 hover:bg-blue-50 rounded cursor-pointer"
                             title="View Payslip"
                           >
                             <FiEye />
@@ -228,7 +228,7 @@ export default function MyPayslipsPage() {
                           <button
                             onClick={() => handleDownloadPayslip(payslip)}
                             disabled={loading.download}
-                            className="p-2 text-green-500 hover:bg-green-50 rounded"
+                            className="p-2 text-green-500 hover:bg-green-50 rounded cursor-pointer"
                             title="Download Payslip"
                           >
                             <FiDownload />
@@ -236,7 +236,7 @@ export default function MyPayslipsPage() {
                           <button
                             onClick={() => handlePrintPayslip(payslip)}
                             disabled={loading.print}
-                            className="p-2 text-purple-500 hover:bg-purple-50 rounded"
+                            className="p-2 text-purple-500 hover:bg-purple-50 rounded cursor-pointer"
                             title="Print Payslip"
                           >
                             <FiPrinter />

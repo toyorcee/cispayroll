@@ -86,11 +86,24 @@ const LeaveManagement: React.FC = () => {
     }
   };
 
-  // Check if user has permission to approve leave
-  if (!hasPermission(Permission.APPROVE_LEAVE)) {
+  // Check user permissions
+  const canApproveLeave = hasPermission(Permission.APPROVE_LEAVE);
+  const canViewTeamLeave = hasPermission(Permission.VIEW_TEAM_LEAVE);
+  const canRequestLeave = hasPermission(Permission.REQUEST_LEAVE);
+  const canViewOwnLeave = hasPermission(Permission.VIEW_OWN_LEAVE);
+  const canCancelOwnLeave = hasPermission(Permission.CANCEL_OWN_LEAVE);
+
+  // If user has no leave-related permissions, show error
+  if (
+    !canRequestLeave &&
+    !canViewOwnLeave &&
+    !canCancelOwnLeave &&
+    !canApproveLeave &&
+    !canViewTeamLeave
+  ) {
     return (
       <Alert severity="error">
-        You don't have permission to approve leave requests.
+        You don't have any leave-related permissions.
       </Alert>
     );
   }
@@ -100,6 +113,36 @@ const LeaveManagement: React.FC = () => {
       <Typography variant="h4" className="mb-6">
         Leave Management
       </Typography>
+
+      {/* Show leave request form if user can request leave */}
+      {canRequestLeave && (
+        <Paper className="p-4 mb-6">
+          <Typography variant="h6" className="mb-4">
+            Request Leave
+          </Typography>
+          {/* Add your leave request form here */}
+        </Paper>
+      )}
+
+      {/* Show team leave requests if user can approve or view team leave */}
+      {(canApproveLeave || canViewTeamLeave) && (
+        <Paper className="p-4 mb-6">
+          <Typography variant="h6" className="mb-4">
+            Team Leave Requests
+          </Typography>
+          {/* Add your team leave requests table here */}
+        </Paper>
+      )}
+
+      {/* Show own leave requests if user can view own leave */}
+      {canViewOwnLeave && (
+        <Paper className="p-4">
+          <Typography variant="h6" className="mb-4">
+            My Leave Requests
+          </Typography>
+          {/* Add your own leave requests table here */}
+        </Paper>
+      )}
 
       {/* Statistics */}
       <Grid container spacing={3} className="mb-6">

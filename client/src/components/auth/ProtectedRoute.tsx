@@ -81,8 +81,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     // Leave Management Routes
     if (path.startsWith("/pms/employees/leave")) {
       const leavePermissions = [
-        Permission.APPROVE_LEAVE,
-        Permission.VIEW_TEAM_LEAVE,
         Permission.REQUEST_LEAVE,
         Permission.VIEW_OWN_LEAVE,
         Permission.CANCEL_OWN_LEAVE,
@@ -180,106 +178,93 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     // Settings Routes
     if (path.startsWith("/pms/settings")) {
-      // General Settings
-      if (path.includes("/general")) {
-        if (!user.permissions?.includes(Permission.MANAGE_SYSTEM_SETTINGS)) {
-          toast.error("Access denied: No system settings permissions");
-          return <Navigate to="/pms/dashboard" replace />;
+      // For Admin role, allow access to their permitted settings pages
+      if (user.role === UserRole.ADMIN) {
+        // Allow access to main settings page
+        if (path === "/pms/settings" || path === "/pms/settings/") {
+          return <>{children || element}</>;
         }
-      }
 
-      // Company Profile Settings
-      if (path.includes("/company")) {
-        if (!user.permissions?.includes(Permission.MANAGE_COMPANY_PROFILE)) {
-          toast.error("Access denied: No company profile settings permissions");
-          return <Navigate to="/pms/dashboard" replace />;
+        // Check specific permissions for each settings page
+        if (path.includes("/departments")) {
+          if (
+            !user.permissions?.includes(Permission.MANAGE_DEPARTMENT_SETTINGS)
+          ) {
+            toast.error("Access denied: No department settings permissions");
+            return <Navigate to="/pms/dashboard" replace />;
+          }
+          return <>{children || element}</>;
         }
-      }
 
-      // Department Settings
-      if (path.includes("/departments")) {
+        if (path.includes("/users")) {
+          if (!user.permissions?.includes(Permission.MANAGE_USER_SETTINGS)) {
+            toast.error("Access denied: No user settings permissions");
+            return <Navigate to="/pms/dashboard" replace />;
+          }
+          return <>{children || element}</>;
+        }
+
+        if (path.includes("/payroll")) {
+          if (!user.permissions?.includes(Permission.MANAGE_PAYROLL_SETTINGS)) {
+            toast.error("Access denied: No payroll settings permissions");
+            return <Navigate to="/pms/dashboard" replace />;
+          }
+          return <>{children || element}</>;
+        }
+
+        if (path.includes("/leave")) {
+          if (!user.permissions?.includes(Permission.MANAGE_LEAVE_SETTINGS)) {
+            toast.error("Access denied: No leave settings permissions");
+            return <Navigate to="/pms/dashboard" replace />;
+          }
+          return <>{children || element}</>;
+        }
+
+        if (path.includes("/documents")) {
+          if (
+            !user.permissions?.includes(Permission.MANAGE_DOCUMENT_SETTINGS)
+          ) {
+            toast.error("Access denied: No document settings permissions");
+            return <Navigate to="/pms/dashboard" replace />;
+          }
+          return <>{children || element}</>;
+        }
+
+        if (path.includes("/notifications")) {
+          if (
+            !user.permissions?.includes(Permission.MANAGE_NOTIFICATION_SETTINGS)
+          ) {
+            toast.error("Access denied: No notification settings permissions");
+            return <Navigate to="/pms/dashboard" replace />;
+          }
+          return <>{children || element}</>;
+        }
+
+        // Block access to settings pages that are only for Super Admin
         if (
-          !user.permissions?.includes(Permission.MANAGE_DEPARTMENT_SETTINGS)
+          path.includes("/company") ||
+          path.includes("/integrations") ||
+          path.includes("/tax") ||
+          path.includes("/compliance")
         ) {
-          toast.error("Access denied: No department settings permissions");
+          toast.error(
+            "Access denied: This setting is only available for Super Admin"
+          );
           return <Navigate to="/pms/dashboard" replace />;
         }
-      }
-
-      // User Settings
-      if (path.includes("/users")) {
-        if (!user.permissions?.includes(Permission.MANAGE_USER_SETTINGS)) {
-          toast.error("Access denied: No user settings permissions");
-          return <Navigate to="/pms/dashboard" replace />;
-        }
-      }
-
-      // Payroll Settings
-      if (path.includes("/payroll")) {
-        if (!user.permissions?.includes(Permission.MANAGE_PAYROLL_SETTINGS)) {
-          toast.error("Access denied: No payroll settings permissions");
-          return <Navigate to="/pms/dashboard" replace />;
-        }
-      }
-
-      // Leave Settings
-      if (path.includes("/leave")) {
-        if (!user.permissions?.includes(Permission.MANAGE_LEAVE_SETTINGS)) {
-          toast.error("Access denied: No leave settings permissions");
-          return <Navigate to="/pms/dashboard" replace />;
-        }
-      }
-
-      // Document Settings
-      if (path.includes("/documents")) {
-        if (!user.permissions?.includes(Permission.MANAGE_DOCUMENT_SETTINGS)) {
-          toast.error("Access denied: No document settings permissions");
-          return <Navigate to="/pms/dashboard" replace />;
-        }
-      }
-
-      // Notification Settings
-      if (path.includes("/notifications")) {
-        if (
-          !user.permissions?.includes(Permission.MANAGE_NOTIFICATION_SETTINGS)
-        ) {
-          toast.error("Access denied: No notification settings permissions");
-          return <Navigate to="/pms/dashboard" replace />;
-        }
-      }
-
-      // Integration Settings
-      if (path.includes("/integrations")) {
-        if (
-          !user.permissions?.includes(Permission.MANAGE_INTEGRATION_SETTINGS)
-        ) {
-          toast.error("Access denied: No integration settings permissions");
-          return <Navigate to="/pms/dashboard" replace />;
-        }
-      }
-
-      // Tax Settings
-      if (path.includes("/tax")) {
-        if (!user.permissions?.includes(Permission.MANAGE_TAX_SETTINGS)) {
-          toast.error("Access denied: No tax settings permissions");
-          return <Navigate to="/pms/dashboard" replace />;
-        }
-      }
-
-      // Compliance Settings
-      if (path.includes("/compliance")) {
-        if (
-          !user.permissions?.includes(Permission.MANAGE_COMPLIANCE_SETTINGS)
-        ) {
-          toast.error("Access denied: No compliance settings permissions");
-          return <Navigate to="/pms/dashboard" replace />;
-        }
-      }
-
-      // System Settings
-      if (path.includes("/system")) {
-        if (!user.permissions?.includes(Permission.MANAGE_SYSTEM_SETTINGS)) {
-          toast.error("Access denied: No system settings permissions");
+      } else if (user.role === UserRole.USER) {
+        if (path.includes("/notifications")) {
+          if (
+            !user.permissions?.includes(Permission.MANAGE_NOTIFICATION_SETTINGS)
+          ) {
+            toast.error("Access denied: No notification settings permissions");
+            return <Navigate to="/pms/dashboard" replace />;
+          }
+          return <>{children || element}</>;
+        } else {
+          toast.error(
+            "Access denied: Users can only access Notification Settings"
+          );
           return <Navigate to="/pms/dashboard" replace />;
         }
       }
@@ -308,7 +293,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       if (
         !path.includes("/my-payslips") &&
         !path.includes("/my-allowances") &&
-        !path.includes("/my-deductions")
+        !path.includes("/my-deductions") &&
+        !path.includes("/my-bonus")
       ) {
         toast.error("Access denied: Users can only access personal views");
         return <Navigate to="/pms/dashboard" replace />;
@@ -332,6 +318,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       if (path.includes("/my-deductions")) {
         if (!user.permissions?.includes(Permission.VIEW_OWN_DEDUCTIONS)) {
           toast.error("Access denied: Cannot view personal deductions");
+          return <Navigate to="/pms/dashboard" replace />;
+        }
+      }
+
+      if (path.includes("/my-bonus")) {
+        if (!user.permissions?.includes(Permission.VIEW_OWN_BONUS)) {
+          toast.error("Access denied: Cannot view personal bonus");
           return <Navigate to="/pms/dashboard" replace />;
         }
       }
@@ -361,9 +354,25 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       }
     }
 
-    // Settings - Users can only view their own settings
+    // Settings - Users can only access Notification Settings if they have the permission
     if (path.startsWith("/pms/settings")) {
-      toast.error("Access denied: Users cannot access settings");
+      // Allow access to main settings page and notification settings if user has the permission
+      if (
+        path === "/pms/settings" ||
+        path === "/pms/settings/" ||
+        path.includes("/notifications")
+      ) {
+        if (
+          !user.permissions?.includes(Permission.MANAGE_NOTIFICATION_SETTINGS)
+        ) {
+          toast.error("Access denied: No notification settings permissions");
+          return <Navigate to="/pms/dashboard" replace />;
+        }
+        return <>{children || element}</>;
+      }
+
+      // Block access to all other settings pages for regular users
+      toast.error("Access denied: Users can only access Notification Settings");
       return <Navigate to="/pms/dashboard" replace />;
     }
   }

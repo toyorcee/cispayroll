@@ -40,7 +40,6 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
     const [isLoading, setIsLoading] = useState(false);
     const pollingInterval = useRef<number | null>(null);
 
-    // Expose the checkForNewNotifications function through the ref
     useImperativeHandle(ref, () => ({
       checkForNewNotifications: async () => {
         console.log("🔄 Manually checking for new notifications...");
@@ -48,14 +47,12 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
       },
     }));
 
-    // Initial fetch
     useEffect(() => {
       fetchNotifications();
 
-      // Set up polling for new notifications every 30 seconds
       pollingInterval.current = window.setInterval(() => {
         fetchNotifications();
-      }, 30000);
+      }, 60000);
 
       // Clean up interval on component unmount
       return () => {
@@ -66,13 +63,12 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
     }, []);
 
     const fetchNotifications = async () => {
-      if (isLoading) return; // Prevent multiple simultaneous requests
+      if (isLoading) return; 
 
       try {
         setIsLoading(true);
         console.log("🔍 Fetching notifications...");
 
-        // Get the API URL from environment variable or use default
         const apiUrl =
           import.meta.env.VITE_API_URL ||
           "https://payrollapi.digitalentshub.net";
@@ -83,7 +79,6 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
           },
         });
 
-        // Check if the response is OK before trying to parse JSON
         if (!response.ok) {
           console.error(
             `❌ API error: ${response.status} ${response.statusText}`
@@ -99,15 +94,13 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
         console.log("📦 Notification data received:", data);
 
         if (data.success) {
-          // Check if there are new unread notifications
           const newUnreadCount = data.data.unreadCount;
           console.log(`📊 Unread count: ${newUnreadCount}`);
 
-          // Log detailed information about each notification
           if (data.data.notifications.length > 0) {
-            console.log(
-              `📬 Received ${data.data.notifications.length} notifications:`
-            );
+            // console.log(
+            //   `📬 Received ${data.data.notifications.length} notifications:`
+            // );
             data.data.notifications.forEach(
               (notification: Notification, index: number) => {
                 console.log(`📝 Notification #${index + 1}:`, {
@@ -143,9 +136,7 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
           }
 
           if (newUnreadCount > unreadCount) {
-            // If we have new notifications and the bell is not open, show a visual indicator
             if (!isOpen) {
-              // You could add a subtle animation or highlight effect here
               console.log(
                 `🔔 New notification! Unread count increased from ${unreadCount} to ${newUnreadCount}`
               );
@@ -159,7 +150,6 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
         }
       } catch (error) {
         console.error("❌ Error fetching notifications:", error);
-        // Don't throw the error, just log it and continue
       } finally {
         setIsLoading(false);
       }
@@ -236,11 +226,11 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
       <div className="relative">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`p-2 hover:bg-green-50 rounded-full relative ${
+          className={`p-2 hover:bg-green-50 rounded-full relative cursor-pointer ${
             unreadCount > 0 ? "animate-pulse" : ""
           }`}
         >
-          <FaBell className="w-5 h-5 text-gray-600" />
+          <FaBell className="w-5 h-5 text-gray-600 cursor-pointer" />
           {unreadCount > 0 && (
             <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
               {unreadCount}

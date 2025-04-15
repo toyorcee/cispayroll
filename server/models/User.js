@@ -1013,6 +1013,7 @@ UserSchema.pre("save", function (next) {
           // Notifications
           Permission.VIEW_NOTIFICATIONS,
           Permission.MARK_NOTIFICATIONS_READ,
+          Permission.MANAGE_NOTIFICATION_SETTINGS,
 
           // Profile Management
           Permission.UPDATE_PROFILE,

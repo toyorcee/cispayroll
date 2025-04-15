@@ -112,12 +112,12 @@ export const routes: RouteConfig[] = [
   {
     path: "employees",
     label: "Employees",
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
     permissions: [
-      Permission.VIEW_ALL_USERS,
-      Permission.MANAGE_DEPARTMENT_USERS,
-      Permission.MANAGE_ONBOARDING,
-      Permission.MANAGE_OFFBOARDING,
+      // Permission.VIEW_ALL_USERS,
+      // Permission.MANAGE_DEPARTMENT_USERS,
+      // Permission.MANAGE_ONBOARDING,
+      // Permission.MANAGE_OFFBOARDING,
     ],
     requireAllPermissions: false,
     element: <Outlet />,
@@ -256,7 +256,7 @@ export const routes: RouteConfig[] = [
         requireAllPermissions: false,
         element: <ProcessPayroll />,
       },
-          {
+      {
         path: "department-process",
         label: "Process Department Payroll",
         roles: [UserRole.ADMIN, UserRole.SUPER_ADMIN],
@@ -274,7 +274,7 @@ export const routes: RouteConfig[] = [
       {
         path: "my-payslips",
         label: "My Payslips",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+        roles: [UserRole.ADMIN, UserRole.USER],
         permissions: [Permission.VIEW_OWN_PAYSLIP],
         requireAllPermissions: true,
         element: <MyPayslipsPage />,
@@ -282,7 +282,7 @@ export const routes: RouteConfig[] = [
       {
         path: "my-allowances",
         label: "My Allowances",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+        roles: [UserRole.ADMIN, UserRole.USER],
         permissions: [
           Permission.VIEW_OWN_ALLOWANCES,
           Permission.REQUEST_ALLOWANCES,
@@ -293,7 +293,7 @@ export const routes: RouteConfig[] = [
       {
         path: "my-deductions",
         label: "My Deductions",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+        roles: [UserRole.ADMIN, UserRole.USER],
         permissions: [Permission.VIEW_OWN_DEDUCTIONS],
         requireAllPermissions: true,
         element: <MyDeductions />,
@@ -301,7 +301,7 @@ export const routes: RouteConfig[] = [
       {
         path: "my-bonus",
         label: "My Bonus",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+        roles: [UserRole.ADMIN, UserRole.USER],
         permissions: [Permission.VIEW_OWN_BONUS],
         requireAllPermissions: true,
         element: <MyBonus />,
@@ -358,16 +358,8 @@ export const routes: RouteConfig[] = [
   {
     path: "settings",
     label: "Settings",
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    permissions: [
-      Permission.MANAGE_SYSTEM_SETTINGS,
-      Permission.MANAGE_DEPARTMENT_SETTINGS,
-      Permission.MANAGE_USER_SETTINGS,
-      Permission.MANAGE_NOTIFICATION_SETTINGS,
-      Permission.MANAGE_LEAVE_SETTINGS,
-      Permission.MANAGE_PAYROLL_SETTINGS,
-      Permission.MANAGE_DOCUMENT_SETTINGS,
-    ],
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+    permissions: [],
     requireAllPermissions: false,
     element: <Outlet />,
     children: [
@@ -430,7 +422,7 @@ export const routes: RouteConfig[] = [
       {
         path: "notifications",
         label: "Notification Settings",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
         permissions: [Permission.MANAGE_NOTIFICATION_SETTINGS],
         requireAllPermissions: true,
         element: <Notifications />,

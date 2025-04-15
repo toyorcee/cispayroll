@@ -10,7 +10,6 @@ import {
   DocumentTextIcon,
   CogIcon,
   UserIcon,
-  ChatBubbleLeftIcon,
 } from "@heroicons/react/24/outline";
 
 type NavigationContextType = {
@@ -32,18 +31,23 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
   const getAvailableMenus = () => {
     if (!user || !user.permissions) {
+      console.log("No user or permissions found");
       return [];
     }
 
     // Check for dashboard access first
     if (!user.permissions.includes(Permission.VIEW_DASHBOARD)) {
+      console.log("User doesn't have VIEW_DASHBOARD permission");
       return [];
     }
 
     const availableMenus = ["Dashboard"];
+    console.log("User role:", user.role);
+    console.log("User permissions:", user.permissions);
 
     // For Super Admin, show ALL main menus (not submenus)
     if (user.role === UserRole.SUPER_ADMIN) {
+      console.log("Super Admin detected, showing all menus");
       return [
         "Dashboard",
         "Employees",
@@ -56,7 +60,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
     // For Admin, check specific permissions
     if (user.role === UserRole.ADMIN) {
-      // Employee Management
+      console.log("Admin detected, checking permissions");
       if (
         user.permissions.some((p) =>
           [
@@ -66,6 +70,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
             Permission.VIEW_ONBOARDING,
             Permission.MANAGE_OFFBOARDING,
             Permission.VIEW_OFFBOARDING,
+            Permission.APPROVE_OFFBOARDING,
           ].includes(p)
         )
       ) {
@@ -124,11 +129,30 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       if (user.permissions.includes(Permission.VIEW_PERSONAL_INFO)) {
         availableMenus.push("Profile");
       }
+
+      // Settings - Add for Admin if they have any settings-related permissions
+      const settingsPermissions = [
+        Permission.MANAGE_SYSTEM_SETTINGS,
+        Permission.MANAGE_DEPARTMENT_SETTINGS,
+        Permission.MANAGE_USER_SETTINGS,
+        Permission.MANAGE_PAYROLL_SETTINGS,
+        Permission.MANAGE_LEAVE_SETTINGS,
+        Permission.MANAGE_DOCUMENT_SETTINGS,
+        Permission.MANAGE_NOTIFICATION_SETTINGS,
+      ];
+      console.log("Checking settings permissions:", settingsPermissions);
+      console.log(
+        "User has settings permissions:",
+        settingsPermissions.some((p) => user.permissions.includes(p))
+      );
+      if (user.permissions.some((p) => settingsPermissions.includes(p))) {
+        console.log("Adding Settings menu for Admin");
+        availableMenus.push("Settings");
+      }
     }
 
-    // For User, only show basic menus
     if (user.role === UserRole.USER) {
-      // Payroll Section
+      console.log("User role detected, checking permissions");
       if (
         user.permissions.some((p) =>
           [
@@ -140,15 +164,37 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
           ].includes(p)
         )
       ) {
+        console.log("User has payroll permissions, adding Payroll menu");
         availableMenus.push("Payroll");
       }
 
       // Profile
       if (user.permissions.includes(Permission.VIEW_PERSONAL_INFO)) {
+        console.log(
+          "User has VIEW_PERSONAL_INFO permission, adding Profile menu"
+        );
         availableMenus.push("Profile");
+      }
+
+      // Settings - Add for User if they have notification settings permission
+      console.log("Checking for MANAGE_NOTIFICATION_SETTINGS permission");
+      console.log(
+        "User has MANAGE_NOTIFICATION_SETTINGS:",
+        user.permissions.includes(Permission.MANAGE_NOTIFICATION_SETTINGS)
+      );
+      if (user.permissions.includes(Permission.MANAGE_NOTIFICATION_SETTINGS)) {
+        console.log(
+          "Adding Settings menu for User with MANAGE_NOTIFICATION_SETTINGS permission"
+        );
+        availableMenus.push("Settings");
+      } else {
+        console.log(
+          "User does NOT have MANAGE_NOTIFICATION_SETTINGS permission"
+        );
       }
     }
 
+    console.log("Final available menus:", availableMenus);
     return availableMenus;
   };
 
@@ -194,8 +240,7 @@ export const menuItems: NavigationItem[] = [
     name: "Employees",
     href: "/pms/employees",
     icon: UsersIcon,
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    permissions: [Permission.VIEW_ALL_USERS],
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
     subItems: [
       {
         name: "All Employees",
@@ -206,16 +251,25 @@ export const menuItems: NavigationItem[] = [
         name: "Onboarding",
         href: "/pms/employees/onboarding",
         permissions: [Permission.MANAGE_ONBOARDING],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
       },
       {
         name: "Offboarding",
         href: "/pms/employees/offboarding",
         permissions: [Permission.MANAGE_OFFBOARDING],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
       },
       {
         name: "Leave Management",
         href: "/pms/employees/leave",
-        permissions: [Permission.APPROVE_LEAVE, Permission.VIEW_TEAM_LEAVE],
+        permissions: [
+          Permission.REQUEST_LEAVE,
+          Permission.VIEW_OWN_LEAVE,
+          Permission.CANCEL_OWN_LEAVE,
+          Permission.APPROVE_LEAVE,
+          Permission.VIEW_TEAM_LEAVE,
+        ],
+        requireAllPermissions: false,
       },
     ],
   },
@@ -322,7 +376,7 @@ export const menuItems: NavigationItem[] = [
         name: "My Payslips",
         href: "/pms/payroll/my-payslips",
         permissions: [Permission.VIEW_OWN_PAYSLIP],
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+        roles: [UserRole.ADMIN, UserRole.USER],
       },
       {
         name: "My Allowances",
@@ -387,12 +441,12 @@ export const menuItems: NavigationItem[] = [
     name: "Settings",
     href: "/pms/settings",
     icon: CogIcon,
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
     permissions: [
       Permission.MANAGE_SYSTEM_SETTINGS,
       Permission.MANAGE_DEPARTMENT_SETTINGS,
       Permission.MANAGE_USER_SETTINGS,
-      Permission.MANAGE_NOTIFICATION_SETTINGS,
+      Permission.MANAGE_PAYROLL_SETTINGS,
     ],
     requireAllPermissions: false,
     subItems: [
@@ -441,7 +495,7 @@ export const menuItems: NavigationItem[] = [
       {
         name: "Notification Settings",
         href: "/pms/settings/notifications",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
         permissions: [Permission.MANAGE_NOTIFICATION_SETTINGS],
       },
       {

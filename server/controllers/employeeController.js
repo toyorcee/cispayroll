@@ -290,7 +290,7 @@ export class EmployeeController {
             path: "employee",
             select: "firstName lastName employeeId bankDetails",
           },
-          { path: "department", select: "name code" },
+        { path: "department", select: "name code" },
           { path: "salaryGrade", select: "level description" },
         ])
         .lean();

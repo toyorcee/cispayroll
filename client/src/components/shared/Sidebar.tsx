@@ -15,9 +15,9 @@ import {
 } from "@heroicons/react/24/outline";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaTimes } from "react-icons/fa";
-import { ProfileMenu } from "./PayrollMenu"; 
+import { ProfileMenu } from "./PayrollMenu";
 import { useAuth } from "../../context/AuthContext";
-import { UserRole, Permission } from "../../types/auth";
+import { UserRole } from "../../types/auth";
 import { menuItems } from "../../context/NavigationContext";
 import {
   NavigationItem,
@@ -26,7 +26,6 @@ import {
 } from "../../types/navigation";
 import { FaGavel } from "react-icons/fa6";
 
-// Updated icon mapping to include all sections
 const iconMap: Record<string, IconType> = {
   Dashboard: ChartBarIcon,
   Employees: UsersIcon,
@@ -74,37 +73,44 @@ export function Sidebar() {
   }, [location.pathname, setIsSidebarOpen]);
 
   const filteredNavigation = menuItems.filter((item: NavigationItem) => {
-    // SUPER_ADMIN has access to everything except personal views that require specific permissions
+    console.log("Filtering menu item:", item.name);
+
+    // SUPER_ADMIN should not see personal views
     if (hasRole(UserRole.SUPER_ADMIN)) {
-      // Only check permissions for personal views
+      // Hide personal views for super admin
       if (
         item.name === "My Allowances" ||
         item.name === "My Deductions" ||
         item.name === "My Bonus" ||
         item.name === "My Payslips"
       ) {
-        const permissionMap = {
-          "My Payslips": Permission.VIEW_OWN_PAYSLIP,
-          "My Allowances": Permission.VIEW_OWN_ALLOWANCES,
-          "My Deductions": Permission.VIEW_OWN_DEDUCTIONS,
-          "My Bonus": Permission.VIEW_OWN_BONUS,
-        };
-        return hasPermission(
-          permissionMap[item.name as keyof typeof permissionMap]
-        );
+        console.log("Hiding personal view for super admin:", item.name);
+        return false;
       }
+      console.log("Super admin can see:", item.name);
       return true;
     }
 
     // For non-SUPER_ADMIN users, check roles and permissions
     if (item.roles && !item.roles.some((role) => hasRole(role))) {
+      console.log("User doesn't have required role for:", item.name);
       return false;
     }
 
     if (item.permissions) {
-      return item.permissions.some((permission) => hasPermission(permission));
+      const hasRequiredPermission = item.permissions.some((permission) =>
+        hasPermission(permission)
+      );
+      console.log(
+        `User ${
+          hasRequiredPermission ? "has" : "doesn't have"
+        } required permissions for:`,
+        item.name
+      );
+      return hasRequiredPermission;
     }
 
+    console.log("No specific permissions required for:", item.name);
     return true;
   });
 
@@ -112,24 +118,15 @@ export function Sidebar() {
     if (!subItems) return [];
 
     return subItems.filter((subItem: NavigationSubItem) => {
-      // SUPER_ADMIN has access to everything except personal views
       if (hasRole(UserRole.SUPER_ADMIN)) {
-        // Only check permissions for personal views
+        // Hide personal views for super admin
         if (
           subItem.name === "My Allowances" ||
           subItem.name === "My Deductions" ||
           subItem.name === "My Bonus" ||
           subItem.name === "My Payslips"
         ) {
-          const permissionMap = {
-            "My Payslips": Permission.VIEW_OWN_PAYSLIP,
-            "My Allowances": Permission.VIEW_OWN_ALLOWANCES,
-            "My Deductions": Permission.VIEW_OWN_DEDUCTIONS,
-            "My Bonus": Permission.VIEW_OWN_BONUS,
-          };
-          return hasPermission(
-            permissionMap[subItem.name as keyof typeof permissionMap]
-          );
+          return false;
         }
         return true;
       }
