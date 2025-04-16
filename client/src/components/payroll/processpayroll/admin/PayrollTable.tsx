@@ -510,29 +510,28 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                           </IconButton>
                         </Tooltip>
                       )}
-                      {payroll.status === "PENDING" &&
-                        canApproveReject(payroll) && (
-                          <>
-                            <Tooltip title="Approve">
-                              <IconButton
-                                size="small"
-                                onClick={() => onApprove(payroll)}
-                                color="success"
-                              >
-                                <CheckCircleIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Reject">
-                              <IconButton
-                                size="small"
-                                onClick={() => onReject(payroll)}
-                                color="error"
-                              >
-                                <CancelIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </>
-                        )}
+                      {payroll.status === "PENDING" && (
+                        <>
+                          <Tooltip title="Approve">
+                            <IconButton
+                              size="small"
+                              onClick={() => onApprove(payroll)}
+                              color="success"
+                            >
+                              <CheckCircleIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Reject">
+                            <IconButton
+                              size="small"
+                              onClick={() => onReject(payroll)}
+                              color="error"
+                            >
+                              <CancelIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      )}
                       {payroll.status === "APPROVED" && onProcessPayment && (
                         <Tooltip title="Process Payment">
                           <IconButton
