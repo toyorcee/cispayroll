@@ -40,7 +40,6 @@ interface ApprovalResponse {
 }
 
 export const payrollService = {
-  // Core Payroll Operations
   createPayroll: async (
     data: PayrollCalculationRequest
   ): Promise<IPayrollCalculationResult> => {
@@ -49,17 +48,13 @@ export const payrollService = {
       const response = await axios.post(`${BASE_URL}/payroll`, data);
 
       if (!response.data.success) {
-        throw new Error(response.data.message || "Failed to create payroll");
+        throw new Error("Failed to create payroll");
       }
 
       return response.data.data;
     } catch (error: unknown) {
       console.error("❌ Error creating payroll:", error);
-      const errorMessage =
-        (error as { response?: { data?: { message?: string } } })?.response
-          ?.data?.message || "Failed to create payroll";
-      toast.error(errorMessage);
-      throw new Error(errorMessage);
+      throw new Error("Failed to create payroll");
     }
   },
 

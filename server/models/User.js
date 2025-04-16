@@ -982,6 +982,9 @@ UserSchema.pre("save", function (next) {
           Permission.MANAGE_SYSTEM_SETTINGS,
           Permission.MANAGE_PAYROLL_SETTINGS,
           Permission.MANAGE_DOCUMENT_SETTINGS,
+
+          // Audit Logs
+          Permission.VIEW_AUDIT_LOGS,
         ];
         break;
 
@@ -1023,6 +1026,9 @@ UserSchema.pre("save", function (next) {
           Permission.SUBMIT_FEEDBACK,
           Permission.VIEW_OWN_FEEDBACK,
           Permission.MANAGE_FEEDBACK,
+
+          // Audit Logs
+          Permission.VIEW_AUDIT_LOGS,
         ];
         break;
     }

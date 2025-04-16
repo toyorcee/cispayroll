@@ -102,7 +102,6 @@ export const RunPayrollModal = ({
     },
     onError: (error: any) => {
       console.error("Error creating payroll:", error);
-      toast.error(error.message || "Failed to create payroll");
     },
   });
 

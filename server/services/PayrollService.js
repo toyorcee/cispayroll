@@ -11,6 +11,7 @@ import { AllowanceService } from "./AllowanceService.js";
 import { BonusService } from "./BonusService.js";
 import { SalaryStructureService } from "./SalaryStructureService.js";
 import DepartmentModel from "../models/Department.js";
+import Audit from "../models/Audit.js";
 
 const asObjectId = (id) => new Types.ObjectId(id);
 
@@ -1069,6 +1070,15 @@ export class PayrollService {
         status: PAYROLL_STATUS.PENDING_PAYMENT,
       });
 
+      // Get recent activity count (last 24 hours)
+      const oneDayAgo = new Date();
+      oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+
+      const recentActivityCount = await Audit.countDocuments({
+        createdAt: { $gte: oneDayAgo },
+        ...(departmentId ? { "details.departmentId": departmentId } : {}),
+      });
+
       // Calculate rates
       const processingRate =
         totalPayrolls > 0 ? (processingPayrolls / totalPayrolls) * 100 : 0;
@@ -1117,6 +1127,7 @@ export class PayrollService {
         approvedPayrolls,
         paidPayrolls,
         pendingPaymentPayrolls,
+        recentActivityCount,
         processingRate,
         completionRate,
         failureRate,

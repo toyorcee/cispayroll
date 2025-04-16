@@ -44,10 +44,11 @@ const StatCard = ({
         stiffness: 300,
         damping: 20,
       }}
+      className="w-full"
     >
-      <Link to={href}>
+      <Link to={href} className="block w-full">
         <div
-          className={`p-6 rounded-xl shadow-sm border-l-4 ${colorClasses[color]} flex items-center justify-between w-64 h-32`}
+          className={`p-6 rounded-xl shadow-sm border-l-4 ${colorClasses[color]} flex items-center justify-between w-full h-32`}
         >
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-gray-800">{name}</h3>

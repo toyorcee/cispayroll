@@ -35,11 +35,13 @@ export interface AdminPayrollProcessingStats {
   approvalRate: number;
   paymentRate: number;
   pendingPaymentRate: number;
-  totalAmountApproved: number;
+  totalApprovedAmount: number;
+  totalPaidAmount: number;
+  totalPendingAmount: number;
+  totalProcessingAmount: number;
+  totalPendingPaymentAmount: number;
+  recentActivityCount: number;
   totalAmountPaid: number;
-  totalAmountPending: number;
-  totalAmountProcessing: number;
-  totalAmountPendingPayment: number;
 }
 
 export interface AdminPayroll {

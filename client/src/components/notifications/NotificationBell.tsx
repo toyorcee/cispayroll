@@ -42,7 +42,6 @@ export const NotificationBell = forwardRef<NotificationBellRef, {}>(
 
     useImperativeHandle(ref, () => ({
       checkForNewNotifications: async () => {
-        console.log("🔄 Manually checking for new notifications...");
         await fetchNotifications();
       },
     }));
@@ -52,9 +51,8 @@ export const NotificationBell = forwardRef<NotificationBellRef, {}>(
 
       pollingInterval.current = window.setInterval(() => {
         fetchNotifications();
-      }, 60000);
+      }, 10000);
 
-      // Clean up interval on component unmount
       return () => {
         if (pollingInterval.current) {
           clearInterval(pollingInterval.current);
@@ -63,11 +61,10 @@ export const NotificationBell = forwardRef<NotificationBellRef, {}>(
     }, []);
 
     const fetchNotifications = async () => {
-      if (isLoading) return; 
+      if (isLoading) return;
 
       try {
         setIsLoading(true);
-        console.log("🔍 Fetching notifications...");
 
         const apiUrl =
           import.meta.env.VITE_API_URL ||
@@ -91,16 +88,11 @@ export const NotificationBell = forwardRef<NotificationBellRef, {}>(
         }
 
         const data = await response.json();
-        console.log("📦 Notification data received:", data);
 
         if (data.success) {
           const newUnreadCount = data.data.unreadCount;
-          console.log(`📊 Unread count: ${newUnreadCount}`);
 
           if (data.data.notifications.length > 0) {
-            // console.log(
-            //   `📬 Received ${data.data.notifications.length} notifications:`
-            // );
             data.data.notifications.forEach(
               (notification: Notification, index: number) => {
                 console.log(`📝 Notification #${index + 1}:`, {

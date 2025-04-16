@@ -1,7 +1,6 @@
 import { ApiError } from "../utils/errorHandler.js";
 import PayrollModel from "../models/Payroll.js";
 import UserModel from "../models/User.js";
-// import NotificationModel from "../models/Notification.js";
 import DepartmentModel from "../models/Department.js";
 import BaseApprovalController, {
   APPROVAL_LEVELS,
@@ -382,7 +381,7 @@ class ApprovalController {
             "You have successfully approved this payroll and it is now pending Finance Director approval",
           {
             data: {
-              approvalLevel: APPROVAL_LEVELS.HR_MANAGER, 
+              approvalLevel: APPROVAL_LEVELS.HR_MANAGER,
             },
           }
         )
@@ -621,59 +620,32 @@ class ApprovalController {
         updatedPayroll
       );
 
-      // Create notification for the next approver
+      // Create notification for the next approver (Super Admin)
       if (nextApprover) {
-        await BaseApprovalController.createApprovalNotification(
-          nextApprover,
-          updatedPayroll,
-          APPROVAL_LEVELS.FINANCE_DIRECTOR
-        );
-
-        // Also create a notification for the employee
         await NotificationService.createPayrollNotification(
-          payroll.employee._id,
-          NOTIFICATION_TYPES.PAYROLL_APPROVED,
+          nextApprover._id,
+          NOTIFICATION_TYPES.PAYROLL_PENDING_APPROVAL,
           updatedPayroll,
-          remarks || "Your payroll has been approved by Finance Director"
+          "New payroll pending your approval as Super Admin"
         );
       }
 
       // Create self-notification for the Finance Director
-      console.log(
-        "🔍 Creating Finance Director self-notification with options:",
-        {
-          currentLevel: APPROVAL_LEVELS.FINANCE_DIRECTOR,
-          employee: updatedPayroll.employee,
-          payroll: updatedPayroll,
-        }
-      );
-      await NotificationService.createNotification(
+      await NotificationService.createPayrollNotification(
         admin._id,
-        "PAYROLL_APPROVED",
-        updatedPayroll.employee,
+        NOTIFICATION_TYPES.PAYROLL_APPROVED,
         updatedPayroll,
         remarks ||
-          "You have successfully approved this payroll and it is now pending Super Admin approval",
-        {
-          data: {
-            approvalLevel: APPROVAL_LEVELS.FINANCE_DIRECTOR, // Hard-code as FINANCE_DIRECTOR
-          },
-        }
+          "You have approved this payroll and it is now pending Super Admin approval"
       );
 
-      return res.status(200).json({
+      // Set header to trigger client-side refresh
+      res.set("X-Refresh-Audit-Logs", "true");
+
+      res.json({
         success: true,
-        message: "Payroll approved successfully",
-        data: {
-          payroll: updatedPayroll,
-          nextApprover: nextApprover
-            ? {
-                id: nextApprover._id,
-                name: nextApprover.name,
-                position: nextApprover.position,
-              }
-            : null,
-        },
+        message: "Payroll approved by Finance Director",
+        payroll: updatedPayroll,
       });
     } catch (error) {
       next(error);
@@ -971,9 +943,21 @@ class ApprovalController {
         );
 
       // Create notification for the employee
-      await BaseApprovalController.createRejectionNotification(
+      await NotificationService.createPayrollNotification(
+        updatedPayroll.employee._id,
+        NOTIFICATION_TYPES.PAYROLL_REJECTED,
         updatedPayroll,
-        reason
+        reason || "Your payroll has been rejected by Super Admin"
+      );
+
+      // Create self-notification for the Super Admin
+      await NotificationService.createPayrollNotification(
+        admin._id,
+        NOTIFICATION_TYPES.PAYROLL_REJECTED,
+        updatedPayroll,
+        `You rejected this payroll with reason: ${
+          reason || "No reason provided"
+        }`
       );
 
       return res.status(200).json({

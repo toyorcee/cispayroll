@@ -6,7 +6,8 @@ import {
   NotificationService,
   NOTIFICATION_TYPES,
 } from "../services/NotificationService.js";
-import NotificationModel from "../models/Notification.js";
+import Audit from "../models/Audit.js";
+import { AuditAction, AuditEntity } from "../models/Audit.js";
 
 // Approval levels enum
 export const APPROVAL_LEVELS = {
@@ -287,25 +288,47 @@ class BaseApprovalController {
         { new: true }
       ).populate("employee");
 
-      if (!updatedPayroll) {
-        throw new ApiError(404, "Payroll not found");
-      }
+      // Create audit log
+      await Audit.create({
+        action: isApproved ? AuditAction.APPROVE : AuditAction.REJECT,
+        entity: AuditEntity.PAYROLL,
+        entityId: payroll._id,
+        performedBy: admin._id,
+        details: {
+          status: updatedPayroll.status,
+          currentLevel,
+          nextLevel,
+          approvalFlow: {
+            currentLevel: nextLevel,
+            history: updatedPayroll.approvalFlow.history,
+            completedAt: nextLevel === "COMPLETED" ? new Date() : null,
+          },
+          employeeName: `${updatedPayroll.employee.firstName} ${updatedPayroll.employee.lastName}`,
+          employeeId: updatedPayroll.employee._id,
+          month: updatedPayroll.month,
+          year: updatedPayroll.year,
+          departmentId: updatedPayroll.department,
+          remarks:
+            reason ||
+            `${isApproved ? "Approved" : "Rejected"} by ${currentLevel.replace(
+              /_/g,
+              " "
+            )}`,
+          approvedAt: new Date(),
+        },
+      });
 
-      console.log(
-        `✅ Updated payroll ${
-          payroll._id
-        } status to ${statusMessage} and level to ${nextLevel || "REJECTED"}`
-      );
-
-      // Create enhanced notifications
+      // Create notifications
       const notificationPromises = [];
 
       // Notify the employee
       notificationPromises.push(
         NotificationService.createPayrollNotification(
-          payroll,
-          isApproved ? "PAYROLL_APPROVED" : "PAYROLL_REJECTED",
-          payroll.employee,
+          updatedPayroll.employee._id,
+          isApproved
+            ? NOTIFICATION_TYPES.PAYROLL_APPROVED
+            : NOTIFICATION_TYPES.PAYROLL_REJECTED,
+          updatedPayroll,
           isApproved
             ? `Your payroll has been ${statusMessage.toLowerCase()}`
             : `Your payroll was rejected by ${currentLevel.replace(
@@ -315,21 +338,22 @@ class BaseApprovalController {
         )
       );
 
-      // If there's a next level, notify the next approver with detailed information
+      // If there's a next level, notify the next approver
       if (nextLevel && nextLevel !== "COMPLETED") {
-        const nextApprover = await this.findNextApprover(nextLevel, payroll);
+        const nextApprover = await this.findNextApprover(
+          nextLevel,
+          updatedPayroll
+        );
         if (nextApprover) {
           notificationPromises.push(
             NotificationService.createPayrollNotification(
-              payroll,
-              "PAYROLL_PENDING_APPROVAL",
-              nextApprover,
+              nextApprover._id,
+              NOTIFICATION_TYPES.PAYROLL_PENDING_APPROVAL,
+              updatedPayroll,
               `New payroll pending your approval as ${nextLevel.replace(
                 /_/g,
                 " "
-              )}. Employee: ${payroll.employee.firstName} ${
-                payroll.employee.lastName
-              }, Amount: ₦${payroll.totals.netPay.toLocaleString()}`
+              )}`
             )
           );
         }
@@ -339,12 +363,10 @@ class BaseApprovalController {
       if (nextLevel === "COMPLETED") {
         notificationPromises.push(
           NotificationService.createPayrollNotification(
-            payroll,
-            "PAYROLL_COMPLETED",
-            payroll.employee,
-            `Your payroll for ${payroll.month} ${
-              payroll.year
-            } has been fully approved and is ready for processing. Net Amount: ₦${payroll.totals.netPay.toLocaleString()}`
+            updatedPayroll.employee._id,
+            NOTIFICATION_TYPES.PAYROLL_COMPLETED,
+            updatedPayroll,
+            `Your payroll for ${updatedPayroll.month} ${updatedPayroll.year} has been fully approved and is ready for processing`
           )
         );
       }

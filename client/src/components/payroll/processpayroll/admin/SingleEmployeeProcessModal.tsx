@@ -6,6 +6,7 @@ import {
   FaSearch,
   FaIdCard,
   FaBriefcase,
+  FaCheckCircle,
 } from "react-icons/fa";
 import { useQuery } from "@tanstack/react-query";
 import { adminEmployeeService } from "../../../../services/adminEmployeeService";
@@ -14,7 +15,6 @@ import { adminPayrollService } from "../../../../services/adminPayrollService";
 import { departmentService } from "../../../../services/departmentService";
 import { toast } from "react-toastify";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNotifications } from "../../../shared/DashboardLayout";
 import { useAuth } from "../../../../context/AuthContext";
 import { UserRole } from "../../../../types/auth";
 
@@ -48,10 +48,22 @@ interface DepartmentEmployee {
   status: string;
 }
 
+// Add Success Animation Component
+const SuccessAnimation = () => (
+  <div className="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="text-center">
+      <FaCheckCircle className="mx-auto h-16 w-16 text-green-500 animate-bounce" />
+      <p className="mt-4 text-lg font-medium text-gray-900">
+        Payroll Processed Successfully!
+      </p>
+    </div>
+  </div>
+);
+
 const SingleEmployeeProcessModal = ({
   isOpen,
   onClose,
-  onSubmit,
+  // onSubmit,
   onSuccess,
 }: SingleEmployeeProcessModalProps) => {
   const { isSuperAdmin } = useAuth();
@@ -73,15 +85,14 @@ const SingleEmployeeProcessModal = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [, setErrorMessage] = useState<string | undefined>(undefined);
 
-  // Add dropdown ref
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const { checkForNewNotifications } = useNotifications();
   const { user } = useAuth();
 
   const queryClient = useQueryClient();
 
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   // Fetch admin's department when modal opens
   useEffect(() => {
@@ -218,7 +229,6 @@ const SingleEmployeeProcessModal = ({
     select: (data) => {
       console.log("Selected data:", data);
 
-      // Handle the direct employees array in the response
       if (data.employees && Array.isArray(data.employees)) {
         console.log(
           "Using employees array from response, count:",
@@ -347,6 +357,8 @@ const SingleEmployeeProcessModal = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+
     if (!selectedEmployees.length) {
       toast.error("Please select at least one employee");
       return;
@@ -360,57 +372,32 @@ const SingleEmployeeProcessModal = ({
     setIsSubmitting(true);
 
     try {
-      const userRole = isSuperAdmin() ? UserRole.SUPER_ADMIN : UserRole.ADMIN;
+      await adminPayrollService.processSingleEmployeePayroll({
+        employeeId: selectedEmployees[0]._id,
+        month: formData.month,
+        year: formData.year,
+        frequency: formData.frequency,
+        departmentId: formData.departmentId,
+        userRole: user?.role,
+      });
 
-      if (selectedEmployees.length === 1) {
-        const employee = selectedEmployees[0];
-        const result = await adminPayrollService.processSingleEmployeePayroll({
-          employeeId: employee._id,
-          month: formData.month,
-          year: formData.year,
-          frequency: formData.frequency,
-          salaryGrade: employee.salaryGrade?._id,
-          departmentId: formData.departmentId,
-          userRole,
-        });
+      toast.success("Payroll processed successfully");
+      setShowSuccess(true);
 
-        console.log("🔄 Single employee payroll processed:", result);
-        console.log("🔔 Checking for new notifications...");
-        await checkForNewNotifications();
+      queryClient.invalidateQueries({ queryKey: ["payrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["departmentEmployees"] });
+      queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] });
+      queryClient.invalidateQueries({ queryKey: ["payrollProcessingStats"] });
+      queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
 
-        // Invalidate queries to refresh data
-        queryClient.invalidateQueries({ queryKey: ["payrolls"] });
-        queryClient.invalidateQueries({ queryKey: ["notifications"] });
-        queryClient.invalidateQueries({ queryKey: ["departmentEmployees"] });
+      // Force a refetch of the department payrolls
+      queryClient.refetchQueries({ queryKey: ["departmentPayrolls"] });
 
-        toast.success("Payroll processed successfully");
-      } else {
-        const result =
-          await adminPayrollService.processMultipleEmployeesPayroll({
-            employeeIds: selectedEmployees.map((emp) => emp._id),
-            month: formData.month,
-            year: formData.year,
-            frequency: formData.frequency,
-            departmentId: formData.departmentId,
-            userRole: isSuperAdmin() ? UserRole.SUPER_ADMIN : UserRole.ADMIN,
-          });
-
-        console.log("🔄 Multiple employees payroll processed:", result);
-        console.log("🔔 Checking for new notifications...");
-        await checkForNewNotifications();
-
-        // Invalidate queries to refresh data
-        queryClient.invalidateQueries({ queryKey: ["payrolls"] });
-        queryClient.invalidateQueries({ queryKey: ["notifications"] });
-        queryClient.invalidateQueries({ queryKey: ["departmentEmployees"] });
-
-        toast.success("Payroll processed successfully");
-      }
-
-      // Call the parent component's onSubmit handler with the form data
-      await onSubmit(formData);
-
+      // Wait for animation to complete before closing
       setTimeout(() => {
+        setShowSuccess(false);
         onClose();
         if (onSuccess) {
           onSuccess();
@@ -454,19 +441,73 @@ const SingleEmployeeProcessModal = ({
     }
   };
 
+  // Handle modal close
+  const handleClose = () => {
+    setFormData({
+      employeeIds: [],
+      month: new Date().getMonth() + 1,
+      year: new Date().getFullYear(),
+      frequency: "monthly",
+      departmentId: "",
+    });
+    setSelectedEmployees([]);
+    setSearchTerm("");
+    setSelectAll(false);
+    setShowEmployeeList(true);
+    setIsLoadingEmployees(false);
+    setIsSubmitting(false);
+
+    onClose();
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      if (!isSuperAdmin() && user?.department) {
+        const departmentId =
+          typeof user.department === "string"
+            ? user.department
+            : user.department._id;
+
+        setFormData((prev) => ({
+          ...prev,
+          departmentId,
+        }));
+      }
+    }
+
+    // When modal closes, reset state
+    if (!isOpen) {
+      // Reset all state when modal is closed
+      setFormData({
+        employeeIds: [],
+        month: new Date().getMonth() + 1,
+        year: new Date().getFullYear(),
+        frequency: "monthly",
+        departmentId: "",
+      });
+      setSelectedEmployees([]);
+      setSearchTerm("");
+      setSelectAll(false);
+      setShowEmployeeList(true);
+      setIsLoadingEmployees(false);
+      setIsSubmitting(false);
+    }
+  }, [isOpen, isSuperAdmin, user]);
+
   // Handle department change
   const handleDepartmentChange = (departmentId: string) => {
     setFormData((prev) => ({ ...prev, departmentId }));
-    // Clear selected employees when department changes
     setSelectedEmployees([]);
     setFormData((prev) => ({ ...prev, employeeIds: [] }));
+    setShowEmployeeList(true);
   };
 
   return (
-    <Dialog open={isOpen} onClose={() => onClose()} className="relative z-50">
+    <Dialog open={isOpen} onClose={handleClose} className="relative z-50">
+      {showSuccess && <SuccessAnimation />}
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="mx-auto max-w-4xl w-full bg-white rounded-xl shadow-lg">
+        <Dialog.Panel className="mx-auto max-w-4xl w-full bg-white rounded-xl shadow-lg max-h-[90vh] flex flex-col">
           {/* Fixed Header */}
           <div className="p-4 border-b">
             <div className="flex items-center justify-between">
@@ -474,7 +515,7 @@ const SingleEmployeeProcessModal = ({
                 Process Payroll for Selected Employees
               </Dialog.Title>
               <button
-                onClick={() => onClose()}
+                onClick={handleClose}
                 className="text-gray-400 hover:text-gray-500"
               >
                 <FaTimes />
@@ -484,7 +525,7 @@ const SingleEmployeeProcessModal = ({
 
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto p-4">
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-4">
               {/* Department Selection for Super Admin */}
               {isSuperAdmin() && (
                 <div className="mb-4">
@@ -518,215 +559,239 @@ const SingleEmployeeProcessModal = ({
                 </div>
               )}
 
-              {/* Employee Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Select Employees
-                </label>
-                <div className="relative" ref={dropdownRef}>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      onFocus={handleSearchFocus}
-                      className="w-full p-2 pl-10 border border-gray-300 rounded-md"
-                      placeholder="Search by name, ID, or position"
-                    />
-                    <FaSearch className="absolute left-3 top-3 text-gray-400" />
-                    {employeesLoading && (
-                      <FaSpinner className="absolute right-3 top-3 animate-spin text-gray-400" />
-                    )}
-                  </div>
-
-                  {/* Employee List - Always visible */}
-                  <div className="mt-2 border border-gray-300 rounded-md shadow-lg max-h-[30vh] overflow-auto">
-                    {/* Select All Button and Toggle */}
-                    <div className="sticky top-0 bg-white border-b px-4 py-2 flex items-center justify-between z-10">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          type="button"
-                          onClick={handleSelectAll}
-                          className="text-sm text-green-600 hover:text-green-800 font-medium"
-                        >
-                          {selectAll ? "Deselect All" : "Select All Active"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowEmployeeList(!showEmployeeList)}
-                          className="text-sm text-gray-600 hover:text-gray-800 flex items-center"
-                        >
-                          {showEmployeeList ? (
-                            <>
-                              <span>Hide List</span>
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-4 w-4 ml-1"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M5 15l7-7 7 7"
-                                />
-                              </svg>
-                            </>
-                          ) : (
-                            <>
-                              <span>Show List</span>
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-4 w-4 ml-1"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M19 9l-7 7-7-7"
-                                />
-                              </svg>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                      <span className="text-xs text-gray-500">
-                        {selectedEmployees.length} selected
-                      </span>
+              {/* Employee Selection - Show for both admin types when department is selected */}
+              {(formData.departmentId || !isSuperAdmin()) && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Select Employees
+                  </label>
+                  <div className="relative" ref={dropdownRef}>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onFocus={handleSearchFocus}
+                        className="w-full p-2 pl-10 border border-gray-300 rounded-md"
+                        placeholder="Search by name, ID, or position"
+                      />
+                      <FaSearch className="absolute left-3 top-3 text-gray-400" />
+                      {employeesLoading && (
+                        <FaSpinner className="absolute right-3 top-3 animate-spin text-gray-400" />
+                      )}
                     </div>
 
-                    {isLoadingEmployees ? (
-                      <div className="flex justify-center items-center h-32">
-                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-500"></div>
-                      </div>
-                    ) : (
-                      showEmployeeList && (
-                        <>
-                          {filteredEmployees.length > 0 ? (
-                            <ul className="py-1">
-                              {filteredEmployees.map((employee) => {
-                                const isSelectable =
-                                  employee.status === "active";
-                                const isSelected = selectedEmployees.some(
-                                  (emp) => emp._id === employee._id
-                                );
-
-                                return (
-                                  <li
-                                    key={employee._id}
-                                    className={`px-4 py-2 flex items-center ${
-                                      isSelectable
-                                        ? "hover:bg-green-50"
-                                        : "opacity-60 bg-gray-50"
-                                    }`}
-                                    title={
-                                      !isSelectable
-                                        ? `Cannot process payroll for ${employee.status} employees`
-                                        : ""
-                                    }
-                                  >
-                                    {/* Checkbox */}
-                                    <div className="flex-shrink-0 mr-3">
-                                      <input
-                                        type="checkbox"
-                                        checked={isSelected}
-                                        onChange={() =>
-                                          isSelectable &&
-                                          handleCheckboxChange(employee)
-                                        }
-                                        disabled={!isSelectable}
-                                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                                      />
-                                    </div>
-
-                                    <div className="flex-shrink-0 mr-3">
-                                      <div
-                                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                          isSelectable
-                                            ? "bg-green-100 text-green-600"
-                                            : "bg-gray-100 text-gray-600"
-                                        }`}
-                                      >
-                                        {employee.firstName.charAt(0)}
-                                        {employee.lastName.charAt(0)}
-                                      </div>
-                                    </div>
-                                    <div className="flex-1">
-                                      <div className="font-medium text-gray-900">
-                                        {employee.fullName}
-                                      </div>
-                                      <div className="text-sm text-gray-500 flex items-center">
-                                        <FaIdCard className="mr-1 text-gray-400" />
-                                        {employee.employeeId}
-                                      </div>
-                                      <div className="text-sm text-gray-500 flex items-center">
-                                        <FaBriefcase className="mr-1 text-gray-400" />
-                                        {employee.position}
-                                      </div>
-                                    </div>
-                                    <div className="flex-shrink-0">
-                                      <span
-                                        className={`px-2 py-1 text-xs rounded-full ${
-                                          employee.status === "active"
-                                            ? "bg-green-100 text-green-800"
-                                            : employee.status === "terminated"
-                                            ? "bg-red-100 text-red-800"
-                                            : "bg-yellow-100 text-yellow-800"
-                                        }`}
-                                      >
-                                        {employee.status}
-                                      </span>
-                                    </div>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          ) : (
-                            <div className="px-4 py-3 text-gray-500 text-center">
-                              No employees found
-                            </div>
-                          )}
-                          <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-500">
-                            Note: Only active employees can be selected for
-                            payroll processing
-                          </div>
-                        </>
-                      )
-                    )}
-                  </div>
-                </div>
-
-                {/* Selected Employees Tags */}
-                {selectedEmployees.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-sm font-medium text-gray-700">
-                      Selected Employees ({selectedEmployees.length}):
-                    </p>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {selectedEmployees.map((employee) => (
-                        <span
-                          key={employee._id}
-                          className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800"
-                        >
-                          {employee.fullName}
+                    {/* Employee List - Always visible */}
+                    <div className="mt-2 border border-gray-300 rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                      {/* Select All Button and Toggle */}
+                      <div className="sticky top-0 bg-white border-b px-4 py-2 flex items-center justify-between z-10">
+                        <div className="flex items-center space-x-2">
                           <button
                             type="button"
-                            onClick={() => handleCheckboxChange(employee)}
-                            className="ml-1 text-green-600 hover:text-green-800"
+                            onClick={handleSelectAll}
+                            className="text-sm text-green-600 hover:text-green-800 font-medium"
                           >
-                            <FaTimes size={10} />
+                            {selectAll ? "Deselect All" : "Select All Active"}
                           </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setShowEmployeeList(!showEmployeeList)
+                            }
+                            className="text-sm text-gray-600 hover:text-gray-800 flex items-center"
+                          >
+                            {showEmployeeList ? (
+                              <>
+                                <span>Hide List</span>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-4 w-4 ml-1"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M5 15l7-7 7 7"
+                                  />
+                                </svg>
+                              </>
+                            ) : (
+                              <>
+                                <span>Show List</span>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-4 w-4 ml-1"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M19 9l-7 7-7-7"
+                                  />
+                                </svg>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {selectedEmployees.length} selected
                         </span>
-                      ))}
+                      </div>
+
+                      {isLoadingEmployees ? (
+                        <div className="flex justify-center items-center h-32">
+                          <div className="relative">
+                            <div className="w-12 h-12 rounded-full border-4 border-green-200"></div>
+                            <div className="w-12 h-12 rounded-full border-4 border-green-500 border-t-transparent animate-spin absolute top-0"></div>
+                          </div>
+                        </div>
+                      ) : (
+                        showEmployeeList && (
+                          <>
+                            {filteredEmployees.length > 0 ? (
+                              <ul className="py-1">
+                                {filteredEmployees.map((employee) => {
+                                  const isSelectable =
+                                    employee.status === "active";
+                                  const isSelected = selectedEmployees.some(
+                                    (emp) => emp._id === employee._id
+                                  );
+
+                                  return (
+                                    <li
+                                      key={employee._id}
+                                      className={`px-4 py-2 ${
+                                        isSelectable
+                                          ? "hover:bg-green-50 cursor-pointer"
+                                          : "opacity-60 bg-gray-50"
+                                      }`}
+                                      title={
+                                        !isSelectable
+                                          ? `Cannot process payroll for ${employee.status} employees`
+                                          : ""
+                                      }
+                                      onClick={() =>
+                                        isSelectable &&
+                                        handleCheckboxChange(employee)
+                                      }
+                                    >
+                                      <div className="flex items-center">
+                                        {/* Checkbox */}
+                                        <div className="flex-shrink-0 mr-3">
+                                          <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() =>
+                                              isSelectable &&
+                                              handleCheckboxChange(employee)
+                                            }
+                                            disabled={!isSelectable}
+                                            className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                        </div>
+
+                                        <div className="flex-shrink-0 mr-3">
+                                          <div
+                                            className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                              isSelectable
+                                                ? "bg-green-100 text-green-600"
+                                                : "bg-gray-100 text-gray-600"
+                                            }`}
+                                          >
+                                            {employee.firstName.charAt(0)}
+                                            {employee.lastName.charAt(0)}
+                                          </div>
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="font-medium text-gray-900">
+                                            {employee.fullName}
+                                          </div>
+                                          <div className="text-sm text-gray-500 flex items-center">
+                                            <FaIdCard className="mr-1 text-gray-400" />
+                                            {employee.employeeId}
+                                          </div>
+                                          <div className="text-sm text-gray-500 flex items-center">
+                                            <FaBriefcase className="mr-1 text-gray-400" />
+                                            {employee.position}
+                                          </div>
+                                        </div>
+                                        <div className="flex-shrink-0">
+                                          <span
+                                            className={`px-2 py-1 text-xs rounded-full ${
+                                              employee.status === "active"
+                                                ? "bg-green-100 text-green-800"
+                                                : employee.status ===
+                                                  "terminated"
+                                                ? "bg-red-100 text-red-800"
+                                                : "bg-yellow-100 text-yellow-800"
+                                            }`}
+                                          >
+                                            {employee.status}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            ) : (
+                              <div className="px-4 py-3 text-gray-500 text-center">
+                                {employeesLoading && formData.departmentId ? (
+                                  <div className="flex justify-center items-center py-2">
+                                    <div className="relative">
+                                      <div className="w-8 h-8 rounded-full border-3 border-green-200"></div>
+                                      <div className="w-8 h-8 rounded-full border-3 border-green-500 border-t-transparent animate-spin absolute top-0"></div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  "No employees found"
+                                )}
+                              </div>
+                            )}
+                            <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-500">
+                              Note: Only active employees can be selected for
+                              payroll processing
+                            </div>
+                          </>
+                        )
+                      )}
                     </div>
                   </div>
-                )}
-              </div>
+
+                  {/* Selected Employees Tags */}
+                  {selectedEmployees.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-sm font-medium text-gray-700">
+                        Selected Employees ({selectedEmployees.length}):
+                      </p>
+                      <div className="mt-1 flex flex-wrap gap-1 max-h-[80px] overflow-y-auto p-1 border border-gray-200 rounded-md">
+                        {selectedEmployees.map((employee) => (
+                          <span
+                            key={employee._id}
+                            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                          >
+                            {employee.fullName}
+                            <button
+                              type="button"
+                              onClick={() => handleCheckboxChange(employee)}
+                              className="ml-1 text-green-600 hover:text-green-800"
+                            >
+                              <FaTimes size={10} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Rest of the form fields */}
               <div className="grid grid-cols-2 gap-4">
@@ -790,7 +855,7 @@ const SingleEmployeeProcessModal = ({
                   <option value="biweekly">Bi-weekly</option>
                 </select>
               </div>
-            </form>
+            </div>
           </div>
 
           {/* Fixed Footer with buttons */}
@@ -798,15 +863,18 @@ const SingleEmployeeProcessModal = ({
             <div className="flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => onClose()}
+                onClick={handleClose}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
               >
                 Cancel
               </button>
               <button
-                type="submit"
-                onClick={handleSubmit}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSubmit(e);
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                 disabled={
                   employeesLoading ||
                   gradesLoading ||
@@ -816,7 +884,10 @@ const SingleEmployeeProcessModal = ({
               >
                 {isSubmitting ? (
                   <span className="flex items-center">
-                    <FaSpinner className="animate-spin mr-2" />
+                    <div className="relative mr-2">
+                      <div className="w-4 h-4 rounded-full border-2 border-white border-opacity-30"></div>
+                      <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin absolute top-0"></div>
+                    </div>
                     Processing...
                   </span>
                 ) : (

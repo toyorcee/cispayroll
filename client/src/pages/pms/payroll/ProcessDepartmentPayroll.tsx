@@ -206,11 +206,13 @@ const ProcessDepartmentPayroll = () => {
     salaryGrade?: string;
     departmentId: string;
   }) => {
+    console.log("Processing payroll submission");
     setIsProcessing(true);
 
     try {
       if (data.employeeIds.length === 1) {
         // Process single employee
+        console.log("Processing single employee payroll");
         await adminPayrollService.processSingleEmployeePayroll({
           employeeId: data.employeeIds[0],
           departmentId: data.departmentId,
@@ -222,11 +224,13 @@ const ProcessDepartmentPayroll = () => {
         });
 
         // Show toast after processing is complete
-        // toast.success("Payroll processed successfully");
+        toast.success("Payroll processed successfully");
 
         setPayrollProcessed(true);
+        console.log("Closing modal after successful processing");
         setShowSingleProcessModal(false);
       } else {
+        console.log("Processing multiple employees payroll");
         const multipleResult =
           await adminPayrollService.processMultipleEmployeesPayroll({
             employeeIds: data.employeeIds,
@@ -237,15 +241,29 @@ const ProcessDepartmentPayroll = () => {
             userRole: user?.role,
           });
 
+        // Show detailed processing results
         if (multipleResult.processed > 0) {
           toast.success(
-            `Successfully processed ${multipleResult.processed} payrolls`
+            `Successfully processed ${multipleResult.processed} out of ${multipleResult.total} payrolls`
           );
+
+          if (multipleResult.skipped > 0) {
+            toast.info(
+              `${multipleResult.skipped} payrolls were skipped (already exist)`
+            );
+          }
+
+          if (multipleResult.failed > 0) {
+            toast.error(`${multipleResult.failed} payrolls failed to process`);
+            // Log detailed errors for debugging
+            console.error("Payroll processing errors:", multipleResult.errors);
+          }
         } else {
           toast.warning("No payrolls were processed");
         }
 
         setPayrollProcessed(true);
+        console.log("Closing modal after successful processing");
         setShowSingleProcessModal(false);
       }
     } catch (error: any) {
@@ -267,6 +285,14 @@ const ProcessDepartmentPayroll = () => {
           remarks: submitDialogData.remarks,
         });
         toast.success("Payroll submitted for approval");
+
+        queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
+        queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] });
+        queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] });
+        queryClient.invalidateQueries({ queryKey: ["payrollProcessingStats"] });
+        queryClient.invalidateQueries({ queryKey: ["notifications"] });
+
+        queryClient.refetchQueries({ queryKey: ["departmentPayrolls"] });
       } else if (submitDialogData.type === "bulk") {
         const result = await adminPayrollService.submitBulkPayrolls({
           payrollIds: selectedPayrollIds,
@@ -274,6 +300,16 @@ const ProcessDepartmentPayroll = () => {
         });
         toast.success(`${result.length} payrolls submitted successfully`);
         setSelectedPayrollIds([]);
+
+        // Invalidate all relevant queries
+        queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
+        queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] });
+        queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] });
+        queryClient.invalidateQueries({ queryKey: ["payrollProcessingStats"] });
+        queryClient.invalidateQueries({ queryKey: ["notifications"] });
+
+        // Force a refetch of the department payrolls
+        queryClient.refetchQueries({ queryKey: ["departmentPayrolls"] });
       }
       setShowSubmitDialog(false);
     } catch (error: any) {
@@ -281,7 +317,6 @@ const ProcessDepartmentPayroll = () => {
     }
   };
 
-  // Add mutation hooks for reject and process payment
   const rejectMutation = useMutation({
     mutationFn: ({
       payrollId,
@@ -313,7 +348,6 @@ const ProcessDepartmentPayroll = () => {
     },
   });
 
-  // Add handler functions
   const handleReject = (payroll: Payroll) => {
     setRejectingPayrollId(payroll._id);
     setRejectDialogData({ remarks: "" });
@@ -326,7 +360,6 @@ const ProcessDepartmentPayroll = () => {
     try {
       setIsRejecting(true);
 
-      // Get the payroll to determine the current approval level
       const payroll = payrolls?.data?.payrolls.find(
         (p) => p._id === rejectingPayrollId
       );
@@ -377,11 +410,9 @@ const ProcessDepartmentPayroll = () => {
       setRejectingPayrollId(null);
       setRejectDialogData({ remarks: "" });
 
-      // Use the backend's success message
       toast.success(response.message);
     } catch (error: any) {
       console.error("Error rejecting payroll:", error);
-      // Use the backend's error message if available
       const errorMessage =
         error.response?.data?.message || "Failed to reject payroll";
       toast.error(errorMessage);
@@ -461,7 +492,6 @@ const ProcessDepartmentPayroll = () => {
             return;
         }
 
-        // Refresh the payrolls data
         queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
         queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] });
 
@@ -469,10 +499,8 @@ const ProcessDepartmentPayroll = () => {
         setApprovingPayrollId(null);
         setApproveDialogData({ remarks: "" });
 
-        // Use the backend's success message
         toast.success(response.message);
 
-        // If there's a next approver, show additional information
         if (response.data?.nextApprover && response.data.nextApprover.name) {
           toast.info(
             `Next approver: ${response.data.nextApprover.name} (${response.data.nextApprover.position})`
@@ -614,7 +642,9 @@ const ProcessDepartmentPayroll = () => {
             startIcon={
               isProcessing ? <FaSpinner className="animate-spin" /> : <FaPlus />
             }
-            onClick={() => setShowSingleProcessModal(true)}
+            onClick={() => {
+              setShowSingleProcessModal(true);
+            }}
             disabled={isProcessing}
           >
             {isProcessing ? "Processing..." : "Create Payroll"}
@@ -644,6 +674,7 @@ const ProcessDepartmentPayroll = () => {
             onSelectionChange={handleSelectPayroll}
             loading={isPayrollsLoading || isProcessing}
             error={payrollsError}
+            currentUserRole={user?.role}
           />
         </>
       ) : (
@@ -724,7 +755,9 @@ const ProcessDepartmentPayroll = () => {
       {/* Single Employee Process Modal */}
       <SingleEmployeeProcessModal
         isOpen={showSingleProcessModal}
-        onClose={() => setShowSingleProcessModal(false)}
+        onClose={() => {
+          setShowSingleProcessModal(false);
+        }}
         onSubmit={handleSinglePayrollSubmit}
         onSuccess={handlePayrollSuccess}
       />

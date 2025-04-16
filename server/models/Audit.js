@@ -8,6 +8,7 @@ export const AuditAction = {
   PROCESS: "PROCESS",
   APPROVE: "APPROVE",
   REJECT: "REJECT",
+  SUBMIT: "SUBMIT",
   VIEW: "VIEW",
   LOGIN: "LOGIN",
   LOGOUT: "LOGOUT",

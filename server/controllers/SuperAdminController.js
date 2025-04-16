@@ -36,6 +36,7 @@ import BaseApprovalController, {
   APPROVAL_LEVELS,
 } from "./BaseApprovalController.js";
 import Payroll from "../models/Payroll.js";
+import AuditService from "../services/AuditService.js";
 
 const asObjectId = (id) => new Types.ObjectId(id);
 
@@ -4336,7 +4337,11 @@ export class SuperAdminController {
   // Process single employee payroll
   static async processSingleEmployeePayroll(req, res, next) {
     try {
-      console.log("🔄 Processing single employee payroll:", req.body);
+      console.log(
+        "🔄 Starting single employee payroll processing (Super Admin)"
+      );
+      console.log("📝 Request data:", JSON.stringify(req.body, null, 2));
+
       const { employeeId, departmentId, month, year, frequency } = req.body;
 
       console.log(
@@ -4383,11 +4388,93 @@ export class SuperAdminController {
       console.log(
         `👤 Employee found: ${employee.firstName} ${employee.lastName} (${employee._id})`
       );
+      console.log(
+        `📊 Salary grade: ${salaryGrade._id} (Level: ${salaryGrade.level})`
+      );
+
+      // Check for existing payroll
+      const periodDates = PayrollService.calculatePeriodDates(
+        month,
+        year,
+        frequency
+      );
+      const existingPayroll = await AuditService.checkDuplicatePayroll(
+        employeeId,
+        departmentId,
+        month,
+        year,
+        frequency,
+        periodDates.start,
+        periodDates.end
+      );
+
+      if (existingPayroll) {
+        console.warn(
+          `⚠️ Payroll already exists for employee ${employeeId} for ${month}/${year}`
+        );
+
+        // Create audit log for duplicate attempt
+        await AuditService.logAction(
+          AuditAction.CREATE,
+          AuditEntity.PAYROLL,
+          employeeId,
+          req.user._id,
+          {
+            status: "FAILED",
+            errorType: "DUPLICATE_PAYROLL",
+            errorMessage: `Payroll already exists for employee ${employee.firstName} ${employee.lastName} for ${month}/${year}`,
+            month,
+            year,
+            frequency,
+            departmentId,
+            periodStart: periodDates.start,
+            periodEnd: periodDates.end,
+          }
+        );
+
+        // Create notification for super admin about duplicate
+        await NotificationService.createPayrollNotification(
+          existingPayroll,
+          NOTIFICATION_TYPES.PAYROLL_ERROR_DUPLICATE_PAYROLL,
+          req.user,
+          `Payroll already exists for employee ${employee.firstName} ${employee.lastName} for ${month}/${year}`
+        );
+
+        throw new ApiError(
+          409,
+          `Payroll already exists for employee ${employee.firstName} ${employee.lastName} for ${month}/${year}`
+        );
+      }
 
       // Calculate payroll using the found salary grade
       console.log(
         `🧮 Calculating payroll for employee ${employeeId} with salary grade ${salaryGrade._id}`
       );
+
+      // Create audit log for payroll calculation start
+      await AuditService.logAction(
+        AuditAction.PROCESS,
+        AuditEntity.PAYROLL,
+        employeeId,
+        req.user._id,
+        {
+          status: "PROCESSING",
+          action: "CALCULATION_STARTED",
+          month,
+          year,
+          frequency,
+          departmentId,
+        }
+      );
+
+      // Notify processing started
+      await NotificationService.createPayrollNotification(
+        { employee: employeeId, month, year },
+        NOTIFICATION_TYPES.PAYROLL_PROCESSING_STARTED,
+        req.user,
+        `Payroll processing started for ${employee.firstName} ${employee.lastName} for ${month}/${year}`
+      );
+
       const payrollData = await PayrollService.calculatePayroll(
         employeeId,
         salaryGrade._id,
@@ -4422,6 +4509,25 @@ export class SuperAdminController {
 
       console.log(`✅ Payroll created with ID: ${payroll._id}`);
 
+      // Create audit log for successful payroll creation
+      await AuditService.logAction(
+        AuditAction.CREATE,
+        AuditEntity.PAYROLL,
+        payroll._id,
+        req.user._id,
+        {
+          status: "SUCCESS",
+          action: "PAYROLL_CREATED",
+          employeeId,
+          employeeName: `${employee.firstName} ${employee.lastName}`,
+          month,
+          year,
+          frequency,
+          netPay: payrollData.totals.netPay,
+          departmentId,
+        }
+      );
+
       // Create notification for super admin only
       await NotificationService.createPayrollNotification(
         payroll,
@@ -4437,6 +4543,44 @@ export class SuperAdminController {
       });
     } catch (error) {
       console.error(`❌ Error processing payroll: ${error.message}`);
+      console.error("Stack trace:", error.stack);
+
+      // Create audit log for failed payroll processing
+      if (req.user && req.body.employeeId) {
+        try {
+          await AuditService.logAction(
+            AuditAction.CREATE,
+            AuditEntity.PAYROLL,
+            req.body.employeeId,
+            req.user._id,
+            {
+              status: "FAILED",
+              errorType:
+                error instanceof ApiError ? "VALIDATION_ERROR" : "SYSTEM_ERROR",
+              errorMessage: error.message,
+              month: req.body.month,
+              year: req.body.year,
+              frequency: req.body.frequency,
+              departmentId: req.body.departmentId,
+            }
+          );
+
+          // Create error notification
+          await NotificationService.createPayrollNotification(
+            {
+              employee: req.body.employeeId,
+              month: req.body.month,
+              year: req.body.year,
+            },
+            NOTIFICATION_TYPES.PAYROLL_PROCESSING_FAILED,
+            req.user,
+            `Failed to process payroll: ${error.message}`
+          );
+        } catch (auditError) {
+          console.error("Failed to create audit log for error:", auditError);
+        }
+      }
+
       next(error);
     }
   }

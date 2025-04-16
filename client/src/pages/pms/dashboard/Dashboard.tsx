@@ -9,14 +9,20 @@ import { employeeService } from "../../../services/employeeService";
 import StatCard from "../../../components/dashboard/StatCard";
 import { departmentService } from "../../../services/departmentService";
 import DepartmentStats from "../../../components/dashboard/DepartmentStats";
+import { RecentActivities } from "../../../components/dashboard/RecentActivities";
 import {
   FaUsers,
   FaUserPlus,
   FaCalendarAlt,
   FaClock,
   FaBell,
+  FaHistory,
 } from "react-icons/fa";
 import { getUnreadNotificationCount } from "../../../services/notificationService";
+import {
+  adminPayrollService,
+  AdminPayrollProcessingStats,
+} from "../../../services/adminPayrollService";
 
 // Lazy load chart components
 const LineChart = lazy(() => import("../../../components/charts/LineChart"));
@@ -87,6 +93,8 @@ export default function Dashboard() {
   >(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
+  const [processingStats, setProcessingStats] =
+    useState<AdminPayrollProcessingStats | null>(null);
 
   // Only fetch the appropriate chart stats based on user role
   const { data: chartStatsData } =
@@ -262,12 +270,14 @@ export default function Dashboard() {
       try {
         setError(null);
         setIsLoading(true);
-        const [stats, unreadCount] = await Promise.all([
+        const [stats, unreadCount, procStats] = await Promise.all([
           employeeService.getDashboardStats(),
           getUnreadNotificationCount(),
+          adminPayrollService.getProcessingStatistics(),
         ]);
         setDashboardStats(stats);
         setUnreadNotifications(unreadCount);
+        setProcessingStats(procStats);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Failed to load dashboard data"
@@ -311,6 +321,14 @@ export default function Dashboard() {
         icon: FaUserPlus,
         href: "/employees/pending",
         color: "yellow" as const,
+      },
+      {
+        name: "Recent Activities",
+        value: processingStats?.recentActivityCount?.toString() || "0",
+        subtext: "In the last 24 hours",
+        icon: FaHistory,
+        href: "/audit-logs",
+        color: "green" as const,
       },
       {
         name: "Unread Notifications",
@@ -433,9 +451,6 @@ export default function Dashboard() {
       </motion.div>
     );
   }
-  <Suspense fallback={<ChartLoading />}>
-    {renderPermissionBasedCharts()}
-  </Suspense>;
 
   return (
     <GlobalErrorBoundary>
@@ -450,24 +465,28 @@ export default function Dashboard() {
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.3 }}
-          className="mb-8 bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center"
+          className="mb-8 bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4"
         >
-          <div>
+          <div className="flex flex-col items-center sm:items-start">
             <h4 className="text-2xl font-semibold text-gray-800">
               Welcome back, {user?.firstName}!
             </h4>
             <p className="mt-1 text-sm text-gray-600">
               {getRoleSpecificWelcomeMessage(user?.role)}
             </p>
+            <div className="mt-2 sm:hidden">
+              <Clock />
+            </div>
           </div>
-          <Clock />
+          <div className="hidden sm:block">
+            <Clock />
+          </div>
         </motion.div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {isLoading
-            ? // Show loading skeletons while data is loading
-              Array(4)
+            ? Array(4)
                 .fill(0)
                 .map((_, index) => (
                   <motion.div
@@ -475,6 +494,7 @@ export default function Dashboard() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
+                    className="w-full"
                   >
                     <StatCardSkeleton />
                   </motion.div>
@@ -487,6 +507,7 @@ export default function Dashboard() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
+                  className="w-full"
                 >
                   <StatCard
                     {...stat}
@@ -504,6 +525,7 @@ export default function Dashboard() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
+                  className="w-full"
                 >
                   <StatCard
                     {...stat}
@@ -524,7 +546,7 @@ export default function Dashboard() {
             </Suspense>
           </div>
 
-          {/* Department Overview Line Chart - Show for users with department view permission */}
+          {/* Department Overview Line Chart */}
           {hasAnyPermission([
             Permission.VIEW_ALL_DEPARTMENTS,
             Permission.MANAGE_DEPARTMENT_USERS,
@@ -539,6 +561,11 @@ export default function Dashboard() {
                 </Suspense>
               </div>
             )}
+        </div>
+
+        {/* Recent Activities Section - At the end */}
+        <div className="mb-6">
+          <RecentActivities />
         </div>
       </motion.div>
     </GlobalErrorBoundary>

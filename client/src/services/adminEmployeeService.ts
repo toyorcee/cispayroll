@@ -1,5 +1,4 @@
 import axios from "axios";
-import { toast } from "react-toastify";
 import { Employee } from "../types/employee";
 import { UserRole } from "../types/auth";
 
@@ -60,10 +59,9 @@ export const adminEmployeeService = {
         message: error.response?.data?.message,
         endpoint: error.config?.url,
       });
-      toast.error(
+      throw (
         error.response?.data?.message || "Failed to fetch department employees"
       );
-      throw error;
     }
   },
 
@@ -83,10 +81,7 @@ export const adminEmployeeService = {
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching employee details:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to fetch employee details"
-      );
-      throw error;
+      throw error.response?.data?.message || "Failed to fetch employee details";
     }
   },
 
@@ -106,10 +101,7 @@ export const adminEmployeeService = {
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching active employees:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to fetch active employees"
-      );
-      throw error;
+      throw error.response?.data?.message || "Failed to fetch active employees";
     }
   },
 
@@ -129,12 +121,10 @@ export const adminEmployeeService = {
         throw new Error(response.data.message || "Failed to update employee");
       }
 
-      toast.success("Employee updated successfully");
       return response.data.data;
     } catch (error: any) {
       console.error("Error updating employee:", error);
-      toast.error(error.response?.data?.message || "Failed to update employee");
-      throw error;
+      throw error.response?.data?.message || "Failed to update employee";
     }
   },
 
@@ -155,36 +145,7 @@ export const adminEmployeeService = {
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching employee payroll history:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to fetch payroll history"
-      );
-      throw error;
-    }
-  },
-
-  // Process payroll for multiple selected employees
-  processMultipleEmployeesPayroll: async (data: {
-    employeeIds: string[];
-    month: number;
-    year: number;
-    frequency: string;
-  }): Promise<any> => {
-    try {
-      const response = await axios.post(
-        `${BASE_URL}/payroll/process-multiple`,
-        data
-      );
-
-      if (response.data.success) {
-        toast.success("Payroll processed successfully");
-      } else {
-        toast.error(response.data.message || "Failed to process payroll");
-      }
-
-      return response.data;
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to process payroll");
-      throw error;
+      throw error.response?.data?.message || "Failed to fetch payroll history";
     }
   },
 };
