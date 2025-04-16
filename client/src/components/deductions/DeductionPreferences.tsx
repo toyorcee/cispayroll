@@ -5,21 +5,14 @@ import {
   Card,
   CardContent,
   CardHeader,
-  Checkbox,
   Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
-  FormControl,
-  FormControlLabel,
   Grid,
   IconButton,
-  InputLabel,
-  MenuItem,
   Paper,
-  Select,
   Table,
   TableBody,
   TableCell,
@@ -32,14 +25,9 @@ import {
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
-import {
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  Info as InfoIcon,
-} from "@mui/icons-material";
+import { Add as AddIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import { deductionService } from "../../services/deductionService";
-import { Deduction, DeductionOptOutReason } from "../../types/deduction";
-import { format } from "date-fns";
+import { Deduction } from "../../types/deduction";
 
 interface DeductionPreferencesProps {
   userId?: string;
@@ -62,7 +50,6 @@ const DeductionPreferences: React.FC<DeductionPreferencesProps> = ({
   const [amount, setAmount] = useState<string>("");
   const [percentage, setPercentage] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
-  const [optOutReason, setOptOutReason] = useState<string>("");
 
   // Fetch deductions and user preferences
   useEffect(() => {
@@ -113,19 +100,6 @@ const DeductionPreferences: React.FC<DeductionPreferencesProps> = ({
     );
   };
 
-  // Get deduction details from preferences
-  const getDeductionDetails = (deductionId: string) => {
-    if (!userPreferences) return null;
-
-    const standardVoluntary = userPreferences.voluntary.standardVoluntary || [];
-    const customVoluntary = userPreferences.voluntary.customVoluntary || [];
-
-    return (
-      standardVoluntary.find((d: any) => d.deduction === deductionId) ||
-      customVoluntary.find((d: any) => d.deduction === deductionId)
-    );
-  };
-
   // Handle opt-in for a deduction
   const handleOptIn = (deduction: Deduction) => {
     setSelectedDeduction(deduction);
@@ -156,7 +130,6 @@ const DeductionPreferences: React.FC<DeductionPreferencesProps> = ({
     setAmount("");
     setPercentage("");
     setNotes("");
-    setOptOutReason("");
   };
 
   // Handle form submission
@@ -267,7 +240,6 @@ const DeductionPreferences: React.FC<DeductionPreferencesProps> = ({
               <TableBody>
                 {voluntaryDeductions.map((deduction) => {
                   const isOpted = isOptedIn(deduction._id);
-                  const details = getDeductionDetails(deduction._id);
 
                   return (
                     <TableRow key={deduction._id}>
@@ -337,7 +309,6 @@ const DeductionPreferences: React.FC<DeductionPreferencesProps> = ({
                 <TableBody>
                   {departmentDeductions.map((deduction) => {
                     const isOpted = isOptedIn(deduction._id);
-                    const details = getDeductionDetails(deduction._id);
 
                     return (
                       <TableRow key={deduction._id}>

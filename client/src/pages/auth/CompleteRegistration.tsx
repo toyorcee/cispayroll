@@ -17,7 +17,7 @@ import { AuthSkeleton } from "../../components/skeletons/AuthSkeleton";
 import { ImageUpload } from "../../components/ImageUpload";
 import { useForm } from "react-hook-form";
 // import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+// import { z } from "zod";
 import { useFieldArray } from "react-hook-form";
 
 const api = axios.create({
@@ -60,60 +60,60 @@ const LoadingSpinner = () => (
   </div>
 );
 
-const registrationSchema = z
-  .object({
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string(),
-    personalDetails: z.object({
-      middleName: z.string().optional(),
-      dateOfBirth: z
-        .string()
-        .transform((str) => new Date(str).toISOString().split("T")[0]),
-      address: z.object({
-        street: z.string().min(1, "Street is required"),
-        city: z.string().min(1, "City is required"),
-        state: z.string().min(1, "State is required"),
-        zipCode: z.string().min(1, "Zip Code is required"),
-        country: z.string().min(1, "Country is required"),
-      }),
-      maritalStatus: z.string().min(1, "Marital Status is required"),
-      nationality: z.string().min(1, "Nationality is required"),
-      nextOfKin: z.object({
-        name: z.string().min(1, "Next of Kin Name is required"),
-        relationship: z.string().min(1, "Next of Kin Relationship is required"),
-        phone: z.string().min(1, "Next of Kin Phone is required"),
-        address: z.object({
-          street: z.string().min(1, "Next of Kin Street is required"),
-          city: z.string().min(1, "Next of Kin City is required"),
-          state: z.string().min(1, "Next of Kin State is required"),
-          zipCode: z.string().min(1, "Next of Kin Zip Code is required"),
-          country: z.string().min(1, "Next of Kin Country is required"),
-        }),
-      }),
-      qualifications: z.array(
-        z.object({
-          highestEducation: z.string().min(1, "Highest Education is required"),
-          institution: z.string().min(1, "Institution is required"),
-          yearGraduated: z.string().min(1, "Year Graduated is required"),
-        })
-      ),
-    }),
-    emergencyContact: z.object({
-      name: z.string().min(1, "Name is required"),
-      relationship: z.string().min(1, "Relationship is required"),
-      phone: z.string().min(1, "Phone is required"),
-    }),
-    bankDetails: z.object({
-      bankName: z.string().min(1, "Bank name is required"),
-      accountNumber: z.string().min(1, "Account number is required"),
-      accountName: z.string().min(1, "Account name is required"),
-      bankCode: z.string().min(1, "Bank Code is required"),
-    }),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
-  });
+// const registrationSchema = z
+//   .object({
+//     password: z.string().min(8, "Password must be at least 8 characters"),
+//     confirmPassword: z.string(),
+//     personalDetails: z.object({
+//       middleName: z.string().optional(),
+//       dateOfBirth: z
+//         .string()
+//         .transform((str) => new Date(str).toISOString().split("T")[0]),
+//       address: z.object({
+//         street: z.string().min(1, "Street is required"),
+//         city: z.string().min(1, "City is required"),
+//         state: z.string().min(1, "State is required"),
+//         zipCode: z.string().min(1, "Zip Code is required"),
+//         country: z.string().min(1, "Country is required"),
+//       }),
+//       maritalStatus: z.string().min(1, "Marital Status is required"),
+//       nationality: z.string().min(1, "Nationality is required"),
+//       nextOfKin: z.object({
+//         name: z.string().min(1, "Next of Kin Name is required"),
+//         relationship: z.string().min(1, "Next of Kin Relationship is required"),
+//         phone: z.string().min(1, "Next of Kin Phone is required"),
+//         address: z.object({
+//           street: z.string().min(1, "Next of Kin Street is required"),
+//           city: z.string().min(1, "Next of Kin City is required"),
+//           state: z.string().min(1, "Next of Kin State is required"),
+//           zipCode: z.string().min(1, "Next of Kin Zip Code is required"),
+//           country: z.string().min(1, "Next of Kin Country is required"),
+//         }),
+//       }),
+//       qualifications: z.array(
+//         z.object({
+//           highestEducation: z.string().min(1, "Highest Education is required"),
+//           institution: z.string().min(1, "Institution is required"),
+//           yearGraduated: z.string().min(1, "Year Graduated is required"),
+//         })
+//       ),
+//     }),
+//     emergencyContact: z.object({
+//       name: z.string().min(1, "Name is required"),
+//       relationship: z.string().min(1, "Relationship is required"),
+//       phone: z.string().min(1, "Phone is required"),
+//     }),
+//     bankDetails: z.object({
+//       bankName: z.string().min(1, "Bank name is required"),
+//       accountNumber: z.string().min(1, "Account number is required"),
+//       accountName: z.string().min(1, "Account name is required"),
+//       bankCode: z.string().min(1, "Bank Code is required"),
+//     }),
+//   })
+//   .refine((data) => data.password === data.confirmPassword, {
+//     message: "Passwords don't match",
+//     path: ["confirmPassword"],
+//   });
 
 interface UserData {
   firstName: string;

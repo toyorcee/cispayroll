@@ -14,7 +14,6 @@ import { adminPayrollService } from "../../../../services/adminPayrollService";
 import { departmentService } from "../../../../services/departmentService";
 import { toast } from "react-toastify";
 import { useQueryClient } from "@tanstack/react-query";
-import SuccessAnimation from "./SuccessAnimation";
 import { useNotifications } from "../../../shared/DashboardLayout";
 import { useAuth } from "../../../../context/AuthContext";
 import { UserRole } from "../../../../types/auth";
@@ -49,14 +48,6 @@ interface DepartmentEmployee {
   status: string;
 }
 
-// Update the interface for getDepartmentEmployees parameters
-interface GetDepartmentEmployeesParams {
-  departmentId?: string;
-  page?: number;
-  limit?: number;
-  status?: string;
-}
-
 const SingleEmployeeProcessModal = ({
   isOpen,
   onClose,
@@ -74,34 +65,16 @@ const SingleEmployeeProcessModal = ({
 
   // Add search state
   const [searchTerm, setSearchTerm] = useState("");
-  const [employeeLimit, setEmployeeLimit] = useState(10);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [allEmployeesLoaded, setAllEmployeesLoaded] = useState(false);
   const [selectedEmployees, setSelectedEmployees] = useState<
     DepartmentEmployee[]
   >([]);
-
-  // Add dropdown state
-  const [showDropdown, setShowDropdown] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Add state for select all functionality
   const [selectAll, setSelectAll] = useState(false);
-
-  // Add state for dropdown visibility
   const [showEmployeeList, setShowEmployeeList] = useState(true);
-
-  // Add state for form submission
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [, setErrorMessage] = useState<string | undefined>(undefined);
 
-  // Add state for success animation
-  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
-  const [processingResults, setProcessingResults] = useState<any>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | undefined>(
-    undefined
-  );
+  // Add dropdown ref
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const { checkForNewNotifications } = useNotifications();
   const { user } = useAuth();
@@ -131,7 +104,7 @@ const SingleEmployeeProcessModal = ({
             const cachedData = queryClient.getQueryData([
               "departmentEmployees",
               departmentId,
-              employeeLimit,
+              10,
             ]);
 
             if (cachedData) {
@@ -167,13 +140,13 @@ const SingleEmployeeProcessModal = ({
 
               // Set the data in the cache
               queryClient.setQueryData(
-                ["departmentEmployees", departmentId, employeeLimit],
+                ["departmentEmployees", departmentId, 10],
                 { users: formattedEmployees }
               );
 
               // Set the query options separately
               queryClient.setQueryDefaults(
-                ["departmentEmployees", departmentId, employeeLimit],
+                ["departmentEmployees", departmentId, 10],
                 {
                   staleTime: 5 * 60 * 1000,
                   gcTime: 30 * 60 * 1000,
@@ -192,7 +165,7 @@ const SingleEmployeeProcessModal = ({
     };
 
     fetchAdminDepartment();
-  }, [isOpen, isSuperAdmin, queryClient, employeeLimit, user]);
+  }, [isOpen, isSuperAdmin, queryClient, user]);
 
   const { data: departments, isLoading: departmentsLoading } = useQuery({
     queryKey: ["departments"],
@@ -206,7 +179,7 @@ const SingleEmployeeProcessModal = ({
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node)
       ) {
-        setShowDropdown(false);
+        setShowEmployeeList(false);
       }
     };
 
@@ -216,16 +189,16 @@ const SingleEmployeeProcessModal = ({
     };
   }, []);
 
-  const {
-    data: employees,
-    isLoading: employeesLoading,
-    refetch,
-  } = useQuery<any, Error, DepartmentEmployee[]>({
-    queryKey: ["departmentEmployees", formData.departmentId, employeeLimit],
+  const { data: employees, isLoading: employeesLoading } = useQuery<
+    any,
+    Error,
+    DepartmentEmployee[]
+  >({
+    queryKey: ["departmentEmployees", formData.departmentId, 10],
     queryFn: async () => {
       console.log("Fetching employees with params:", {
         departmentId: formData.departmentId,
-        limit: employeeLimit,
+        limit: 10,
         page: 1,
       });
 
@@ -313,61 +286,18 @@ const SingleEmployeeProcessModal = ({
       );
     }) || [];
 
-  console.log("Search term:", searchTerm);
-  console.log("Filtered employees:", filteredEmployees);
-
-  // Function to load more employees
-  const loadMoreEmployees = async (limit: number) => {
-    setIsLoadingMore(true);
-    setEmployeeLimit(limit);
-    await refetch();
-    setIsLoadingMore(false);
-  };
-
-  // Function to load all employees
-  const loadAllEmployees = async () => {
-    setIsLoadingMore(true);
-    setEmployeeLimit(1000); // A large number to get all employees
-    await refetch();
-    setAllEmployeesLoaded(true);
-    setIsLoadingMore(false);
-  };
+  // console.log("Search term:", searchTerm);
+  // console.log("Filtered employees:", filteredEmployees);
 
   // Fetch salary grades
-  const { data: salaryGrades, isLoading: gradesLoading } = useQuery({
+  const { isLoading: gradesLoading } = useQuery({
     queryKey: ["salaryGrades"],
     queryFn: () => salaryStructureService.getAllSalaryGrades(),
   });
 
-  // When employee is selected, no need to pre-fill salary grade
-  const handleEmployeeChange = (employeeId: string) => {
-    const selectedEmployee = employees?.find((emp) => emp._id === employeeId);
-
-    if (selectedEmployee) {
-      // Check if employee is already selected
-      if (formData.employeeIds.includes(employeeId)) {
-        // Remove employee if already selected
-        setFormData((prev) => ({
-          ...prev,
-          employeeIds: prev.employeeIds.filter((id) => id !== employeeId),
-        }));
-        setSelectedEmployees((prev) =>
-          prev.filter((emp) => emp._id !== employeeId)
-        );
-      } else {
-        // Add employee if not selected
-        setFormData((prev) => ({
-          ...prev,
-          employeeIds: [...prev.employeeIds, employeeId],
-        }));
-        setSelectedEmployees((prev) => [...prev, selectedEmployee]);
-      }
-    }
-  };
-
   // Handle search input focus
   const handleSearchFocus = () => {
-    setShowDropdown(true);
+    setShowEmployeeList(true);
   };
 
   // Function to handle select all
@@ -428,7 +358,6 @@ const SingleEmployeeProcessModal = ({
     }
 
     setIsSubmitting(true);
-    setIsLoading(true);
 
     try {
       const userRole = isSuperAdmin() ? UserRole.SUPER_ADMIN : UserRole.ADMIN;
@@ -478,12 +407,11 @@ const SingleEmployeeProcessModal = ({
         toast.success("Payroll processed successfully");
       }
 
-      // Show success animation and close modal
-      setShowSuccessAnimation(true);
+      // Call the parent component's onSubmit handler with the form data
+      await onSubmit(formData);
+
       setTimeout(() => {
-        setShowSuccessAnimation(false);
         onClose();
-        // Call the onSuccess callback to refresh the parent component
         if (onSuccess) {
           onSuccess();
         }
@@ -523,7 +451,6 @@ const SingleEmployeeProcessModal = ({
       }
     } finally {
       setIsSubmitting(false);
-      setIsLoading(false);
     }
   };
 
@@ -539,7 +466,7 @@ const SingleEmployeeProcessModal = ({
     <Dialog open={isOpen} onClose={() => onClose()} className="relative z-50">
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="mx-auto max-w-2xl w-full bg-white rounded-xl shadow-lg max-h-[90vh] flex flex-col">
+        <Dialog.Panel className="mx-auto max-w-4xl w-full bg-white rounded-xl shadow-lg">
           {/* Fixed Header */}
           <div className="p-4 border-b">
             <div className="flex items-center justify-between">
@@ -900,16 +827,6 @@ const SingleEmployeeProcessModal = ({
           </div>
         </Dialog.Panel>
       </div>
-
-      {/* Success Animation */}
-      {showSuccessAnimation && (
-        <SuccessAnimation
-          type={errorMessage ? "error" : "success"}
-          message={errorMessage || "Payroll processed successfully"}
-          results={processingResults}
-          onClose={() => setShowSuccessAnimation(false)}
-        />
-      )}
     </Dialog>
   );
 };

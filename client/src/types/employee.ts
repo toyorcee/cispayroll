@@ -203,6 +203,7 @@ export interface OnboardingTask {
   name: string;
   completed: boolean;
   completedAt?: Date;
+  assignedTo?: string;
 }
 
 export interface OnboardingEmployee {

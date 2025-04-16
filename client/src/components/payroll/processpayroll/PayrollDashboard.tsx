@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from "react";
 import {
   Grid,
-  Paper,
   Typography,
   Box,
   CircularProgress,
-  Divider,
   Card,
   CardContent,
   useTheme,
@@ -243,8 +241,8 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <AssessmentIcon sx={{ fontSize: 32, mr: 1 }} />
                 <Typography variant="subtitle1" sx={{ fontWeight: "medium" }}>
-                  Total Payrolls
-                </Typography>
+              Total Payrolls
+            </Typography>
               </Box>
               <Typography
                 variant="h5"
@@ -275,8 +273,8 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
               <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
                 <PaymentIcon sx={{ fontSize: 32, mr: 1 }} />
                 <Typography variant="subtitle1" sx={{ fontWeight: "medium" }}>
-                  Total Amount
-                </Typography>
+              Total Amount
+            </Typography>
               </Box>
               <Typography
                 variant="h5"
@@ -329,7 +327,7 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
                 {processingStats?.processingRate
                   ? `${processingStats.processingRate.toFixed(1)}% of total`
                   : ""}
-              </Typography>
+            </Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -361,12 +359,12 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
                 }}
               >
                 {processingStats?.paidPayrolls || 0}
-              </Typography>
+            </Typography>
               <Typography variant="caption" sx={{ fontSize: "0.875rem" }}>
                 {processingStats?.paymentRate
                   ? `${processingStats.paymentRate.toFixed(1)}% of total`
                   : ""}
-              </Typography>
+            </Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -383,13 +381,13 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
             </Typography>
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={450}>
-                <PieChart>
-                  <Pie
+              <PieChart>
+                <Pie
                     data={chartData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
                     outerRadius={160}
                     innerRadius={80}
                     labelLine={false}
@@ -401,9 +399,9 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
                   >
                     {chartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
+                  ))}
+                </Pie>
+                <Tooltip />
                   <Legend
                     verticalAlign="bottom"
                     height={36}
@@ -413,8 +411,8 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
                       </span>
                     )}
                   />
-                </PieChart>
-              </ResponsiveContainer>
+              </PieChart>
+            </ResponsiveContainer>
             ) : (
               <Box
                 display="flex"
@@ -424,7 +422,7 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
               >
                 <Typography variant="body1" color="textSecondary">
                   No payroll data available
-                </Typography>
+            </Typography>
               </Box>
             )}
           </Card>

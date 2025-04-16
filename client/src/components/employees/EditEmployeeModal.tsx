@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { FaTimes, FaSpinner } from "react-icons/fa";
 import { departmentService } from "../../services/departmentService";
 import { toast } from "react-hot-toast";
+import { Department } from "../../types/department";
 
 interface EditEmployeeModalProps {
   isOpen: boolean;
@@ -40,7 +41,7 @@ export const EditEmployeeModal = ({
       // Handle department value
       const departmentValue =
         typeof employee.department === "object" && employee.department !== null
-          ? (employee.department as { _id: string })._id
+          ? (employee.department as Department)._id
           : employee.department;
 
       setFormData({
@@ -77,8 +78,22 @@ export const EditEmployeeModal = ({
         changedFields.gradeLevel = formData.gradeLevel;
       if (formData.workLocation !== employee?.workLocation)
         changedFields.workLocation = formData.workLocation;
-      if (formData.department !== employee?.department)
-        changedFields.department = formData.department;
+
+      // Fix the department comparison by comparing IDs
+      const employeeDepartmentId =
+        typeof employee?.department === "object" &&
+        employee?.department !== null
+          ? (employee.department as Department)._id
+          : employee?.department;
+
+      if (formData.department !== employeeDepartmentId) {
+        const selectedDepartment = departments?.find(
+          (dept) => dept._id === formData.department
+        );
+        if (selectedDepartment) {
+          changedFields.department = selectedDepartment;
+        }
+      }
 
       console.log("Sending update data:", changedFields);
       await onSave(changedFields);

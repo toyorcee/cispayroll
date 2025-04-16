@@ -17,7 +17,7 @@ import { ComponentType, CreateSalaryGradeDTO } from "../../types/salary";
 import { useAuth } from "../../context/AuthContext";
 import { Permission } from "../../types/auth";
 import { departmentService } from "../../services/departmentService";
-import { DepartmentBasic } from "../../types/employee";
+import { DepartmentBasic } from "../../types/department";
 
 const salaryGradeSchema = z.object({
   level: z

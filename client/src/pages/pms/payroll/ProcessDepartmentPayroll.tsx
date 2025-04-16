@@ -1,38 +1,13 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  FaMoneyBill,
-  FaSpinner,
-  FaExclamationTriangle,
-  FaFileAlt,
-  FaCheck,
-  FaTimes,
-  FaChevronLeft,
-  FaChevronRight,
-  FaEye,
-  FaPaperPlane,
-  FaPlus,
-  FaCheckSquare,
-  FaSquare,
-  FaClock,
-  FaUserClock,
-  FaHourglassHalf,
-} from "react-icons/fa";
-import {
-  adminPayrollService,
-  type AdminPayrollResponse,
-  type AdminPayrollPeriod,
-  type AdminPayrollStats,
-} from "../../../services/adminPayrollService";
+import { FaExclamationTriangle, FaPlus, FaSpinner } from "react-icons/fa";
+import { adminPayrollService } from "../../../services/adminPayrollService";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
-import { UserRole, Permission } from "../../../types/auth";
-import { PayrollData, PayrollStatus } from "../../../types/payroll";
+import { Permission } from "../../../types/auth";
+import { PayrollData } from "../../../types/payroll";
 import PayrollDetailsModal from "../../../components/payroll/processpayroll/admin/PayrollDetailsModal";
 import SingleEmployeeProcessModal from "../../../components/payroll/processpayroll/admin/SingleEmployeeProcessModal";
-import { Department as DepartmentType } from "../../../types/department";
-import { User } from "../../../types/user";
 import PayrollTable, {
   Payroll,
 } from "../../../components/payroll/processpayroll/admin/PayrollTable";
@@ -48,36 +23,6 @@ import {
 } from "@mui/material";
 import TableSkeleton from "../../../components/skeletons/TableSkeleton";
 
-interface SummaryCardProps {
-  icon: React.ReactNode;
-  title: string;
-  value: string;
-}
-
-const SummaryCard = ({ icon, title, value }: SummaryCardProps) => (
-  <div className="bg-white overflow-hidden shadow rounded-lg transform transition-all duration-300 hover:scale-105 hover:-translate-y-1 hover:shadow-lg cursor-pointer">
-    <div className="p-5">
-      <div className="flex items-center">
-        <div className="flex-shrink-0">{icon}</div>
-        <div className="ml-5 w-0 flex-1">
-          <dl>
-            <dt className="text-sm font-medium text-gray-500 truncate">
-              {title}
-            </dt>
-            <dd className="text-lg font-medium text-gray-900">{value}</dd>
-          </dl>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-interface Department {
-  _id: string;
-  name: string;
-  code: string;
-}
-
 interface ApiError {
   response?: {
     status?: number;
@@ -89,45 +34,63 @@ interface ApiError {
 }
 
 const ProcessDepartmentPayroll = () => {
-  const { user, hasPermission, hasRole } = useAuth();
+  const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
+
+  // Improve type safety for department checking
+  const isHRDepartment = (
+    department: { _id: string; name: string; code: string } | string | undefined
+  ): boolean => {
+    if (!department) return false;
+
+    const getDepartmentName = (dept: typeof department): string => {
+      if (typeof dept === "string") return dept;
+      return dept.name;
+    };
+
+    const deptName = getDepartmentName(department).toLowerCase();
+    return ["hr", "human resources"].some((term) => deptName.includes(term));
+  };
+
+  // Check if user has an HR-related position
+  const hasHRPosition = (position: string): boolean => {
+    if (!position) return false;
+    const positionLower = position.toLowerCase();
+    return [
+      "head of human resources",
+      "hr manager",
+      "hr head",
+      "human resources manager",
+      "hr director",
+      "head of hr",
+      "hr",
+      "human resources",
+    ].some((pos) => positionLower.includes(pos));
+  };
+
+  // Check if user has HR position
+  const isHRPosition = user ? hasHRPosition(user.position) : false;
+
+  // Check if user has permission to process payroll
+  const canProcessPayroll = hasPermission(Permission.CREATE_PAYROLL);
+  const canApprovePayroll = hasPermission(Permission.EDIT_PAYROLL);
+  const canViewPayroll =
+    hasPermission(Permission.VIEW_ALL_PAYROLL) ||
+    hasPermission(Permission.VIEW_DEPARTMENT_PAYROLL);
+
+  const isInHRDepartment = user ? isHRDepartment(user.department) : false;
+  const canProcessHRPayroll =
+    (isInHRDepartment || isHRPosition) &&
+    hasPermission(Permission.CREATE_PAYROLL);
+
+  const [activeTab, setActiveTab] = useState(0);
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollData | null>(
     null
   );
-  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
-  const [showRejectConfirm, setShowRejectConfirm] = useState(false);
-  const [selectedPayrollId, setSelectedPayrollId] = useState<string | null>(
-    null
-  );
-  const [filters, setFilters] = useState({
-    page: 1,
-    limit: 10,
-    status: "all",
-  });
   const [showSingleProcessModal, setShowSingleProcessModal] = useState(false);
-  const [processingType, setProcessingType] = useState<
-    "single" | "multiple" | "department"
-  >("single");
-  const [processingResults, setProcessingResults] = useState<
-    | {
-        total: number;
-        processed: number;
-        skipped: number;
-        failed: number;
-        errors?: Array<{
-          employeeId: string;
-          employeeName: string;
-          reason: string;
-          details: string;
-        }>;
-      }
-    | undefined
-  >(undefined);
   const [isProcessing, setIsProcessing] = useState(false);
   const [payrollProcessed, setPayrollProcessed] = useState(false);
   const [selectedPayrollIds, setSelectedPayrollIds] = useState<string[]>([]);
-  const [showBulkSubmitModal, setShowBulkSubmitModal] = useState(false);
-  const [bulkSubmitRemarks, setBulkSubmitRemarks] = useState("");
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [submitDialogData, setSubmitDialogData] = useState<{
     type: "single" | "bulk";
@@ -139,7 +102,6 @@ const ProcessDepartmentPayroll = () => {
   });
 
   // Add state for details and reject dialog
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectingPayrollId, setRejectingPayrollId] = useState<string | null>(
     null
@@ -151,7 +113,7 @@ const ProcessDepartmentPayroll = () => {
   });
 
   // Add state for approve dialog
-  const [showApproveDialog, setShowApproveDialog] = useState(false);
+  const [, setShowApproveDialog] = useState(false);
   const [approvingPayrollId, setApprovingPayrollId] = useState<string | null>(
     null
   );
@@ -162,23 +124,12 @@ const ProcessDepartmentPayroll = () => {
   });
 
   // Add state for processing payment
-  const [processingPayrollId, setProcessingPayrollId] = useState<string | null>(
-    null
-  );
+  // const [processingPayrollId, setProcessingPayrollId] = useState<string | null>(
+  //   null
+  // );
 
   const [isApproving, setIsApproving] = useState(false);
-  const [isRejecting, setIsRejecting] = useState(false);
-
-  // Check if user has permission to process payroll
-  const canProcessPayroll = hasPermission(Permission.CREATE_PAYROLL);
-  const canApprovePayroll = hasPermission(Permission.EDIT_PAYROLL);
-  const canViewPayroll =
-    hasPermission(Permission.VIEW_ALL_PAYROLL) ||
-    hasPermission(Permission.VIEW_DEPARTMENT_PAYROLL);
-
-  const currentUserId = user?._id;
-
-  const [activeTab, setActiveTab] = useState(0);
+  const [, setIsRejecting] = useState(false);
 
   // Add statistics query
   const { data: processingStats } = useQuery({
@@ -208,12 +159,12 @@ const ProcessDepartmentPayroll = () => {
     queryFn: () => adminPayrollService.getDepartmentPayrolls(user?.role),
   });
 
-  const { data: payrollPeriods, isLoading: isPeriodsLoading } = useQuery({
+  const { isLoading: isPeriodsLoading } = useQuery({
     queryKey: ["departmentPayrollPeriods"],
     queryFn: () => adminPayrollService.getPayrollPeriods(user?.role),
   });
 
-  const { data: payrollStats, isLoading: isStatsLoading } = useQuery({
+  const { isLoading: isStatsLoading } = useQuery({
     queryKey: ["departmentPayrollStats"],
     queryFn: () => {
       return adminPayrollService.getPayrollStats(user?.role).then((stats) => {
@@ -238,27 +189,13 @@ const ProcessDepartmentPayroll = () => {
     },
   });
 
-  const handleSubmit = (payrollId: string) => {
-    setSubmitDialogData({
-      type: "single",
-      payrollId,
-      remarks: "",
-    });
-    setShowSubmitDialog(true);
-  };
-
   const handleViewDetails = (payroll: Payroll) => {
     const payrollData = payrolls?.data?.payrolls.find(
       (p: PayrollData) => p._id === payroll._id
     );
     if (payrollData) {
       setSelectedPayroll(payrollData);
-      setShowDetailsModal(true);
     }
-  };
-
-  const handlePageChange = (newPage: number) => {
-    setFilters((prev) => ({ ...prev, page: newPage }));
   };
 
   const handleSinglePayrollSubmit = async (data: {
@@ -270,41 +207,18 @@ const ProcessDepartmentPayroll = () => {
     departmentId: string;
   }) => {
     setIsProcessing(true);
-    setProcessingType(data.employeeIds.length === 1 ? "single" : "multiple");
 
     try {
       if (data.employeeIds.length === 1) {
         // Process single employee
-        const singleResult =
-          await adminPayrollService.processSingleEmployeePayroll({
-            employeeId: data.employeeIds[0],
-            departmentId: data.departmentId,
-            month: data.month,
-            year: data.year,
-            frequency: data.frequency,
-            salaryGrade: data.salaryGrade,
-            userRole: user?.role,
-          });
-
-        // Use the result to set processing results
-        setProcessingResults({
-          total: 1,
-          processed: singleResult.status === "APPROVED" ? 1 : 0,
-          skipped: singleResult.status === "DRAFT" ? 1 : 0,
-          failed: singleResult.status === "REJECTED" ? 1 : 0,
-          errors:
-            singleResult.status === "REJECTED"
-              ? [
-                  {
-                    employeeId: singleResult.employee.employeeId,
-                    employeeName: singleResult.employee.fullName,
-                    reason: "Payroll was rejected",
-                    details:
-                      singleResult.approvalFlow?.remarks ||
-                      "No remarks provided",
-                  },
-                ]
-              : undefined,
+        await adminPayrollService.processSingleEmployeePayroll({
+          employeeId: data.employeeIds[0],
+          departmentId: data.departmentId,
+          month: data.month,
+          year: data.year,
+          frequency: data.frequency,
+          salaryGrade: data.salaryGrade,
+          userRole: user?.role,
         });
 
         // Show toast after processing is complete
@@ -323,8 +237,6 @@ const ProcessDepartmentPayroll = () => {
             userRole: user?.role,
           });
 
-        setProcessingResults(multipleResult);
-
         if (multipleResult.processed > 0) {
           toast.success(
             `Successfully processed ${multipleResult.processed} payrolls`
@@ -337,24 +249,6 @@ const ProcessDepartmentPayroll = () => {
         setShowSingleProcessModal(false);
       }
     } catch (error: any) {
-      setProcessingResults({
-        total: 0,
-        processed: 0,
-        skipped: 0,
-        failed: 1,
-        errors: [
-          {
-            employeeId: "department",
-            employeeName: "Department Payroll",
-            reason: "Failed to process department payroll",
-            details:
-              error.response?.data?.message ||
-              error.message ||
-              "An unexpected error occurred",
-          },
-        ],
-      });
-
       toast.error(error.message || "Failed to process payroll");
     } finally {
       setIsProcessing(false);
@@ -363,33 +257,6 @@ const ProcessDepartmentPayroll = () => {
 
   const handleSelectPayroll = (selectedIds: string[]) => {
     setSelectedPayrollIds(selectedIds);
-  };
-
-  const handleSelectAll = () => {
-    if (!payrolls?.data?.payrolls) return;
-
-    const draftPayrolls = payrolls.data.payrolls
-      .filter((p: PayrollData) => p.status === PayrollStatus.DRAFT)
-      .map((p: PayrollData) => p._id);
-
-    if (selectedPayrollIds.length === draftPayrolls.length) {
-      setSelectedPayrollIds([]);
-    } else {
-      setSelectedPayrollIds(draftPayrolls);
-    }
-  };
-
-  const handleBulkSubmit = async () => {
-    if (selectedPayrollIds.length === 0) {
-      toast.warning("Please select at least one payroll to submit");
-      return;
-    }
-
-    setSubmitDialogData({
-      type: "bulk",
-      remarks: "",
-    });
-    setShowSubmitDialog(true);
   };
 
   const handleConfirmSubmit = async () => {
@@ -411,84 +278,6 @@ const ProcessDepartmentPayroll = () => {
       setShowSubmitDialog(false);
     } catch (error: any) {
       toast.error(error.message || "Failed to submit payroll(s)");
-    }
-  };
-
-  const handleProcessDepartmentPayroll = async (data: {
-    month: number;
-    year: number;
-    frequency: string;
-  }) => {
-    setIsProcessing(true);
-    setProcessingType("department");
-
-    try {
-      const departmentResult =
-        await adminPayrollService.processDepartmentPayroll({
-          month: data.month,
-          year: data.year,
-          frequency: data.frequency,
-        });
-
-      // Transform the departmentResult into the expected format
-      const processedResults = {
-        total: departmentResult.length,
-        processed: departmentResult.filter(
-          (p: PayrollData) => p.status === "APPROVED"
-        ).length,
-        skipped: departmentResult.filter(
-          (p: PayrollData) => p.status === "DRAFT"
-        ).length,
-        failed: departmentResult.filter(
-          (p: PayrollData) => p.status === "REJECTED"
-        ).length,
-        errors: departmentResult
-          .filter((p: PayrollData) => p.status === "REJECTED")
-          .map((p: PayrollData) => ({
-            employeeId: p.employee.employeeId,
-            employeeName: p.employee.fullName,
-            reason: "Payroll was rejected",
-            details: p.approvalFlow.remarks || "No remarks provided",
-          })),
-      };
-
-      setProcessingResults(processedResults);
-
-      if (processedResults.processed > 0) {
-        toast.success(
-          `Successfully processed ${processedResults.processed} department payrolls`
-        );
-      } else {
-        toast.warning("No department payrolls were processed");
-      }
-
-      queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
-      queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] });
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
-    } catch (error: any) {
-      const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "An unexpected error occurred";
-
-      setProcessingResults({
-        total: 0,
-        processed: 0,
-        skipped: 0,
-        failed: 1,
-        errors: [
-          {
-            employeeId: "department",
-            employeeName: "Department Payroll",
-            reason: "Failed to process department payroll",
-            details: errorMessage,
-          },
-        ],
-      });
-
-      toast.error(errorMessage);
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -521,25 +310,6 @@ const ProcessDepartmentPayroll = () => {
     },
     onError: (error: any) => {
       toast.error(error.message || "Failed to process payment");
-    },
-  });
-
-  // Add approve mutation
-  const approveMutation = useMutation({
-    mutationFn: ({
-      payrollId,
-      remarks,
-    }: {
-      payrollId: string;
-      remarks: string;
-    }) => adminPayrollService.approvePayroll(payrollId, remarks),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
-      queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] });
-      toast.success("Payroll approved successfully");
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Failed to approve payroll");
     },
   });
 
@@ -621,7 +391,6 @@ const ProcessDepartmentPayroll = () => {
   };
 
   const handleProcessPayment = (payroll: Payroll) => {
-    setProcessingPayrollId(payroll._id);
     try {
       processPaymentMutation.mutate(payroll._id);
     } catch (error) {
@@ -732,47 +501,40 @@ const ProcessDepartmentPayroll = () => {
     }
   };
 
+  const handleViewDetailsWithPermission = (payroll: Payroll) => {
+    if (canViewPayroll) {
+      handleViewDetails(payroll);
+    }
+  };
+
+  const handleApproveWithPermission = (payroll: Payroll) => {
+    if (canApprovePayroll) {
+      handleApprove(payroll);
+    }
+  };
+
+  const handleRejectWithPermission = (payroll: Payroll) => {
+    if (canApprovePayroll) {
+      handleReject(payroll);
+    }
+  };
+
+  const handleSubmitForApprovalWithPermission = (payroll: Payroll) => {
+    if (canProcessPayroll) {
+      handleSubmitForApproval(payroll);
+    }
+  };
+
+  const handleProcessPaymentWithPermission = (payroll: Payroll) => {
+    if (canProcessPayroll) {
+      handleProcessPayment(payroll);
+    }
+  };
+
   const isLoadingCombined =
     isPeriodsLoading || isStatsLoading || isPayrollsLoading;
 
   const payrollsData = payrolls?.data?.payrolls ?? [];
-
-  // Improve type safety for department checking
-  const isHRDepartment = (
-    department: { _id: string; name: string; code: string } | string | undefined
-  ): boolean => {
-    if (!department) return false;
-
-    const getDepartmentName = (dept: typeof department): string => {
-      if (typeof dept === "string") return dept;
-      return dept.name;
-    };
-
-    const deptName = getDepartmentName(department).toLowerCase();
-    return ["hr", "human resources"].some((term) => deptName.includes(term));
-  };
-
-  // Special case for HR department
-  const isHR = user ? isHRDepartment(user.department) : false;
-
-  // Check if user has an HR-related position
-  const hasHRPosition = (position: string): boolean => {
-    if (!position) return false;
-    const positionLower = position.toLowerCase();
-    return [
-      "head of human resources",
-      "hr manager",
-      "hr head",
-      "human resources manager",
-      "hr director",
-      "head of hr",
-      "hr",
-      "human resources",
-    ].some((pos) => positionLower.includes(pos));
-  };
-
-  // Check if user has HR position
-  const isHRPosition = user ? hasHRPosition(user.position) : false;
 
   if (isLoadingCombined) {
     return (
@@ -845,21 +607,24 @@ const ProcessDepartmentPayroll = () => {
         <h1 className="text-2xl font-semibold text-gray-900">
           Process Department Payroll
         </h1>
-        {canProcessPayroll && (
+        {(canProcessPayroll || canProcessHRPayroll) && (
           <Button
             variant="contained"
             color="primary"
-            startIcon={<FaPlus />}
+            startIcon={
+              isProcessing ? <FaSpinner className="animate-spin" /> : <FaPlus />
+            }
             onClick={() => setShowSingleProcessModal(true)}
+            disabled={isProcessing}
           >
-            Create Payroll
+            {isProcessing ? "Processing..." : "Create Payroll"}
           </Button>
         )}
       </Box>
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
         <Tabs
           value={activeTab}
-          onChange={(e, newValue) => setActiveTab(newValue)}
+          onChange={(_, newValue) => setActiveTab(newValue)}
         >
           <Tab label="Payroll List" />
           <Tab label="Dashboard" />
@@ -870,16 +635,14 @@ const ProcessDepartmentPayroll = () => {
         <>
           <PayrollTable
             payrolls={convertedPayrolls}
-            onApprove={handleApprove}
-            onReject={handleReject}
-            onView={handleViewDetails}
-            onEdit={handleViewDetails}
-            onDelete={handleViewDetails}
-            onSubmitForApproval={handleSubmitForApproval}
-            onProcessPayment={handleProcessPayment}
+            onApprove={handleApproveWithPermission}
+            onReject={handleRejectWithPermission}
+            onView={handleViewDetailsWithPermission}
+            onSubmitForApproval={handleSubmitForApprovalWithPermission}
+            onProcessPayment={handleProcessPaymentWithPermission}
             selectedPayrolls={selectedPayrollIds}
             onSelectionChange={handleSelectPayroll}
-            loading={isPayrollsLoading}
+            loading={isPayrollsLoading || isProcessing}
             error={payrollsError}
           />
         </>
@@ -988,10 +751,10 @@ const ProcessDepartmentPayroll = () => {
                 className="w-full p-2 border rounded-md"
                 rows={3}
                 value={submitDialogData.remarks}
-                onChange={(e) =>
+                onChange={(event) =>
                   setSubmitDialogData((prev) => ({
                     ...prev,
-                    remarks: e.target.value,
+                    remarks: event.target.value,
                   }))
                 }
                 placeholder="Add any remarks for the submission..."
@@ -1039,10 +802,10 @@ const ProcessDepartmentPayroll = () => {
                 className="w-full p-2 border rounded-md"
                 rows={3}
                 value={rejectDialogData.remarks}
-                onChange={(e) =>
+                onChange={(event) =>
                   setRejectDialogData((prev) => ({
                     ...prev,
-                    remarks: e.target.value,
+                    remarks: event.target.value,
                   }))
                 }
                 placeholder="Please provide a reason for rejection..."

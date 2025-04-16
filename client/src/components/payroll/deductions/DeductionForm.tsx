@@ -9,7 +9,6 @@ import {
   DeductionScope,
   DeductionApplicability,
   TaxBracket,
-  DeductionType,
   CreateDeductionInput,
   UpdateDeductionInput,
 } from "../../../types/deduction";

@@ -8,15 +8,20 @@ import {
   FaTrash,
 } from "react-icons/fa";
 import { Deduction } from "../../../types/deduction";
-import { DeductionType, CalculationMethod } from "../../../types/deduction";
+import {
+  DeductionType,
+  CalculationMethod,
+  CreateDeductionInput,
+  UpdateDeductionInput,
+} from "../../../types/deduction";
 import { FormSkeleton } from "./Skeletons";
 import { DeductionForm } from "./DeductionForm";
 
 interface VoluntaryDeductionsProps {
   deductions: Deduction[];
   isLoading: boolean;
-  onAdd: (data: Partial<Deduction>) => Promise<void>;
-  onUpdate: (id: string, data: Partial<Deduction>) => Promise<void>;
+  onAdd: (data: CreateDeductionInput) => Promise<void>;
+  onUpdate: (id: string, data: UpdateDeductionInput) => Promise<void>;
   onToggle: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }
@@ -37,14 +42,16 @@ export const VoluntaryDeductions = ({
 
   if (isLoading) return <FormSkeleton />;
 
-  const handleSubmit = async (data: Partial<Deduction>) => {
+  const handleSubmit = async (
+    data: CreateDeductionInput | UpdateDeductionInput
+  ) => {
     try {
       // Removed 'setSubmitting' call
       if (editingDeduction) {
-        await onUpdate(editingDeduction._id, data);
+        await onUpdate(editingDeduction._id, data as UpdateDeductionInput);
         toast.success("Deduction updated successfully");
       } else {
-        await onAdd(data);
+        await onAdd(data as CreateDeductionInput);
         toast.success("Deduction added successfully");
       }
       setShowForm(false);
@@ -104,7 +111,7 @@ export const VoluntaryDeductions = ({
           <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
             <DeductionForm
               deduction={editingDeduction || undefined}
-              deductionType={DeductionType.VOLUNTARY}
+              deductionType="voluntary"
               onSubmit={handleSubmit}
               onCancel={() => {
                 setShowForm(false);

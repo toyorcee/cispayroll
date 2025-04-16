@@ -2,7 +2,6 @@ import { useAuth } from "../../../context/AuthContext.js";
 import { UserRole } from "../../../types/auth.js";
 import {
   Card,
-  Grid,
   Typography,
   Box,
   Avatar,
@@ -41,12 +40,6 @@ interface OnboardingTask {
   completed: boolean;
   completedAt?: string;
   id: string;
-}
-
-interface ImageUploadResponse {
-  success: boolean;
-  message: string;
-  profileImage: string;
 }
 
 export default function UserProfile() {

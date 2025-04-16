@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef, lazy, Suspense } from "react";
-import { motion, useInView } from "framer-motion";
+import { useEffect, useState, lazy, Suspense } from "react";
+import { motion } from "framer-motion";
 import { useAuth } from "../../../context/AuthContext";
 import { Permission, UserRole } from "../../../types/auth";
 import { getRoleSpecificWelcomeMessage } from "../../../utils/dashboardUtils";
@@ -11,7 +11,6 @@ import { departmentService } from "../../../services/departmentService";
 import DepartmentStats from "../../../components/dashboard/DepartmentStats";
 import {
   FaUsers,
-  FaUserTie,
   FaUserPlus,
   FaCalendarAlt,
   FaClock,
@@ -290,8 +289,6 @@ export default function Dashboard() {
         (sum, val) => sum + val,
         0
       );
-    const roleDistribution =
-      adminChartStatsData.roleDistribution.datasets[0].data;
     const totalGrowth =
       adminChartStatsData.monthlyGrowth.datasets[0].data.reduce(
         (sum, val) => sum + val,

@@ -4,7 +4,6 @@ import {
   Deduction,
   DeductionResponse,
   UserDeductionPreferences,
-  DeductionPreference,
   CalculationMethod,
 } from "../types/deduction";
 

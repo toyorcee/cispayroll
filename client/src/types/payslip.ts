@@ -12,7 +12,11 @@ export interface Payslip {
     type: string;
     amount: number;
   }>;
+  totals: {
+    grossEarnings: number;
+    totalDeductions: number;
   netPay: number;
+  };
   status: "pending" | "processed" | "paid";
   paymentDate: Date | null;
   createdAt: Date;

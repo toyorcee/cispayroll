@@ -19,7 +19,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   permissions,
   requireAllPermissions = false,
 }) => {
-  const { user, loading, isSuperAdmin, isAdmin } = useAuth();
+  const { user, loading, isSuperAdmin } = useAuth();
   const location = useLocation();
   const { getSkeleton } = useSkeleton();
 

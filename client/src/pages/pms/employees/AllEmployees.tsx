@@ -1,12 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  FaBuilding,
-  FaPlus,
-  FaEdit,
-  FaTrash,
-  FaTimes,
-  FaSpinner,
-} from "react-icons/fa";
+import { FaBuilding, FaPlus, FaEdit, FaTimes, FaSpinner } from "react-icons/fa";
 import { Employee, EmployeeFilters } from "../../../types/employee";
 import { Status } from "../../../types/common";
 import { useAuth } from "../../../context/AuthContext";
@@ -17,7 +10,6 @@ import { useQuery } from "@tanstack/react-query";
 // Component imports
 import { EmployeeSearch } from "../../../components/employees/EmployeeSearch";
 import { EmployeeDetailsModal } from "../../../components/employees/EmployeeDetailsModal";
-import { DeleteEmployeeModal } from "../../../components/employees/DeleteEmployeeModal";
 import { StatusFilter } from "../../../components/employees/StatusFilter";
 import { Pagination } from "../../../components/shared/Pagination";
 import { EmployeeTableSkeleton } from "../../../components/employees/EmployeeTableSkeleton";
@@ -85,7 +77,6 @@ export default function AllEmployees() {
     null
   );
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -124,7 +115,7 @@ export default function AllEmployees() {
     };
   };
 
-  const { canCreate, canEdit, canDelete } = getActionPermissions();
+  const { canCreate, canEdit } = getActionPermissions();
 
   const { data: departmentsData, isLoading: departmentsLoading } =
     departmentService.useGetDepartments();
@@ -204,25 +195,6 @@ export default function AllEmployees() {
     setShowEditModal(true);
   };
 
-  const handleDeleteClick = async (e: React.MouseEvent, employee: Employee) => {
-    e.stopPropagation();
-    setSelectedEmployeeId(employee._id);
-    setShowDeleteModal(true);
-  };
-
-  const handleDelete = async () => {
-    if (!selectedEmployeeId) return;
-    try {
-      await employeeService.deleteEmployee(selectedEmployeeId);
-      setEmployees(employees.filter((e) => e._id !== selectedEmployeeId));
-      await refreshDepartments();
-      toast.success("Employee deleted successfully");
-      setShowDeleteModal(false);
-    } catch (error) {
-      toast.error("Failed to delete employee");
-    }
-  };
-
   const handleStatusChange = (newStatus: Status | undefined) => {
     setFilters((prev) => ({
       ...prev,
@@ -281,15 +253,6 @@ export default function AllEmployees() {
           Edit
         </button>
       )}
-      {canDelete && (
-        <button
-          onClick={(e) => handleDeleteClick(e, employee)}
-          className="text-red-600 hover:text-red-900 flex items-center"
-        >
-          <FaTrash className="w-4 h-4 mr-1" />
-          Delete
-        </button>
-      )}
     </div>
   );
 
@@ -346,9 +309,11 @@ export default function AllEmployees() {
 
   const handleUpdateEmployee = async (id: string, data: Partial<Employee>) => {
     try {
-      const response = isSuperAdmin
-        ? await employeeService.updateEmployee(id, data)
-        : await employeeService.adminService.updateEmployee(id, data);
+      if (isSuperAdmin) {
+        await employeeService.updateEmployee(id, data);
+      } else {
+        await employeeService.adminService.updateEmployee(id, data);
+      }
 
       toast.success("Employee updated successfully");
       setShowEditModal(false);
@@ -356,20 +321,6 @@ export default function AllEmployees() {
     } catch (error) {
       console.error("Error updating employee:", error);
       toast.error("Failed to update employee");
-    }
-  };
-
-  const handleDeleteEmployee = async (id: string) => {
-    try {
-      const response = isSuperAdmin
-        ? await employeeService.deleteEmployee(id)
-        : await employeeService.adminService.deleteEmployee(id);
-
-      toast.success("Employee deleted successfully");
-      refetch();
-    } catch (error) {
-      console.error("Error deleting employee:", error);
-      toast.error("Failed to delete employee");
     }
   };
 
@@ -682,19 +633,6 @@ export default function AllEmployees() {
           setShowDetailsModal(false);
           setSelectedEmployeeId(null);
         }}
-      />
-
-      <DeleteEmployeeModal
-        isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        employeeName={
-          selectedEmployeeId
-            ? employees.find((e) => e._id === selectedEmployeeId)?.firstName +
-              " " +
-              employees.find((e) => e._id === selectedEmployeeId)?.lastName
-            : ""
-        }
-        onConfirm={handleDelete}
       />
 
       <EditEmployeeModal

@@ -1,11 +1,11 @@
-import { useEffect, useState, useRef, createContext, useContext } from "react";
+import { useEffect, useRef, createContext, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { Outlet } from "react-router-dom";
-import { FaBars, FaMoneyCheckAlt, FaSearch } from "react-icons/fa";
+import { FaBars, FaMoneyCheckAlt } from "react-icons/fa";
 import { useNavigation } from "../../context/NavigationContext";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sidebar } from "./Sidebar"; 
-import { ProfileMenu } from "./PayrollMenu"; 
+import { Sidebar } from "./Sidebar";
+import { ProfileMenu } from "./PayrollMenu";
 import {
   NotificationBell,
   NotificationBellRef,
@@ -23,7 +23,6 @@ export const useNotifications = () => useContext(NotificationContext);
 
 export default function DashboardLayout() {
   const { isSidebarOpen, setIsSidebarOpen } = useNavigation();
-  const [searchQuery, setSearchQuery] = useState("");
   const notificationBellRef = useRef<NotificationBellRef>(null);
   const navigate = useNavigate();
 
@@ -83,9 +82,6 @@ export default function DashboardLayout() {
 
               {/* Right section with notifications and profile */}
               <div className="flex items-center gap-4 mr-2">
-                <button className="md:hidden p-2 hover:bg-green-50 rounded-full">
-                  <FaSearch className="w-5 h-5 text-gray-600" />
-                </button>
                 <NotificationBell ref={notificationBellRef} />
                 <ProfileMenu />
               </div>

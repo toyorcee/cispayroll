@@ -772,7 +772,7 @@ export class SuperAdminController {
       const skip = (page - 1) * limit;
 
       const payrolls = await PayrollModel.find(query)
-        .sort({ year: -1, month: -1 })
+        .sort({ createdAt: -1, year: -1, month: -1 })
         .skip(skip)
         .limit(limit)
         .populate([

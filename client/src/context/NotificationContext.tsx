@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useCallback } from "react";
 import { useAuth } from "./AuthContext";
 import { toast } from "react-toastify";
 
@@ -24,7 +24,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const { user } = useAuth();
-  const [notifications, setNotifications] = useState<any[]>([]);
 
   const checkForNewNotifications = useCallback(async () => {
     if (!user) return;
@@ -46,7 +45,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       const data = await response.json();
-      setNotifications(data.notifications);
 
       // Show toast for new notifications
       data.notifications.forEach((notification: any) => {

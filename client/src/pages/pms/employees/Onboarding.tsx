@@ -1,10 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import {
-  FaUserPlus,
-  FaUsers,
-  FaBuildingColumns,
-} from "react-icons/fa6";
+import { FaUserPlus, FaUsers, FaBuildingColumns } from "react-icons/fa6";
 import { FaTimes, FaSpinner } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { employeeService } from "../../../services/employeeService";
@@ -187,6 +183,9 @@ const ONBOARDING_STAGES = {
   COMPLETED: "completed",
 } as const;
 
+type OnboardingStage =
+  (typeof ONBOARDING_STAGES)[keyof typeof ONBOARDING_STAGES];
+
 export default function Onboarding() {
   // Move ALL hooks to the top, before any conditional returns
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -320,6 +319,24 @@ export default function Onboarding() {
     console.log("Opening modal for:", employee);
     setSelectedEmployee(employee);
     setIsModalOpen(true);
+  };
+
+  const getStatusColor = (status: OnboardingStage) => {
+    switch (status) {
+      case ONBOARDING_STAGES.COMPLETED:
+        return "bg-green-100 text-green-800";
+      case ONBOARDING_STAGES.NOT_STARTED:
+        return "bg-gray-100 text-gray-800";
+      default:
+        return "bg-yellow-100 text-yellow-800";
+    }
+  };
+
+  const getStatusText = (status: OnboardingStage) => {
+    return status
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
   };
 
   // Now you can safely use conditional rendering
@@ -482,15 +499,13 @@ export default function Onboarding() {
                       </div>
                       <span
                         className={`px-3 py-1 text-sm font-semibold rounded-full 
-                        ${
-                          employee.onboarding.status === "completed"
-                            ? "bg-green-100 text-green-800"
-                            : employee.onboarding.status === "in_progress"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
+                        ${getStatusColor(
+                          employee.onboarding?.status as OnboardingStage
+                        )}`}
                       >
-                        {employee.onboarding.status.replace("_", " ")}
+                        {getStatusText(
+                          employee.onboarding?.status as OnboardingStage
+                        )}
                       </span>
                     </div>
 

@@ -4,7 +4,7 @@ import { salaryStructureService } from "../../../services/salaryStructureService
 import { ISalaryGrade } from "../../../types/salary";
 import { departmentService } from "../../../services/departmentService";
 import TableSkeleton from "../../../components/skeletons/TableSkeleton";
-import { DepartmentBasic } from "../../../types/employee";
+import { DepartmentBasic } from "../../../types/department";
 import { Permission } from "../../../types/auth";
 import { useAuth } from "../../../context/AuthContext";
 import NewSalaryGrade from "../../../components/modals/NewSalaryGrade";

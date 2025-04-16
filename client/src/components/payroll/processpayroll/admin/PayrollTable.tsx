@@ -29,7 +29,6 @@ import {
   Cancel as CancelIcon,
   Payment as PaymentIcon,
   Search,
-  FilterList,
   ArrowUpward,
   ArrowDownward,
 } from "@mui/icons-material";
@@ -70,8 +69,6 @@ interface PayrollTableProps {
   onApprove: (payroll: Payroll) => void;
   onReject: (payroll: Payroll) => void;
   onView: (payroll: Payroll) => void;
-  onEdit: (payroll: Payroll) => void;
-  onDelete: (payroll: Payroll) => void;
   onSubmitForApproval?: (payroll: Payroll) => void;
   onProcessPayment?: (payroll: Payroll) => void;
   selectedPayrolls: string[];
@@ -85,8 +82,6 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
   onApprove,
   onReject,
   onView,
-  onEdit,
-  onDelete,
   onSubmitForApproval,
   onProcessPayment,
   selectedPayrolls,
@@ -101,7 +96,7 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
   const [sortField, setSortField] = useState<keyof Payroll>("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
   };
 
@@ -159,29 +154,6 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
     onSelectionChange(newSelectedPayrolls);
   };
 
-  const formatApprovalLevel = (level: string | undefined) => {
-    if (!level) return "N/A";
-
-    // Special case for COMPLETED level
-    if (level === "COMPLETED") return "Completed";
-
-    return level
-      .split("_")
-      .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
-      .join(" ");
-  };
-
-  const getApprovalLevelColor = (payroll: Payroll) => {
-    // If status is COMPLETED, use success color
-    if (payroll.status === "COMPLETED") return "success";
-
-    // If status is PENDING, use warning color
-    if (payroll.status === "PENDING") return "warning";
-
-    // Default color
-    return "default";
-  };
-
   // Filter and sort payrolls
   const filteredAndSortedPayrolls = useMemo(() => {
     let result = [...payrolls];
@@ -190,7 +162,6 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       result = result.filter((payroll) => {
-        // Check employee name - first name and last name separately
         if (payroll.employee.firstName.toLowerCase().includes(searchLower))
           return true;
         if (payroll.employee.lastName.toLowerCase().includes(searchLower))

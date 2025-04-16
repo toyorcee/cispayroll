@@ -21,7 +21,7 @@ import { toast } from "react-toastify";
 import { Employee, OffboardingStatus } from "../../../types/employee";
 
 export default function Offboarding() {
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employees ] = useState<Employee[]>([]);
 
   // useEffect(() => {
   //   fetchOffboardingEmployees();

@@ -64,15 +64,22 @@ interface PaymentBatch {
 }
 
 const calculateAllowances = (employee: Employee): number => 
-  employee.salary.allowances.reduce((sum: number, a: Allowance) => sum + a.amount, 0);
+  employee.salary.allowances.reduce(
+    (sum: number, a: Allowance) => sum + a.amount,
+    0
+  );
 
 const calculateDeductions = (employee: Employee): number => 
-  employee.salary.deductions.reduce((sum: number, d: Deduction) => sum + d.amount, 0);
+  employee.salary.deductions.reduce(
+    (sum: number, d: Deduction) => sum + d.amount,
+    0
+  );
 
 const findDeductionAmount = (employee: Employee, type: string): number => 
-  employee.salary.deductions.find(d => d.type === type)?.amount || 0;
+  employee.salary.deductions.find((d) => d.type === type)?.amount || 0;
 
-export const currentPayrollEntries: PayrollEntry[] = employees.map((employee: Employee): PayrollEntry => ({
+export const currentPayrollEntries: PayrollEntry[] = employees.map(
+  (employee: Employee): PayrollEntry => ({
   id: `PE-${employee.employeeId}-2024-03`,
   periodId: "PAY-2024-03",
   employeeId: employee.employeeId,
@@ -80,18 +87,28 @@ export const currentPayrollEntries: PayrollEntry[] = employees.map((employee: Em
   basicSalary: employee.salary.basic,
   grossAllowances: calculateAllowances(employee),
   grossDeductions: calculateDeductions(employee),
-  netSalary: employee.salary.basic + calculateAllowances(employee) - calculateDeductions(employee),
+    netSalary:
+      employee.salary.basic +
+      calculateAllowances(employee) -
+      calculateDeductions(employee),
   tax: findDeductionAmount(employee, "Tax"),
   pension: findDeductionAmount(employee, "Pension"),
   nhf: employee.nhfNumber ? findDeductionAmount(employee, "NHF") : 0,
   otherDeductions: 0,
-  overtime: employee.overtime ? {
+    overtime: employee.overtime
+      ? {
     hours: employee.overtime.hoursWorked,
     rate: employee.overtime.rate,
-    amount: employee.overtime.hoursWorked * employee.overtime.rate * employee.salary.basic / 160
-  } : undefined,
-  paymentStatus: "pending"
-}));
+          amount:
+            (employee.overtime.hoursWorked *
+              employee.overtime.rate *
+              employee.salary.basic) /
+            160,
+        }
+      : undefined,
+    paymentStatus: "pending",
+  })
+);
 
 export const payrollPeriods: PayrollPeriod[] = [
   {
@@ -100,7 +117,10 @@ export const payrollPeriods: PayrollPeriod[] = [
     year: 2024,
     status: PayrollStatus.PROCESSING,
     totalEmployees: employees.length,
-    totalNetSalary: currentPayrollEntries.reduce((sum, entry) => sum + entry.netSalary, 0)
+    totalNetSalary: currentPayrollEntries.reduce(
+      (sum, entry) => sum + entry.netSalary,
+      0
+    ),
   },
   {
     _id: "PAY-2024-02",
@@ -110,7 +130,7 @@ export const payrollPeriods: PayrollPeriod[] = [
     processedDate: "2024-03-05",
     employee: "Aisha Ibrahim",
     totalEmployees: employees.length,
-    totalNetSalary: 13050000
+    totalNetSalary: 13050000,
   },
   {
     _id: "PAY-2024-01",
@@ -120,8 +140,8 @@ export const payrollPeriods: PayrollPeriod[] = [
     processedDate: "2024-02-05",
     employee: "Aisha Ibrahim",
     totalEmployees: employees.length,
-    totalNetSalary: 12550000
-  }
+    totalNetSalary: 12550000,
+  },
 ];
 
 export const paymentBatches: PaymentBatch[] = [
@@ -129,12 +149,15 @@ export const paymentBatches: PaymentBatch[] = [
     id: "PB-2024-03-001",
     periodId: "PAY-2024-03",
     batchNumber: "B001",
-    totalAmount: currentPayrollEntries.reduce((sum, entry) => sum + entry.netSalary, 0),
+    totalAmount: currentPayrollEntries.reduce(
+      (sum, entry) => sum + entry.netSalary,
+      0
+    ),
     status: "pending",
     entries: currentPayrollEntries,
     createdAt: new Date(),
     ippisStatus: "pending",
-    tsaStatus: "pending"
+    tsaStatus: "pending",
   },
   {
     id: "PB-2024-02-001",
@@ -142,21 +165,21 @@ export const paymentBatches: PaymentBatch[] = [
     batchNumber: "B001",
     totalAmount: 13050000,
     status: "completed",
-    entries: currentPayrollEntries.map(entry => ({
+    entries: currentPayrollEntries.map((entry) => ({
       ...entry,
       periodId: "PAY-2024-02",
       paymentStatus: "paid",
       paymentDate: new Date("2024-03-05"),
       paymentReference: `PAY-REF-${entry.employeeId}-02`,
       ippisReference: `IPPIS-${entry.employeeId}-02`,
-      tsaReference: `TSA-${entry.employeeId}-02`
+      tsaReference: `TSA-${entry.employeeId}-02`,
     })),
     createdAt: new Date("2024-03-03"),
     processedAt: new Date("2024-03-05"),
     ippisStatus: "completed",
     tsaStatus: "completed",
-    bankReference: "BANK-REF-2024-02"
-  }
+    bankReference: "BANK-REF-2024-02",
+  },
 ];
 
 interface DepartmentBreakdown {
@@ -174,29 +197,56 @@ export const payrollSummaries: PayrollSummary[] = [
   {
     periodId: "PAY-2024-03",
     totalEmployees: employees.length,
-    totalBasicSalary: currentPayrollEntries.reduce((sum: number, entry: PayrollEntry) => sum + entry.basicSalary, 0),
-    totalAllowances: currentPayrollEntries.reduce((sum: number, entry: PayrollEntry) => sum + entry.grossAllowances, 0),
-    totalDeductions: currentPayrollEntries.reduce((sum: number, entry: PayrollEntry) => sum + entry.grossDeductions, 0),
-    totalNetSalary: currentPayrollEntries.reduce((sum: number, entry: PayrollEntry) => sum + entry.netSalary, 0),
-    totalTax: currentPayrollEntries.reduce((sum: number, entry: PayrollEntry) => sum + entry.tax, 0),
-    totalPension: currentPayrollEntries.reduce((sum: number, entry: PayrollEntry) => sum + entry.pension, 0),
-    totalNHF: currentPayrollEntries.reduce((sum: number, entry: PayrollEntry) => sum + entry.nhf, 0),
+    totalBasicSalary: currentPayrollEntries.reduce(
+      (sum: number, entry: PayrollEntry) => sum + entry.basicSalary,
+      0
+    ),
+    totalAllowances: currentPayrollEntries.reduce(
+      (sum: number, entry: PayrollEntry) => sum + entry.grossAllowances,
+      0
+    ),
+    totalDeductions: currentPayrollEntries.reduce(
+      (sum: number, entry: PayrollEntry) => sum + entry.grossDeductions,
+      0
+    ),
+    totalNetSalary: currentPayrollEntries.reduce(
+      (sum: number, entry: PayrollEntry) => sum + entry.netSalary,
+      0
+    ),
+    totalTax: currentPayrollEntries.reduce(
+      (sum: number, entry: PayrollEntry) => sum + entry.tax,
+      0
+    ),
+    totalPension: currentPayrollEntries.reduce(
+      (sum: number, entry: PayrollEntry) => sum + entry.pension,
+      0
+    ),
+    totalNHF: currentPayrollEntries.reduce(
+      (sum: number, entry: PayrollEntry) => sum + entry.nhf,
+      0
+    ),
     totalOvertime: 0,
     totalBonuses: 0,
     totalArrears: 0,
-    departmentBreakdown: employees.reduce((acc: Record<string, DepartmentBreakdown>, emp: Employee) => {
-      const dept = emp.department;
-      if (!acc[dept]) {
-        acc[dept] = { employees: 0, totalCost: 0 };
+    departmentBreakdown: employees.reduce(
+      (acc: Record<string, DepartmentBreakdown>, emp: Employee) => {
+        const deptId =
+          typeof emp.department === "object"
+            ? emp.department._id
+            : emp.department;
+        if (!acc[deptId]) {
+          acc[deptId] = { employees: 0, totalCost: 0 };
       }
-      acc[dept].employees += 1;
-      acc[dept].totalCost += emp.salary.basic + calculateAllowances(emp);
+        acc[deptId].employees += 1;
+        acc[deptId].totalCost += emp.salary.basic + calculateAllowances(emp);
       return acc;
-    }, {} as Record<string, DepartmentBreakdown>),
+      },
+      {} as Record<string, DepartmentBreakdown>
+    ),
     complianceStatus: {
       payeSubmitted: false,
       pensionRemitted: false,
-      nhfRemitted: false
-    } as ComplianceStatus
-  }
+      nhfRemitted: false,
+    } as ComplianceStatus,
+  },
 ];

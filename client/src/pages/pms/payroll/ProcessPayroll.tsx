@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -13,7 +13,6 @@ import {
   FaPaperPlane,
   FaEdit,
   FaHistory,
-  FaReceipt,
   FaFileInvoiceDollar,
 } from "react-icons/fa";
 import {
@@ -32,7 +31,6 @@ import TableSkeleton from "../../../components/skeletons/TableSkeleton";
 import { toast } from "react-toastify";
 import PayslipDetail from "../../../components/payroll/processpayroll/PayslipDetail";
 import { BarChart, LineChart, PieChart } from "../../../components/charts";
-import { useInView } from "framer-motion";
 import PayrollHistoryModal from "../../../components/payroll/processpayroll/PayrollHistoryModal";
 import {
   TableContainer,
@@ -42,8 +40,6 @@ import {
   TableRow,
   TableCell,
   Paper,
-  IconButton,
-  Tooltip,
 } from "@mui/material";
 import { RunPayrollModal } from "../../../components/payroll/processpayroll/RunPayrollModal";
 
@@ -146,23 +142,6 @@ const EmployeePayrollCharts: React.FC<EmployeePayrollChartsProps> = ({
   </div>
 );
 
-interface FrequencyTotal {
-  _id: string;
-  totalNetPay: number;
-  totalGrossPay: number;
-  totalDeductions: number;
-  count: number;
-  paidCount: number;
-  approvedCount: number;
-  pendingCount: number;
-}
-
-interface StatusBreakdown {
-  _id: string;
-  count: number;
-  totalNetPay: number;
-}
-
 interface Statistics {
   totalPayrolls: number;
   processingPayrolls: number;
@@ -258,7 +237,7 @@ export default function ProcessPayroll() {
 
   const markAsPaidMutation = useMutation({
     mutationFn: (payrollId: string) => payrollService.markAsPaid(payrollId),
-    onSuccess: (data, payrollId) => {
+    onSuccess: (_, payrollId) => {
       queryClient.setQueryData(["payrolls", filters], (oldData: any) => {
         if (!oldData?.data?.payrolls) return oldData;
         return {
@@ -286,7 +265,7 @@ export default function ProcessPayroll() {
 
   const markAsFailedMutation = useMutation({
     mutationFn: (payrollId: string) => payrollService.markAsFailed(payrollId),
-    onSuccess: (data, payrollId) => {
+    onSuccess: (_, payrollId) => {
       queryClient.setQueryData(["payrolls", filters], (oldData: any) => {
         if (!oldData?.data?.payrolls) return oldData;
         return {
@@ -397,97 +376,31 @@ export default function ProcessPayroll() {
 
   const isLoading = isPeriodsLoading || isStatsLoading;
 
-  const statusDistRef = useRef(null);
-  const monthlyCompRef = useRef(null);
-
-  const isStatusDistInView = useInView(statusDistRef, { amount: 0.5 });
-  const isMonthlyCompInView = useInView(monthlyCompRef, { amount: 0.5 });
-
-  const monthlyComparisonData = {
-    labels: Array.from(
-      new Set(
-        payrollsData?.data?.payrolls
-          ?.filter(
-            (payroll: PayrollData) =>
-              payroll.status === PayrollStatus.APPROVED ||
-              payroll.status === PayrollStatus.PAID
-          )
-          ?.map((payroll: PayrollData) => {
-            const date = new Date(payroll.processedDate || new Date());
-            return `${date.toLocaleString("default", {
-              month: "short",
-            })}/${date.getFullYear()}`;
-          }) || []
-      )
-    ).sort() as string[],
-    datasets: [
-      {
-        label: "Total Net Pay",
-        data: Array.from<string>(
-          new Set<string>(
-            payrollsData?.data?.payrolls
-              ?.filter(
-                (payroll: PayrollData) =>
-                  payroll.status === PayrollStatus.APPROVED ||
-                  payroll.status === PayrollStatus.PAID
-              )
-              ?.map(
-                (p: PayrollData) =>
-                  `${new Date(
-                    p.processedDate || new Date()
-                  ).getMonth()}-${new Date(
-                    p.processedDate || new Date()
-                  ).getFullYear()}`
-              ) || []
-          )
-        ).map((monthYear: string) => {
-          const [month, year] = monthYear.split("-");
-          return (
-            payrollsData?.data?.payrolls
-              ?.filter(
-                (p: PayrollData) =>
-                  (p.status === PayrollStatus.APPROVED ||
-                    p.status === PayrollStatus.PAID) &&
-                  new Date(p.processedDate || new Date())
-                    .getMonth()
-                    .toString() === month &&
-                  new Date(p.processedDate || new Date())
-                    .getFullYear()
-                    .toString() === year
-              )
-              .reduce(
-                (sum: number, p: PayrollData) => sum + (p.totals.netPay || 0),
-                0
-              ) || 0
-          );
-        }),
-        borderColor: Array(payrollsData?.data?.payrolls?.length || 0).fill(
-          "rgb(34, 197, 94)"
-        ),
-        backgroundColor: Array(payrollsData?.data?.payrolls?.length || 0).fill(
-          "rgba(34, 197, 94, 0.8)"
-        ),
-        borderWidth: 2,
-      },
-    ],
-  };
-
   const PayrollTable = () => (
     <div className="space-y-4">
       <TableContainer component={Paper} className="rounded-lg shadow">
         <Table>
-          <TableHead className="bg-gray-50">
+          <TableHead className="bg-blue-50">
             <TableRow>
-              <TableCell className="text-base font-semibold">Period</TableCell>
-              <TableCell className="text-base font-semibold">
-                Employees
+              <TableCell className="text-lg font-extrabold text-blue-700 py-5 uppercase tracking-wider">
+                Employee Name
               </TableCell>
-              <TableCell className="text-base font-semibold">
+              <TableCell className="text-lg font-extrabold text-blue-700 py-5 uppercase tracking-wider">
+                Salary Grade
+              </TableCell>
+              <TableCell className="text-lg font-extrabold text-blue-700 py-5 uppercase tracking-wider">
                 Net Salary
               </TableCell>
-              <TableCell className="text-base font-semibold">Status</TableCell>
-              <TableCell className="text-base font-semibold">Date</TableCell>
-              <TableCell className="text-base font-semibold" align="center">
+              <TableCell className="text-lg font-extrabold text-blue-700 py-5 uppercase tracking-wider">
+                Status
+              </TableCell>
+              <TableCell className="text-lg font-extrabold text-blue-700 py-5 uppercase tracking-wider">
+                Date
+              </TableCell>
+              <TableCell
+                className="text-lg font-extrabold text-blue-700 py-5 uppercase tracking-wider"
+                align="center"
+              >
                 Actions
               </TableCell>
             </TableRow>
@@ -894,133 +807,6 @@ export default function ProcessPayroll() {
 
   const handleMarkAsFailed = (payrollId: string) => {
     markAsFailedMutation.mutate(payrollId);
-  };
-
-  const statusDistributionData = {
-    labels: Object.keys(PayrollStatus),
-    datasets: [
-      {
-        data: Object.values(PayrollStatus).map(
-          (status) =>
-            payrollsData?.data?.summary?.statusBreakdown?.find(
-              (s: StatusBreakdown) => s._id === status
-            )?.count || 0
-        ),
-        backgroundColor: [
-          "rgba(34, 197, 94, 0.8)",
-          "rgba(59, 130, 246, 0.8)",
-          "rgba(239, 68, 68, 0.8)",
-          "rgba(245, 158, 11, 0.8)",
-          "rgba(139, 92, 246, 0.8)",
-          "rgba(107, 114, 128, 0.8)",
-        ],
-        borderColor: ["white", "white", "white", "white", "white", "white"],
-        borderWidth: 2,
-      },
-    ],
-  };
-
-  const employeeTrendsData = {
-    labels: Array.from(
-      new Set(
-        payrollsData?.data?.payrolls?.map((payroll: PayrollData) => {
-          const date = new Date(payroll.processedDate || new Date());
-          return `${date.toLocaleString("default", {
-            month: "short",
-          })}/${date.getFullYear()}`;
-        }) || []
-      )
-    ).sort() as string[],
-    datasets: [
-      {
-        label: "Employee Count",
-        data: Array.from<string>(
-          new Set<string>(
-            payrollsData?.data?.payrolls?.map(
-              (p: PayrollData) =>
-                `${new Date(
-                  p.processedDate || new Date()
-                ).getMonth()}-${new Date(
-                  p.processedDate || new Date()
-                ).getFullYear()}`
-            ) || []
-          )
-        ).map((monthYear: string) => {
-          const [month, year] = monthYear.split("-");
-          return (
-            payrollsData?.data?.payrolls?.filter(
-              (p: PayrollData) =>
-                new Date(p.processedDate || new Date())
-                  .getMonth()
-                  .toString() === month &&
-                new Date(p.processedDate || new Date())
-                  .getFullYear()
-                  .toString() === year
-            ).length || 0
-          );
-        }),
-        backgroundColor: ["rgba(59, 130, 246, 0.8)"],
-        borderColor: ["white"],
-        borderWidth: 2,
-      },
-    ],
-  };
-
-  const renderStatusIcons = (payroll: PayrollData) => {
-    if (payroll.status === "PAID") {
-      return (
-        <Tooltip title="View Payslip">
-          <IconButton
-            size="small"
-            onClick={() => handleViewPayslip(payroll.employee?._id ?? "")}
-            sx={{ color: "success.main" }}
-          >
-            <FaFileInvoiceDollar />
-          </IconButton>
-        </Tooltip>
-      );
-    }
-
-    if (payroll.status === "PENDING_PAYMENT") {
-      return (
-        <>
-          <Tooltip title="Mark as Paid">
-            <IconButton
-              size="small"
-              onClick={() => handleMarkAsPaid(payroll._id)}
-              sx={{ color: "success.main" }}
-            >
-              <FaCheck />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Mark as Failed">
-            <IconButton
-              size="small"
-              onClick={() => handleMarkAsFailed(payroll._id)}
-              sx={{ color: "error.main" }}
-            >
-              <FaTimes />
-            </IconButton>
-          </Tooltip>
-        </>
-      );
-    }
-
-    if (payroll.status === "PROCESSING") {
-      return (
-        <Tooltip title="Process Payment">
-          <IconButton
-            size="small"
-            onClick={() => handleProcessPayment(payroll._id)}
-            sx={{ color: "primary.main" }}
-          >
-            <FaMoneyBill />
-          </IconButton>
-        </Tooltip>
-      );
-    }
-
-    return null;
   };
 
   return (

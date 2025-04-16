@@ -1,103 +1,195 @@
-import { OnboardingEmployee, OnboardingTask } from "../types/employee";
+import { OnboardingEmployee } from "../types/employee";
 
 export const onboardingEmployees: OnboardingEmployee[] = [
   {
+    _id: "ONB001",
     id: "ONB001",
     employeeId: "EMP005",
     firstName: "Folake",
     lastName: "Adeleke",
+    email: "folake.adeleke@example.com",
+    phone: "+2348012345678",
+    role: "USER",
+    permissions: [],
     position: "Frontend Developer",
-    department: "Engineering",
-    startDate: "2024-04-15",
+    gradeLevel: "L3",
+    workLocation: "Lagos",
+    dateJoined: new Date("2024-04-15"),
     status: "documentation_pending",
-    progress: 75,
-    supervisor: "Oluwaseun Adebayo",
-    tasks: [
-      {
-        name: "contract_signing",
-        completed: true,
-        assignedTo: "Aisha Ibrahim",
-      },
-      { name: "it_setup", completed: true, assignedTo: "Babajide Oluwole" },
-      { name: "documentation", completed: false, assignedTo: "Aisha Ibrahim" },
-      { name: "training", completed: false, assignedTo: "Oluwaseun Adebayo" },
-      { name: "bank_setup", completed: true, assignedTo: "Chidinma Okonkwo" },
-      { name: "pension_setup", completed: false, assignedTo: "Aisha Ibrahim" },
-    ] as OnboardingTask[],
-    documents: {
-      contractSigned: true,
-      idSubmitted: true,
-      bankDetailsProvided: true,
-      taxInfoSubmitted: false,
-    },
+    profileImage: "",
+    department: "Engineering",
     onboarding: {
       status: "documentation_pending",
+      progress: 75,
+      tasks: [
+        {
+          _id: "task1",
+          id: "task1",
+          name: "contract_signing",
+          completed: true,
+          completedAt: "2024-04-15"
+        },
+        {
+          _id: "task2",
+          id: "task2",
+          name: "it_setup",
+          completed: true,
+          completedAt: "2024-04-15"
+        },
+        {
+          _id: "task3",
+          id: "task3",
+          name: "documentation",
+          completed: false
+        },
+        {
+          _id: "task4",
+          id: "task4",
+          name: "training",
+          completed: false
+        },
+        {
+          _id: "task5",
+          id: "task5",
+          name: "bank_setup",
+          completed: true,
+          completedAt: "2024-04-15"
+        },
+        {
+          _id: "task6",
+          id: "task6",
+          name: "pension_setup",
+          completed: false
+        }
+      ],
+      startedAt: "2024-04-15"
     },
+    fullName: "Folake Adeleke"
   },
   {
+    _id: "ONB002",
     id: "ONB002",
     employeeId: "EMP006",
     firstName: "Taiwo",
     lastName: "Ogunleye",
+    email: "taiwo.ogunleye@example.com",
+    phone: "+2348012345679",
+    role: "USER",
+    permissions: [],
     position: "Sales Executive",
-    department: "Sales",
-    startDate: "2024-04-10",
+    gradeLevel: "L2",
+    workLocation: "Lagos",
+    dateJoined: new Date("2024-04-10"),
     status: "it_setup_pending",
-    progress: 50,
-    supervisor: "Chidinma Okonkwo",
-    tasks: [
-      {
-        name: "contract_signing",
-        completed: true,
-        assignedTo: "Aisha Ibrahim",
-      },
-      { name: "it_setup", completed: false, assignedTo: "Babajide Oluwole" },
-      { name: "documentation", completed: false, assignedTo: "Aisha Ibrahim" },
-      { name: "training", completed: false, assignedTo: "Chidinma Okonkwo" },
-      { name: "bank_setup", completed: true, assignedTo: "Chidinma Okonkwo" },
-      { name: "pension_setup", completed: false, assignedTo: "Aisha Ibrahim" },
-    ] as OnboardingTask[],
-    documents: {
-      contractSigned: true,
-      idSubmitted: true,
-      bankDetailsProvided: true,
-      taxInfoSubmitted: false,
-    },
+    profileImage: "",
+    department: "Sales",
     onboarding: {
       status: "it_setup_pending",
+      progress: 50,
+      tasks: [
+        {
+          _id: "task7",
+          id: "task7",
+          name: "contract_signing",
+          completed: true,
+          completedAt: "2024-04-10"
+        },
+        {
+          _id: "task8",
+          id: "task8",
+          name: "it_setup",
+          completed: false
+        },
+        {
+          _id: "task9",
+          id: "task9",
+          name: "documentation",
+          completed: false
+        },
+        {
+          _id: "task10",
+          id: "task10",
+          name: "training",
+          completed: false
+        },
+        {
+          _id: "task11",
+          id: "task11",
+          name: "bank_setup",
+          completed: true,
+          completedAt: "2024-04-10"
+        },
+        {
+          _id: "task12",
+          id: "task12",
+          name: "pension_setup",
+          completed: false
+        }
+      ],
+      startedAt: "2024-04-10"
     },
+    fullName: "Taiwo Ogunleye"
   },
   {
+    _id: "ONB003",
     id: "ONB003",
     employeeId: "EMP007",
     firstName: "Yetunde",
     lastName: "Balogun",
+    email: "yetunde.balogun@example.com",
+    phone: "+2348012345680",
+    role: "USER",
+    permissions: [],
     position: "HR Associate",
-    department: "HR",
-    startDate: "2024-04-20",
+    gradeLevel: "L2",
+    workLocation: "Lagos",
+    dateJoined: new Date("2024-04-20"),
     status: "contract_pending",
-    progress: 25,
-    supervisor: "Aisha Ibrahim",
-    tasks: [
-      {
-        name: "contract_signing",
-        completed: false,
-        assignedTo: "Aisha Ibrahim",
-      },
-      { name: "it_setup", completed: false, assignedTo: "Babajide Oluwole" },
-      { name: "documentation", completed: false, assignedTo: "Aisha Ibrahim" },
-      { name: "training", completed: false, assignedTo: "Aisha Ibrahim" },
-      { name: "bank_setup", completed: false, assignedTo: "Chidinma Okonkwo" },
-      { name: "pension_setup", completed: false, assignedTo: "Aisha Ibrahim" },
-    ] as OnboardingTask[],
-    documents: {
-      contractSigned: false,
-      idSubmitted: true,
-      bankDetailsProvided: false,
-      taxInfoSubmitted: false,
-    },
+    profileImage: "",
+    department: "HR",
     onboarding: {
       status: "contract_pending",
+      progress: 25,
+      tasks: [
+        {
+          _id: "task13",
+          id: "task13",
+          name: "contract_signing",
+          completed: false
+        },
+        {
+          _id: "task14",
+          id: "task14",
+          name: "it_setup",
+          completed: false
+        },
+        {
+          _id: "task15",
+          id: "task15",
+          name: "documentation",
+          completed: false
+        },
+        {
+          _id: "task16",
+          id: "task16",
+          name: "training",
+          completed: false
+        },
+        {
+          _id: "task17",
+          id: "task17",
+          name: "bank_setup",
+          completed: false
+        },
+        {
+          _id: "task18",
+          id: "task18",
+          name: "pension_setup",
+          completed: false
+        }
+      ],
+      startedAt: "2024-04-20"
     },
-  },
+    fullName: "Yetunde Balogun"
+  }
 ];

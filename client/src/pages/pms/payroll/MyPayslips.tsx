@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import { employeeService } from "../../../services/employeeService";
 import { format } from "date-fns";
@@ -54,15 +53,15 @@ export default function MyPayslipsPage() {
   };
 
   // Function to fetch selected payslip
-  const fetchSelectedPayslip = async (payslipId: string) => {
-    try {
-      const response = await employeeService.getOwnPayslipById(payslipId);
-      setSelectedPayslip(response);
-    } catch (err) {
-      console.error("Error fetching payslip details:", err);
-      toast.error("Failed to load payslip details");
-    }
-  };
+  // const fetchSelectedPayslip = async (payslipId: string) => {
+  //   try {
+  //     const response = await employeeService.getOwnPayslipById(payslipId);
+  //     setSelectedPayslip(response);
+  //   } catch (err) {
+  //     console.error("Error fetching payslip details:", err);
+  //     toast.error("Failed to load payslip details");
+  //   }
+  // };
 
   const handleViewPayslip = (payslip: Payslip) => {
     setSelectedPayslip(payslip);
@@ -122,7 +121,7 @@ export default function MyPayslipsPage() {
   }, [page, hasAttemptedFetch]);
 
   if (error && hasAttemptedFetch) {
-    return (
+  return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
           <h2 className="text-2xl font-bold text-red-600 mb-4">Error</h2>

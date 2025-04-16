@@ -1,6 +1,6 @@
 import axios from "axios";
 import { toast } from "react-toastify";
-import { PayrollData, PayrollResponse } from "../types/payroll";
+import { PayrollData } from "../types/payroll";
 import { UserRole } from "../types/auth";
 
 // Define types for the admin payroll data

@@ -32,8 +32,8 @@ export interface NotificationBellRef {
   checkForNewNotifications: () => Promise<void>;
 }
 
-export const NotificationBell = forwardRef<NotificationBellRef>(
-  (props, ref) => {
+export const NotificationBell = forwardRef<NotificationBellRef, {}>(
+  (_, ref) => {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [isOpen, setIsOpen] = useState(false);

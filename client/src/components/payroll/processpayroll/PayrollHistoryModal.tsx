@@ -123,6 +123,10 @@ const statusColors: Record<PayrollStatus, string> = {
   [PayrollStatus.REJECTED]: "bg-red-100 text-red-800",
   [PayrollStatus.PAID]: "bg-green-100 text-green-800",
   [PayrollStatus.CANCELLED]: "bg-gray-100 text-gray-800",
+  [PayrollStatus.FAILED]: "bg-red-100 text-red-800",
+  [PayrollStatus.ARCHIVED]: "bg-gray-100 text-gray-800",
+  [PayrollStatus.COMPLETED]: "bg-green-100 text-green-800",
+  [PayrollStatus.PENDING_PAYMENT]: "bg-yellow-100 text-yellow-800",
 };
 
 // Update the cell styles with stronger borders
