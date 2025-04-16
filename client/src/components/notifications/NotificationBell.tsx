@@ -68,7 +68,7 @@ export const NotificationBell = forwardRef<NotificationBellRef, {}>(
 
         const apiUrl =
           import.meta.env.VITE_API_URL ||
-          "https://payrollapi.digitalentshub.net";
+          "http://localhost:5000";
         const response = await fetch(`${apiUrl}/api/notifications`, {
           credentials: "include",
           headers: {
@@ -151,7 +151,7 @@ export const NotificationBell = forwardRef<NotificationBellRef, {}>(
       try {
         const apiUrl =
           import.meta.env.VITE_API_URL ||
-          "https://payrollapi.digitalentshub.net";
+          "http://localhost:5000";
         await fetch(`${apiUrl}/api/notifications/${notificationId}/read`, {
           method: "PATCH",
           credentials: "include",
@@ -174,7 +174,7 @@ export const NotificationBell = forwardRef<NotificationBellRef, {}>(
       try {
         const apiUrl =
           import.meta.env.VITE_API_URL ||
-          "https://payrollapi.digitalentshub.net";
+          "http://localhost:5000";
         await fetch(`${apiUrl}/api/notifications/read-all`, {
           method: "PATCH",
           credentials: "include",

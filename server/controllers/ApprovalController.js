@@ -232,12 +232,19 @@ class ApprovalController {
    */
   static async approveAsHRManager(req, res, next) {
     try {
+      console.log(
+        "🔍 Starting HR Manager approval process for payroll:",
+        req.params.id
+      );
       const { id } = req.params;
       const { remarks } = req.body;
-      console.log("🔍 Starting HR Manager approval process for payroll:", id);
-      console.log("📝 Remarks:", remarks);
 
       const admin = await UserModel.findById(req.user.id);
+
+      if (!admin) {
+        throw new ApiError(404, "Admin not found");
+      }
+
       console.log("👤 Admin details:", {
         id: admin._id,
         name: `${admin.firstName} ${admin.lastName}`,
@@ -245,22 +252,19 @@ class ApprovalController {
         department: admin.department,
       });
 
-      if (!admin) {
-        throw new ApiError(404, "Admin not found");
-      }
-
       // Get the payroll
       const payroll = await PayrollModel.findById(id).populate("employee");
+
+      if (!payroll) {
+        throw new ApiError(404, "Payroll not found");
+      }
+
       console.log("📊 Payroll details:", {
         id: payroll._id,
         employee: `${payroll.employee.firstName} ${payroll.employee.lastName}`,
         status: payroll.status,
         currentLevel: payroll.approvalFlow?.currentLevel,
       });
-
-      if (!payroll) {
-        throw new ApiError(404, "Payroll not found");
-      }
 
       // Check if the payroll is in the correct status
       if (payroll.status !== PAYROLL_STATUS.PENDING) {

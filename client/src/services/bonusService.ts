@@ -2,7 +2,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import type { IBonus, BonusType, IBonusFilters } from "../types/payroll";
 
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = "https://payrollapi.digitalentshub.net/api";
 
 
 interface CreateBonusData {

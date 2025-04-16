@@ -31,7 +31,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const response = await fetch(
         `${
-          import.meta.env.VITE_API_URL || "http://localhost:5000"
+          import.meta.env.VITE_API_URL || "https://payrollapi.digitalentshub.net"
         }/api/notifications/unread`,
         {
           headers: {

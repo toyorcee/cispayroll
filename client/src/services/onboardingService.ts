@@ -2,7 +2,7 @@ import axios from "axios";
 import { OnboardingEmployee, Task } from "../types/employee";
 import { toast } from "react-toastify";
 
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = "https://payrollapi.digitalentshub.net/api";
 
 export interface OnboardingFilters {
   page?: number;

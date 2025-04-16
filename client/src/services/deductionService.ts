@@ -7,7 +7,7 @@ import {
   CalculationMethod,
 } from "../types/deduction";
 
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = "https://payrollapi.digitalentshub.net/api";
 
 // Set default axios config
 axios.defaults.withCredentials = true;

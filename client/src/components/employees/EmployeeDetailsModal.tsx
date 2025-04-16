@@ -21,7 +21,7 @@ export const EmployeeDetailsModal = ({
 
   const DEFAULT_AVATAR = "/images/default-avatar.png";
   const imageUrl = employee.profileImage
-    ? `http://localhost:5000/${employee.profileImage}`
+    ? `https://payrollapi.digitalentshub.net/${employee.profileImage}`
     : DEFAULT_AVATAR;
 
   const renderDepartmentName = (department: any) => {
