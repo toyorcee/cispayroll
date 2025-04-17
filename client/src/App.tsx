@@ -4,6 +4,7 @@ import { router } from "./routes";
 import { ToastContainer } from "react-toastify";
 import { SkeletonProvider } from "./components/skeletons/SkeletonProvider";
 import { AuthProvider } from "./context/AuthContext";
+import { NavigationProvider } from "./context/NavigationContext";
 import "react-toastify/dist/ReactToastify.css";
 
 // Create a client
@@ -21,7 +22,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <SkeletonProvider>
-          <>
+          <NavigationProvider>
             <RouterProvider router={router} />
             <ToastContainer
               position="top-right"
@@ -42,7 +43,7 @@ function App() {
                 boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
               }}
             />
-          </>
+          </NavigationProvider>
         </SkeletonProvider>
       </AuthProvider>
     </QueryClientProvider>

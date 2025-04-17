@@ -10,6 +10,8 @@ import {
   NotificationService,
   NOTIFICATION_TYPES,
 } from "../services/NotificationService.js";
+import AuditService from "../services/AuditService.js";
+import { AuditAction, AuditEntity } from "../models/Audit.js";
 
 class ApprovalController {
   /**
@@ -655,29 +657,37 @@ class ApprovalController {
    */
   static async approveAsFinanceDirector(req, res, next) {
     try {
+      console.log("🔍 Starting Finance Director approval process");
       const { id } = req.params;
       const { remarks } = req.body;
       const admin = await UserModel.findById(req.user.id);
 
       if (!admin) {
+        console.log("❌ Admin not found:", req.user.id);
         return res.status(404).json({
           success: false,
           message: "Admin not found",
         });
       }
 
+      console.log("✅ Admin found:", admin.firstName, admin.lastName);
+
       // Find the payroll
       const payroll = await PayrollModel.findById(id).populate("employee");
 
       if (!payroll) {
+        console.log("❌ Payroll not found:", id);
         return res.status(404).json({
           success: false,
           message: "Payroll not found",
         });
       }
 
+      console.log("✅ Payroll found:", payroll._id);
+
       // Check if the payroll is in the correct status
       if (payroll.status !== PAYROLL_STATUS.PENDING) {
+        console.log("❌ Payroll not in PENDING status:", payroll.status);
         return res.status(400).json({
           success: false,
           message: `Payroll is not in PENDING status. Current status: ${payroll.status}`,
@@ -688,6 +698,10 @@ class ApprovalController {
       if (
         payroll.approvalFlow?.currentLevel !== APPROVAL_LEVELS.FINANCE_DIRECTOR
       ) {
+        console.log(
+          "❌ Payroll not at FINANCE_DIRECTOR level:",
+          payroll.approvalFlow?.currentLevel
+        );
         return res.status(400).json({
           success: false,
           message: `Payroll is not at FINANCE_DIRECTOR approval level. Current level: ${payroll.approvalFlow?.currentLevel}`,
@@ -701,6 +715,7 @@ class ApprovalController {
       });
 
       if (!financeDepartment) {
+        console.log("❌ Finance department not found");
         return res.status(500).json({
           success: false,
           message: "Finance department not found",
@@ -708,6 +723,7 @@ class ApprovalController {
       }
 
       if (admin.department?.toString() !== financeDepartment._id.toString()) {
+        console.log("❌ Admin not in Finance department:", admin.department);
         return res.status(403).json({
           success: false,
           message:
@@ -724,13 +740,17 @@ class ApprovalController {
       ].some((pos) => adminPosition.includes(pos));
 
       if (!isFinanceDirector) {
+        console.log("❌ Admin not a Finance Director:", adminPosition);
         return res.status(403).json({
           success: false,
           message: "You must be a Finance Director to approve at this level",
         });
       }
 
+      console.log("✅ Finance Director validation passed");
+
       // Update the payroll approval flow
+      console.log("🔄 Updating payroll approval flow");
       const updatedPayroll =
         await BaseApprovalController.updatePayrollApprovalFlow(
           payroll,
@@ -739,41 +759,82 @@ class ApprovalController {
           true,
           remarks
         );
+      console.log("✅ Payroll approval flow updated");
 
       // Find the next approver (Super Admin)
+      console.log("🔍 Finding next approver (Super Admin)");
       const nextApprover = await BaseApprovalController.findNextApprover(
         APPROVAL_LEVELS.FINANCE_DIRECTOR,
         updatedPayroll
       );
+      console.log(
+        "✅ Next approver found:",
+        nextApprover ? nextApprover.firstName : "None"
+      );
 
       // Create notification for the next approver (Super Admin)
       if (nextApprover) {
+        console.log("📬 Creating notification for Super Admin");
         await NotificationService.createPayrollNotification(
-          nextApprover._id,
-          NOTIFICATION_TYPES.PAYROLL_PENDING_APPROVAL,
           updatedPayroll,
+          NOTIFICATION_TYPES.PAYROLL_PENDING_APPROVAL,
+          admin,
           "New payroll pending your approval as Super Admin"
         );
+        console.log("✅ Super Admin notification created");
       }
 
       // Create self-notification for the Finance Director
+      console.log("📬 Creating self-notification for Finance Director");
       await NotificationService.createPayrollNotification(
-        admin._id,
-        NOTIFICATION_TYPES.PAYROLL_APPROVED,
         updatedPayroll,
+        NOTIFICATION_TYPES.PAYROLL_APPROVED,
+        admin,
         remarks ||
           "You have approved this payroll and it is now pending Super Admin approval"
       );
+      console.log("✅ Finance Director self-notification created");
+
+      // Create audit log
+      console.log("📝 Creating audit log");
+      await AuditService.logAction(
+        AuditAction.APPROVE,
+        AuditEntity.PAYROLL,
+        updatedPayroll._id,
+        admin._id,
+        {
+          status: updatedPayroll.status,
+          currentLevel: APPROVAL_LEVELS.FINANCE_DIRECTOR,
+          nextLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+          approvalFlow: {
+            currentLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+            history: updatedPayroll.approvalFlow.history,
+          },
+          employeeName: `${updatedPayroll.employee.firstName} ${updatedPayroll.employee.lastName}`,
+          employeeId: updatedPayroll.employee._id,
+          month: updatedPayroll.month,
+          year: updatedPayroll.year,
+          departmentId: updatedPayroll.department,
+          remarks: remarks || "Approved by Finance Director",
+          approvedAt: new Date(),
+        }
+      );
+      console.log("✅ Audit log created");
 
       // Set header to trigger client-side refresh
       res.set("X-Refresh-Audit-Logs", "true");
+      console.log("✅ Set refresh header");
 
+      console.log(
+        "🎉 Finance Director approval process completed successfully"
+      );
       res.json({
         success: true,
         message: "Payroll approved by Finance Director",
         payroll: updatedPayroll,
       });
     } catch (error) {
+      console.error("❌ Error in Finance Director approval process:", error);
       next(error);
     }
   }
@@ -873,9 +934,80 @@ class ApprovalController {
 
       // Create notification for the employee
       await BaseApprovalController.createRejectionNotification(
+        admin,
         updatedPayroll,
         reason
       );
+
+      // Find the HR Manager to notify them
+      const hrDepartment = await DepartmentModel.findOne({
+        name: { $in: ["Human Resources", "HR"] },
+        status: "active",
+      });
+
+      if (hrDepartment) {
+        // Find HR Manager
+        const hrManager = await UserModel.findOne({
+          department: hrDepartment._id,
+          position: {
+            $in: [
+              "HR Manager",
+              "Head of HR",
+              "HR Head",
+              "Head of Human Resources",
+            ],
+          },
+          status: "active",
+        });
+
+        if (hrManager) {
+          console.log(
+            "📬 Creating notification for HR Manager about rejection"
+          );
+          await NotificationService.createPayrollNotification(
+            updatedPayroll,
+            NOTIFICATION_TYPES.PAYROLL_REJECTED,
+            admin,
+            `Payroll for ${updatedPayroll.employee.firstName} ${
+              updatedPayroll.employee.lastName
+            } was rejected by Finance Director: ${
+              reason || "No reason provided"
+            }`,
+            {
+              data: {
+                approvalLevel: APPROVAL_LEVELS.FINANCE_DIRECTOR,
+                rejectionReason: reason,
+              },
+            }
+          );
+          console.log("✅ HR Manager notification created for rejection");
+        }
+      }
+
+      // Create audit log
+      console.log("�� Creating audit log for rejection");
+      await AuditService.logAction(
+        AuditAction.REJECT,
+        AuditEntity.PAYROLL,
+        updatedPayroll._id,
+        admin._id,
+        {
+          status: updatedPayroll.status,
+          currentLevel: APPROVAL_LEVELS.FINANCE_DIRECTOR,
+          approvalFlow: {
+            currentLevel: updatedPayroll.approvalFlow.currentLevel,
+            history: updatedPayroll.approvalFlow.history,
+          },
+          employeeName: `${updatedPayroll.employee.firstName} ${updatedPayroll.employee.lastName}`,
+          employeeId: updatedPayroll.employee._id,
+          month: updatedPayroll.month,
+          year: updatedPayroll.year,
+          departmentId: updatedPayroll.department,
+          remarks: reason || "Rejected by Finance Director",
+          rejectedAt: new Date(),
+        }
+      );
+      console.log("✅ Audit log created for rejection");
 
       return res.status(200).json({
         success: true,
@@ -968,9 +1100,9 @@ class ApprovalController {
 
       // Create notification for the employee using NotificationService
       await NotificationService.createPayrollNotification(
-        payroll.employee._id,
-        NOTIFICATION_TYPES.PAYROLL_COMPLETED,
         updatedPayroll,
+        NOTIFICATION_TYPES.PAYROLL_COMPLETED,
+        admin,
         remarks ||
           "Your payroll has been fully approved and is ready for processing."
       );
@@ -982,9 +1114,9 @@ class ApprovalController {
         payroll: updatedPayroll,
       });
       await NotificationService.createPayrollNotification(
-        admin._id,
-        NOTIFICATION_TYPES.PAYROLL_COMPLETED,
         updatedPayroll,
+        NOTIFICATION_TYPES.PAYROLL_COMPLETED,
+        admin,
         remarks || "You approved this payroll as the final approver.",
         {
           data: {
@@ -1070,17 +1202,17 @@ class ApprovalController {
 
       // Create notification for the employee
       await NotificationService.createPayrollNotification(
-        updatedPayroll.employee._id,
-        NOTIFICATION_TYPES.PAYROLL_REJECTED,
         updatedPayroll,
+        NOTIFICATION_TYPES.PAYROLL_REJECTED,
+        admin,
         reason || "Your payroll has been rejected by Super Admin"
       );
 
       // Create self-notification for the Super Admin
       await NotificationService.createPayrollNotification(
-        admin._id,
-        NOTIFICATION_TYPES.PAYROLL_REJECTED,
         updatedPayroll,
+        NOTIFICATION_TYPES.PAYROLL_REJECTED,
+        admin,
         `You rejected this payroll with reason: ${
           reason || "No reason provided"
         }`

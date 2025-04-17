@@ -184,7 +184,6 @@ export default function AllEmployees() {
   };
 
   const handleEmployeeClick = (employeeId: string) => {
-    console.log("Employee clicked:", employeeId);
     setSelectedEmployeeId(employeeId);
     setShowDetailsModal(true);
   };
@@ -334,16 +333,43 @@ export default function AllEmployees() {
   };
 
   // Use the hook to fetch employee details
-  const { data: employeeDetails } = useQuery({
+  const {
+    data: employeeDetails,
+    isLoading: isLoadingEmployeeDetails,
+    error: employeeDetailsError,
+  } = useQuery({
     queryKey: ["employee", selectedEmployeeId],
-    queryFn: () => {
-      if (!selectedEmployeeId) return null;
-      return isSuperAdmin
-        ? employeeService.getEmployeeById(selectedEmployeeId)
-        : employeeService.adminService.getEmployeeById(selectedEmployeeId);
+    queryFn: async () => {
+      if (!selectedEmployeeId) {
+        return null;
+      }
+
+      try {
+        const result = isSuperAdmin
+          ? await employeeService.getEmployeeById(selectedEmployeeId)
+          : await employeeService.adminService.getEmployeeById(
+              selectedEmployeeId
+            );
+
+        return result;
+      } catch (error) {
+        console.error("Error fetching employee details:", error);
+        throw error;
+      }
     },
     enabled: !!selectedEmployeeId,
   });
+
+  // Add effect to log when employeeDetails changes
+  useEffect(() => {
+    // Silent effect to handle employee details updates
+  }, [
+    employeeDetails,
+    isLoadingEmployeeDetails,
+    employeeDetailsError,
+    showDetailsModal,
+    selectedEmployeeId,
+  ]);
 
   // Fetch departments when component mounts
   useEffect(() => {
@@ -365,36 +391,36 @@ export default function AllEmployees() {
       transition={{ duration: 0.5 }}
       className="p-4"
     >
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-        <div className="flex-1 max-w-md">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-8">
+        <div className="w-full sm:w-auto sm:flex-1 max-w-md">
           <EmployeeSearch onSearch={handleSearch} />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="w-full sm:w-auto flex flex-col xs:flex-row items-stretch gap-2">
           {canCreate && (
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2 !bg-green-600 !text-white rounded-lg hover:!bg-green-700 
-                       transition-colors flex items-center space-x-2 whitespace-nowrap"
+              className="min-w-[120px] px-3 py-1.5 text-sm !bg-green-600 !text-white rounded-lg hover:!bg-green-700 
+                       transition-colors flex items-center justify-center gap-2"
             >
-              <FaPlus className="w-4 h-4" />
+              <FaPlus className="w-3.5 h-3.5" />
               <span>Add Employee</span>
             </button>
           )}
           {isSuperAdmin && (
             <button
               onClick={() => setShowDepartmentModal(true)}
-              className="px-4 py-2 !bg-blue-600 !text-white rounded-lg hover:!bg-blue-700 
-                       transition-colors flex items-center space-x-2 whitespace-nowrap"
+              className="min-w-[120px] px-3 py-1.5 text-sm !bg-blue-600 !text-white rounded-lg hover:!bg-blue-700 
+                       transition-colors flex items-center justify-center gap-2"
             >
-              <FaBuilding className="w-4 h-4" />
+              <FaBuilding className="w-3.5 h-3.5" />
               <span>Manage Departments</span>
             </button>
           )}
         </div>
       </div>
 
-      <div className="flex items-center gap-3 mb-6 w-full">
-        <div className="flex-1 flex items-center">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6 w-full">
+        <div className="flex-1 w-full sm:w-auto">
           <StatusFilter
             currentStatus={filters.status as Status | undefined}
             onStatusChange={handleStatusChange}
@@ -404,7 +430,7 @@ export default function AllEmployees() {
         </div>
 
         {isSuperAdmin && (
-          <div className="w-56">
+          <div className="w-full sm:w-56">
             <select
               value={filters.department || ""}
               onChange={(e) =>
@@ -626,7 +652,7 @@ export default function AllEmployees() {
       )}
 
       <EmployeeDetailsModal
-        employee={employeeDetails || null}
+        employee={isLoadingEmployeeDetails ? null : employeeDetails || null}
         departments={departments}
         isOpen={showDetailsModal}
         onClose={() => {

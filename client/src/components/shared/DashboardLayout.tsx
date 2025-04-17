@@ -33,6 +33,14 @@ export default function DashboardLayout() {
     }
   };
 
+  const handleToggle = () => {
+    console.log("Toggle clicked:", {
+      currentState: isSidebarOpen,
+      newState: !isSidebarOpen,
+    });
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth >= 1024) {
@@ -64,7 +72,7 @@ export default function DashboardLayout() {
               {/* Left section with menu button and logo */}
               <div className="flex items-center">
                 <button
-                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                  onClick={handleToggle}
                   className="p-0 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500 ml-0"
                 >
                   <FaBars className="h-6 w-6" />
@@ -89,16 +97,15 @@ export default function DashboardLayout() {
           </div>
         </header>
 
-        {/* Fixed Sidebar */}
-        <div className="fixed top-16 left-0 h-[calc(100vh-4rem)] z-40 shadow-lg">
+        {/* Fixed Sidebar with animation */}
+        <div className="fixed top-16 left-0 z-40">
           <AnimatePresence>
             {isSidebarOpen && (
               <motion.div
-                initial={{ x: -300, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: -300, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                className="h-full"
+                initial={{ x: -256 }}
+                animate={{ x: 0 }}
+                exit={{ x: -256 }}
+                transition={{ duration: 0.2 }}
               >
                 <Sidebar />
               </motion.div>
@@ -109,7 +116,7 @@ export default function DashboardLayout() {
         {/* Main content */}
         <main
           className={`pt-16 transition-all duration-300 ${
-            isSidebarOpen ? "lg:pl-64" : ""
+            isSidebarOpen ? "pl-64" : ""
           }`}
         >
           <div className="w-full px-4 sm:px-6 lg:px-8 py-6">

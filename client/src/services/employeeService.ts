@@ -257,18 +257,27 @@ export const employeeService = {
 
   async getEmployeeById(id: string): Promise<EmployeeDetails> {
     try {
-      const response = await axios.get(`${BASE_URL}/employees/${id}`);
-      const { employee } = response.data;
+      const response = await axios.get(`${BASE_URL}/super-admin/users/${id}`);
 
-      // Ensure dates are properly formatted
-      if (employee.dateJoined) {
-        employee.dateJoined = new Date(employee.dateJoined).toISOString();
-      }
-      if (employee.startDate) {
-        employee.startDate = new Date(employee.startDate).toISOString();
+      if (!response.data || (!response.data.employee && !response.data.user)) {
+        console.error("Invalid response format:", response.data);
+        throw new Error("Invalid response format from server");
       }
 
-      return mapEmployeeToDetails(employee);
+      const employee = response.data.employee || response.data.user;
+
+      const employeeCopy = { ...employee };
+
+      if (employeeCopy.dateJoined) {
+        employeeCopy.dateJoined = new Date(
+          employeeCopy.dateJoined
+        ).toISOString();
+      }
+      if (employeeCopy.startDate) {
+        employeeCopy.startDate = new Date(employeeCopy.startDate).toISOString();
+      }
+
+      return mapEmployeeToDetails(employeeCopy);
     } catch (error) {
       console.error(`Error fetching employee ${id}:`, error);
       throw error;
@@ -780,17 +789,33 @@ export const employeeService = {
     getEmployeeById: async (id: string): Promise<EmployeeDetails> => {
       try {
         const response = await axios.get(`${BASE_URL}/admin/employees/${id}`);
-        const { employee } = response.data;
 
-        // Ensure dates are properly formatted
-        if (employee.dateJoined) {
-          employee.dateJoined = new Date(employee.dateJoined).toISOString();
-        }
-        if (employee.startDate) {
-          employee.startDate = new Date(employee.startDate).toISOString();
+        // Check if the response has the expected structure
+        if (!response.data || !response.data.data) {
+          console.error(
+            "Invalid response format from admin endpoint:",
+            response.data
+          );
+          throw new Error("Invalid response format from server");
         }
 
-        return mapEmployeeToDetails(employee);
+        const employee = response.data.data;
+
+        // Create a copy of the employee object to avoid modifying the original
+        const employeeCopy = { ...employee };
+
+        if (employeeCopy.dateJoined) {
+          employeeCopy.dateJoined = new Date(
+            employeeCopy.dateJoined
+          ).toISOString();
+        }
+        if (employeeCopy.startDate) {
+          employeeCopy.startDate = new Date(
+            employeeCopy.startDate
+          ).toISOString();
+        }
+
+        return mapEmployeeToDetails(employeeCopy);
       } catch (error) {
         console.error(`Error fetching employee ${id}:`, error);
         throw error;

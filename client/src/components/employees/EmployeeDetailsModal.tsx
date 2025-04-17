@@ -17,11 +17,58 @@ export const EmployeeDetailsModal = ({
   isOpen,
   onClose,
 }: EmployeeDetailsModalProps) => {
-  if (!employee) return null;
+  if (!isOpen) {
+    return null;
+  }
+
+  if (!employee) {
+    return (
+      <AnimatePresence>
+        {isOpen && (
+          <Dialog
+            as="div"
+            className="fixed inset-0 z-50 overflow-y-auto"
+            onClose={onClose}
+            open={isOpen}
+          >
+            <div className="min-h-screen px-4 text-center flex items-center justify-center">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.5 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black"
+                aria-hidden="true"
+                onClick={onClose}
+              />
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative bg-white rounded-xl shadow-xl w-full max-w-4xl mx-auto p-4 sm:p-6 max-h-[90vh] overflow-y-auto"
+              >
+                <button
+                  onClick={onClose}
+                  className="sticky top-0 right-0 float-right z-10 text-gray-400 hover:text-gray-600"
+                >
+                  <FaTimes className="w-5 h-5" />
+                </button>
+
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500 mb-4"></div>
+                  <p className="text-gray-600">Loading employee details...</p>
+                </div>
+              </motion.div>
+            </div>
+          </Dialog>
+        )}
+      </AnimatePresence>
+    );
+  }
 
   const DEFAULT_AVATAR = "/images/default-avatar.png";
   const imageUrl = employee.profileImage
-    ? `https://payrollapi.digitalentshub.net/${employee.profileImage}`
+    ? `http://localhost:5000/${employee.profileImage}`
     : DEFAULT_AVATAR;
 
   const renderDepartmentName = (department: any) => {
@@ -104,17 +151,17 @@ export const EmployeeDetailsModal = ({
                   </div>
 
                   <div className="space-y-3 sm:space-y-4">
-                    <div className="flex items-center text-gray-600">
+                    <div className="flex items-center justify-center md:justify-start text-gray-600">
                       <FaEnvelope className="w-4 h-4 mr-3 text-green-500" />
-                      <div>
+                      <div className="text-center md:text-left">
                         <p className="text-xs text-gray-500">Email</p>
                         <p className="text-sm font-medium">{employee.email}</p>
                       </div>
                     </div>
 
-                    <div className="flex items-center text-gray-600">
+                    <div className="flex items-center justify-center md:justify-start text-gray-600">
                       <FaPhone className="w-4 h-4 mr-3 text-green-500" />
-                      <div>
+                      <div className="text-center md:text-left">
                         <p className="text-xs text-gray-500">Phone</p>
                         <p className="text-sm font-medium">{employee.phone}</p>
                       </div>

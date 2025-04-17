@@ -138,6 +138,66 @@ const ProcessDepartmentPayroll = () => {
     enabled: !!user?.role,
   });
 
+  const [showApprovalJourney, setShowApprovalJourney] = useState(false);
+  const [selectedPayrollForJourney, setSelectedPayrollForJourney] =
+    useState<Payroll | null>(null);
+
+  // Add helper function to check if a level has been approved
+  const isLevelApproved = (
+    history: Array<{
+      level: string;
+      status: string;
+      action?: string;
+      timestamp?: string;
+      remarks?: string;
+    }>,
+    level: string
+  ): boolean => {
+    // Special case: If payroll is created by HR and it's Department Head level
+    if (level === "DEPARTMENT_HEAD") {
+      // Check if there's a submission by HR
+      const hrSubmission = history.find(
+        (h) =>
+          h.level === "HR_MANAGER" &&
+          h.status === "PENDING" &&
+          h.action === "SUBMIT"
+      );
+      if (hrSubmission) {
+        return true; // Department Head is considered approved if HR submitted
+      }
+    }
+    return history.some((h) => h.level === level && h.status === "APPROVED");
+  };
+
+  // Add helper function to check if a level is pending
+  const isLevelPending = (
+    history: Array<{
+      level: string;
+      status: string;
+      action?: string;
+      timestamp?: string;
+      remarks?: string;
+    }>,
+    currentLevel: string,
+    level: string
+  ): boolean => {
+    // Special case: If payroll is created by HR and it's Department Head level
+    if (level === "DEPARTMENT_HEAD") {
+      const hrSubmission = history.find(
+        (h) =>
+          h.level === "HR_MANAGER" &&
+          h.status === "PENDING" &&
+          h.action === "SUBMIT"
+      );
+      if (hrSubmission) {
+        return false; // Department Head is never pending if HR submitted
+      }
+    }
+    if (currentLevel === level) return true;
+    if (!history.some((h) => h.level === level)) return true;
+    return false;
+  };
+
   useEffect(() => {
     if (payrollProcessed) {
       queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
@@ -318,20 +378,27 @@ const ProcessDepartmentPayroll = () => {
   };
 
   const rejectMutation = useMutation({
-    mutationFn: ({
-      payrollId,
-      remarks,
-    }: {
-      payrollId: string;
-      remarks: string;
-    }) => adminPayrollService.rejectPayroll(payrollId, remarks),
+    mutationFn: async () => {
+      if (!rejectingPayrollId || !rejectDialogData.remarks) return;
+      return adminPayrollService.rejectPayroll({
+        payrollId: rejectingPayrollId,
+        remarks: rejectDialogData.remarks,
+        userRole: user?.role,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
       queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] });
+      queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["payrollProcessingStats"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
       toast.success("Payroll rejected successfully");
+      setShowRejectDialog(false);
+      setRejectingPayrollId(null);
+      setRejectDialogData({ remarks: "" });
     },
     onError: (error: any) => {
-      toast.error(error.message || "Failed to reject payroll");
+      toast.error(error.response?.data?.message || "Failed to reject payroll");
     },
   });
 
@@ -354,71 +421,14 @@ const ProcessDepartmentPayroll = () => {
     setShowRejectDialog(true);
   };
 
-  const handleConfirmReject = async () => {
-    if (!rejectingPayrollId) return;
-
-    try {
-      setIsRejecting(true);
-
-      const payroll = payrolls?.data?.payrolls.find(
-        (p) => p._id === rejectingPayrollId
-      );
-
-      if (!payroll) {
-        toast.error("Payroll not found");
-        return;
-      }
-
-      // Determine which rejection method to use based on the current approval level
-      let response;
-
-      switch (payroll.approvalFlow?.currentLevel) {
-        case "DEPARTMENT_HEAD":
-          response = await approvalService.rejectAsDepartmentHead(
-            rejectingPayrollId,
-            rejectDialogData.remarks || "Rejected by Department Head"
-          );
-          break;
-        case "HR_MANAGER":
-          response = await approvalService.rejectAsHRManager(
-            rejectingPayrollId,
-            rejectDialogData.remarks || "Rejected by HR Manager"
-          );
-          break;
-        case "FINANCE_DIRECTOR":
-          response = await approvalService.rejectAsFinanceDirector(
-            rejectingPayrollId,
-            rejectDialogData.remarks || "Rejected by Finance Director"
-          );
-          break;
-        case "SUPER_ADMIN":
-          response = await approvalService.rejectAsSuperAdmin(
-            rejectingPayrollId,
-            rejectDialogData.remarks || "Rejected by Super Admin"
-          );
-          break;
-        default:
-          toast.error("Invalid approval level");
-          return;
-      }
-
-      // Refresh the payrolls data
-      queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
-      queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] });
-
-      setShowRejectDialog(false);
-      setRejectingPayrollId(null);
-      setRejectDialogData({ remarks: "" });
-
-      toast.success(response.message);
-    } catch (error: any) {
-      console.error("Error rejecting payroll:", error);
-      const errorMessage =
-        error.response?.data?.message || "Failed to reject payroll";
-      toast.error(errorMessage);
-    } finally {
-      setIsRejecting(false);
+  const handleConfirmReject = () => {
+    if (!rejectingPayrollId || !rejectDialogData.remarks) {
+      toast.error("Please provide a rejection reason");
+      return;
     }
+
+    rejectMutation.mutate();
+    setShowRejectDialog(false);
   };
 
   const handleProcessPayment = (payroll: Payroll) => {
@@ -559,6 +569,11 @@ const ProcessDepartmentPayroll = () => {
     }
   };
 
+  const handleViewApprovalJourney = (payroll: Payroll) => {
+    setSelectedPayrollForJourney(payroll);
+    setShowApprovalJourney(true);
+  };
+
   const isLoadingCombined =
     isPeriodsLoading || isStatsLoading || isPayrollsLoading;
 
@@ -668,6 +683,7 @@ const ProcessDepartmentPayroll = () => {
             onApprove={handleApproveWithPermission}
             onReject={handleRejectWithPermission}
             onView={handleViewDetailsWithPermission}
+            onViewApprovalJourney={handleViewApprovalJourney}
             onSubmitForApproval={handleSubmitForApprovalWithPermission}
             onProcessPayment={handleProcessPaymentWithPermission}
             selectedPayrolls={selectedPayrollIds}
@@ -675,6 +691,7 @@ const ProcessDepartmentPayroll = () => {
             loading={isPayrollsLoading || isProcessing}
             error={payrollsError}
             currentUserRole={user?.role}
+            user={user}
           />
         </>
       ) : (
@@ -697,12 +714,22 @@ const ProcessDepartmentPayroll = () => {
             <Box sx={{ mt: 2 }}>
               <ApprovalTimeline
                 steps={[
-                  { level: "Department Head", status: "completed" },
+                  {
+                    level: "Department Head",
+                    status:
+                      payrollsData.find((p) => p._id === approvingPayrollId)
+                        ?.approvalFlow?.currentLevel === "DEPARTMENT_HEAD"
+                        ? "pending"
+                        : "completed",
+                  },
                   {
                     level: "HR Manager",
                     status:
                       payrollsData.find((p) => p._id === approvingPayrollId)
                         ?.approvalFlow?.currentLevel === "HR_MANAGER"
+                        ? "pending"
+                        : payrollsData.find((p) => p._id === approvingPayrollId)
+                            ?.approvalFlow?.currentLevel === "DEPARTMENT_HEAD"
                         ? "pending"
                         : "completed",
                   },
@@ -712,6 +739,12 @@ const ProcessDepartmentPayroll = () => {
                       payrollsData.find((p) => p._id === approvingPayrollId)
                         ?.approvalFlow?.currentLevel === "FINANCE_DIRECTOR"
                         ? "pending"
+                        : payrollsData.find((p) => p._id === approvingPayrollId)
+                            ?.approvalFlow?.currentLevel ===
+                            "DEPARTMENT_HEAD" ||
+                          payrollsData.find((p) => p._id === approvingPayrollId)
+                            ?.approvalFlow?.currentLevel === "HR_MANAGER"
+                        ? "pending"
                         : "completed",
                   },
                   {
@@ -719,6 +752,14 @@ const ProcessDepartmentPayroll = () => {
                     status:
                       payrollsData.find((p) => p._id === approvingPayrollId)
                         ?.approvalFlow?.currentLevel === "SUPER_ADMIN"
+                        ? "pending"
+                        : payrollsData.find((p) => p._id === approvingPayrollId)
+                            ?.approvalFlow?.currentLevel ===
+                            "DEPARTMENT_HEAD" ||
+                          payrollsData.find((p) => p._id === approvingPayrollId)
+                            ?.approvalFlow?.currentLevel === "HR_MANAGER" ||
+                          payrollsData.find((p) => p._id === approvingPayrollId)
+                            ?.approvalFlow?.currentLevel === "FINANCE_DIRECTOR"
                         ? "pending"
                         : "completed",
                   },
@@ -821,15 +862,24 @@ const ProcessDepartmentPayroll = () => {
 
       {/* Reject Dialog */}
       {showRejectDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Reject Payroll</h3>
+        <Dialog
+          open={showRejectDialog}
+          onClose={() => {
+            setShowRejectDialog(false);
+            setRejectingPayrollId(null);
+            setRejectDialogData({ remarks: "" });
+          }}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Reject Payroll</DialogTitle>
+          <DialogContent>
             <p className="mb-4">
               Are you sure you want to reject this payroll?
             </p>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Rejection Reason (Required)
+                Remarks (Required)
               </label>
               <textarea
                 className="w-full p-2 border rounded-md"
@@ -841,41 +891,152 @@ const ProcessDepartmentPayroll = () => {
                     remarks: event.target.value,
                   }))
                 }
-                placeholder="Please provide a reason for rejection..."
+                placeholder="Please provide remarks for rejection..."
                 required
               />
             </div>
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={() => {
-                  setShowRejectDialog(false);
-                  setRejectingPayrollId(null);
-                  setRejectDialogData({ remarks: "" });
-                }}
-                className="px-4 py-2 border rounded-md hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmReject}
-                disabled={
-                  rejectMutation.isPending || !rejectDialogData.remarks.trim()
-                }
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-              >
-                {rejectMutation.isPending ? (
-                  <>
-                    <FaSpinner className="animate-spin" />
-                    <span>Rejecting...</span>
-                  </>
-                ) : (
-                  <span>Reject</span>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                setShowRejectDialog(false);
+                setRejectingPayrollId(null);
+                setRejectDialogData({ remarks: "" });
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmReject}
+              variant="contained"
+              color="error"
+              disabled={
+                rejectMutation.isPending || !rejectDialogData.remarks.trim()
+              }
+            >
+              {rejectMutation.isPending ? "Rejecting..." : "Reject"}
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
+
+      {/* Approval Journey Dialog */}
+      <Dialog
+        open={showApprovalJourney}
+        onClose={() => setShowApprovalJourney(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Approval Journey</DialogTitle>
+        <DialogContent>
+          {selectedPayrollForJourney && (
+            <Box sx={{ mt: 2 }}>
+              <ApprovalTimeline
+                steps={[
+                  {
+                    level: "Department Head",
+                    status: isLevelPending(
+                      selectedPayrollForJourney.approvalFlow?.history || [],
+                      selectedPayrollForJourney.approvalFlow?.currentLevel ||
+                        "",
+                      "DEPARTMENT_HEAD"
+                    )
+                      ? "pending"
+                      : isLevelApproved(
+                          selectedPayrollForJourney.approvalFlow?.history || [],
+                          "DEPARTMENT_HEAD"
+                        )
+                      ? "completed"
+                      : "pending",
+                    date: selectedPayrollForJourney.approvalFlow?.history?.find(
+                      (h) => h.level === "DEPARTMENT_HEAD"
+                    )?.timestamp,
+                    comment:
+                      selectedPayrollForJourney.approvalFlow?.history?.find(
+                        (h) => h.level === "DEPARTMENT_HEAD"
+                      )?.remarks,
+                  },
+                  {
+                    level: "HR Manager",
+                    status: isLevelPending(
+                      selectedPayrollForJourney.approvalFlow?.history || [],
+                      selectedPayrollForJourney.approvalFlow?.currentLevel ||
+                        "",
+                      "HR_MANAGER"
+                    )
+                      ? "pending"
+                      : isLevelApproved(
+                          selectedPayrollForJourney.approvalFlow?.history || [],
+                          "HR_MANAGER"
+                        )
+                      ? "completed"
+                      : "pending",
+                    date: selectedPayrollForJourney.approvalFlow?.history?.find(
+                      (h) => h.level === "HR_MANAGER"
+                    )?.timestamp,
+                    comment:
+                      selectedPayrollForJourney.approvalFlow?.history?.find(
+                        (h) => h.level === "HR_MANAGER"
+                      )?.remarks,
+                  },
+                  {
+                    level: "Finance Director",
+                    status: isLevelPending(
+                      selectedPayrollForJourney.approvalFlow?.history || [],
+                      selectedPayrollForJourney.approvalFlow?.currentLevel ||
+                        "",
+                      "FINANCE_DIRECTOR"
+                    )
+                      ? "pending"
+                      : isLevelApproved(
+                          selectedPayrollForJourney.approvalFlow?.history || [],
+                          "FINANCE_DIRECTOR"
+                        )
+                      ? "completed"
+                      : "pending",
+                    date: selectedPayrollForJourney.approvalFlow?.history?.find(
+                      (h) => h.level === "FINANCE_DIRECTOR"
+                    )?.timestamp,
+                    comment:
+                      selectedPayrollForJourney.approvalFlow?.history?.find(
+                        (h) => h.level === "FINANCE_DIRECTOR"
+                      )?.remarks,
+                  },
+                  {
+                    level: "Super Admin",
+                    status: isLevelPending(
+                      selectedPayrollForJourney.approvalFlow?.history || [],
+                      selectedPayrollForJourney.approvalFlow?.currentLevel ||
+                        "",
+                      "SUPER_ADMIN"
+                    )
+                      ? "pending"
+                      : isLevelApproved(
+                          selectedPayrollForJourney.approvalFlow?.history || [],
+                          "SUPER_ADMIN"
+                        )
+                      ? "completed"
+                      : "pending",
+                    date: selectedPayrollForJourney.approvalFlow?.history?.find(
+                      (h) => h.level === "SUPER_ADMIN"
+                    )?.timestamp,
+                    comment:
+                      selectedPayrollForJourney.approvalFlow?.history?.find(
+                        (h) => h.level === "SUPER_ADMIN"
+                      )?.remarks,
+                  },
+                ]}
+                currentLevel={
+                  selectedPayrollForJourney.approvalFlow?.currentLevel || ""
+                }
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowApprovalJourney(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

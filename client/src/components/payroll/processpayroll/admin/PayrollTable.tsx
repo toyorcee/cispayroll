@@ -31,9 +31,18 @@ import {
   Search,
   ArrowUpward,
   ArrowDownward,
+  AccessTime as AccessTimeIcon,
+  Block as BlockIcon,
+  Done as DoneIcon,
+  Timeline as TimelineIcon,
+  HourglassTop as HourglassTopIcon,
+  ErrorOutline as ErrorOutlineIcon,
 } from "@mui/icons-material";
 import { formatCurrency, formatDate } from "../../../../utils/formatters";
 import { PayrollStatus } from "../../../../types/payroll";
+import { styled } from "@mui/material/styles";
+import { User } from "../../../../types/auth";
+import { UserRole } from "../../../../types/auth";
 
 export interface Payroll {
   _id: string;
@@ -56,11 +65,13 @@ export interface Payroll {
     history: Array<{
       level: string;
       status: string;
-      action: string;
-      user: string;
-      timestamp: string;
-      remarks: string;
+      timestamp?: string;
+      remarks?: string;
     }>;
+  };
+  department?: {
+    _id: string;
+    name: string;
   };
 }
 
@@ -69,6 +80,7 @@ interface PayrollTableProps {
   onApprove: (payroll: Payroll) => void;
   onReject: (payroll: Payroll) => void;
   onView: (payroll: Payroll) => void;
+  onViewApprovalJourney?: (payroll: Payroll) => void;
   onSubmitForApproval?: (payroll: Payroll) => void;
   onProcessPayment?: (payroll: Payroll) => void;
   selectedPayrolls: string[];
@@ -76,20 +88,34 @@ interface PayrollTableProps {
   loading?: boolean;
   error?: string | null;
   currentUserRole?: string;
+  user?: User | null;
 }
+
+const RotatingHourglass = styled(HourglassTopIcon)(({ theme }) => ({
+  animation: "rotate 2s linear infinite",
+  "@keyframes rotate": {
+    "0%": {
+      transform: "rotate(0deg)",
+    },
+    "100%": {
+      transform: "rotate(360deg)",
+    },
+  },
+}));
 
 const PayrollTable: React.FC<PayrollTableProps> = ({
   payrolls,
   onApprove,
   onReject,
   onView,
+  onViewApprovalJourney = onView,
   onSubmitForApproval,
   onProcessPayment,
   selectedPayrolls,
   onSelectionChange,
   loading,
   error,
-  // currentUserRole,
+  user,
 }) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -258,58 +284,125 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
     );
   };
 
-  // Add this helper function to determine if the current user can approve/reject
-  // const canApproveReject = (payroll: Payroll) => {
-  //   if (!currentUserRole || !payroll.approvalFlow?.currentLevel) {
-  //     console.log("Missing role or approval flow:", {
-  //       currentUserRole,
-  //       approvalFlow: payroll.approvalFlow,
-  //     });
-  //     return false;
-  //   }
+  const getStatusIcon = (
+    status: string,
+    approvalFlow?: { currentLevel: string }
+  ) => {
+    switch (status) {
+      case PayrollStatus.DRAFT:
+        return undefined;
+      case PayrollStatus.PENDING:
+        return <AccessTimeIcon fontSize="small" color="warning" />;
+      case PayrollStatus.APPROVED:
+        return <DoneIcon fontSize="small" color="success" />;
+      case PayrollStatus.REJECTED:
+        return <BlockIcon fontSize="small" color="error" />;
+      case PayrollStatus.COMPLETED:
+        return <DoneIcon fontSize="small" color="success" />;
+      default:
+        return undefined;
+    }
+  };
 
-  //   // Map user roles to approval levels
-  //   const roleToLevel: Record<string, string> = {
-  //     department_head: "DEPARTMENT_HEAD",
-  //     hr_manager: "HR_MANAGER",
-  //     finance_director: "FINANCE_DIRECTOR",
-  //     super_admin: "SUPER_ADMIN",
-  //   };
+  // Add this function to determine if the current user is the approver for this payroll
+  const isCurrentApprover = (payroll: Payroll) => {
+    if (!user || !payroll.approvalFlow?.currentLevel) return false;
 
-  //   const userApprovalLevel = roleToLevel[currentUserRole.toLowerCase()];
-  //   if (!userApprovalLevel) {
-  //     console.log("No matching approval level for role:", currentUserRole);
-  //     return false;
-  //   }
+    const userPosition = user.position?.toLowerCase() || "";
+    const currentLevel = payroll.approvalFlow.currentLevel;
 
-  //   console.log("Approval check:", {
-  //     userRole: currentUserRole,
-  //     userApprovalLevel,
-  //     payrollCurrentLevel: payroll.approvalFlow.currentLevel,
-  //     payrollStatus: payroll.status,
-  //   });
+    switch (currentLevel) {
+      case "DEPARTMENT_HEAD":
+        return (
+          userPosition.includes("department head") ||
+          userPosition.includes("head of department") ||
+          userPosition.includes("department director")
+        );
+      case "HR_MANAGER":
+        return (
+          userPosition.includes("hr manager") ||
+          userPosition.includes("head of hr") ||
+          userPosition.includes("hr head") ||
+          userPosition.includes("head of human resources")
+        );
+      case "FINANCE_DIRECTOR":
+        return (
+          userPosition.includes("finance director") ||
+          userPosition.includes("head of finance") ||
+          userPosition.includes("finance head") ||
+          userPosition.includes("director of finance")
+        );
+      case "SUPER_ADMIN":
+        return (
+          userPosition.includes("super admin") ||
+          userPosition.includes("administrator") ||
+          user.role === UserRole.SUPER_ADMIN
+        );
+      default:
+        return false;
+    }
+  };
 
-  //   // For HR Managers, they can approve if:
-  //   // 1. They are in the HR department and the payroll is at HR_MANAGER level
-  //   // 2. The payroll is at their current approval level
-  //   if (
-  //     currentUserRole.toLowerCase() === "hr_manager" ||
-  //     currentUserRole.toLowerCase() === "head of human resources" ||
-  //     currentUserRole.toLowerCase() === "hr head"
-  //   ) {
-  //     const canApprove =
-  //       userApprovalLevel === payroll.approvalFlow.currentLevel;
-  //     console.log("HR Manager approval check:", {
-  //       canApprove,
-  //       userLevel: userApprovalLevel,
-  //       currentLevel: payroll.approvalFlow.currentLevel,
-  //     });
-  //     return canApprove;
-  //   }
+  // Update the shouldShowActions function
+  const shouldShowActions = (payroll: Payroll) => {
+    // Don't show actions for rejected or completed payrolls
+    if (payroll.status === "REJECTED" || payroll.status === "COMPLETED") {
+      return false;
+    }
 
-  //   // For other roles, they can only approve at their specific level
-  //   return userApprovalLevel === payroll.approvalFlow.currentLevel;
-  // };
+    // For DRAFT status, show submit for approval button
+    if (payroll.status === "DRAFT") {
+      return true;
+    }
+
+    // For PENDING status, only show approve/reject if user is the current approver
+    if (payroll.status === "PENDING") {
+      return isCurrentApprover(payroll);
+    }
+
+    return false;
+  };
+
+  // Add this helper function to check approval status
+  const isLevelApproved = (history: any[], level: string) => {
+    return history.some((h) => h.level === level && h.status === "APPROVED");
+  };
+
+  // Update the getNextLevelLabel function to handle undefined values
+  const getNextLevelLabel = (currentLevel: string | undefined) => {
+    if (!currentLevel) return "Pending Approval";
+
+    switch (currentLevel) {
+      case "DEPARTMENT_HEAD":
+        return "Waiting for Department Head Approval";
+      case "HR_MANAGER":
+        return "Waiting for HR Manager Approval";
+      case "FINANCE_DIRECTOR":
+        return "Waiting for Finance Director Approval";
+      case "SUPER_ADMIN":
+        return "Waiting for Super Admin Approval";
+      default:
+        return "Pending Approval";
+    }
+  };
+
+  // Add this helper function to check if all levels are approved
+  const isFullyApproved = (history: any[]) => {
+    const requiredLevels = [
+      "DEPARTMENT_HEAD",
+      "HR_MANAGER",
+      "FINANCE_DIRECTOR",
+      "SUPER_ADMIN",
+    ];
+    return requiredLevels.every((level) =>
+      history.some((h) => h.level === level && h.status === "APPROVED")
+    );
+  };
+
+  // Add this helper function to check if payroll is rejected
+  const isPayrollRejected = (history: any[]) => {
+    return history.some((h) => h.status === "REJECTED");
+  };
 
   if (loading) {
     return (
@@ -472,11 +565,31 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                   </TableCell>
                   <TableCell>{`${payroll.month}/${payroll.year}`}</TableCell>
                   <TableCell>
-                    <Chip
-                      label={payroll.status}
-                      color={getStatusColor(payroll.status) as any}
-                      size="small"
-                    />
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Chip
+                        label={payroll.status}
+                        color={getStatusColor(payroll.status) as any}
+                        size="small"
+                        icon={getStatusIcon(
+                          payroll.status,
+                          payroll.approvalFlow
+                        )}
+                      />
+                      {payroll.approvalFlow?.currentLevel &&
+                        payroll.status === "PENDING" && (
+                          <Tooltip
+                            title={`Waiting for ${payroll.approvalFlow.currentLevel
+                              .split("_")
+                              .map(
+                                (word) =>
+                                  word.charAt(0) + word.slice(1).toLowerCase()
+                              )
+                              .join(" ")}`}
+                          >
+                            <AccessTimeIcon fontSize="small" color="action" />
+                          </Tooltip>
+                        )}
+                    </Box>
                   </TableCell>
                   <TableCell align="right">
                     {formatCurrency(payroll.totalEarnings)}
@@ -500,6 +613,7 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                           <VisibilityIcon />
                         </IconButton>
                       </Tooltip>
+
                       {payroll.status === "DRAFT" && onSubmitForApproval && (
                         <Tooltip title="Submit for Approval">
                           <IconButton
@@ -510,28 +624,72 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                           </IconButton>
                         </Tooltip>
                       )}
+
                       {payroll.status === "PENDING" && (
                         <>
-                          <Tooltip title="Approve">
-                            <IconButton
-                              size="small"
-                              onClick={() => onApprove(payroll)}
-                              color="success"
+                          {isPayrollRejected(
+                            payroll.approvalFlow?.history || []
+                          ) ? (
+                            <Tooltip title="Rejected - Click to view rejection details">
+                              <IconButton
+                                size="small"
+                                onClick={() => onView(payroll)}
+                                color="error"
+                              >
+                                <ErrorOutlineIcon />
+                              </IconButton>
+                            </Tooltip>
+                          ) : isCurrentApprover(payroll) ? (
+                            <>
+                              <Tooltip title="Approve">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => onApprove(payroll)}
+                                  color="success"
+                                >
+                                  <CheckCircleIcon />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Reject">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => onReject(payroll)}
+                                  color="error"
+                                >
+                                  <CancelIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </>
+                          ) : (
+                            <Tooltip
+                              title={`Click to view approval journey - ${getNextLevelLabel(
+                                payroll.approvalFlow?.currentLevel
+                              )}`}
                             >
-                              <CheckCircleIcon />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Reject">
-                            <IconButton
-                              size="small"
-                              onClick={() => onReject(payroll)}
-                              color="error"
-                            >
-                              <CancelIcon />
-                            </IconButton>
-                          </Tooltip>
+                              <IconButton
+                                size="small"
+                                onClick={() => onViewApprovalJourney(payroll)}
+                                color="info"
+                              >
+                                <RotatingHourglass />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </>
                       )}
+
+                      {payroll.status === "COMPLETED" && (
+                        <Tooltip title="Fully Approved">
+                          <IconButton
+                            size="small"
+                            onClick={() => onView(payroll)}
+                            color="success"
+                          >
+                            <DoneIcon />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+
                       {payroll.status === "APPROVED" && onProcessPayment && (
                         <Tooltip title="Process Payment">
                           <IconButton

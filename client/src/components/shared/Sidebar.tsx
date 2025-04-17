@@ -14,7 +14,6 @@ import {
   UserCircleIcon,
 } from "@heroicons/react/24/outline";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaTimes } from "react-icons/fa";
 import { ProfileMenu } from "./PayrollMenu";
 import { useAuth } from "../../context/AuthContext";
 import { UserRole } from "../../types/auth";
@@ -45,12 +44,8 @@ export function Sidebar() {
   const { hasPermission, hasRole } = useAuth();
   const location = useLocation();
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
-  const {
-    setActiveMenuText,
-    isSidebarOpen,
-    setIsSidebarOpen,
-    getAvailableMenus,
-  } = useNavigation();
+  const { setActiveMenuText, getAvailableMenus } =
+    useNavigation();
 
   // Get the list of available menus from the NavigationContext
   const availableMenus = getAvailableMenus();
@@ -70,14 +65,6 @@ export function Sidebar() {
       setActiveMenuText("Dashboard");
     }
   }, [location.pathname, setActiveMenuText]);
-
-  // Close sidebar when route changes on mobile
-  useEffect(() => {
-    if (window.innerWidth < 1024) {
-      // lg breakpoint
-      setIsSidebarOpen(false);
-    }
-  }, [location.pathname, setIsSidebarOpen]);
 
   const filteredNavigation = menuItems.filter((item: NavigationItem) => {
     // Check if the menu is in the available menus list
@@ -129,120 +116,78 @@ export function Sidebar() {
     }
   };
 
-  // Close sidebar handler
-  const handleCloseSidebar = () => {
-    setIsSidebarOpen(false);
-    // Optionally close any open submenus
-    setOpenSubmenu(null);
-  };
-
   return (
-    <>
-      {/* Overlay for mobile */}
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-gray-600 bg-opacity-50 transition-opacity lg:hidden z-30"
-          onClick={handleCloseSidebar}
-        />
-      )}
+    <aside className="w-64 bg-white border-r border-gray-200 shadow-lg h-[calc(100vh-4rem)]">
+      <nav className="h-full flex flex-col">
+        <div className="flex-1 px-2 py-4 overflow-y-auto">
+          {filteredNavigation.map((item: NavigationItem) => {
+            // Only render items that the user has permission to see
+            const filteredSubItems = getFilteredChildren(item.subItems);
 
-      <aside
-        id="sidebar"
-        className={`${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 h-[calc(100vh-4rem)] top-16 shadow-md`}
-      >
-        {/* Close button for mobile */}
-        <div className="lg:hidden absolute right-2 top-2">
-          <button
-            onClick={handleCloseSidebar}
-            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
-            aria-label="Close sidebar"
-          >
-            <FaTimes className="w-5 h-5" />
-          </button>
-        </div>
+            // Don't render items with no accessible subitems
+            if (item.subItems && filteredSubItems.length === 0) {
+              return null;
+            }
 
-        <nav className="h-full flex flex-col relative z-10">
-          <div className="flex-1 px-2 py-4 lg:py-3 overflow-y-auto">
-            {filteredNavigation.map((item: NavigationItem) => {
-              // Only render items that the user has permission to see
-              const filteredSubItems = getFilteredChildren(item.subItems);
-
-              // Don't render items with no accessible subitems
-              if (item.subItems && filteredSubItems.length === 0) {
-                return null;
-              }
-
-              return (
-                <div key={item.name} className="mb-1">
-                  <Link
-                    to={item.href}
-                    className={`nav-link group flex items-center px-3 py-2.5 lg:py-2 text-sm font-medium rounded-md transition-all duration-150 ${
-                      location.pathname === item.href
-                        ? "active bg-green-50 text-green-700"
-                        : "hover:bg-green-50/50 text-gray-700 hover:text-green-700"
-                    }`}
-                    onClick={(e) => handleItemClick(e, item)}
-                  >
-                    {iconMap[item.name] && (
-                      <div
-                        className={`h-5 w-5 mr-3 lg:mr-2 transition-colors ${
-                          location.pathname === item.href
-                            ? "text-green-700"
-                            : "text-green-600 group-hover:text-green-700"
-                        }`}
-                      >
-                        {React.createElement(iconMap[item.name])}
-                      </div>
-                    )}
-                    <span className="text-current">{item.name}</span>
-                  </Link>
-                  {item.subItems && (
-                    <AnimatePresence>
-                      {openSubmenu === item.name && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="pl-6 mt-1 space-y-1"
-                        >
-                          {(() => {
-                            const filteredSubItems = getFilteredChildren(
-                              item.subItems
-                            );
-                            return filteredSubItems.map(
-                              (subItem: NavigationSubItem) => (
-                                <Link
-                                  key={subItem.name}
-                                  to={subItem.href}
-                                  className={`nav-link block px-3 py-2 text-sm font-medium rounded-md transition-all duration-150 ${
-                                    location.pathname === subItem.href
-                                      ? "active bg-green-50 text-green-700"
-                                      : "hover:bg-green-50/50 text-gray-700 hover:text-green-700"
-                                  }`}
-                                >
-                                  <span className="text-current">
-                                    {subItem.name}
-                                  </span>
-                                </Link>
-                              )
-                            );
-                          })()}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+            return (
+              <div key={item.name} className="mb-1">
+                <Link
+                  to={item.href}
+                  className={`nav-link group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-all duration-150 ${
+                    location.pathname === item.href
+                      ? "active bg-green-50 text-green-700"
+                      : "hover:bg-green-50/50 text-gray-700 hover:text-green-700"
+                  }`}
+                  onClick={(e) => handleItemClick(e, item)}
+                >
+                  {iconMap[item.name] && (
+                    <div
+                      className={`h-5 w-5 mr-3 transition-colors ${
+                        location.pathname === item.href
+                          ? "text-green-700"
+                          : "text-green-600 group-hover:text-green-700"
+                      }`}
+                    >
+                      {React.createElement(iconMap[item.name])}
+                    </div>
                   )}
-                </div>
-              );
-            })}
-          </div>
-          <div className="p-4 border-t border-gray-200 bg-gray-50/50">
-            <ProfileMenu variant="sidebar" />
-          </div>
-        </nav>
-      </aside>
-    </>
+                  <span className="text-current">{item.name}</span>
+                </Link>
+                {item.subItems && (
+                  <AnimatePresence>
+                    {openSubmenu === item.name && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="pl-6 mt-1 space-y-1"
+                      >
+                        {filteredSubItems.map((subItem: NavigationSubItem) => (
+                          <Link
+                            key={subItem.name}
+                            to={subItem.href}
+                            className={`nav-link block px-3 py-2 text-sm font-medium rounded-md transition-all duration-150 ${
+                              location.pathname === subItem.href
+                                ? "active bg-green-50 text-green-700"
+                                : "hover:bg-green-50/50 text-gray-700 hover:text-green-700"
+                            }`}
+                          >
+                            <span className="text-current">{subItem.name}</span>
+                          </Link>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div className="p-4 border-t border-gray-200 bg-gray-50/50">
+          <ProfileMenu variant="sidebar" />
+        </div>
+      </nav>
+    </aside>
   );
 }

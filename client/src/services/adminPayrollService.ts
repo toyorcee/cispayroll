@@ -275,11 +275,15 @@ export const adminPayrollService = {
   },
 
   // Reject payroll
-  rejectPayroll: async (
-    payrollId: string,
-    userRole?: string,
-    remarks?: string
-  ): Promise<PayrollData> => {
+  rejectPayroll: async ({
+    payrollId,
+    remarks,
+    userRole,
+  }: {
+    payrollId: string;
+    remarks: string;
+    userRole?: string;
+  }): Promise<PayrollData> => {
     try {
       // Use different endpoint for Super Admin
       const endpoint = isSuperAdmin(userRole)

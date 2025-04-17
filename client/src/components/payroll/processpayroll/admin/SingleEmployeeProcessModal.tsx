@@ -119,7 +119,6 @@ const SingleEmployeeProcessModal = ({
             ]);
 
             if (cachedData) {
-              // Even if we have cached data, keep the spinner visible for a short time
               setTimeout(() => {
                 setIsLoadingEmployees(false);
               }, 500);

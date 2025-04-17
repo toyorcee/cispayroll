@@ -180,6 +180,7 @@ export default function ProcessPayroll() {
   );
   const [selectedPayrollForEdit, setSelectedPayrollForEdit] =
     useState<PayrollData | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
 
   const queryClient = useQueryClient();
 
@@ -205,7 +206,7 @@ export default function ProcessPayroll() {
       payrollService.rejectPayroll(data.payrollId, data.remarks),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payrollPeriods"] });
-      toast.success("Payroll rejected successfully");
+      // toast.success("Payroll rejected successfully");
     },
   });
 
@@ -711,6 +712,7 @@ export default function ProcessPayroll() {
 
   const handleRejectClick = (payrollId: string) => {
     setSelectedPayrollId(payrollId);
+    setRejectionReason("");
     setShowRejectConfirm(true);
   };
 
@@ -723,7 +725,7 @@ export default function ProcessPayroll() {
   };
 
   const handleConfirmReject = () => {
-    if (selectedPayrollId) {
+    if (selectedPayrollId && rejectionReason.trim()) {
       queryClient.setQueryData(["payrolls", filters], (oldData: any) => {
         if (!oldData?.data?.payrolls) return oldData;
         return {
@@ -741,11 +743,12 @@ export default function ProcessPayroll() {
 
       rejectMutation.mutate({
         payrollId: selectedPayrollId,
-        remarks: "Rejected by admin",
+        remarks: rejectionReason.trim(),
       });
 
       setShowRejectConfirm(false);
       setSelectedPayrollId(null);
+      setRejectionReason("");
     }
   };
 
@@ -1059,30 +1062,41 @@ export default function ProcessPayroll() {
                     Confirm Rejection
                   </h3>
                 </div>
-                <p className="text-gray-600 mb-8 text-base leading-relaxed">
+                <p className="text-gray-600 mb-4 text-base leading-relaxed">
                   Are you sure you want to reject this payroll? This action
                   cannot be undone.
                 </p>
-                <div className="flex justify-end gap-4">
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Rejection Reason (Required)
+                  </label>
+                  <textarea
+                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    rows={3}
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder="Please provide a reason for rejection..."
+                    required
+                  />
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button
                     onClick={() => {
                       setShowRejectConfirm(false);
                       setSelectedPayrollId(null);
+                      setRejectionReason("");
                     }}
-                    className="px-6 py-2.5 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors duration-200"
+                    className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
                   >
                     Cancel
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                  </button>
+                  <button
                     onClick={handleConfirmReject}
-                    className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 shadow-lg shadow-red-500/25"
+                    disabled={!rejectionReason.trim()}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Confirm Reject
-                  </motion.button>
+                    Reject Payroll
+                  </button>
                 </div>
               </motion.div>
             </motion.div>

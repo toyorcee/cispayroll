@@ -494,15 +494,9 @@ export const routes: RouteConfig[] = [
 export const router = createBrowserRouter([
   {
     element: (
-      <AuthProvider>
-        <SkeletonProvider>
-          <NavigationProvider>
-            <GlobalErrorBoundary>
-              <Outlet />
-            </GlobalErrorBoundary>
-          </NavigationProvider>
-        </SkeletonProvider>
-      </AuthProvider>
+      <GlobalErrorBoundary>
+        <Outlet />
+      </GlobalErrorBoundary>
     ),
     errorElement: <RouteErrorFallback />,
     children: [
