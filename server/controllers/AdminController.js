@@ -1,11 +1,10 @@
 import UserModel from "../models/User.js";
-import PayrollModel from "../models/Payroll.js";
-import { Permission, UserRole } from "../models/User.js";
-import {
+import PayrollModel, {
   PAYROLL_STATUS,
-  PayrollFrequency,
   APPROVAL_LEVELS,
 } from "../models/Payroll.js";
+import { Permission, UserRole } from "../models/User.js";
+import { PayrollFrequency } from "../models/Payroll.js";
 import { PermissionChecker } from "../utils/permissionUtils.js";
 import { Types } from "mongoose";
 import { handleError, ApiError } from "../utils/errorHandler.js";
@@ -23,10 +22,9 @@ import {
   NotificationService,
   NOTIFICATION_TYPES,
 } from "../services/NotificationService.js";
+import AuditService from "../services/AuditService.js";
 import BaseApprovalController from "./BaseApprovalController.js";
 import { AuditAction, AuditEntity } from "../models/Audit.js";
-import AuditService from "../services/AuditService.js";
-import Audit from "../models/Audit.js";
 
 // Define the order of approval levels
 const APPROVAL_ORDER = [
@@ -38,30 +36,40 @@ const APPROVAL_ORDER = [
 
 // Simple function to check approval permissions
 const checkApprovalPermission = (admin, currentLevel) => {
-  // HR Department Head can only approve at HR level
-  if (admin.position && admin.position.includes("Human Resources")) {
-    return currentLevel === APPROVAL_LEVELS.HR_MANAGER;
+  if (!admin || !currentLevel) {
+    console.log("Permission check failed: Missing admin or currentLevel", {
+      admin,
+      currentLevel,
+    });
+    return false;
   }
 
-  // Regular approval flow
+  const position = admin.position?.toLowerCase() || "";
+  const role = admin.role?.toLowerCase() || "";
+
+  console.log("Checking permissions:", { position, role, currentLevel });
+
   switch (currentLevel) {
     case APPROVAL_LEVELS.DEPARTMENT_HEAD:
       return (
-        admin.position &&
-        (admin.position.includes("Head") ||
-          admin.position.includes("Director") ||
-          admin.position.includes("Manager"))
+        position.includes("head of department") ||
+        position.includes("department head")
       );
-
     case APPROVAL_LEVELS.HR_MANAGER:
-      return admin.position && admin.position.includes("Human Resources");
-
+      return (
+        position.includes("head of hr") ||
+        position.includes("head of human resources") ||
+        position.includes("hr manager") ||
+        position.includes("human resources manager") ||
+        position.includes("hr head")
+      );
     case APPROVAL_LEVELS.FINANCE_DIRECTOR:
-      return admin.position && admin.position.includes("Finance");
-
+      return (
+        position.includes("finance director") ||
+        position.includes("finance head")
+      );
     case APPROVAL_LEVELS.SUPER_ADMIN:
-      return admin.role === "SUPER_ADMIN";
-
+      return role === "super_admin";
     default:
       return false;
   }
@@ -70,16 +78,18 @@ const checkApprovalPermission = (admin, currentLevel) => {
 // Helper function to get next approval level
 const getNextApprovalLevel = (currentLevel) => {
   switch (currentLevel) {
+    case APPROVAL_LEVELS.DRAFT:
+      return APPROVAL_LEVELS.DEPARTMENT_HEAD;
     case APPROVAL_LEVELS.DEPARTMENT_HEAD:
-      return APPROVAL_LEVELS.HR_MANAGER;
-    case APPROVAL_LEVELS.HR_MANAGER:
+      return APPROVAL_LEVELS.HR_HEAD;
+    case APPROVAL_LEVELS.HR_HEAD:
       return APPROVAL_LEVELS.FINANCE_DIRECTOR;
     case APPROVAL_LEVELS.FINANCE_DIRECTOR:
       return APPROVAL_LEVELS.SUPER_ADMIN;
     case APPROVAL_LEVELS.SUPER_ADMIN:
-      return null; // Final approval level
-    default:
       return null;
+    default:
+      throw new ApiError(400, "Invalid approval level");
   }
 };
 
@@ -814,27 +824,55 @@ export class AdminController {
     try {
       const { id } = req.params;
       const { remarks } = req.body;
-      const admin = await UserModel.findById(req.user.id);
+      const admin = req.user;
 
-      if (!admin?.department) {
-        throw new ApiError(400, "Admin is not assigned to any department");
-      }
+      console.log("Starting payroll rejection:", {
+        payrollId: id,
+        adminId: admin._id,
+        adminPosition: admin.position,
+        adminRole: admin.role,
+        remarks: remarks,
+      });
 
-      // Get the payroll with employee details
-      const payroll = await PayrollModel.findOne({
-        _id: id,
-        department: admin.department,
-      }).populate("employee", "firstName lastName email department");
+      // Get the payroll
+      const payroll = await PayrollModel.findById(id)
+        .populate("employee")
+        .populate("department");
 
       if (!payroll) {
-        throw new ApiError(404, "Payroll not found in your department");
+        console.log("Payroll not found:", id);
+        return res.status(404).json({
+          success: false,
+          message: "Payroll not found",
+        });
       }
 
-      if (payroll.status !== PAYROLL_STATUS.PENDING) {
-        throw new ApiError(400, "Only pending payrolls can be rejected");
+      console.log("Found payroll:", {
+        payrollId: payroll._id,
+        currentLevel: payroll.approvalFlow.currentLevel,
+        status: payroll.status,
+      });
+
+      // Check if admin has permission to reject at current level
+      const hasPermission = checkApprovalPermission(
+        admin,
+        payroll.approvalFlow.currentLevel
+      );
+
+      console.log("Permission check result:", {
+        hasPermission,
+        adminPosition: admin.position,
+        currentLevel: payroll.approvalFlow.currentLevel,
+      });
+
+      if (!hasPermission) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have permission to reject this payroll",
+        });
       }
 
-      // Update payroll status and add to approval history
+      // Update payroll status to REJECTED
       payroll.status = PAYROLL_STATUS.REJECTED;
       payroll.approvalFlow.history.push({
         level: payroll.approvalFlow.currentLevel,
@@ -842,133 +880,49 @@ export class AdminController {
         action: "REJECT",
         user: admin._id,
         timestamp: new Date(),
-        remarks: remarks || "Rejected by HR Admin/HOD",
+        remarks: remarks || "No reason provided",
       });
-
-      // Update legacy fields for backward compatibility
-      payroll.approvalFlow.rejectedBy = admin._id;
-      payroll.approvalFlow.rejectedAt = new Date();
 
       await payroll.save();
 
-      // Create audit log for rejection
-      await Audit.create({
-        action: "REJECT",
-        entity: "PAYROLL",
-        entityId: payroll._id,
-        performedBy: admin._id,
-        details: {
+      console.log("Payroll rejected successfully:", {
+        payrollId: payroll._id,
+        status: payroll.status,
+        rejectionReason: remarks,
+      });
+
+      // Create notifications
+      await NotificationService.createPayrollNotification(
+        payroll,
+        NOTIFICATION_TYPES.PAYROLL_REJECTED,
+        admin,
+        remarks
+      );
+
+      // Create audit log using AuditService
+      await AuditService.logAction(
+        "REJECT",
+        "PAYROLL",
+        payroll._id,
+        admin._id,
+        {
           status: PAYROLL_STATUS.REJECTED,
           level: payroll.approvalFlow.currentLevel,
           employeeName: `${payroll.employee.firstName} ${payroll.employee.lastName}`,
           month: payroll.month,
           year: payroll.year,
-          remarks: remarks || "Rejected by HR Admin/HOD",
-          departmentId: payroll.department,
-        },
-      });
-
-      // Set refresh header
-      res.set("X-Refresh-Audit-Logs", "true");
-
-      const notificationPromises = [];
-
-      // Notify the employee
-      notificationPromises.push(
-        NotificationService.createPayrollNotification(
-          payroll.employee._id,
-          NOTIFICATION_TYPES.PAYROLL_REJECTED,
-          {
-            _id: payroll._id,
-            month: payroll.month,
-            year: payroll.year,
-            status: PAYROLL_STATUS.REJECTED,
-            approvalFlow: payroll.approvalFlow,
-            employee: {
-              _id: payroll.employee._id,
-              firstName: payroll.employee.firstName,
-              lastName: payroll.employee.lastName,
-              email: payroll.employee.email,
-              department: payroll.employee.department,
-            },
-          },
-          remarks || "Rejected by HR Admin/HOD"
-        )
+          remarks: remarks,
+          departmentId: payroll.department._id,
+        }
       );
 
-      // Notify the admin who rejected
-      notificationPromises.push(
-        NotificationService.createPayrollNotification(
-          admin._id,
-          NOTIFICATION_TYPES.PAYROLL_REJECTED,
-          {
-            _id: payroll._id,
-            month: payroll.month,
-            year: payroll.year,
-            status: PAYROLL_STATUS.REJECTED,
-            approvalFlow: payroll.approvalFlow,
-            employee: {
-              _id: payroll.employee._id,
-              firstName: payroll.employee.firstName,
-              lastName: payroll.employee.lastName,
-              email: payroll.employee.email,
-              department: payroll.employee.department,
-            },
-          },
-          remarks || "Rejected by HR Admin/HOD"
-        )
-      );
-
-      // Notify the department head
-      const departmentHead = await UserModel.findOne({
-        department: admin.department,
-        position: {
-          $in: [
-            "Head of Department",
-            "Department Head",
-            "Head",
-            "Director",
-            "Manager",
-          ],
-        },
-        status: "active",
-      });
-
-      if (
-        departmentHead &&
-        departmentHead._id.toString() !== admin._id.toString()
-      ) {
-        notificationPromises.push(
-          NotificationService.createPayrollNotification(
-            departmentHead._id,
-            NOTIFICATION_TYPES.PAYROLL_REJECTED,
-            {
-              _id: payroll._id,
-              month: payroll.month,
-              year: payroll.year,
-              status: PAYROLL_STATUS.REJECTED,
-              approvalFlow: payroll.approvalFlow,
-              employee: {
-                _id: payroll.employee._id,
-                firstName: payroll.employee.firstName,
-                lastName: payroll.employee.lastName,
-                email: payroll.employee.email,
-                department: payroll.employee.department,
-              },
-            },
-            remarks || "Rejected by HR Admin/HOD"
-          )
-        );
-      }
-
-      await Promise.all(notificationPromises);
-
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         message: "Payroll rejected successfully",
         data: payroll,
       });
     } catch (error) {
+      console.error("Error in rejectPayroll:", error);
       next(error);
     }
   }
@@ -1543,14 +1497,18 @@ export class AdminController {
 
   static async getProcessingStatistics(req, res) {
     try {
-      const admin = await UserModel.findById(req.user.id).select("department");
-      if (!admin?.department) {
+      const admin = await UserModel.findById(req.user.id).select(
+        "department role"
+      );
+
+      if (admin.role !== "SUPER_ADMIN" && !admin?.department) {
         throw new ApiError(400, "Admin is not assigned to any department");
       }
 
       const stats = await PayrollService.getProcessingStatistics(
-        admin.department
+        admin.role === "SUPER_ADMIN" ? null : admin.department
       );
+
       res.json({
         success: true,
         data: stats,
@@ -2628,43 +2586,33 @@ export class AdminController {
 
   static async getEmployeeById(req, res, next) {
     try {
-      if (
-        !PermissionChecker.hasPermission(req.user, Permission.VIEW_ALL_USERS)
-      ) {
-        throw new ApiError(403, "Not authorized to view employee details");
-      }
+      const { id } = req.params;
+      const admin = req.user;
 
-      const admin = await UserModel.findById(req.user.id);
-      if (!admin?.department) {
-        throw new ApiError(400, "Admin is not assigned to any department");
-      }
-
-      const employee = await UserModel.findById(req.params.id)
-        .select("-password")
-        .populate([
-          { path: "department", select: "name" },
-          { path: "salaryGrade", select: "level basicSalary" },
-        ]);
+      // Find the employee
+      const employee = await UserModel.findById(id)
+        .populate("department")
+        .populate("salaryGrade");
 
       if (!employee) {
         throw new ApiError(404, "Employee not found");
       }
 
-      // Check if employee belongs to admin's department
-      if (employee.department?.toString() !== admin.department?.toString()) {
-        throw new ApiError(
-          403,
-          "Cannot access employee from another department"
-        );
+      if (employee.department.toString() !== admin.department.toString()) {
+        if (
+          !PermissionChecker.hasPermission(admin, Permission.VIEW_ALL_USERS)
+        ) {
+          throw new ApiError(403, "Not authorized to view employee details");
+        }
       }
 
-      res.status(200).json({
+      // Return the employee details
+      res.json({
         success: true,
-        employee,
+        data: employee,
       });
     } catch (error) {
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
+      next(error);
     }
   }
 
@@ -2986,17 +2934,38 @@ export class AdminController {
 
   static async processSingleEmployeePayroll(req, res, next) {
     try {
-      const { employeeId, month, year, frequency, departmentId } = req.body;
-      const admin = await UserModel.findById(req.user.id);
+      const { employeeId, month, year, frequency, departmentId, salaryGrade } =
+        req.body;
 
-      if (!admin?.department) {
-        throw new ApiError(400, "Admin is not assigned to any department");
+      // Fetch admin with full details
+      const admin = await UserModel.findById(req.user.id)
+        .populate("department", "name code")
+        .select("+position +role +department");
+
+      // Check if admin exists and has necessary permissions
+      if (!admin) {
+        throw new ApiError(404, "Admin not found");
       }
 
-      // Get employee
+      // Validate department access
+      const targetDepartment = departmentId || admin.department?._id;
+      if (!targetDepartment) {
+        throw new ApiError(400, "No department specified");
+      }
+
+      // Check if admin has access to this department
+      const hasAccess =
+        admin.role === "super-admin" ||
+        admin.department?._id.toString() === targetDepartment.toString();
+
+      if (!hasAccess) {
+        throw new ApiError(403, "You don't have access to this department");
+      }
+
+      // Get employee with proper department check
       const employee = await UserModel.findOne({
         _id: employeeId,
-        department: admin.department,
+        department: targetDepartment,
         status: "active",
       });
 
@@ -3005,68 +2974,57 @@ export class AdminController {
       }
 
       // Check for existing payroll
-      const duplicateCheck = await AuditService.checkDuplicatePayroll(
-        employeeId,
-        admin.department,
+      const existingPayroll = await PayrollModel.findOne({
+        employee: employeeId,
         month,
         year,
-        frequency
-      );
+        frequency,
+      });
 
-      if (duplicateCheck.isProcessing) {
-        throw new ApiError(
-          409,
-          `Payroll is already being processed for employee ${employee.firstName} ${employee.lastName} for ${month}/${year}. Please try again in a few moments.`
-        );
+      if (existingPayroll) {
+        throw new ApiError(400, "Payroll already exists for this period");
       }
 
-      if (duplicateCheck.exists) {
-        // Create audit log for duplicate attempt
-        await AuditService.logAction(
-          AuditAction.CREATE,
-          AuditEntity.PAYROLL,
-          employeeId,
-          req.user._id,
-          {
-            status: "FAILED",
-            errorType: "DUPLICATE_PAYROLL",
-            errorMessage: `Payroll already exists for employee ${employee.firstName} ${employee.lastName} for ${month}/${year}`,
-            month,
-            year,
-            frequency,
-            departmentId: admin.department,
-          }
-        );
-
-        // Create notification for admin about duplicate
-        await NotificationService.createPayrollNotification(
-          duplicateCheck.payroll,
-          NOTIFICATION_TYPES.PAYROLL_ERROR_DUPLICATE_PAYROLL,
-          req.user,
-          `Payroll already exists for employee ${employee.firstName} ${employee.lastName} for ${month}/${year}`
-        );
-
-        throw new ApiError(
-          409,
-          `Payroll already exists for employee ${employee.firstName} ${employee.lastName} for ${month}/${year}`
-        );
-      }
-
-      // Calculate payroll using the found salary grade
+      // Calculate payroll using PayrollService
       const payrollData = await PayrollService.calculatePayroll(
         employeeId,
-        req.body.salaryGrade,
+        salaryGrade,
         month,
         year,
-        frequency.toLowerCase()
+        frequency,
+        targetDepartment
       );
 
-      // Create payroll with correct approvalFlow structure
+      if (!payrollData) {
+        throw new ApiError(400, "Failed to calculate payroll");
+      }
+
+      // Enhanced HR Head detection
+      const isHRHead =
+        (admin.position?.toLowerCase().includes("head of human resources") ||
+          admin.position?.toLowerCase().includes("hr head") ||
+          admin.role?.toLowerCase() === "head of hr") &&
+        admin.department?.name?.toLowerCase().includes("human resources");
+
+      console.log("🔍 Admin Details:", {
+        id: admin._id,
+        role: admin.role,
+        position: admin.position,
+        department: admin.department?.name,
+        isHRHead,
+        positionCheck: admin.position
+          ?.toLowerCase()
+          .includes("head of human resources"),
+        departmentCheck: admin.department?.name
+          ?.toLowerCase()
+          .includes("human resources"),
+      });
+
+      // Create payroll record
       const payroll = await PayrollModel.create({
         ...payrollData,
-        employee: employeeId,
-        department: admin.department,
-        status: PAYROLL_STATUS.DRAFT,
+        department: targetDepartment,
+        status: isHRHead ? PAYROLL_STATUS.PENDING : PAYROLL_STATUS.DRAFT,
         createdBy: admin._id,
         updatedBy: admin._id,
         processedBy: admin._id,
@@ -3076,62 +3034,49 @@ export class AdminController {
           bankName: "Pending",
         },
         approvalFlow: {
-          currentLevel: APPROVAL_LEVELS.DRAFT,
-          history: [],
+          currentLevel: isHRHead
+            ? APPROVAL_LEVELS.HR_MANAGER
+            : APPROVAL_LEVELS.DEPARTMENT_HEAD,
+          history: [
+            {
+              level: isHRHead
+                ? APPROVAL_LEVELS.HR_MANAGER
+                : APPROVAL_LEVELS.DEPARTMENT_HEAD,
+              status: "PENDING",
+              action: "SUBMIT",
+              user: admin._id,
+              timestamp: new Date(),
+              remarks: isHRHead
+                ? "Payroll created and submitted by HR Head"
+                : "Initial payroll creation",
+            },
+          ],
           submittedBy: admin._id,
-          submittedAt: new Date(),
-          status: PAYROLL_STATUS.DRAFT,
-          remarks: "Initial payroll creation",
+          submittedAt: isHRHead ? new Date() : null,
         },
       });
 
-      // Create audit log for successful payroll creation
-      await AuditService.logAction(
-        AuditAction.CREATE,
-        AuditEntity.PAYROLL,
-        payroll._id,
-        admin._id,
-        {
-          status: "SUCCESS",
-          action: "PAYROLL_CREATED",
-          employeeId: employee._id,
-          employeeName: `${employee.firstName} ${employee.lastName}`,
-          month,
-          year,
-          frequency,
-          netPay: payroll.totals.netPay,
-          departmentId: employee.department,
-          processingStatus: "DRAFT",
-          message: `Created payroll for ${employee.firstName} ${employee.lastName}`,
-        }
+      // Create notifications with correct types
+      const isHR =
+        admin.position === "HR Manager" ||
+        admin.position === "Head of Human Resources";
+
+      // Set the currentLevel explicitly for HR Manager
+      if (isHR) {
+        payroll.approvalFlow.currentLevel = APPROVAL_LEVELS.HR_MANAGER;
+      }
+
+      await NotificationService.createPayrollNotification(
+        payroll,
+        isHR ? "PAYROLL_PENDING_APPROVAL" : "PAYROLL_DRAFT_CREATED",
+        admin
       );
 
-      // Create notifications for both employee and admin
-      const notificationPromises = [
-        // Notify the employee
-        NotificationService.createPayrollNotification(
-          payroll,
-          "PAYROLL_DRAFT_CREATED",
-          employee,
-          "Payroll has been created for your review"
-        ),
-        // Notify the admin
-        NotificationService.createPayrollNotification(
-          payroll,
-          "PAYROLL_DRAFT_CREATED",
-          admin,
-          "You have created a draft payroll"
-        ),
-      ];
-
-      await Promise.all(notificationPromises);
-
-      // Set a header to indicate that audit logs should be refreshed
-      res.set("X-Refresh-Audit-Logs", "true");
-
-      return res.status(200).json({
+      res.status(201).json({
         success: true,
-        message: "Payroll processed successfully",
+        message: isHR
+          ? "Payroll created and submitted for approval"
+          : "Payroll created as draft",
         data: payroll,
       });
     } catch (error) {

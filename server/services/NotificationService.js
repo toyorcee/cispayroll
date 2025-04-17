@@ -310,7 +310,7 @@ export class NotificationService {
           employee,
           payroll,
           remarks,
-          data
+          { ...data, admin }
         );
         if (employeeNotification) {
           notifications.push(employeeNotification);
@@ -330,7 +330,7 @@ export class NotificationService {
           employee,
           payroll,
           remarks,
-          data
+          { ...data, admin }
         );
         if (hrManagerNotification) {
           notifications.push(hrManagerNotification);
@@ -352,7 +352,7 @@ export class NotificationService {
           employee,
           payroll,
           remarks,
-          data
+          { ...data, admin }
         );
         if (financeDirectorNotification) {
           notifications.push(financeDirectorNotification);
@@ -371,7 +371,7 @@ export class NotificationService {
           employee,
           payroll,
           remarks,
-          data
+          { ...data, admin }
         );
         if (superAdminNotification) {
           notifications.push(superAdminNotification);
@@ -390,7 +390,7 @@ export class NotificationService {
           employee,
           payroll,
           remarks,
-          data
+          { ...data, admin }
         );
         if (adminNotification) {
           notifications.push(adminNotification);
@@ -942,6 +942,18 @@ export class NotificationService {
           message: `Payroll for ${employeeName} (${payrollPeriod}) has been fully approved and is ready for processing.`,
         };
       case NOTIFICATION_TYPES.PAYROLL_PENDING_APPROVAL:
+        // Check if the recipient is HR Manager
+        if (
+          data.currentLevel === APPROVAL_LEVELS.HR_MANAGER ||
+          (data.admin &&
+            (data.admin.position === "HR Manager" ||
+              data.admin.position === "Head of Human Resources"))
+        ) {
+          return {
+            title: "Payroll Pending Your Approval",
+            message: `Payroll for ${employeeName} (${payrollPeriod}) has been created and is awaiting your approval as HR Manager.`,
+          };
+        }
         return {
           title: "Payroll Pending Approval",
           message: `Payroll for ${employeeName} (${payrollPeriod}) is pending approval${
