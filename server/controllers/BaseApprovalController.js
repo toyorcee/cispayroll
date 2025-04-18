@@ -154,25 +154,14 @@ class BaseApprovalController {
    */
   static async createApprovalNotification(nextApprover, payroll, currentLevel) {
     try {
-      console.log(
-        "🔔 Creating payroll notification for next approver:",
-        nextApprover._id
-      );
+      console.log("🔍 Finding next approver for level:", currentLevel);
       console.log("📊 Payroll data:", JSON.stringify(payroll, null, 2));
 
-      // Use the NotificationService instead of direct model creation
-      const notification = await NotificationService.createPayrollNotification(
-        payroll,
-        NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
-        nextApprover,
-        `Your payroll requires ${currentLevel} approval`
-      );
-
-      console.log("✅ Notification created with ID:", notification?._id);
-      console.log("📨 Notification saved for user:", nextApprover._id);
-      return notification;
+      // This method is now just for finding the next approver
+      // Notifications are handled in ApprovalController
+      return nextApprover;
     } catch (error) {
-      console.error("❌ Error creating approval notification:", error);
+      console.error("❌ Error finding next approver:", error);
       throw error;
     }
   }
@@ -185,28 +174,14 @@ class BaseApprovalController {
    */
   static async createRejectionNotification(employee, payroll, reason) {
     try {
-      console.log(
-        "🔔 Creating rejection notification for employee:",
-        employee._id
-      );
+      console.log("🔍 Processing rejection for employee:", employee._id);
       console.log("📊 Payroll data:", JSON.stringify(payroll, null, 2));
 
-      // Use the NotificationService instead of direct model creation
-      const notification = await NotificationService.createPayrollNotification(
-        payroll,
-        NOTIFICATION_TYPES.PAYROLL_REJECTED,
-        employee,
-        reason
-      );
-
-      console.log(
-        "✅ Rejection notification created with ID:",
-        notification?._id
-      );
-      console.log("📨 Rejection notification saved for user:", employee._id);
-      return notification;
+      // This method is now just for processing the rejection
+      // Notifications are handled in ApprovalController
+      return { employee, payroll, reason };
     } catch (error) {
-      console.error("❌ Error creating rejection notification:", error);
+      console.error("❌ Error processing rejection:", error);
       throw error;
     }
   }
@@ -318,84 +293,6 @@ class BaseApprovalController {
           approvedAt: new Date(),
         },
       });
-
-      // Create notifications
-      const notificationPromises = [];
-
-      // If there's a next level, notify the next approver
-      if (nextLevel && nextLevel !== "COMPLETED") {
-        const nextApprover = await this.findNextApprover(
-          nextLevel,
-          updatedPayroll
-        );
-        if (nextApprover) {
-          notificationPromises.push(
-            NotificationService.createPayrollNotification(
-              nextApprover._id,
-              NOTIFICATION_TYPES.PAYROLL_PENDING_APPROVAL,
-              updatedPayroll,
-              `New payroll pending your approval as ${nextLevel.replace(
-                /_/g,
-                " "
-              )}`
-            )
-          );
-        }
-      }
-
-      // If payroll is completed, create a completion notification
-      if (nextLevel === "COMPLETED") {
-        notificationPromises.push(
-          NotificationService.createPayrollNotification(
-            updatedPayroll.employee._id,
-            NOTIFICATION_TYPES.PAYROLL_COMPLETED,
-            updatedPayroll,
-            `Your payroll for ${updatedPayroll.month} ${updatedPayroll.year} has been fully approved and is ready for processing`
-          )
-        );
-      }
-
-      // If payroll is rejected, notify HR Manager
-      if (!isApproved) {
-        // Find HR Manager
-        const hrDepartment = await DepartmentModel.findOne({
-          name: { $in: ["Human Resources", "HR"] },
-          status: "active",
-        });
-
-        if (hrDepartment) {
-          const hrManager = await UserModel.findOne({
-            department: hrDepartment._id,
-            position: {
-              $in: [
-                "HR Manager",
-                "Head of HR",
-                "HR Head",
-                "Head of Human Resources",
-              ],
-            },
-            status: "active",
-          });
-
-          if (hrManager) {
-            notificationPromises.push(
-              NotificationService.createPayrollNotification(
-                hrManager._id,
-                NOTIFICATION_TYPES.PAYROLL_REJECTED,
-                updatedPayroll,
-                `Payroll for ${updatedPayroll.employee.firstName} ${
-                  updatedPayroll.employee.lastName
-                } was rejected by ${currentLevel.replace(/_/g, " ")}. Reason: ${
-                  reason || "No reason provided"
-                }. Please communicate with the employee.`
-              )
-            );
-          }
-        }
-      }
-
-      // Send all notifications
-      await Promise.all(notificationPromises);
 
       return updatedPayroll;
     } catch (error) {

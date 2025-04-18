@@ -44,10 +44,14 @@ const checkApprovalPermission = (admin, currentLevel) => {
     return false;
   }
 
-  const position = admin.position || "";
-  const role = admin.role || "";
+  const position = (admin.position || "").toLowerCase(); // Convert position to lowercase
+  const role = (admin.role || "").toLowerCase(); // Convert role to lowercase
 
-  console.log("Checking permissions:", { position, role, currentLevel });
+  console.log("Checking permissions (case-insensitive):", {
+    position,
+    role,
+    currentLevel,
+  });
 
   switch (currentLevel) {
     case APPROVAL_LEVELS.DEPARTMENT_HEAD:
@@ -64,8 +68,10 @@ const checkApprovalPermission = (admin, currentLevel) => {
         position.includes("hr head")
       );
     case APPROVAL_LEVELS.FINANCE_DIRECTOR:
-      return position === "Head of Finance";
+      // Assuming 'Head of Finance' is the specific required position
+      return position === "head of finance";
     case APPROVAL_LEVELS.SUPER_ADMIN:
+      // Use lowercase role check
       return role === "super_admin";
     default:
       return false;
@@ -3068,27 +3074,88 @@ export class AdminController {
         },
       });
 
-      // Create notifications with correct types
-      const isHR =
-        admin.position === "HR Manager" ||
-        admin.position === "Head of Human Resources";
-
-      // Set the currentLevel explicitly for HR Manager
-      if (isHR) {
-        payroll.approvalFlow.currentLevel = APPROVAL_LEVELS.HR_MANAGER;
-      }
-
-      await NotificationService.createPayrollNotification(
-        payroll,
-        isHR ? "PAYROLL_PENDING_APPROVAL" : "PAYROLL_DRAFT_CREATED",
-        admin
+      // Create audit log for payroll creation
+      await AuditService.logAction(
+        "CREATE",
+        "PAYROLL",
+        payroll._id,
+        admin._id,
+        {
+          status: isHRHead ? "PENDING" : "DRAFT",
+          action: "PAYROLL_CREATED",
+          employeeId: employee._id,
+          employeeName: `${employee.firstName} ${employee.lastName}`,
+          month,
+          year,
+          frequency,
+          departmentId: targetDepartment,
+          createdBy: admin._id,
+          position: admin.position,
+          role: admin.role,
+        }
       );
 
-      res.status(201).json({
+      // Notify the creating admin
+      await NotificationService.createPayrollNotification(
+        payroll,
+        NOTIFICATION_TYPES.PAYROLL_CREATED,
+        admin,
+        `You have created a ${isHRHead ? "pending" : "draft"} payroll for ${
+          employee.firstName
+        } ${employee.lastName} (${employee.employeeId}) for ${month}/${year}`,
+        {
+          approvalLevel: isHRHead
+            ? APPROVAL_LEVELS.HR_MANAGER
+            : APPROVAL_LEVELS.DEPARTMENT_HEAD,
+          metadata: {
+            payrollId: payroll._id,
+            employeeId: employee._id,
+            departmentId: employee.department._id,
+            status: payroll.status,
+          },
+        }
+      );
+
+      // Notify Super Admin about new payroll creation
+      const superAdmin = await UserModel.findOne({ role: "super-admin" });
+      if (superAdmin) {
+        await NotificationService.createPayrollNotification(
+          payroll,
+          NOTIFICATION_TYPES.PAYROLL_CREATED,
+          admin,
+          `A new ${
+            isHRHead ? "pending" : "draft"
+          } payroll has been created for ${employee.firstName} ${
+            employee.lastName
+          } (${employee.employeeId}) in ${
+            admin.department.name
+          } department by ${admin.firstName} ${admin.lastName} (${
+            admin.position
+          })`,
+          {
+            approvalLevel: isHRHead
+              ? APPROVAL_LEVELS.HR_MANAGER
+              : APPROVAL_LEVELS.DEPARTMENT_HEAD,
+            metadata: {
+              payrollId: payroll._id,
+              employeeId: employee._id,
+              departmentId: targetDepartment,
+              createdBy: admin._id,
+              status: isHRHead ? "PENDING" : "DRAFT",
+            },
+          }
+        );
+      }
+
+      // Set response headers to trigger UI updates
+      res.set({
+        "x-refresh-payrolls": "true",
+        "x-refresh-audit-logs": "true",
+      });
+
+      return res.status(201).json({
         success: true,
-        message: isHR
-          ? "Payroll created and submitted for approval"
-          : "Payroll created as draft",
+        message: "Payroll processed successfully",
         data: payroll,
       });
     } catch (error) {
@@ -3391,7 +3458,7 @@ export class AdminController {
           // Create payroll record
           const payroll = await PayrollModel.create({
             ...payrollData,
-            status: PAYROLL_STATUS.DRAFT, // Start with DRAFT status for consistency
+            status: PAYROLL_STATUS.DRAFT,
             processedBy: adminId,
             createdBy: adminId,
             updatedBy: adminId,
@@ -3415,17 +3482,19 @@ export class AdminController {
           // Create notification for the employee
           console.log(`🔔 Creating notification for employee: ${employee._id}`);
           await NotificationService.createPayrollNotification(
-            employee._id,
-            "PAYROLL_DRAFT_CREATED",
-            payroll
+            payroll,
+            NOTIFICATION_TYPES.PAYROLL_DRAFT_CREATED,
+            admin,
+            `A draft payroll has been created for ${month}/${year}`
           );
 
           // Create notification for the admin
           console.log(`🔔 Creating notification for admin: ${adminId}`);
           await NotificationService.createPayrollNotification(
-            adminId,
-            "PAYROLL_DRAFT_CREATED",
-            payroll
+            payroll,
+            NOTIFICATION_TYPES.PAYROLL_DRAFT_CREATED,
+            admin,
+            `You have created a draft payroll for ${employee.firstName} ${employee.lastName} for ${month}/${year}`
           );
 
           results.processed++;

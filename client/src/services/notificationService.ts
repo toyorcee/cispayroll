@@ -17,3 +17,16 @@ export const getUnreadNotificationCount = async () => {
     throw error;
   }
 };
+
+// Fetch all notifications
+export const getNotifications = async () => {
+  try {
+    const response = await axios.get(BASE_URL, {
+      withCredentials: true,
+    });
+    return response;
+  } catch (error) {
+    console.error("Error fetching notifications:", error);
+    throw error;
+  }
+};

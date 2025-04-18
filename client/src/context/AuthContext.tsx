@@ -34,6 +34,11 @@ axios.interceptors.response.use(
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     }
 
+    if (response.headers?.["x-refresh-notifications"] === "true") {
+      const queryClient = new QueryClient();
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    }
+
     if (response.headers?.["x-refresh-finance-director"] === "true") {
       const queryClient = new QueryClient();
       queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] });
@@ -85,8 +90,8 @@ export const AuthContext = createContext<AuthContextType | undefined>(
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, 
-      gcTime: 30 * 60 * 1000, 
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
     },
   },
 });

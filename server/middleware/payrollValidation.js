@@ -188,24 +188,20 @@ export const validatePayrollApproval = (req, res, next) => {
 export const validatePayrollRejection = (req, res, next) => {
   try {
     const { id } = req.params;
-    const { remarks } = req.body;
+    const { reason } = req.body;
 
     // Validate payroll ID
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new ApiError(400, "Invalid payroll ID format");
     }
 
-    // Remarks are required for rejection
-    if (
-      !remarks ||
-      typeof remarks !== "string" ||
-      remarks.trim().length === 0
-    ) {
-      throw new ApiError(400, "Remarks are required when rejecting a payroll");
+    // Reason is required for rejection
+    if (!reason || typeof reason !== "string" || reason.trim().length === 0) {
+      throw new ApiError(400, "Reason is required when rejecting a payroll");
     }
 
-    if (remarks.length > 500) {
-      throw new ApiError(400, "Remarks cannot exceed 500 characters");
+    if (reason.length > 500) {
+      throw new ApiError(400, "Reason cannot exceed 500 characters");
     }
 
     next();

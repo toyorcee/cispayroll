@@ -643,7 +643,7 @@ const SingleEmployeeProcessModal = ({
                         </span>
                       </div>
 
-                      {isLoadingEmployees ? (
+                      {isLoadingEmployees || employeesLoading ? (
                         <div className="flex justify-center items-center h-32">
                           <div className="relative">
                             <div className="w-12 h-12 rounded-full border-4 border-green-200"></div>
@@ -742,16 +742,7 @@ const SingleEmployeeProcessModal = ({
                               </ul>
                             ) : (
                               <div className="px-4 py-3 text-gray-500 text-center">
-                                {employeesLoading && formData.departmentId ? (
-                                  <div className="flex justify-center items-center py-2">
-                                    <div className="relative">
-                                      <div className="w-8 h-8 rounded-full border-3 border-green-200"></div>
-                                      <div className="w-8 h-8 rounded-full border-3 border-green-500 border-t-transparent animate-spin absolute top-0"></div>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  "No employees found"
-                                )}
+                                No employees found
                               </div>
                             )}
                             <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-500">

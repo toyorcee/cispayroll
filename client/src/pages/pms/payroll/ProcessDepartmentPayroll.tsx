@@ -399,9 +399,50 @@ const ProcessDepartmentPayroll = () => {
     }
   };
 
+  const handleReject = (payroll: Payroll) => {
+    setRejectingPayrollId(payroll._id);
+    setRejectDialogData({ remarks: "" });
+    setShowRejectDialog(true);
+  };
+
+  const handleConfirmReject = () => {
+    if (!rejectingPayrollId || !rejectDialogData.remarks) {
+      toast.error("Please provide a rejection reason");
+      return;
+    }
+
+    console.log("📤 Sending reject request:", {
+      payrollId: rejectingPayrollId,
+      remarks: rejectDialogData.remarks,
+      userRole: user?.role,
+      userPosition: user?.position,
+      userDepartment: user?.department,
+    });
+
+    // Add more detailed logging for Super Admin
+    if (user?.role === "SUPER_ADMIN") {
+      console.log("🔍 Super Admin rejection attempt:", {
+        payrollId: rejectingPayrollId,
+        remarks: rejectDialogData.remarks,
+        userRole: user?.role,
+        userPosition: user?.position,
+        userDepartment: user?.department,
+        isRejecting: isRejecting,
+        showRejectDialog: showRejectDialog,
+      });
+    }
+
+    rejectMutation.mutate();
+  };
+
   const rejectMutation = useMutation({
     mutationFn: async () => {
       if (!rejectingPayrollId || !rejectDialogData.remarks) return;
+      console.log("🔄 Starting rejection mutation for:", {
+        payrollId: rejectingPayrollId,
+        remarks: rejectDialogData.remarks,
+        userRole: user?.role,
+      });
       setIsRejecting(true);
       return adminPayrollService.rejectPayroll({
         payrollId: rejectingPayrollId,
@@ -409,7 +450,8 @@ const ProcessDepartmentPayroll = () => {
         userRole: user?.role,
       });
     },
-    onSuccess: async () => {
+    onSuccess: async (data) => {
+      console.log("✅ Rejection successful:", data);
       // Invalidate all relevant queries
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] }),
@@ -432,6 +474,7 @@ const ProcessDepartmentPayroll = () => {
       setRejectDialogData({ remarks: "" });
     },
     onError: (error: any) => {
+      console.error("❌ Rejection error:", error);
       setIsRejecting(false);
       toast.error(error.response?.data?.message || "Failed to reject payroll");
     },
@@ -449,36 +492,6 @@ const ProcessDepartmentPayroll = () => {
       toast.error(error.message || "Failed to process payment");
     },
   });
-
-  const handleReject = (payroll: Payroll) => {
-    console.log("🔍 Rejecting payroll:", {
-      payrollId: payroll._id,
-      currentLevel: payroll.approvalFlow?.currentLevel,
-      status: payroll.status,
-      employee: payroll.employee,
-      department: payroll.department,
-    });
-    setRejectingPayrollId(payroll._id);
-    setRejectDialogData({ remarks: "" });
-    setShowRejectDialog(true);
-  };
-
-  const handleConfirmReject = () => {
-    if (!rejectingPayrollId || !rejectDialogData.remarks) {
-      toast.error("Please provide a rejection reason");
-      return;
-    }
-
-    console.log("📤 Sending reject request:", {
-      payrollId: rejectingPayrollId,
-      remarks: rejectDialogData.remarks,
-      userRole: user?.role,
-      userPosition: user?.position,
-      userDepartment: user?.department,
-    });
-
-    rejectMutation.mutate();
-  };
 
   const handleProcessPayment = (payroll: Payroll) => {
     try {
@@ -570,37 +583,20 @@ const ProcessDepartmentPayroll = () => {
           type: "active",
         });
 
-        setShowApproveDialog(false);
-        setApprovingPayrollId(null);
-        setApproveDialogData({ remarks: "" });
-
-        toast.success(response.message);
-
-        if (response.data?.nextApprover && response.data.nextApprover.name) {
-          toast.info(
-            `Next approver: ${response.data.nextApprover.name} (${response.data.nextApprover.position})`
-          );
+        // Only show success toast for Finance Director approval
+        if (payroll.approvalFlow?.currentLevel === "FINANCE_DIRECTOR") {
+          toast.success("Payroll approved successfully");
         }
-      } catch (error) {
-        const apiError = error as ApiError;
-        if (apiError.response?.status === 403) {
-          toast.error("You don't have permission to approve at this level");
-        } else if (apiError.response?.status === 400) {
-          toast.error(
-            apiError.response.data?.message || "Invalid approval request"
-          );
-        } else {
-          throw error;
-        }
+      } catch (error: any) {
+        toast.error(
+          error.response?.data?.message || "Failed to approve payroll"
+        );
       }
-    } catch (error) {
-      const apiError = error as ApiError;
-      console.error("Error approving payroll:", apiError);
-      const errorMessage =
-        apiError.response?.data?.message || "Failed to approve payroll";
-      toast.error(errorMessage);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Failed to approve payroll");
     } finally {
       setIsApproving(false);
+      setShowApproveDialog(false);
     }
   };
 

@@ -725,6 +725,14 @@ export class NotificationService {
           }${nextLevel ? ` and is waiting for ${nextLevel} approval` : ""}`,
         };
 
+      case NOTIFICATION_TYPES.PAYROLL_CREATED:
+        return {
+          title: "Payroll Created",
+          message: `Payroll for ${employeeName} (${payrollPeriod}) has been created and is currently in ${
+            payroll?.status || "Unknown"
+          } status.`,
+        };
+
       case NOTIFICATION_TYPES.PAYROLL_DRAFT_CREATED:
         return {
           title: "Draft Payroll Created",

@@ -212,14 +212,6 @@ router.patch(
   SuperAdminController.approvePayroll
 );
 
-// Reject payroll (PROCESSING/PENDING -> REJECTED)
-router.patch(
-  "/payroll/:id/reject",
-  requirePermission([Permission.APPROVE_PAYROLL]),
-  validatePayrollRejection,
-  SuperAdminController.rejectPayroll
-);
-
 // Mark payroll as paid (PENDING_PAYMENT -> PAID)
 router.patch(
   "/payroll/:payrollId/mark-paid",

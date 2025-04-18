@@ -1648,19 +1648,6 @@ export class SuperAdminController {
     }
   }
 
-  static async rejectPayroll(req, res, next) {
-    try {
-      const { id } = req.params;
-      const { remarks } = req.body;
-
-      const payroll = await PayrollModel.findById(id);
-      // ... rejection logic
-      // ... notification logic
-    } catch (error) {
-      next(error);
-    }
-  }
-
   static async updatePayrollStatus(req, res, next) {
     try {
       const { id } = req.params;
@@ -4469,10 +4456,19 @@ export class SuperAdminController {
 
       // Notify processing started
       await NotificationService.createPayrollNotification(
-        { employee: employeeId, month, year },
+        payroll,
         NOTIFICATION_TYPES.PAYROLL_PROCESSING_STARTED,
         req.user,
-        `Payroll processing started for ${employee.firstName} ${employee.lastName} for ${month}/${year}`
+        `Payroll processing started for ${employee.firstName} ${employee.lastName} for ${month}/${year}`,
+        {
+          approvalLevel: APPROVAL_LEVELS.PROCESSING,
+          metadata: {
+            employeeId,
+            month,
+            year,
+            frequency,
+          },
+        }
       );
 
       const payrollData = await PayrollService.calculatePayroll(
@@ -4531,9 +4527,20 @@ export class SuperAdminController {
       // Create notification for super admin only
       await NotificationService.createPayrollNotification(
         payroll,
-        "PAYROLL_DRAFT_CREATED",
+        NOTIFICATION_TYPES.PAYROLL_DRAFT_CREATED,
         req.user,
-        "You have created a draft payroll"
+        `You have created a draft payroll for ${employee.firstName} ${employee.lastName} for ${month}/${year}`,
+        {
+          approvalLevel: APPROVAL_LEVELS.PROCESSING,
+          metadata: {
+            employeeId,
+            month,
+            year,
+            frequency,
+            payrollId: payroll._id,
+            departmentId,
+          },
+        }
       );
 
       return res.status(201).json({

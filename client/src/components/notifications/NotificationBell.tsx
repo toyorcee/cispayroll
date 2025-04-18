@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { FaBell, FaUser, FaBuilding, FaCalendarAlt } from "react-icons/fa";
 import { format } from "date-fns";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { getNotifications } from "../../services/notificationService";
 
 interface Notification {
   _id: string;
@@ -24,55 +25,27 @@ export const NotificationBell = React.memo(() => {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        setIsLoading(true);
-        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
-        const response = await fetch(`${apiUrl}/api/notifications`, {
-          credentials: "include",
-        });
-        const data = await response.json();
-
-        if (data.success) {
-          const newUnreadCount = data.data.notifications.filter(
-            (n: Notification) => !n.read
-          ).length;
-
-          // Check for forceRefresh flag in notifications
-          data.data.notifications.forEach((notification: Notification) => {
-            if (notification.data?.forceRefresh) {
-              console.log("🔄 Force refresh triggered by notification");
-              queryClient.invalidateQueries({ queryKey: ["payrolls"] });
-            }
-          });
-
-          if (!isOpen) {
-            console.log(
-              `🔔 New notification! Unread count increased from ${unreadCount} to ${newUnreadCount}`
-            );
-          }
-
-          setNotifications(data.data.notifications);
-          setUnreadCount(newUnreadCount);
-        } else {
-          console.error("❌ Failed to fetch notifications:", data.message);
-        }
-      } catch (error) {
-        console.error("❌ Error fetching notifications:", error);
-      } finally {
-        setIsLoading(false);
+  const { data: notificationsData, isLoading } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: async () => {
+      const response = await getNotifications();
+      if (response.headers?.["x-refresh-notifications"] === "true") {
+        queryClient.invalidateQueries({ queryKey: ["notifications"] });
       }
-    };
+      return response.data;
+    },
+    refetchInterval: 30000, // Poll every 30 seconds
+  });
 
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000); // Poll every 30 seconds
-
-    return () => clearInterval(interval);
-  }, [isOpen, unreadCount, queryClient]);
+  // Update notifications and unread count when data changes
+  useEffect(() => {
+    if (notificationsData?.data) {
+      setNotifications(notificationsData.data.notifications || []);
+      setUnreadCount(notificationsData.data.unreadCount || 0);
+    }
+  }, [notificationsData]);
 
   const markAsRead = async (notificationId: string) => {
     try {

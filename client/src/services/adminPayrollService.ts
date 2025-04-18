@@ -85,6 +85,7 @@ export interface AdminPayrollResponse {
 // Base URL for admin API
 const BASE_URL = "http://localhost:5000/api/admin";
 const SUPER_ADMIN_BASE_URL = "http://localhost:5000/api/super-admin";
+const APPROVAL_BASE_URL = "http://localhost:5000/api/approvals";
 
 // Helper function to determine if user is Super Admin
 const isSuperAdmin = (userRole?: string): boolean => {
@@ -149,9 +150,9 @@ export const adminPayrollService = {
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching payroll statistics:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to fetch payroll statistics"
-      );
+      // toast.error(
+      //   error.response?.data?.message || "Failed to fetch payroll statistics"
+      // );
       throw error;
     }
   },
@@ -178,9 +179,9 @@ export const adminPayrollService = {
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching payroll periods:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to fetch payroll periods"
-      );
+      // toast.error(
+      //   error.response?.data?.message || "Failed to fetch payroll periods"
+      // );
       throw error;
     }
   },
@@ -206,7 +207,7 @@ export const adminPayrollService = {
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching payroll:", error);
-      toast.error(error.response?.data?.message || "Failed to fetch payroll");
+      // toast.error(error.response?.data?.message || "Failed to fetch payroll");
       throw error;
     }
   },
@@ -238,7 +239,7 @@ export const adminPayrollService = {
       return response.data.data;
     } catch (error: any) {
       console.error("Error submitting payroll:", error);
-      toast.error(error.response?.data?.message || "Failed to submit payroll");
+      // toast.error(error.response?.data?.message || "Failed to submit payroll");
       throw error;
     }
   },
@@ -265,11 +266,11 @@ export const adminPayrollService = {
         throw new Error(response.data.message || "Failed to approve payroll");
       }
 
-      toast.success("Payroll approved successfully");
+      // toast.success("Payroll approved successfully");
       return response.data.data;
     } catch (error: any) {
       console.error("Error approving payroll:", error);
-      toast.error(error.response?.data?.message || "Failed to approve payroll");
+      // toast.error(error.response?.data?.message || "Failed to approve payroll");
       throw error;
     }
   },
@@ -285,15 +286,15 @@ export const adminPayrollService = {
     userRole?: string;
   }): Promise<PayrollData> => {
     try {
-      // Use different endpoint for Super Admin
+      // Use approval endpoint for Super Admin
       const endpoint = isSuperAdmin(userRole)
-        ? `${SUPER_ADMIN_BASE_URL}/payroll/${payrollId}/reject`
+        ? `${APPROVAL_BASE_URL}/super-admin/${payrollId}/reject`
         : `${BASE_URL}/payroll/${payrollId}/reject`;
 
       console.log("Making request to:", endpoint); // Debug log
       const response = await axios.patch(
         endpoint,
-        { remarks },
+        { reason: remarks },
         { withCredentials: true }
       );
 
@@ -330,11 +331,11 @@ export const adminPayrollService = {
         throw new Error(response.data.message || "Failed to process payment");
       }
 
-      toast.success("Payment processed successfully");
+      // toast.success("Payment processed successfully");
       return response.data.data;
     } catch (error: any) {
       console.error("Error processing payment:", error);
-      toast.error(error.response?.data?.message || "Failed to process payment");
+      // toast.error(error.response?.data?.message || "Failed to process payment");
       throw error;
     }
   },
@@ -362,10 +363,10 @@ export const adminPayrollService = {
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching employee payroll history:", error);
-      toast.error(
-        error.response?.data?.message ||
-          "Failed to fetch employee payroll history"
-      );
+      // toast.error(
+      //   error.response?.data?.message ||
+      //     "Failed to fetch employee payroll history"
+      // );
       throw error;
     }
   },
@@ -408,15 +409,15 @@ export const adminPayrollService = {
       return response.data.data;
     } catch (error: any) {
       console.error("Error in processSingleEmployeePayroll:", error);
-      if (error.response?.data?.message?.includes("duplicate")) {
-        toast.error(
-          "A payroll for this employee already exists for this period"
-        );
-      } else {
-        toast.error(
-          error.response?.data?.message || "Failed to process payroll"
-        );
-      }
+      // if (error.response?.data?.message?.includes("duplicate")) {
+      //   toast.error(
+      //     "A payroll for this employee already exists for this period"
+      //   );
+      // } else {
+      //   toast.error(
+      //     error.response?.data?.message || "Failed to process payroll"
+      //   );
+      // }
       throw error;
     }
   },
@@ -427,6 +428,7 @@ export const adminPayrollService = {
       month: number;
       year: number;
       frequency: string;
+      employeeSalaryGrades: { employeeId: string; salaryGradeId: string }[];
     },
     userRole?: string
   ): Promise<any> => {
