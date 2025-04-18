@@ -205,6 +205,54 @@ const ProcessDepartmentPayroll = () => {
     return false;
   };
 
+  // Add this helper function near the other helper functions
+  const isHRManagerApproved = (
+    history: Array<{
+      level: string;
+      status: string;
+      action?: string;
+      timestamp?: string;
+      remarks?: string;
+    }>
+  ): boolean => {
+    return history.some(
+      (h) => h.level === "HR_MANAGER" && h.status === "APPROVED"
+    );
+  };
+
+  // Add this helper function near the other helper functions
+  const isHRManagerCreated = (
+    history: Array<{
+      level: string;
+      status: string;
+      action?: string;
+      timestamp?: string;
+      remarks?: string;
+    }>
+  ): boolean => {
+    return history.some(
+      (h) =>
+        h.level === "HR_MANAGER" &&
+        h.status === "PENDING" &&
+        h.action === "SUBMIT"
+    );
+  };
+
+  // Add this helper function near the other helper functions
+  const isFinanceDirectorApproved = (
+    history: Array<{
+      level: string;
+      status: string;
+      action?: string;
+      timestamp?: string;
+      remarks?: string;
+    }>
+  ): boolean => {
+    return history.some(
+      (h) => h.level === "FINANCE_DIRECTOR" && h.status === "APPROVED"
+    );
+  };
+
   useEffect(() => {
     if (payrollProcessed) {
       queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
@@ -547,10 +595,11 @@ const ProcessDepartmentPayroll = () => {
           type: "active",
         });
 
-        // Only show success toast for Finance Director approval
-        if (payroll.approvalFlow?.currentLevel === "FINANCE_DIRECTOR") {
-          toast.success("Payroll approved successfully");
-        }
+        // Show success toast and close modal immediately after success
+        toast.success("Payroll approved successfully");
+        setApprovingPayrollId(null);
+        setApproveDialogData({ remarks: "" });
+        setShowApproveDialog(false);
       } catch (error: any) {
         toast.error(
           error.response?.data?.message || "Failed to approve payroll"
@@ -560,7 +609,6 @@ const ProcessDepartmentPayroll = () => {
       toast.error(error.response?.data?.message || "Failed to approve payroll");
     } finally {
       setIsApproving(false);
-      setShowApproveDialog(false);
     }
   };
 
@@ -847,52 +895,48 @@ const ProcessDepartmentPayroll = () => {
                 steps={[
                   {
                     level: "Department Head",
-                    status:
+                    status: isHRManagerCreated(
                       payrollsData.find((p) => p._id === approvingPayrollId)
-                        ?.approvalFlow?.currentLevel === "DEPARTMENT_HEAD"
-                        ? "pending"
-                        : "completed",
+                        ?.approvalFlow?.history || []
+                    )
+                      ? "completed"
+                      : isLevelApproved(
+                          payrollsData.find((p) => p._id === approvingPayrollId)
+                            ?.approvalFlow?.history || [],
+                          "DEPARTMENT_HEAD"
+                        )
+                      ? "completed"
+                      : "pending",
                   },
                   {
                     level: "HR Manager",
-                    status:
+                    status: isLevelApproved(
                       payrollsData.find((p) => p._id === approvingPayrollId)
-                        ?.approvalFlow?.currentLevel === "HR_MANAGER"
-                        ? "pending"
-                        : payrollsData.find((p) => p._id === approvingPayrollId)
-                            ?.approvalFlow?.currentLevel === "DEPARTMENT_HEAD"
-                        ? "pending"
-                        : "completed",
+                        ?.approvalFlow?.history || [],
+                      "HR_MANAGER"
+                    )
+                      ? "completed"
+                      : "pending",
                   },
                   {
                     level: "Finance Director",
-                    status:
+                    status: isLevelApproved(
                       payrollsData.find((p) => p._id === approvingPayrollId)
-                        ?.approvalFlow?.currentLevel === "FINANCE_DIRECTOR"
-                        ? "pending"
-                        : payrollsData.find((p) => p._id === approvingPayrollId)
-                            ?.approvalFlow?.currentLevel ===
-                            "DEPARTMENT_HEAD" ||
-                          payrollsData.find((p) => p._id === approvingPayrollId)
-                            ?.approvalFlow?.currentLevel === "HR_MANAGER"
-                        ? "pending"
-                        : "completed",
+                        ?.approvalFlow?.history || [],
+                      "FINANCE_DIRECTOR"
+                    )
+                      ? "completed"
+                      : "pending",
                   },
                   {
                     level: "Super Admin",
-                    status:
+                    status: isLevelApproved(
                       payrollsData.find((p) => p._id === approvingPayrollId)
-                        ?.approvalFlow?.currentLevel === "SUPER_ADMIN"
-                        ? "pending"
-                        : payrollsData.find((p) => p._id === approvingPayrollId)
-                            ?.approvalFlow?.currentLevel ===
-                            "DEPARTMENT_HEAD" ||
-                          payrollsData.find((p) => p._id === approvingPayrollId)
-                            ?.approvalFlow?.currentLevel === "HR_MANAGER" ||
-                          payrollsData.find((p) => p._id === approvingPayrollId)
-                            ?.approvalFlow?.currentLevel === "FINANCE_DIRECTOR"
-                        ? "pending"
-                        : "completed",
+                        ?.approvalFlow?.history || [],
+                      "SUPER_ADMIN"
+                    )
+                      ? "completed"
+                      : "pending",
                   },
                 ]}
                 currentLevel={

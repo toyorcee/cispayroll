@@ -403,7 +403,7 @@ export const adminPayrollService = {
   }): Promise<PayrollData> => {
     try {
       const endpoint = isSuperAdmin(data.userRole)
-        ? `${SUPER_ADMIN_BASE_URL}/payroll/process-single`
+        ? `${SUPER_ADMIN_BASE_URL}/payroll/process-single-employee`
         : `${BASE_URL}/payroll/process-single`;
 
       const response = await axios.post(

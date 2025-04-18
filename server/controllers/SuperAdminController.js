@@ -4331,11 +4331,22 @@ export class SuperAdminController {
 
       const { employeeId, departmentId, month, year, frequency } = req.body;
 
-      console.log(
-        `👤 Super Admin processing payroll for employee: ${employeeId}`
-      );
+      // Get super admin with full details
+      const superAdmin = await UserModel.findById(req.user.id)
+        .populate("department", "name code")
+        .select("+position +role +department");
 
-      // Get employee
+      // Check if super admin exists
+      if (!superAdmin) {
+        throw new ApiError(404, "Super Admin not found");
+      }
+
+      // Validate department access
+      if (!departmentId) {
+        throw new ApiError(400, "No department specified");
+      }
+
+      // Get employee with proper department check
       const employee = await UserModel.findOne({
         _id: employeeId,
         department: departmentId,
@@ -4343,13 +4354,11 @@ export class SuperAdminController {
       });
 
       if (!employee) {
-        console.error(`❌ Employee not found or not active: ${employeeId}`);
         throw new ApiError(404, "Employee not found or not active");
       }
 
       // Get the employee's salary grade based on their grade level
       if (!employee.gradeLevel) {
-        console.error(`❌ Employee has no grade level assigned: ${employeeId}`);
         throw new ApiError(
           400,
           "Employee does not have a grade level assigned"
@@ -4363,231 +4372,225 @@ export class SuperAdminController {
       });
 
       if (!salaryGrade) {
-        console.error(
-          `❌ No active salary grade found for level ${employee.gradeLevel}`
-        );
         throw new ApiError(
           400,
           `No active salary grade found for level ${employee.gradeLevel}`
         );
       }
 
-      console.log(
-        `👤 Employee found: ${employee.firstName} ${employee.lastName} (${employee._id})`
-      );
-      console.log(
-        `📊 Salary grade: ${salaryGrade._id} (Level: ${salaryGrade.level})`
-      );
-
       // Check for existing payroll
-      const periodDates = PayrollService.calculatePeriodDates(
-        month,
-        year,
-        frequency
-      );
-      const existingPayroll = await AuditService.checkDuplicatePayroll(
-        employeeId,
-        departmentId,
+      const existingPayroll = await PayrollModel.findOne({
+        employee: employeeId,
         month,
         year,
         frequency,
-        periodDates.start,
-        periodDates.end
-      );
+      });
 
       if (existingPayroll) {
-        console.warn(
-          `⚠️ Payroll already exists for employee ${employeeId} for ${month}/${year}`
-        );
-
-        // Create audit log for duplicate attempt
-        await AuditService.logAction(
-          AuditAction.CREATE,
-          AuditEntity.PAYROLL,
-          employeeId,
-          req.user._id,
-          {
-            status: "FAILED",
-            errorType: "DUPLICATE_PAYROLL",
-            errorMessage: `Payroll already exists for employee ${employee.firstName} ${employee.lastName} for ${month}/${year}`,
-            month,
-            year,
-            frequency,
-            departmentId,
-            periodStart: periodDates.start,
-            periodEnd: periodDates.end,
-          }
-        );
-
-        // Create notification for super admin about duplicate
-        await NotificationService.createPayrollNotification(
-          existingPayroll,
-          NOTIFICATION_TYPES.PAYROLL_ERROR_DUPLICATE_PAYROLL,
-          req.user,
-          `Payroll already exists for employee ${employee.firstName} ${employee.lastName} for ${month}/${year}`
-        );
-
-        throw new ApiError(
-          409,
-          `Payroll already exists for employee ${employee.firstName} ${employee.lastName} for ${month}/${year}`
-        );
+        throw new ApiError(400, "Payroll already exists for this period");
       }
 
-      // Calculate payroll using the found salary grade
-      console.log(
-        `🧮 Calculating payroll for employee ${employeeId} with salary grade ${salaryGrade._id}`
-      );
-
-      // Create audit log for payroll calculation start
-      await AuditService.logAction(
-        AuditAction.PROCESS,
-        AuditEntity.PAYROLL,
-        employeeId,
-        req.user._id,
-        {
-          status: "PROCESSING",
-          action: "CALCULATION_STARTED",
-          month,
-          year,
-          frequency,
-          departmentId,
-        }
-      );
-
-      // Notify processing started
-      await NotificationService.createPayrollNotification(
-        payroll,
-        NOTIFICATION_TYPES.PAYROLL_PROCESSING_STARTED,
-        req.user,
-        `Payroll processing started for ${employee.firstName} ${employee.lastName} for ${month}/${year}`,
-        {
-          approvalLevel: APPROVAL_LEVELS.PROCESSING,
-          metadata: {
-            employeeId,
-            month,
-            year,
-            frequency,
-          },
-        }
-      );
-
+      // Calculate payroll using PayrollService
       const payrollData = await PayrollService.calculatePayroll(
         employeeId,
         salaryGrade._id,
         month,
         year,
-        frequency.toLowerCase()
+        frequency,
+        departmentId
       );
 
-      // Create payroll record
+      if (!payrollData) {
+        throw new ApiError(400, "Failed to calculate payroll");
+      }
+
+      // Create payroll record with COMPLETED status since Super Admin is bypassing approval
       const payroll = await PayrollModel.create({
         ...payrollData,
         employee: employeeId,
         department: departmentId,
-        status: PAYROLL_STATUS.PROCESSING,
-        processedBy: req.user._id,
-        createdBy: req.user._id,
-        updatedBy: req.user._id,
+        status: PAYROLL_STATUS.COMPLETED,
+        processedBy: superAdmin._id,
+        createdBy: superAdmin._id,
+        updatedBy: superAdmin._id,
         payment: {
           accountName: "Pending",
           accountNumber: "Pending",
           bankName: "Pending",
         },
         approvalFlow: {
-          currentLevel: APPROVAL_LEVELS.PROCESSING,
-          history: [],
-          submittedBy: req.user._id,
+          currentLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+          history: [
+            {
+              level: APPROVAL_LEVELS.SUPER_ADMIN,
+              status: "APPROVED",
+              action: "APPROVE",
+              user: superAdmin._id,
+              timestamp: new Date(),
+              remarks: "Payroll created and approved by Super Admin",
+            },
+          ],
+          submittedBy: superAdmin._id,
           submittedAt: new Date(),
-          status: PAYROLL_STATUS.PROCESSING,
-          remarks: "Initial payroll creation",
+          status: "APPROVED",
         },
       });
 
-      console.log(`✅ Payroll created with ID: ${payroll._id}`);
-
-      // Create audit log for successful payroll creation
+      // Create audit log for payroll creation
       await AuditService.logAction(
         AuditAction.CREATE,
         AuditEntity.PAYROLL,
         payroll._id,
-        req.user._id,
+        superAdmin._id,
         {
-          status: "SUCCESS",
+          status: "COMPLETED",
           action: "PAYROLL_CREATED",
-          employeeId,
+          employeeId: employee._id,
           employeeName: `${employee.firstName} ${employee.lastName}`,
           month,
           year,
           frequency,
-          netPay: payrollData.totals.netPay,
           departmentId,
+          createdBy: superAdmin._id,
+          position: superAdmin.position,
+          role: superAdmin.role,
+          message: `Created and completed payroll for ${employee.firstName} ${employee.lastName}`,
+          approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
         }
       );
 
-      // Create notification for super admin only
-      await NotificationService.createPayrollNotification(
+      // Find HR Manager and Finance Director to notify
+      const hrDepartment = await DepartmentModel.findOne({
+        name: { $in: ["Human Resources", "HR"] },
+        status: "active",
+      });
+
+      const financeDepartment = await DepartmentModel.findOne({
+        name: { $in: ["Finance and Accounting", "Finance", "Financial"] },
+        status: "active",
+      });
+
+      let hrManager = null;
+      let financeDirector = null;
+      const notifiedRoles = [];
+
+      if (hrDepartment) {
+        hrManager = await UserModel.findOne({
+          department: hrDepartment._id,
+          position: {
+            $in: [
+              "Head of Human Resources",
+              "HR Manager",
+              "HR Head",
+              "Human Resources Manager",
+              "HR Director",
+            ],
+          },
+          status: "active",
+        });
+
+        if (hrManager) {
+          notifiedRoles.push("HR Manager");
+          // Create notification for HR Manager
+          await NotificationService.createNotification(
+            hrManager._id,
+            NOTIFICATION_TYPES.PAYROLL_CREATED,
+            employee,
+            payroll,
+            `A new payroll has been completed for ${employee.firstName} ${employee.lastName} (${employee.employeeId}) by ${superAdmin.firstName} ${superAdmin.lastName} (Super Admin).`,
+            {
+              approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+              metadata: {
+                payrollId: payroll._id,
+                employeeId: employee._id,
+                departmentId: employee.department._id,
+                status: payroll.status,
+              },
+            }
+          );
+        }
+      }
+
+      if (financeDepartment) {
+        financeDirector = await UserModel.findOne({
+          department: financeDepartment._id,
+          position: {
+            $in: [
+              "Head of Finance",
+              "Finance Director",
+              "Finance Head",
+              "Financial Director",
+              "Financial Head",
+            ],
+          },
+          status: "active",
+        });
+
+        if (financeDirector) {
+          notifiedRoles.push("Finance Director");
+          // Create notification for Finance Director
+          await NotificationService.createNotification(
+            financeDirector._id,
+            NOTIFICATION_TYPES.PAYROLL_CREATED,
+            employee,
+            payroll,
+            `A new payroll has been completed for ${employee.firstName} ${employee.lastName} (${employee.employeeId}) by ${superAdmin.firstName} ${superAdmin.lastName} (Super Admin).`,
+            {
+              approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+              metadata: {
+                payrollId: payroll._id,
+                employeeId: employee._id,
+                departmentId: employee.department._id,
+                status: payroll.status,
+              },
+            }
+          );
+        }
+      }
+
+      // Create a single notification for the Super Admin
+      const notificationMessage =
+        notifiedRoles.length > 0
+          ? `You have created and completed a payroll for ${
+              employee.firstName
+            } ${employee.lastName} (${
+              employee.employeeId
+            }) for ${month}/${year}. Notifications have been sent to ${notifiedRoles.join(
+              " and "
+            )}.`
+          : `You have created and completed a payroll for ${employee.firstName} ${employee.lastName} (${employee.employeeId}) for ${month}/${year}.`;
+
+      await NotificationService.createNotification(
+        superAdmin._id,
+        NOTIFICATION_TYPES.PAYROLL_CREATED,
+        employee,
         payroll,
-        NOTIFICATION_TYPES.PAYROLL_DRAFT_CREATED,
-        req.user,
-        `You have created a draft payroll for ${employee.firstName} ${employee.lastName} for ${month}/${year}`,
+        notificationMessage,
         {
-          approvalLevel: APPROVAL_LEVELS.PROCESSING,
+          approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
           metadata: {
-            employeeId,
-            month,
-            year,
-            frequency,
             payrollId: payroll._id,
-            departmentId,
+            employeeId: employee._id,
+            departmentId: employee.department._id,
+            status: payroll.status,
           },
         }
       );
 
+      // Set response headers to trigger UI updates
+      res.set({
+        "X-Refresh-Payrolls": "true",
+        "X-Refresh-Audit-Logs": "true",
+      });
+
       return res.status(201).json({
         success: true,
-        message: "Payroll processed successfully",
+        message: "Payroll processed and completed successfully",
         data: payroll,
       });
     } catch (error) {
       console.error(`❌ Error processing payroll: ${error.message}`);
       console.error("Stack trace:", error.stack);
-
-      // Create audit log for failed payroll processing
-      if (req.user && req.body.employeeId) {
-        try {
-          await AuditService.logAction(
-            AuditAction.CREATE,
-            AuditEntity.PAYROLL,
-            req.body.employeeId,
-            req.user._id,
-            {
-              status: "FAILED",
-              errorType:
-                error instanceof ApiError ? "VALIDATION_ERROR" : "SYSTEM_ERROR",
-              errorMessage: error.message,
-              month: req.body.month,
-              year: req.body.year,
-              frequency: req.body.frequency,
-              departmentId: req.body.departmentId,
-            }
-          );
-
-          // Create error notification
-          await NotificationService.createPayrollNotification(
-            {
-              employee: req.body.employeeId,
-              month: req.body.month,
-              year: req.body.year,
-            },
-            NOTIFICATION_TYPES.PAYROLL_PROCESSING_FAILED,
-            req.user,
-            `Failed to process payroll: ${error.message}`
-          );
-        } catch (auditError) {
-          console.error("Failed to create audit log for error:", auditError);
-        }
-      }
-
       next(error);
     }
   }
@@ -4831,10 +4834,13 @@ export class SuperAdminController {
       }
 
       // Validate payroll status
-      if (payroll.status !== PAYROLL_STATUS.PROCESSING) {
+      if (
+        payroll.status !== PAYROLL_STATUS.PROCESSING &&
+        payroll.status !== PAYROLL_STATUS.COMPLETED
+      ) {
         throw new ApiError(
           400,
-          "Only processing payrolls can be initiated for payment"
+          "Only processing or completed payrolls can be initiated for payment"
         );
       }
 

@@ -4,7 +4,7 @@ import { UserRole } from "../types/auth";
 
 // Use the same BASE_URL pattern as adminPayrollService
 const BASE_URL = "http://localhost:5000/api/admin";
-const SUPER_ADMIN_BASE_URL = "http://localhost:5000/super-admin";
+const SUPER_ADMIN_BASE_URL = "http://localhost:5000/api/super-admin";
 
 // Helper function to determine if user is Super Admin
 const isSuperAdmin = (userRole?: string): boolean => {

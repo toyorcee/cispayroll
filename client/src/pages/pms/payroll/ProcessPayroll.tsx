@@ -484,6 +484,15 @@ export default function ProcessPayroll() {
                           <FaFileInvoiceDollar />
                         </button>
                       )}
+                      {payroll.status === PayrollStatus.COMPLETED && (
+                        <button
+                          onClick={() => handleProcessPayment(payroll._id)}
+                          className="flex items-center justify-center p-2 text-green-600 hover:text-white bg-green-50 hover:bg-green-600 rounded-full transition-all duration-200"
+                          title="Initiate Payment"
+                        >
+                          <FaMoneyBill size={20} />
+                        </button>
+                      )}
                       {payroll.status === PayrollStatus.PROCESSING && (
                         <button
                           onClick={() => handleProcessPayment(payroll._id)}

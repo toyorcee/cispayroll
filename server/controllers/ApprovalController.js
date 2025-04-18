@@ -468,10 +468,10 @@ class ApprovalController {
       if (nextApprover) {
         console.log("📬 Creating notification for Finance Director");
         await NotificationService.createNotification(
-          nextApprover._id,
+            nextApprover._id,
           NOTIFICATION_TYPES.PAYROLL_PENDING_APPROVAL,
           updatedPayroll.employee,
-          updatedPayroll,
+            updatedPayroll,
           remarks || "A payroll is pending your approval as Finance Director",
           {
             data: {
@@ -486,17 +486,17 @@ class ApprovalController {
       // Create self-notification for the HR Manager
       console.log("📬 Creating self-notification for HR Manager");
       await NotificationService.createNotification(
-        admin._id,
+          admin._id,
         NOTIFICATION_TYPES.PAYROLL_APPROVED,
-        updatedPayroll.employee,
-        updatedPayroll,
-        remarks ||
-          "You have successfully approved this payroll and it is now pending Finance Director approval",
-        {
-          data: {
-            approvalLevel: APPROVAL_LEVELS.HR_MANAGER,
-          },
-        }
+          updatedPayroll.employee,
+          updatedPayroll,
+          remarks ||
+            "You have successfully approved this payroll and it is now pending Finance Director approval",
+          {
+            data: {
+              approvalLevel: APPROVAL_LEVELS.HR_MANAGER, 
+            },
+          }
       );
 
       // Create notification for the employee
@@ -1251,17 +1251,17 @@ class ApprovalController {
           console.log("📬 Creating notification for HR Manager");
           await NotificationService.createNotification(
             hrManager._id,
-            NOTIFICATION_TYPES.PAYROLL_COMPLETED,
+        NOTIFICATION_TYPES.PAYROLL_COMPLETED,
             updatedPayroll.employee,
-            updatedPayroll,
+        updatedPayroll,
             `The payroll for ${updatedPayroll.employee.firstName} ${updatedPayroll.employee.lastName} (${updatedPayroll.employee.employeeId}) has been fully approved by ${admin.firstName} ${admin.lastName} (${admin.position}). The payroll is now ready for processing.`,
-            {
-              data: {
+        {
+          data: {
                 approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
                 remarks: remarks || "No remarks provided",
-              },
-            }
-          );
+          },
+        }
+      );
         }
       }
 
