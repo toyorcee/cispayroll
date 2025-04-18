@@ -301,11 +301,9 @@ export const adminPayrollService = {
         throw new Error(response.data.message || "Failed to reject payroll");
       }
 
-      toast.success("Payroll rejected successfully");
       return response.data.data;
     } catch (error: any) {
       console.error("Error rejecting payroll:", error);
-      toast.error(error.response?.data?.message || "Failed to reject payroll");
       throw error;
     }
   },

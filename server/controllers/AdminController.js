@@ -44,8 +44,8 @@ const checkApprovalPermission = (admin, currentLevel) => {
     return false;
   }
 
-  const position = admin.position?.toLowerCase() || "";
-  const role = admin.role?.toLowerCase() || "";
+  const position = admin.position || "";
+  const role = admin.role || "";
 
   console.log("Checking permissions:", { position, role, currentLevel });
 
@@ -64,10 +64,7 @@ const checkApprovalPermission = (admin, currentLevel) => {
         position.includes("hr head")
       );
     case APPROVAL_LEVELS.FINANCE_DIRECTOR:
-      return (
-        position.includes("finance director") ||
-        position.includes("finance head")
-      );
+      return position === "Head of Finance";
     case APPROVAL_LEVELS.SUPER_ADMIN:
       return role === "super_admin";
     default:
@@ -872,17 +869,25 @@ export class AdminController {
         });
       }
 
-      // Update payroll status to REJECTED
       payroll.status = PAYROLL_STATUS.REJECTED;
-      payroll.approvalFlow.history.push({
+
+      const historyEntry = {
         level: payroll.approvalFlow.currentLevel,
         status: PAYROLL_STATUS.REJECTED,
         action: "REJECT",
         user: admin._id,
         timestamp: new Date(),
         remarks: remarks || "No reason provided",
-      });
+      };
 
+      // Replace the entire history array with the new entry
+      payroll.approvalFlow.history = [historyEntry];
+
+      // Update legacy fields
+      payroll.approvalFlow.rejectedBy = admin._id;
+      payroll.approvalFlow.rejectedAt = new Date();
+
+      // Save the payroll
       await payroll.save();
 
       console.log("Payroll rejected successfully:", {
@@ -915,6 +920,13 @@ export class AdminController {
           departmentId: payroll.department._id,
         }
       );
+
+      // Set response headers to trigger UI updates
+      res.set({
+        "x-refresh-payrolls": "true",
+        "x-refresh-audit-logs": "true",
+        "x-refresh-finance-director": "true",
+      });
 
       return res.status(200).json({
         success: true,

@@ -86,11 +86,7 @@ const notificationMessages = {
     if (isSubmitter) {
       return `You have submitted payroll for ${payroll.employee.firstName} ${payroll.employee.lastName} (${payroll.month}/${payroll.year}) and it is waiting for your approval as HR Manager`;
     } else {
-      return `New payroll submission for ${employee.firstName} ${
-        employee.lastName
-      } (${employee.department?.name || "No Department"}) for ${
-        payroll.month
-      }/${payroll.year} requires your approval as HR Manager`;
+      return `New payroll submission for ${employee.firstName} ${employee.lastName} for ${payroll.month}/${payroll.year} requires your approval as HR Manager`;
     }
   },
   [NOTIFICATION_TYPES.PAYROLL_APPROVED]: (employee, payroll, remarks) => {
@@ -262,6 +258,8 @@ export class NotificationService {
           actionButtons: this.getActionButtons(type, payrollData),
           statusColor: this.getStatusColor(payrollData?.status),
           statusIcon: this.getStatusIcon(payrollData?.status),
+          // Add forceRefresh flag for PAYROLL_PENDING_APPROVAL notifications
+          forceRefresh: type === NOTIFICATION_TYPES.PAYROLL_PENDING_APPROVAL,
         },
         read: false,
       });
@@ -301,6 +299,8 @@ export class NotificationService {
 
       // Create notifications array to store all notifications
       const notifications = [];
+      // Track notifications to prevent duplicates
+      const notifiedUsers = new Set();
 
       // 1. Notify the employee (skip for draft payrolls)
       if (type !== "PAYROLL_DRAFT_CREATED") {
@@ -314,6 +314,7 @@ export class NotificationService {
         );
         if (employeeNotification) {
           notifications.push(employeeNotification);
+          notifiedUsers.add(employee._id.toString());
         }
       }
 
@@ -323,7 +324,7 @@ export class NotificationService {
         position: { $in: ["HR Manager", "Human Resources Manager"] },
       });
 
-      if (hrManager && hrManager._id.toString() !== admin._id.toString()) {
+      if (hrManager && !notifiedUsers.has(hrManager._id.toString())) {
         const hrManagerNotification = await this.createNotification(
           hrManager._id,
           type,
@@ -334,6 +335,7 @@ export class NotificationService {
         );
         if (hrManagerNotification) {
           notifications.push(hrManagerNotification);
+          notifiedUsers.add(hrManager._id.toString());
         }
       }
 
@@ -344,7 +346,7 @@ export class NotificationService {
 
       if (
         financeDirector &&
-        financeDirector._id.toString() !== admin._id.toString()
+        !notifiedUsers.has(financeDirector._id.toString())
       ) {
         const financeDirectorNotification = await this.createNotification(
           financeDirector._id,
@@ -356,6 +358,7 @@ export class NotificationService {
         );
         if (financeDirectorNotification) {
           notifications.push(financeDirectorNotification);
+          notifiedUsers.add(financeDirector._id.toString());
         }
       }
 
@@ -364,7 +367,7 @@ export class NotificationService {
         position: "Super Admin",
       });
 
-      if (superAdmin && superAdmin._id.toString() !== admin._id.toString()) {
+      if (superAdmin && !notifiedUsers.has(superAdmin._id.toString())) {
         const superAdminNotification = await this.createNotification(
           superAdmin._id,
           type,
@@ -375,18 +378,17 @@ export class NotificationService {
         );
         if (superAdminNotification) {
           notifications.push(superAdminNotification);
+          notifiedUsers.add(superAdmin._id.toString());
         }
       }
 
       // 5. Notify the creator/admin if they are different from the above
-      const alreadyNotified = notifications.some(
-        (n) => n.recipient.toString() === admin._id.toString()
-      );
-
-      if (!alreadyNotified) {
+      if (!notifiedUsers.has(admin._id.toString())) {
         const adminNotification = await this.createNotification(
           admin._id,
-          type,
+          type === NOTIFICATION_TYPES.PAYROLL_PENDING_APPROVAL
+            ? NOTIFICATION_TYPES.PAYROLL_SUBMITTED
+            : type,
           employee,
           payroll,
           remarks,
@@ -394,6 +396,7 @@ export class NotificationService {
         );
         if (adminNotification) {
           notifications.push(adminNotification);
+          notifiedUsers.add(admin._id.toString());
         }
       }
 
@@ -647,6 +650,41 @@ export class NotificationService {
     const netPay = payroll?.netPay ? `₦${payroll.netPay.toLocaleString()}` : "";
 
     switch (type) {
+      case NOTIFICATION_TYPES.PAYROLL_SUBMITTED:
+        // Check if the employee is the one who submitted
+        const isSubmitter =
+          employee._id.toString() ===
+          payroll.approvalFlow?.submittedBy?.toString();
+
+        if (isSubmitter) {
+          return {
+            title: "Payroll Submitted",
+            message: `You have submitted payroll for ${payroll.employee.firstName} ${payroll.employee.lastName} (${payroll.month}/${payroll.year}) and it is waiting for your approval as HR Manager`,
+          };
+        } else {
+          return {
+            title: "Payroll Submitted",
+            message: `New payroll submission for ${employee.firstName} ${employee.lastName} for ${payroll.month}/${payroll.year} requires your approval as HR Manager`,
+          };
+        }
+
+      case NOTIFICATION_TYPES.PAYROLL_PENDING_APPROVAL:
+        let approverRole = "";
+        if (currentLevel === APPROVAL_LEVELS.DEPARTMENT_HEAD) {
+          approverRole = "HR Manager";
+        } else if (currentLevel === APPROVAL_LEVELS.HR_MANAGER) {
+          approverRole = "Finance Director";
+        } else if (currentLevel === APPROVAL_LEVELS.FINANCE_DIRECTOR) {
+          approverRole = "Finance Director";
+        } else if (currentLevel === APPROVAL_LEVELS.SUPER_ADMIN) {
+          approverRole = "Super Admin";
+        }
+
+        return {
+          title: "Payroll Pending Approval",
+          message: `New payroll for ${employeeName} (${payrollPeriod}) requires your approval as ${approverRole}`,
+        };
+
       case NOTIFICATION_TYPES.PAYROLL_APPROVED:
         // Get approvalLevel from data.approvalLevel or data.data.approvalLevel
         const level =
@@ -658,39 +696,35 @@ export class NotificationService {
         });
 
         if (level === APPROVAL_LEVELS.HR_MANAGER) {
-          console.log("✅ Using HR Manager message template");
           return {
             title: "Payroll Approved",
-            message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved by you and is now pending the next approval.`,
+            message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved by you as HR Manager${
+              remarks ? `: ${remarks}` : ""
+            } and is now waiting for Finance Director approval`,
           };
         } else if (level === APPROVAL_LEVELS.FINANCE_DIRECTOR) {
-          console.log("✅ Using Finance Director message template");
           return {
             title: "Payroll Approved",
-            message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved by you and is now pending the next approval.`,
+            message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved by you as Finance Director${
+              remarks ? `: ${remarks}` : ""
+            } and is now waiting for Super Admin approval`,
           };
         } else if (level === APPROVAL_LEVELS.DEPARTMENT_HEAD) {
           return {
             title: "Payroll Approved",
-            message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved by you and is now pending the next approval.`,
-          };
-        } else if (level === APPROVAL_LEVELS.SUPER_ADMIN) {
-          return {
-            title: "Payroll Approved",
-            message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved by you and is now pending the next approval.`,
-          };
-        } else {
-          return {
-            title: "Payroll Approved",
-            message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved by you and is now pending the next approval.`,
+            message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved by you as Department Head${
+              remarks ? `: ${remarks}` : ""
+            } and is now waiting for HR Manager approval`,
           };
         }
-        break;
-      case NOTIFICATION_TYPES.PAYROLL_SUBMITTED:
+
         return {
-          title: "Payroll Submitted",
-          message: `New payroll for ${employeeName} (${payrollPeriod}) has been submitted and is pending your approval.`,
+          title: "Payroll Approved",
+          message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved${
+            remarks ? `: ${remarks}` : ""
+          }${nextLevel ? ` and is waiting for ${nextLevel} approval` : ""}`,
         };
+
       case NOTIFICATION_TYPES.PAYROLL_DRAFT_CREATED:
         return {
           title: "Draft Payroll Created",
@@ -765,206 +799,10 @@ export class NotificationService {
           title: "Payment Archived",
           message: `Payment record for ${employeeName}'s payroll (${payrollPeriod}) has been archived.`,
         };
-      case NOTIFICATION_TYPES.PAYROLL_PROCESSING_STARTED:
-        return {
-          title: "Payroll Processing Started",
-          message: `Payroll processing for ${employeeName} (${payrollPeriod}) has started.`,
-        };
-      case NOTIFICATION_TYPES.PAYROLL_PROCESSING_COMPLETED:
-        return {
-          title: "Payroll Processing Completed",
-          message: `Payroll processing for ${employeeName} (${payrollPeriod}) has been completed.`,
-        };
-      case NOTIFICATION_TYPES.PAYROLL_PROCESSING_FAILED:
-        return {
-          title: "Payroll Processing Failed",
-          message: `Payroll processing for ${employeeName} (${payrollPeriod}) has failed.${
-            remarks ? ` Reason: ${remarks}` : ""
-          }`,
-        };
-      case NOTIFICATION_TYPES.PAYROLL_PROCESSING_WARNING:
-        return {
-          title: "Payroll Processing Warning",
-          message: `Warning during payroll processing for ${employeeName} (${payrollPeriod}).${
-            remarks ? ` Details: ${remarks}` : ""
-          }`,
-        };
-      case NOTIFICATION_TYPES.PAYROLL_PROCESSING_ERROR:
-        return {
-          title: "Payroll Processing Error",
-          message: `Error during payroll processing for ${employeeName} (${payrollPeriod}).${
-            remarks ? ` Details: ${remarks}` : ""
-          }`,
-        };
-      case NOTIFICATION_TYPES.PAYROLL_PROCESSING_SKIPPED:
-        return {
-          title: "Payroll Processing Skipped",
-          message: `Payroll processing for ${employeeName} (${payrollPeriod}) has been skipped.${
-            remarks ? ` Reason: ${remarks}` : ""
-          }`,
-        };
-      case NOTIFICATION_TYPES.PAYROLL_PROCESSING_SUMMARY:
-        return {
-          title: "Payroll Processing Summary",
-          message: `Payroll processing summary for ${payrollPeriod}: ${
-            remarks || "No summary provided"
-          }`,
-        };
-      case NOTIFICATION_TYPES.DEPARTMENT_PAYROLL_PROCESSING_STARTED:
-        return {
-          title: "Department Payroll Processing Started",
-          message: `Department payroll processing for ${payrollPeriod} has started.`,
-        };
-      case NOTIFICATION_TYPES.DEPARTMENT_PAYROLL_PROCESSING_COMPLETED:
-        return {
-          title: "Department Payroll Processing Completed",
-          message: `Department payroll processing for ${payrollPeriod} has been completed.`,
-        };
-      case NOTIFICATION_TYPES.DEPARTMENT_PAYROLL_PROCESSING_FAILED:
-        return {
-          title: "Department Payroll Processing Failed",
-          message: `Department payroll processing for ${payrollPeriod} has failed.${
-            remarks ? ` Reason: ${remarks}` : ""
-          }`,
-        };
-      case NOTIFICATION_TYPES.DEPARTMENT_PAYROLL_PROCESSING_WARNING:
-        return {
-          title: "Department Payroll Processing Warning",
-          message: `Warning during department payroll processing for ${payrollPeriod}.${
-            remarks ? ` Details: ${remarks}` : ""
-          }`,
-        };
-      case NOTIFICATION_TYPES.DEPARTMENT_PAYROLL_PROCESSING_ERROR:
-        return {
-          title: "Department Payroll Processing Error",
-          message: `Error during department payroll processing for ${payrollPeriod}.${
-            remarks ? ` Details: ${remarks}` : ""
-          }`,
-        };
-      case NOTIFICATION_TYPES.DEPARTMENT_PAYROLL_PROCESSING_SKIPPED:
-        return {
-          title: "Department Payroll Processing Skipped",
-          message: `Department payroll processing for ${payrollPeriod} has been skipped.${
-            remarks ? ` Reason: ${remarks}` : ""
-          }`,
-        };
-      case NOTIFICATION_TYPES.DEPARTMENT_PAYROLL_PROCESSING_SUMMARY:
-        return {
-          title: "Department Payroll Processing Summary",
-          message: `Department payroll processing summary for ${payrollPeriod}: ${
-            remarks || "No summary provided"
-          }`,
-        };
-      case NOTIFICATION_TYPES.MULTIPLE_PAYROLL_PROCESSING_STARTED:
-        return {
-          title: "Multiple Payroll Processing Started",
-          message: `Multiple payroll processing for ${payrollPeriod} has started.`,
-        };
-      case NOTIFICATION_TYPES.MULTIPLE_PAYROLL_PROCESSING_COMPLETED:
-        return {
-          title: "Multiple Payroll Processing Completed",
-          message: `Multiple payroll processing for ${payrollPeriod} has been completed.`,
-        };
-      case NOTIFICATION_TYPES.MULTIPLE_PAYROLL_PROCESSING_FAILED:
-        return {
-          title: "Multiple Payroll Processing Failed",
-          message: `Multiple payroll processing for ${payrollPeriod} has failed.${
-            remarks ? ` Reason: ${remarks}` : ""
-          }`,
-        };
-      case NOTIFICATION_TYPES.MULTIPLE_PAYROLL_PROCESSING_WARNING:
-        return {
-          title: "Multiple Payroll Processing Warning",
-          message: `Warning during multiple payroll processing for ${payrollPeriod}.${
-            remarks ? ` Details: ${remarks}` : ""
-          }`,
-        };
-      case NOTIFICATION_TYPES.MULTIPLE_PAYROLL_PROCESSING_ERROR:
-        return {
-          title: "Multiple Payroll Processing Error",
-          message: `Error during multiple payroll processing for ${payrollPeriod}.${
-            remarks ? ` Details: ${remarks}` : ""
-          }`,
-        };
-      case NOTIFICATION_TYPES.MULTIPLE_PAYROLL_PROCESSING_SKIPPED:
-        return {
-          title: "Multiple Payroll Processing Skipped",
-          message: `Multiple payroll processing for ${payrollPeriod} has been skipped.${
-            remarks ? ` Reason: ${remarks}` : ""
-          }`,
-        };
-      case NOTIFICATION_TYPES.MULTIPLE_PAYROLL_PROCESSING_SUMMARY:
-        return {
-          title: "Multiple Payroll Processing Summary",
-          message: remarks || "Multiple payroll processing completed",
-        };
-      case NOTIFICATION_TYPES.PAYROLL_ERROR_NO_GRADE_LEVEL:
-        return {
-          title: "Payroll Error: No Grade Level",
-          message: `Error processing payroll for ${employeeName} (${payrollPeriod}): No grade level found.`,
-        };
-      case NOTIFICATION_TYPES.PAYROLL_ERROR_INCOMPLETE_BANK_DETAILS:
-        return {
-          title: "Payroll Error: Incomplete Bank Details",
-          message: `Error processing payroll for ${employeeName} (${payrollPeriod}): Incomplete bank details.`,
-        };
-      case NOTIFICATION_TYPES.PAYROLL_ERROR_DUPLICATE_PAYROLL:
-        return {
-          title: "Payroll Error: Duplicate Payroll",
-          message: `Error processing payroll for ${employeeName} (${payrollPeriod}): Duplicate payroll found.`,
-        };
-      case NOTIFICATION_TYPES.PAYROLL_ERROR_CALCULATION_FAILED:
-        return {
-          title: "Payroll Error: Calculation Failed",
-          message: `Error processing payroll for ${employeeName} (${payrollPeriod}): Calculation failed.`,
-        };
-      case NOTIFICATION_TYPES.PAYROLL_ERROR_PERMISSION_DENIED:
-        return {
-          title: "Payroll Error: Permission Denied",
-          message: `Error processing payroll for ${employeeName} (${payrollPeriod}): Permission denied.`,
-        };
-      case NOTIFICATION_TYPES.PAYROLL_ERROR_SYSTEM_ERROR:
-        return {
-          title: "Payroll Error: System Error",
-          message: `Error processing payroll for ${employeeName} (${payrollPeriod}): System error.`,
-        };
-      case NOTIFICATION_TYPES.PAYROLL_COMPLETED:
-        // For Super Admin self-notification
-        if (data.approvalLevel === APPROVAL_LEVELS.SUPER_ADMIN) {
-          return {
-            title: "Payroll Fully Approved",
-            message: `Payroll for ${employeeName} (${payrollPeriod}) has been fully approved by you as Super Admin.`,
-          };
-        }
-        // For employee notification
-        return {
-          title: "Payroll Fully Approved",
-          message: `Payroll for ${employeeName} (${payrollPeriod}) has been fully approved and is ready for processing.`,
-        };
-      case NOTIFICATION_TYPES.PAYROLL_PENDING_APPROVAL:
-        // Check if the recipient is HR Manager
-        if (
-          data.currentLevel === APPROVAL_LEVELS.HR_MANAGER ||
-          (data.admin &&
-            (data.admin.position === "HR Manager" ||
-              data.admin.position === "Head of Human Resources"))
-        ) {
-          return {
-            title: "Payroll Pending Your Approval",
-            message: `Payroll for ${employeeName} (${payrollPeriod}) has been created and is awaiting your approval as HR Manager.`,
-          };
-        }
-        return {
-          title: "Payroll Pending Approval",
-          message: `Payroll for ${employeeName} (${payrollPeriod}) is pending approval${
-            nextLevel ? ` from ${nextLevel}` : ""
-          }.`,
-        };
       default:
-        // Fallback for any unknown notification type
         return {
-          title: "Notification",
-          message: remarks || "You have a new notification.",
+          title: "Payroll Notification",
+          message: `A notification of type ${type} for ${employeeName} (${payrollPeriod})`,
         };
     }
   }

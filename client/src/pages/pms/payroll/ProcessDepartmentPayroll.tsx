@@ -129,7 +129,7 @@ const ProcessDepartmentPayroll = () => {
   // );
 
   const [isApproving, setIsApproving] = useState(false);
-  const [, setIsRejecting] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
 
   // Add statistics query
   const { data: processingStats } = useQuery({
@@ -344,32 +344,54 @@ const ProcessDepartmentPayroll = () => {
           payrollId: submitDialogData.payrollId,
           remarks: submitDialogData.remarks,
         });
+
+        // Invalidate all relevant queries
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] }),
+          queryClient.invalidateQueries({
+            queryKey: ["departmentPayrollStats"],
+          }),
+          queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] }),
+          queryClient.invalidateQueries({
+            queryKey: ["payrollProcessingStats"],
+          }),
+          queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+        ]);
+
+        // Force immediate refetch
+        await queryClient.refetchQueries({
+          queryKey: ["departmentPayrolls"],
+          type: "active",
+        });
+
         toast.success("Payroll submitted for approval");
-
-        queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
-        queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] });
-        queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] });
-        queryClient.invalidateQueries({ queryKey: ["payrollProcessingStats"] });
-        queryClient.invalidateQueries({ queryKey: ["notifications"] });
-
-        queryClient.refetchQueries({ queryKey: ["departmentPayrolls"] });
       } else if (submitDialogData.type === "bulk") {
         const result = await adminPayrollService.submitBulkPayrolls({
           payrollIds: selectedPayrollIds,
           remarks: submitDialogData.remarks,
         });
-        toast.success(`${result.length} payrolls submitted successfully`);
-        setSelectedPayrollIds([]);
 
         // Invalidate all relevant queries
-        queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
-        queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] });
-        queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] });
-        queryClient.invalidateQueries({ queryKey: ["payrollProcessingStats"] });
-        queryClient.invalidateQueries({ queryKey: ["notifications"] });
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] }),
+          queryClient.invalidateQueries({
+            queryKey: ["departmentPayrollStats"],
+          }),
+          queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] }),
+          queryClient.invalidateQueries({
+            queryKey: ["payrollProcessingStats"],
+          }),
+          queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+        ]);
 
-        // Force a refetch of the department payrolls
-        queryClient.refetchQueries({ queryKey: ["departmentPayrolls"] });
+        // Force immediate refetch
+        await queryClient.refetchQueries({
+          queryKey: ["departmentPayrolls"],
+          type: "active",
+        });
+
+        toast.success(`${result.length} payrolls submitted successfully`);
+        setSelectedPayrollIds([]);
       }
       setShowSubmitDialog(false);
     } catch (error: any) {
@@ -380,24 +402,37 @@ const ProcessDepartmentPayroll = () => {
   const rejectMutation = useMutation({
     mutationFn: async () => {
       if (!rejectingPayrollId || !rejectDialogData.remarks) return;
+      setIsRejecting(true);
       return adminPayrollService.rejectPayroll({
         payrollId: rejectingPayrollId,
         remarks: rejectDialogData.remarks,
         userRole: user?.role,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
-      queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] });
-      queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] });
-      queryClient.invalidateQueries({ queryKey: ["payrollProcessingStats"] });
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    onSuccess: async () => {
+      // Invalidate all relevant queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] }),
+        queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] }),
+        queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] }),
+        queryClient.invalidateQueries({ queryKey: ["payrollProcessingStats"] }),
+        queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+      ]);
+
+      // Force immediate refetch
+      await queryClient.refetchQueries({
+        queryKey: ["departmentPayrolls"],
+        type: "active",
+      });
+
       toast.success("Payroll rejected successfully");
+      setIsRejecting(false);
       setShowRejectDialog(false);
       setRejectingPayrollId(null);
       setRejectDialogData({ remarks: "" });
     },
     onError: (error: any) => {
+      setIsRejecting(false);
       toast.error(error.response?.data?.message || "Failed to reject payroll");
     },
   });
@@ -416,6 +451,13 @@ const ProcessDepartmentPayroll = () => {
   });
 
   const handleReject = (payroll: Payroll) => {
+    console.log("🔍 Rejecting payroll:", {
+      payrollId: payroll._id,
+      currentLevel: payroll.approvalFlow?.currentLevel,
+      status: payroll.status,
+      employee: payroll.employee,
+      department: payroll.department,
+    });
     setRejectingPayrollId(payroll._id);
     setRejectDialogData({ remarks: "" });
     setShowRejectDialog(true);
@@ -427,8 +469,15 @@ const ProcessDepartmentPayroll = () => {
       return;
     }
 
+    console.log("📤 Sending reject request:", {
+      payrollId: rejectingPayrollId,
+      remarks: rejectDialogData.remarks,
+      userRole: user?.role,
+      userPosition: user?.position,
+      userDepartment: user?.department,
+    });
+
     rejectMutation.mutate();
-    setShowRejectDialog(false);
   };
 
   const handleProcessPayment = (payroll: Payroll) => {
@@ -502,8 +551,24 @@ const ProcessDepartmentPayroll = () => {
             return;
         }
 
-        queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
-        queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] });
+        // Invalidate all relevant queries
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] }),
+          queryClient.invalidateQueries({
+            queryKey: ["departmentPayrollStats"],
+          }),
+          queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] }),
+          queryClient.invalidateQueries({
+            queryKey: ["payrollProcessingStats"],
+          }),
+          queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+        ]);
+
+        // Force immediate refetch of the main payroll data
+        await queryClient.refetchQueries({
+          queryKey: ["departmentPayrolls"],
+          type: "active",
+        });
 
         setShowApproveDialog(false);
         setApprovingPayrollId(null);
@@ -865,9 +930,11 @@ const ProcessDepartmentPayroll = () => {
         <Dialog
           open={showRejectDialog}
           onClose={() => {
-            setShowRejectDialog(false);
-            setRejectingPayrollId(null);
-            setRejectDialogData({ remarks: "" });
+            if (!isRejecting) {
+              setShowRejectDialog(false);
+              setRejectingPayrollId(null);
+              setRejectDialogData({ remarks: "" });
+            }
           }}
           maxWidth="sm"
           fullWidth
@@ -893,16 +960,20 @@ const ProcessDepartmentPayroll = () => {
                 }
                 placeholder="Please provide remarks for rejection..."
                 required
+                disabled={isRejecting}
               />
             </div>
           </DialogContent>
           <DialogActions>
             <Button
               onClick={() => {
-                setShowRejectDialog(false);
-                setRejectingPayrollId(null);
-                setRejectDialogData({ remarks: "" });
+                if (!isRejecting) {
+                  setShowRejectDialog(false);
+                  setRejectingPayrollId(null);
+                  setRejectDialogData({ remarks: "" });
+                }
               }}
+              disabled={isRejecting}
             >
               Cancel
             </Button>
@@ -910,11 +981,12 @@ const ProcessDepartmentPayroll = () => {
               onClick={handleConfirmReject}
               variant="contained"
               color="error"
-              disabled={
-                rejectMutation.isPending || !rejectDialogData.remarks.trim()
+              disabled={isRejecting || !rejectDialogData.remarks.trim()}
+              startIcon={
+                isRejecting ? <FaSpinner className="animate-spin" /> : null
               }
             >
-              {rejectMutation.isPending ? "Rejecting..." : "Reject"}
+              {isRejecting ? "Rejecting..." : "Reject"}
             </Button>
           </DialogActions>
         </Dialog>

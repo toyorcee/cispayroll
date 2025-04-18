@@ -4,7 +4,6 @@ import { createBrowserRouter, Outlet } from "react-router-dom";
 import { ProtectedRoute } from "../components/auth/ProtectedRoute";
 // import Home from "../pages/Home";
 import DashboardLayout from "../components/shared/DashboardLayout";
-import { NavigationProvider } from "../context/NavigationContext";
 import AllEmployees from "../pages/pms/employees/AllEmployees";
 import Onboarding from "../pages/pms/employees/Onboarding";
 import LeaveManagement from "../pages/pms/employees/LeaveManagement";

@@ -279,9 +279,10 @@ class BaseApprovalController {
             "approvalFlow.history": {
               level: currentLevel,
               status: isApproved ? "APPROVED" : "REJECTED",
-              approvedBy: admin._id,
-              approvedAt: new Date(),
-              reason: reason,
+              action: isApproved ? "APPROVE" : "REJECT",
+              user: admin._id,
+              timestamp: new Date(),
+              remarks: reason,
             },
           },
         },
@@ -321,23 +322,6 @@ class BaseApprovalController {
       // Create notifications
       const notificationPromises = [];
 
-      // Notify the employee
-      notificationPromises.push(
-        NotificationService.createPayrollNotification(
-          updatedPayroll.employee._id,
-          isApproved
-            ? NOTIFICATION_TYPES.PAYROLL_APPROVED
-            : NOTIFICATION_TYPES.PAYROLL_REJECTED,
-          updatedPayroll,
-          isApproved
-            ? `Your payroll has been ${statusMessage.toLowerCase()}`
-            : `Your payroll was rejected by ${currentLevel.replace(
-                /_/g,
-                " "
-              )}: ${reason}`
-        )
-      );
-
       // If there's a next level, notify the next approver
       if (nextLevel && nextLevel !== "COMPLETED") {
         const nextApprover = await this.findNextApprover(
@@ -369,6 +353,45 @@ class BaseApprovalController {
             `Your payroll for ${updatedPayroll.month} ${updatedPayroll.year} has been fully approved and is ready for processing`
           )
         );
+      }
+
+      // If payroll is rejected, notify HR Manager
+      if (!isApproved) {
+        // Find HR Manager
+        const hrDepartment = await DepartmentModel.findOne({
+          name: { $in: ["Human Resources", "HR"] },
+          status: "active",
+        });
+
+        if (hrDepartment) {
+          const hrManager = await UserModel.findOne({
+            department: hrDepartment._id,
+            position: {
+              $in: [
+                "HR Manager",
+                "Head of HR",
+                "HR Head",
+                "Head of Human Resources",
+              ],
+            },
+            status: "active",
+          });
+
+          if (hrManager) {
+            notificationPromises.push(
+              NotificationService.createPayrollNotification(
+                hrManager._id,
+                NOTIFICATION_TYPES.PAYROLL_REJECTED,
+                updatedPayroll,
+                `Payroll for ${updatedPayroll.employee.firstName} ${
+                  updatedPayroll.employee.lastName
+                } was rejected by ${currentLevel.replace(/_/g, " ")}. Reason: ${
+                  reason || "No reason provided"
+                }. Please communicate with the employee.`
+              )
+            );
+          }
+        }
       }
 
       // Send all notifications

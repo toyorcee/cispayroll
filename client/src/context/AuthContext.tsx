@@ -19,6 +19,33 @@ axios.defaults.baseURL =
   import.meta.env.VITE_API_URL || "http://localhost:5000";
 axios.defaults.withCredentials = true;
 
+axios.interceptors.response.use(
+  (response) => {
+    if (response.headers?.["x-refresh-payrolls"] === "true") {
+      const queryClient = new QueryClient();
+      queryClient.invalidateQueries({ queryKey: ["payrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] });
+    }
+
+    if (response.headers?.["x-refresh-audit-logs"] === "true") {
+      const queryClient = new QueryClient();
+      queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["payrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    }
+
+    if (response.headers?.["x-refresh-finance-director"] === "true") {
+      const queryClient = new QueryClient();
+      queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    }
+    return response;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -58,8 +85,8 @@ export const AuthContext = createContext<AuthContextType | undefined>(
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 30 * 60 * 1000, // 30 minutes (previously called cacheTime)
+      staleTime: 5 * 60 * 1000, 
+      gcTime: 30 * 60 * 1000, 
     },
   },
 });
