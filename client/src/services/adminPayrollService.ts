@@ -187,27 +187,15 @@ export const adminPayrollService = {
   },
 
   // Get a single payroll by ID
-  getPayrollById: async (
-    payrollId: string,
-    userRole?: string
-  ): Promise<PayrollData> => {
+  getPayrollById: async (payrollId: string): Promise<PayrollData> => {
     try {
-      // Use different endpoint for Super Admin
-      const endpoint = isSuperAdmin(userRole)
-        ? `${SUPER_ADMIN_BASE_URL}/payroll/${payrollId}`
-        : `${BASE_URL}/payroll/${payrollId}`;
-
-      console.log("Making request to:", endpoint);
-      const response = await axios.get(endpoint, { withCredentials: true });
-
+      const response = await axios.get(`${BASE_URL}/payroll/${payrollId}`);
       if (!response.data.success) {
-        throw new Error(response.data.message || "Failed to fetch payroll");
+        throw new Error(response.data.message || "Failed to get payroll");
       }
-
       return response.data.data;
-    } catch (error: any) {
-      console.error("Error fetching payroll:", error);
-      // toast.error(error.response?.data?.message || "Failed to fetch payroll");
+    } catch (error) {
+      console.error("[getPayrollById] Error:", error);
       throw error;
     }
   },
@@ -278,15 +266,15 @@ export const adminPayrollService = {
   // Reject payroll
   rejectPayroll: async ({
     payrollId,
-    remarks,
+    reason,
     userRole,
   }: {
     payrollId: string;
-    remarks: string;
+    reason: string;
     userRole?: string;
   }): Promise<PayrollData> => {
     try {
-      // Use approval endpoint for Super Admin
+      // Use different endpoint for Super Admin
       const endpoint = isSuperAdmin(userRole)
         ? `${APPROVAL_BASE_URL}/super-admin/${payrollId}/reject`
         : `${BASE_URL}/payroll/${payrollId}/reject`;
@@ -294,7 +282,7 @@ export const adminPayrollService = {
       console.log("Making request to:", endpoint); // Debug log
       const response = await axios.patch(
         endpoint,
-        { reason: remarks },
+        { reason },
         { withCredentials: true }
       );
 
@@ -305,6 +293,38 @@ export const adminPayrollService = {
       return response.data.data;
     } catch (error: any) {
       console.error("Error rejecting payroll:", error);
+      throw error;
+    }
+  },
+
+  // Resubmit rejected payroll
+  resubmitPayroll: async (payrollId: string, userRole?: string) => {
+    try {
+      // First get the payroll details to get the salary grade
+      const response = await axios.get(`${BASE_URL}/payroll/${payrollId}`);
+      const payroll = response.data.data;
+
+      if (!payroll) {
+        throw new Error("Payroll not found");
+      }
+
+      const endpoint = isSuperAdmin(userRole)
+        ? `${BASE_URL}/payroll/${payrollId}/resubmit`
+        : `${BASE_URL}/payroll/${payrollId}/resubmit`;
+
+      console.log("🔄 Resubmitting payroll:", {
+        payrollId,
+        salaryGrade: payroll.salaryGrade,
+      });
+
+      const res = await axios.post(endpoint, {
+        salaryGrade: payroll.salaryGrade,
+      });
+
+      console.log("✅ Resubmission request completed");
+      return res.data;
+    } catch (error) {
+      console.error("❌ Error in resubmitPayroll:", error);
       throw error;
     }
   },
@@ -383,7 +403,7 @@ export const adminPayrollService = {
   }): Promise<PayrollData> => {
     try {
       const endpoint = isSuperAdmin(data.userRole)
-        ? `${SUPER_ADMIN_BASE_URL}/payroll/process-single-employee`
+        ? `${SUPER_ADMIN_BASE_URL}/payroll/process-single`
         : `${BASE_URL}/payroll/process-single`;
 
       const response = await axios.post(

@@ -4149,7 +4149,6 @@ export class AdminController {
     }
   }
 
-  // Submit multiple payrolls for approval
   static async submitBulkPayrolls(req, res, next) {
     try {
       const { payrollIds, remarks, frequency } = req.body;
@@ -4413,6 +4412,189 @@ export class AdminController {
       });
     } catch (error) {
       console.error(`❌ Error submitting bulk payrolls: ${error.message}`);
+      next(error);
+    }
+  }
+
+  static async resubmitPayroll(req, res, next) {
+    try {
+      const { payrollId } = req.params;
+      const { salaryGrade } = req.body;
+
+      // Fetch admin with full details
+      const admin = await UserModel.findById(req.user.id)
+        .populate("department", "name code")
+        .select("+position +role +department");
+
+      // Check if admin exists and has necessary permissions
+      if (!admin) {
+        throw new ApiError(404, "Admin not found");
+      }
+
+      // Get the existing payroll
+      const existingPayroll = await PayrollModel.findOne({
+        _id: payrollId,
+        status: "REJECTED",
+      }).populate("employee");
+
+      if (!existingPayroll) {
+        throw new ApiError(404, "Rejected payroll not found");
+      }
+
+      // Check if admin has access to this department
+      const hasAccess =
+        admin.role === "super-admin" ||
+        admin.department?._id.toString() ===
+          existingPayroll.department.toString();
+
+      if (!hasAccess) {
+        throw new ApiError(403, "You don't have access to this department");
+      }
+
+      // Enhanced HR Head detection
+      const isHRHead =
+        (admin.position?.toLowerCase().includes("head of human resources") ||
+          admin.position?.toLowerCase().includes("hr head") ||
+          admin.role?.toLowerCase() === "head of hr") &&
+        admin.department?.name?.toLowerCase().includes("human resources");
+
+      // Calculate new payroll data
+      const payrollData = await PayrollService.calculatePayroll(
+        existingPayroll.employee._id,
+        salaryGrade || existingPayroll.employee.salaryGrade,
+        existingPayroll.month,
+        existingPayroll.year,
+        existingPayroll.frequency,
+        existingPayroll.department
+      );
+
+      if (!payrollData) {
+        throw new ApiError(400, "Failed to calculate payroll");
+      }
+
+      // Update the existing payroll with new data
+      existingPayroll.earnings = payrollData.earnings;
+      existingPayroll.deductions = payrollData.deductions;
+      existingPayroll.totals = payrollData.totals;
+      existingPayroll.allowances = payrollData.allowances;
+      existingPayroll.bonuses = payrollData.bonuses;
+      existingPayroll.components = payrollData.components;
+      existingPayroll.status = isHRHead
+        ? PAYROLL_STATUS.PENDING
+        : PAYROLL_STATUS.DRAFT;
+      existingPayroll.approvalFlow = {
+        currentLevel: isHRHead
+          ? APPROVAL_LEVELS.HR_MANAGER
+          : APPROVAL_LEVELS.DEPARTMENT_HEAD,
+        history: [
+          {
+            level: isHRHead
+              ? APPROVAL_LEVELS.HR_MANAGER
+              : APPROVAL_LEVELS.DEPARTMENT_HEAD,
+            status: isHRHead ? "PENDING" : "DRAFT",
+            action: "SUBMIT",
+            user: admin._id,
+            timestamp: new Date(),
+            remarks: isHRHead
+              ? "Payroll resubmitted by HR Head"
+              : "Payroll resubmitted after rejection",
+          },
+        ],
+        submittedBy: admin._id,
+        submittedAt: isHRHead ? new Date() : null,
+      };
+      existingPayroll.updatedBy = admin._id;
+      existingPayroll.updatedAt = new Date();
+
+      await existingPayroll.save();
+
+      // Create audit log for payroll resubmission
+      await AuditService.logAction(
+        "UPDATE",
+        "PAYROLL",
+        existingPayroll._id,
+        admin._id,
+        {
+          status: isHRHead ? "PENDING" : "DRAFT",
+          action: "PAYROLL_RESUBMITTED",
+          employeeId: existingPayroll.employee._id,
+          employeeName: `${existingPayroll.employee.firstName} ${existingPayroll.employee.lastName}`,
+          month: existingPayroll.month,
+          year: existingPayroll.year,
+          frequency: existingPayroll.frequency,
+          departmentId: existingPayroll.department,
+          createdBy: admin._id,
+          position: admin.position,
+          role: admin.role,
+        }
+      );
+
+      // Notify the creating admin
+      await NotificationService.createPayrollNotification(
+        existingPayroll,
+        NOTIFICATION_TYPES.PAYROLL_CREATED,
+        admin,
+        `You have created a ${isHRHead ? "pending" : "draft"} payroll for ${
+          existingPayroll.employee.firstName
+        } ${existingPayroll.employee.lastName} (${
+          existingPayroll.employee.employeeId
+        }) for ${existingPayroll.month}/${existingPayroll.year}`,
+        {
+          approvalLevel: isHRHead
+            ? APPROVAL_LEVELS.HR_MANAGER
+            : APPROVAL_LEVELS.DEPARTMENT_HEAD,
+          metadata: {
+            payrollId: existingPayroll._id,
+            employeeId: existingPayroll.employee._id,
+            departmentId: existingPayroll.department,
+            status: existingPayroll.status,
+          },
+        }
+      );
+
+      // Notify Super Admin about payroll creation
+      const superAdmin = await UserModel.findOne({ role: "super-admin" });
+      if (superAdmin) {
+        await NotificationService.createPayrollNotification(
+          existingPayroll,
+          NOTIFICATION_TYPES.PAYROLL_CREATED,
+          admin,
+          `A new ${
+            isHRHead ? "pending" : "draft"
+          } payroll has been created for ${
+            existingPayroll.employee.firstName
+          } ${existingPayroll.employee.lastName} (${
+            existingPayroll.employee.employeeId
+          }) in ${admin.department.name} department by ${admin.firstName} ${
+            admin.lastName
+          } (${admin.position})`,
+          {
+            approvalLevel: isHRHead
+              ? APPROVAL_LEVELS.HR_MANAGER
+              : APPROVAL_LEVELS.DEPARTMENT_HEAD,
+            metadata: {
+              payrollId: existingPayroll._id,
+              employeeId: existingPayroll.employee._id,
+              departmentId: existingPayroll.department,
+              createdBy: admin._id,
+              status: isHRHead ? "PENDING" : "DRAFT",
+            },
+          }
+        );
+      }
+
+      // Set response headers to trigger UI updates
+      res.set({
+        "x-refresh-payrolls": "true",
+        "x-refresh-audit-logs": "true",
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Payroll resubmitted successfully",
+        data: existingPayroll,
+      });
+    } catch (error) {
       next(error);
     }
   }

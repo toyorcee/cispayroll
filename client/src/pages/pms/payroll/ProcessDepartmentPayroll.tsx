@@ -12,15 +12,21 @@ import PayrollTable, {
   Payroll,
 } from "../../../components/payroll/processpayroll/admin/PayrollTable";
 import approvalService from "../../../services/approvalService";
-import { Box, Tab, Tabs, Button } from "@mui/material";
-import ApprovalTimeline from "../../../components/payroll/processpayroll/admin/ApprovalTimeline";
-import PayrollDashboard from "../../../components/payroll/processpayroll/PayrollDashboard";
 import {
+  Box,
+  Tab,
+  Tabs,
+  Button,
+  TextField,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
+  CircularProgress,
+  Typography,
 } from "@mui/material";
+import ApprovalTimeline from "../../../components/payroll/processpayroll/admin/ApprovalTimeline";
+import PayrollDashboard from "../../../components/payroll/processpayroll/PayrollDashboard";
 import TableSkeleton from "../../../components/skeletons/TableSkeleton";
 
 interface ApiError {
@@ -36,6 +42,7 @@ interface ApiError {
 const ProcessDepartmentPayroll = () => {
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
+  const [isResubmitting, setIsResubmitting] = useState(false);
 
   // Improve type safety for department checking
   const isHRDepartment = (
@@ -107,9 +114,9 @@ const ProcessDepartmentPayroll = () => {
     null
   );
   const [rejectDialogData, setRejectDialogData] = useState<{
-    remarks: string;
+    reason: string;
   }>({
-    remarks: "",
+    reason: "",
   });
 
   // Add state for approve dialog
@@ -399,60 +406,23 @@ const ProcessDepartmentPayroll = () => {
     }
   };
 
-  const handleReject = (payroll: Payroll) => {
-    setRejectingPayrollId(payroll._id);
-    setRejectDialogData({ remarks: "" });
-    setShowRejectDialog(true);
-  };
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectionDialogOpen, setRejectionDialogOpen] = useState(false);
+  const [selectedPayrollId, setSelectedPayrollId] = useState<string | null>(
+    null
+  );
 
-  const handleConfirmReject = () => {
-    if (!rejectingPayrollId || !rejectDialogData.remarks) {
-      toast.error("Please provide a rejection reason");
-      return;
-    }
-
-    console.log("📤 Sending reject request:", {
-      payrollId: rejectingPayrollId,
-      remarks: rejectDialogData.remarks,
-      userRole: user?.role,
-      userPosition: user?.position,
-      userDepartment: user?.department,
-    });
-
-    // Add more detailed logging for Super Admin
-    if (user?.role === "SUPER_ADMIN") {
-      console.log("🔍 Super Admin rejection attempt:", {
-        payrollId: rejectingPayrollId,
-        remarks: rejectDialogData.remarks,
-        userRole: user?.role,
-        userPosition: user?.position,
-        userDepartment: user?.department,
-        isRejecting: isRejecting,
-        showRejectDialog: showRejectDialog,
-      });
-    }
-
-    rejectMutation.mutate();
-  };
-
-  const rejectMutation = useMutation({
-    mutationFn: async () => {
-      if (!rejectingPayrollId || !rejectDialogData.remarks) return;
-      console.log("🔄 Starting rejection mutation for:", {
-        payrollId: rejectingPayrollId,
-        remarks: rejectDialogData.remarks,
+  const handleReject = async (payrollId: string) => {
+    try {
+      await adminPayrollService.rejectPayroll({
+        payrollId,
+        reason: rejectionReason,
         userRole: user?.role,
       });
-      setIsRejecting(true);
-      return adminPayrollService.rejectPayroll({
-        payrollId: rejectingPayrollId,
-        remarks: rejectDialogData.remarks,
-        userRole: user?.role,
-      });
-    },
-    onSuccess: async (data) => {
-      console.log("✅ Rejection successful:", data);
-      // Invalidate all relevant queries
+      setRejectionReason("");
+      setRejectionDialogOpen(false);
+
+      // Invalidate and refetch payrolls data
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] }),
         queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] }),
@@ -468,17 +438,11 @@ const ProcessDepartmentPayroll = () => {
       });
 
       toast.success("Payroll rejected successfully");
-      setIsRejecting(false);
-      setShowRejectDialog(false);
-      setRejectingPayrollId(null);
-      setRejectDialogData({ remarks: "" });
-    },
-    onError: (error: any) => {
-      console.error("❌ Rejection error:", error);
-      setIsRejecting(false);
-      toast.error(error.response?.data?.message || "Failed to reject payroll");
-    },
-  });
+    } catch (error) {
+      console.error("Error rejecting payroll:", error);
+      toast.error("Failed to reject payroll");
+    }
+  };
 
   const processPaymentMutation = useMutation({
     mutationFn: (payrollId: string) =>
@@ -614,7 +578,8 @@ const ProcessDepartmentPayroll = () => {
 
   const handleRejectWithPermission = (payroll: Payroll) => {
     if (canApprovePayroll) {
-      handleReject(payroll);
+      setSelectedPayrollId(payroll._id);
+      setRejectionDialogOpen(true);
     }
   };
 
@@ -635,10 +600,69 @@ const ProcessDepartmentPayroll = () => {
     setShowApprovalJourney(true);
   };
 
+  const handleResubmit = async (payroll: Payroll): Promise<void> => {
+    console.log("🔄 Starting resubmission process for payroll:", {
+      id: payroll._id,
+      employee: `${payroll.employee.firstName} ${payroll.employee.lastName}`,
+      status: payroll.status,
+      month: payroll.month,
+      year: payroll.year,
+    });
+
+    setIsResubmitting(true);
+    try {
+      // Directly resubmit the payroll
+      await adminPayrollService.resubmitPayroll(payroll._id, user?.role);
+
+      // Invalidate queries to refresh the data
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] }),
+        queryClient.invalidateQueries({ queryKey: ["departmentPayrollStats"] }),
+        queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] }),
+        queryClient.invalidateQueries({ queryKey: ["payrollProcessingStats"] }),
+        queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+      ]);
+
+      toast.success("Payroll resubmitted successfully");
+    } catch (error: any) {
+      console.error("❌ Error resubmitting payroll:", error);
+      toast.error(error.message || "Failed to resubmit payroll");
+    } finally {
+      setIsResubmitting(false);
+    }
+  };
+
+  const handleResubmitWithPermission = (payroll: Payroll) => {
+    console.log("🔒 Checking permission for resubmission", {
+      userRole: user?.role,
+      canProcessPayroll,
+      payrollId: payroll._id,
+    });
+
+    if (canProcessPayroll) {
+      console.log("✅ Permission granted, proceeding with resubmission");
+      handleResubmit(payroll);
+    } else {
+      console.log("❌ Permission denied for resubmission", {
+        userRole: user?.role,
+        requiredPermission: "PROCESS_PAYROLL",
+      });
+      toast.error("You don't have permission to resubmit payrolls");
+    }
+  };
+
   const isLoadingCombined =
     isPeriodsLoading || isStatsLoading || isPayrollsLoading;
 
   const payrollsData = payrolls?.data?.payrolls ?? [];
+
+  const [singleProcessData, setSingleProcessData] = useState<{
+    employeeIds: string[];
+    month: number;
+    year: number;
+    frequency: string;
+    departmentId: string;
+  } | null>(null);
 
   if (isLoadingCombined) {
     return (
@@ -674,11 +698,12 @@ const ProcessDepartmentPayroll = () => {
           _id: payroll.employee._id,
           firstName: payroll.employee.firstName,
           lastName: payroll.employee.lastName,
-          email: payroll.employee.employeeId, // Use employeeId as email since it's not available
+          email: payroll.employee.employeeId,
         },
         month: payroll.month,
         year: payroll.year,
         status: payroll.status,
+        frequency: "monthly", // Default to monthly since it's not in PayrollData
         totalEarnings: payroll.earnings.totalEarnings || 0,
         totalDeductions: payroll.deductions.totalDeductions || 0,
         netPay: payroll.totals.netPay || 0,
@@ -686,11 +711,17 @@ const ProcessDepartmentPayroll = () => {
         updatedAt: payroll.updatedAt,
       };
 
-      // Add approvalFlow if it exists
+      // Add approvalFlow if it exists, ensuring proper type conversion
       if (payroll.approvalFlow) {
         convertedPayroll.approvalFlow = {
-          currentLevel: payroll.approvalFlow.currentLevel || "",
-          history: payroll.approvalFlow.history || [],
+          currentLevel: payroll.approvalFlow.currentLevel || "PENDING", // Provide a default value
+          history:
+            payroll.approvalFlow.history?.map((h) => ({
+              level: h.level,
+              status: h.status,
+              timestamp: h.timestamp,
+              remarks: h.remarks,
+            })) || [],
         };
       }
 
@@ -700,6 +731,44 @@ const ProcessDepartmentPayroll = () => {
 
   return (
     <Box sx={{ width: "100%" }}>
+      {isResubmitting && (
+        <Box
+          sx={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+        >
+          <Box
+            sx={{
+              backgroundColor: "white",
+              padding: 3,
+              borderRadius: 2,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 2,
+            }}
+          >
+            <CircularProgress size={60} />
+            <Typography variant="h6" sx={{ color: "text.primary" }}>
+              Resubmitting Payroll
+            </Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Please wait while we process your request...
+            </Typography>
+          </Box>
+        </Box>
+      )}
+
       <Box
         sx={{
           display: "flex",
@@ -747,6 +816,7 @@ const ProcessDepartmentPayroll = () => {
             onViewApprovalJourney={handleViewApprovalJourney}
             onSubmitForApproval={handleSubmitForApprovalWithPermission}
             onProcessPayment={handleProcessPaymentWithPermission}
+            onResubmit={handleResubmitWithPermission}
             selectedPayrolls={selectedPayrollIds}
             onSelectionChange={handleSelectPayroll}
             loading={isPayrollsLoading || isProcessing}
@@ -922,71 +992,39 @@ const ProcessDepartmentPayroll = () => {
       )}
 
       {/* Reject Dialog */}
-      {showRejectDialog && (
-        <Dialog
-          open={showRejectDialog}
-          onClose={() => {
-            if (!isRejecting) {
-              setShowRejectDialog(false);
-              setRejectingPayrollId(null);
-              setRejectDialogData({ remarks: "" });
-            }
-          }}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle>Reject Payroll</DialogTitle>
-          <DialogContent>
-            <p className="mb-4">
-              Are you sure you want to reject this payroll?
-            </p>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Remarks (Required)
-              </label>
-              <textarea
-                className="w-full p-2 border rounded-md"
-                rows={3}
-                value={rejectDialogData.remarks}
-                onChange={(event) =>
-                  setRejectDialogData((prev) => ({
-                    ...prev,
-                    remarks: event.target.value,
-                  }))
-                }
-                placeholder="Please provide remarks for rejection..."
-                required
-                disabled={isRejecting}
-              />
-            </div>
-          </DialogContent>
-          <DialogActions>
-            <Button
-              onClick={() => {
-                if (!isRejecting) {
-                  setShowRejectDialog(false);
-                  setRejectingPayrollId(null);
-                  setRejectDialogData({ remarks: "" });
-                }
-              }}
-              disabled={isRejecting}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmReject}
-              variant="contained"
-              color="error"
-              disabled={isRejecting || !rejectDialogData.remarks.trim()}
-              startIcon={
-                isRejecting ? <FaSpinner className="animate-spin" /> : null
-              }
-            >
-              {isRejecting ? "Rejecting..." : "Reject"}
-            </Button>
-          </DialogActions>
-        </Dialog>
-      )}
+      <Dialog
+        open={rejectionDialogOpen}
+        onClose={() => setRejectionDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Reject Payroll</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Reason for Rejection"
+            type="text"
+            fullWidth
+            multiline
+            rows={4}
+            value={rejectionReason}
+            onChange={(e) => setRejectionReason(e.target.value)}
+            placeholder="Please provide a reason for rejecting this payroll"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRejectionDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={() => handleReject(selectedPayrollId || "")}
+            variant="contained"
+            color="error"
+            disabled={!rejectionReason.trim()}
+          >
+            Reject
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Approval Journey Dialog */}
       <Dialog

@@ -600,7 +600,7 @@ export class PayrollService {
         month,
         year,
         frequency,
-        status: { $ne: PAYROLL_STATUS.DRAFT },
+        status: { $nin: [PAYROLL_STATUS.DRAFT, PAYROLL_STATUS.REJECTED] },
       });
 
       if (existingPayroll) {

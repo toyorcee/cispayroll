@@ -55,6 +55,7 @@ export interface Payroll {
   month: number;
   year: number;
   status: string;
+  frequency: string;
   totalEarnings: number;
   totalDeductions: number;
   netPay: number;
@@ -83,6 +84,7 @@ interface PayrollTableProps {
   onViewApprovalJourney?: (payroll: Payroll) => void;
   onSubmitForApproval?: (payroll: Payroll) => void;
   onProcessPayment?: (payroll: Payroll) => void;
+  onResubmit?: (payroll: Payroll) => void;
   selectedPayrolls: string[];
   onSelectionChange: (selectedIds: string[]) => void;
   loading?: boolean;
@@ -111,6 +113,7 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
   onViewApprovalJourney = onView,
   onSubmitForApproval,
   onProcessPayment,
+  onResubmit,
   selectedPayrolls,
   onSelectionChange,
   loading,
@@ -564,10 +567,10 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                   <TableCell>{`${payroll.month}/${payroll.year}`}</TableCell>
                   <TableCell>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Chip
-                      label={payroll.status}
-                      color={getStatusColor(payroll.status) as any}
-                      size="small"
+                      <Chip
+                        label={payroll.status}
+                        color={getStatusColor(payroll.status) as any}
+                        size="small"
                         icon={getStatusIcon(
                           payroll.status,
                           payroll.approvalFlow
@@ -638,26 +641,26 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                               </IconButton>
                             </Tooltip>
                           ) : isCurrentApprover(payroll) ? (
-                        <>
-                          <Tooltip title="Approve">
-                            <IconButton
-                              size="small"
-                              onClick={() => onApprove(payroll)}
-                              color="success"
-                            >
-                              <CheckCircleIcon />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Reject">
-                            <IconButton
-                              size="small"
-                              onClick={() => onReject(payroll)}
-                              color="error"
-                            >
-                              <CancelIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </>
+                            <>
+                              <Tooltip title="Approve">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => onApprove(payroll)}
+                                  color="success"
+                                >
+                                  <CheckCircleIcon />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Reject">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => onReject(payroll)}
+                                  color="error"
+                                >
+                                  <CancelIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </>
                           ) : (
                             <Tooltip
                               title={`Click to view approval journey - ${getNextLevelLabel(
@@ -696,6 +699,18 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                             color="primary"
                           >
                             <PaymentIcon />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+
+                      {payroll.status === "REJECTED" && onResubmit && (
+                        <Tooltip title="Resubmit Payroll">
+                          <IconButton
+                            size="small"
+                            onClick={() => onResubmit(payroll)}
+                            color="primary"
+                          >
+                            <SendIcon />
                           </IconButton>
                         </Tooltip>
                       )}

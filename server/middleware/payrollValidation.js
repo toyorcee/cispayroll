@@ -6,6 +6,7 @@ import UserModel from "../models/User.js";
 import SalaryGrade from "../models/SalaryStructure.js";
 import { UserRole } from "../models/User.js";
 import Payroll from "../models/Payroll.js";
+import { AppError } from "../utils/errorHandler.js";
 
 // Keep this comprehensive validation for super admin payroll creation
 export const validatePayrollCreate = (req, res, next) => {
@@ -413,6 +414,44 @@ export const validateSuperAdminMultipleEmployeesPayroll = async (
     next();
   } catch (error) {
     console.error("❌ Super admin multiple payroll validation failed:", error);
+    next(error);
+  }
+};
+
+export const validatePayrollResubmission = async (req, res, next) => {
+  try {
+    const { payrollId } = req.params;
+    const payroll = await Payroll.findById(payrollId);
+
+    if (!payroll) {
+      throw new AppError("Payroll not found", 404);
+    }
+
+    if (payroll.status !== "REJECTED") {
+      throw new AppError("Only rejected payrolls can be resubmitted", 400);
+    }
+
+    // Check if user has permission to resubmit this payroll
+    const user = await UserModel.findById(req.user._id);
+    if (!user) {
+      throw new AppError("User not found", 404);
+    }
+
+    // Check if user has access to the department
+    const hasAccess =
+      user.role === "super-admin" ||
+      (user.department &&
+        user.department.toString() === payroll.department.toString());
+
+    if (!hasAccess) {
+      throw new AppError(
+        "You don't have access to this department's payrolls",
+        403
+      );
+    }
+
+    next();
+  } catch (error) {
     next(error);
   }
 };

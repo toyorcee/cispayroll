@@ -227,42 +227,113 @@ class BaseApprovalController {
       // Create detailed status message
       const statusMessage = isApproved
         ? `Pending ${nextLevel.replace(/_/g, " ")} Approval`
-        : "Rejected";
+        : "Returned to Department Head for Review";
+
+      // Create the history entry for this action
+      const historyEntry = {
+        level: currentLevel,
+        status: isApproved ? "APPROVED" : "REJECTED",
+        action: isApproved ? "APPROVE" : "REJECT",
+        user: admin._id,
+        timestamp: new Date(),
+        remarks: reason,
+      };
+
+      // If rejected, we'll preserve the history but reset the approval flow
+      const updateQuery = isApproved
+        ? {
+            $set: {
+              status:
+                nextLevel === "COMPLETED"
+                  ? PAYROLL_STATUS.COMPLETED
+                  : PAYROLL_STATUS.PENDING,
+              "approvalFlow.currentLevel": nextLevel,
+              "approvalFlow.statusMessage": statusMessage,
+              "approvalFlow.nextApprovalLevel":
+                nextLevel === "COMPLETED" ? null : nextLevel,
+              [`approvalFlow.${currentLevel}`]: {
+                status: "APPROVED",
+                approvedBy: admin._id,
+                approvedAt: new Date(),
+                reason: reason,
+              },
+            },
+            $push: {
+              "approvalFlow.history": historyEntry,
+            },
+          }
+        : {
+            $set: {
+              status: PAYROLL_STATUS.REJECTED,
+              "approvalFlow.currentLevel": APPROVAL_LEVELS.DEPARTMENT_HEAD,
+              "approvalFlow.statusMessage": statusMessage,
+              "approvalFlow.nextApprovalLevel": null,
+              "approvalFlow.rejectedAt": new Date(),
+              "approvalFlow.rejectedBy": admin._id,
+              "approvalFlow.rejectedAtLevel": currentLevel,
+              "approvalFlow.rejectionReason": reason || "No reason provided",
+              // Reset approval levels but keep history
+              "approvalFlow.DEPARTMENT_HEAD": null,
+              "approvalFlow.HR_MANAGER": null,
+              "approvalFlow.FINANCE_DIRECTOR": null,
+              "approvalFlow.SUPER_ADMIN": null,
+              // Track rejection state
+              "approvalFlow.rejectionState": {
+                level: currentLevel,
+                timestamp: new Date(),
+                reason: reason || "No reason provided",
+                rejectedBy: admin._id,
+                departmentHeadId: payroll.employee.department,
+                needsReview: true,
+              },
+              // Increment rejection count
+              "approvalFlow.rejectionCount": {
+                $cond: {
+                  if: { $exists: ["$approvalFlow.rejectionCount"] },
+                  then: { $add: ["$approvalFlow.rejectionCount", 1] },
+                  else: 1,
+                },
+              },
+            },
+            $push: {
+              "approvalFlow.history": historyEntry,
+            },
+          };
 
       // Update payroll status and approval flow
       const updatedPayroll = await PayrollModel.findByIdAndUpdate(
         payroll._id,
-        {
-          $set: {
-            status: isApproved
-              ? nextLevel === "COMPLETED"
-                ? PAYROLL_STATUS.COMPLETED
-                : PAYROLL_STATUS.PENDING
-              : PAYROLL_STATUS.REJECTED,
-            "approvalFlow.currentLevel": nextLevel,
-            "approvalFlow.statusMessage": statusMessage,
-            "approvalFlow.nextApprovalLevel":
-              nextLevel === "COMPLETED" ? null : nextLevel,
-            [`approvalFlow.${currentLevel}`]: {
-              status: isApproved ? "APPROVED" : "REJECTED",
-              approvedBy: admin._id,
-              approvedAt: new Date(),
-              reason: reason,
-            },
-          },
-          $push: {
-            "approvalFlow.history": {
-              level: currentLevel,
-              status: isApproved ? "APPROVED" : "REJECTED",
-              action: isApproved ? "APPROVE" : "REJECT",
-              user: admin._id,
-              timestamp: new Date(),
-              remarks: reason,
-            },
-          },
-        },
+        updateQuery,
         { new: true }
       ).populate("employee");
+
+      // If rejected, notify the department head
+      if (!isApproved) {
+        const departmentHead = await UserModel.findOne({
+          department: payroll.employee.department,
+          position: { $regex: "head|director|manager", $options: "i" },
+        });
+
+        if (departmentHead) {
+          await NotificationService.createNotification(
+            departmentHead._id,
+            NOTIFICATION_TYPES.PAYROLL_REJECTED,
+            updatedPayroll.employee,
+            updatedPayroll,
+            `Payroll rejected by ${currentLevel.replace(
+              /_/g,
+              " "
+            )}. Please review and resubmit.`,
+            {
+              data: {
+                rejectionLevel: currentLevel,
+                reason: reason || "No reason provided",
+                needsReview: true,
+              },
+            }
+          );
+        }
+      }
 
       // Create audit log
       await Audit.create({
@@ -273,11 +344,15 @@ class BaseApprovalController {
         details: {
           status: updatedPayroll.status,
           currentLevel,
-          nextLevel,
+          nextLevel: isApproved ? nextLevel : null,
           approvalFlow: {
-            currentLevel: nextLevel,
+            currentLevel: isApproved
+              ? nextLevel
+              : APPROVAL_LEVELS.DEPARTMENT_HEAD,
             history: updatedPayroll.approvalFlow.history,
             completedAt: nextLevel === "COMPLETED" ? new Date() : null,
+            rejectedAt: !isApproved ? new Date() : null,
+            rejectionReason: !isApproved ? reason : null,
           },
           employeeName: `${updatedPayroll.employee.firstName} ${updatedPayroll.employee.lastName}`,
           employeeId: updatedPayroll.employee._id,
@@ -290,7 +365,7 @@ class BaseApprovalController {
               /_/g,
               " "
             )}`,
-          approvedAt: new Date(),
+          approvedAt: isApproved ? new Date() : null,
         },
       });
 

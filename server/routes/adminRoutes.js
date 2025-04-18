@@ -11,6 +11,7 @@ import {
   validateEmployeePayrollHistory,
   validatePayrollApproval,
   validatePayrollRejection,
+  validatePayrollResubmission,
 } from "../middleware/payrollValidation.js";
 import {
   validateAdminSinglePayrollCreate,
@@ -319,6 +320,13 @@ router.post(
   requirePermission([Permission.APPROVE_PAYROLL]),
   validateAdminPayrollSubmission,
   AdminController.rejectDepartmentPayrolls
+);
+
+router.post(
+  "/payroll/:payrollId/resubmit",
+  requirePermission([Permission.CREATE_PAYROLL]),
+  validatePayrollResubmission,
+  AdminController.resubmitPayroll
 );
 
 export default router;

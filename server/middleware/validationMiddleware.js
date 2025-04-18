@@ -1,4 +1,19 @@
 import { ApiError } from "../utils/errorHandler.js";
+import { Types } from "mongoose";
+
+export const validateObjectId = (paramName) => {
+  return (req, res, next) => {
+    try {
+      const id = req.params[paramName];
+      if (!Types.ObjectId.isValid(id)) {
+        throw new ApiError(400, `Invalid ${paramName} format`);
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+};
 
 export const validateSignup = (req, res, next) => {
   try {

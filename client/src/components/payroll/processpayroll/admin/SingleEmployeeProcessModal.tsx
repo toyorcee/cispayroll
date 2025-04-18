@@ -358,19 +358,27 @@ const SingleEmployeeProcessModal = ({
     e.preventDefault();
     e.stopPropagation();
 
+    console.log("🔄 Starting payroll submission process");
+    console.log("📋 Form data:", formData);
+    console.log("👥 Selected employees:", selectedEmployees);
+
     if (!selectedEmployees.length) {
+      console.log("❌ No employees selected");
       toast.error("Please select at least one employee");
       return;
     }
 
     if (isSuperAdmin() && !formData.departmentId) {
+      console.log("❌ No department selected for super admin");
       toast.error("Please select a department first");
       return;
     }
 
     setIsSubmitting(true);
+    console.log("⏳ Setting isSubmitting to true");
 
     try {
+      console.log("📤 Making API call to process payroll");
       await adminPayrollService.processSingleEmployeePayroll({
         employeeId: selectedEmployees[0]._id,
         month: formData.month,
@@ -380,9 +388,11 @@ const SingleEmployeeProcessModal = ({
         userRole: user?.role,
       });
 
+      console.log("✅ Payroll processed successfully");
       toast.success("Payroll processed successfully");
       setShowSuccess(true);
 
+      console.log("🔄 Invalidating queries");
       queryClient.invalidateQueries({ queryKey: ["payrolls"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["departmentEmployees"] });
@@ -392,50 +402,20 @@ const SingleEmployeeProcessModal = ({
       queryClient.invalidateQueries({ queryKey: ["adminPayrolls"] });
 
       // Force a refetch of the department payrolls
+      console.log("🔄 Forcing refetch of department payrolls");
       queryClient.refetchQueries({ queryKey: ["departmentPayrolls"] });
 
       // Wait for animation to complete before closing
       setTimeout(() => {
+        console.log("⏳ Animation complete, closing modal");
         setShowSuccess(false);
         onClose();
-        if (onSuccess) {
-          onSuccess();
-        }
       }, 1500);
-    } catch (error: any) {
+    } catch (error) {
       console.error("❌ Error processing payroll:", error);
-
-      // Handle specific error cases
-      if (error.response?.data?.message) {
-        const errorMsg = error.response.data.message;
-        setErrorMessage(errorMsg);
-        toast.error(errorMsg);
-      } else if (
-        error.message?.includes("duplicate key error") ||
-        error.message?.includes("already exists")
-      ) {
-        const monthName = new Date(0, formData.month - 1).toLocaleString(
-          "default",
-          { month: "long" }
-        );
-        const errorMsg = `A payroll record already exists for ${
-          selectedEmployees.length === 1
-            ? selectedEmployees[0].fullName
-            : "one or more selected employees"
-        } for ${monthName} ${
-          formData.year
-        }. Please select a different month/year or update the existing payroll.`;
-        setErrorMessage(errorMsg);
-        toast.error(errorMsg);
-      } else if (error.message?.includes("Failed to calculate payroll")) {
-        setErrorMessage(error.message);
-        toast.error(error.message);
-      } else {
-        const errorMsg = "Failed to process payroll. Please try again later.";
-        setErrorMessage(errorMsg);
-        toast.error(errorMsg);
-      }
+      toast.error("Failed to process payroll");
     } finally {
+      console.log("🏁 Setting isSubmitting to false");
       setIsSubmitting(false);
     }
   };
