@@ -645,6 +645,37 @@ export const adminPayrollService = {
     }
   },
 
+  // Process payroll for all active employees
+  processAllEmployeesPayroll: async (data: {
+    month: number;
+    year: number;
+    frequency: string;
+    userRole?: string;
+  }): Promise<any> => {
+    try {
+      // This endpoint is only available for Super Admin
+      if (!isSuperAdmin(data.userRole)) {
+        throw new Error("Only Super Admin can process all employees payroll");
+      }
+
+      const endpoint = `${SUPER_ADMIN_BASE_URL}/payroll/process-all-employees`;
+
+      console.log("Making request to:", endpoint); 
+      const response = await axios.post(endpoint, data, {
+        withCredentials: true,
+      });
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to process payroll");
+      }
+
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Error processing all employees payroll:", error);
+      throw error;
+    }
+  },
+
   processPayroll: async (
     payrollId: string,
     userRole?: string
@@ -655,7 +686,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/${payrollId}/process`
         : `${BASE_URL}/payroll/${payrollId}/process`;
 
-      console.log("Making request to:", endpoint); // Debug log
+      console.log("Making request to:", endpoint); 
       const response = await axios.post(
         endpoint,
         {},

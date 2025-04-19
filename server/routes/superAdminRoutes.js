@@ -608,4 +608,12 @@ router.post(
   SuperAdminController.processMultipleEmployeesPayroll
 );
 
+// Add route for processing all employees payroll
+router.post(
+  "/payroll/process-all-employees",
+  requirePermission([Permission.CREATE_PAYROLL]),
+  validateBulkPayrollCreate,
+  SuperAdminController.processAllEmployeesPayroll
+);
+
 export default router;

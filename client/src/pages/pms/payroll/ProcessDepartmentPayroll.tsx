@@ -712,6 +712,30 @@ const ProcessDepartmentPayroll = () => {
     departmentId: string;
   } | null>(null);
 
+  const handleProcessAllPayrolls = async () => {
+    try {
+      setIsProcessing(true);
+      const response = await adminPayrollService.processAllEmployeesPayroll({
+        month: new Date().getMonth() + 1,
+        year: new Date().getFullYear(),
+        frequency: "monthly",
+        userRole: user?.role,
+      });
+
+      if (response.success) {
+        toast.success(`Successfully processed ${response.processed} payrolls`);
+        queryClient.invalidateQueries({ queryKey: ["payrolls"] });
+      }
+    } catch (error: any) {
+      console.error("Error processing all payrolls:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to process all payrolls"
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   if (isLoadingCombined) {
     return (
       <div className="p-4">
@@ -737,24 +761,25 @@ const ProcessDepartmentPayroll = () => {
   }
 
   // Convert PayrollData to Payroll for the PayrollTable component
-  const convertedPayrolls: Payroll[] = payrollsData.map(
-    (payroll: PayrollData) => {
+  const convertedPayrolls: Payroll[] = payrollsData
+    .filter((payroll: PayrollData) => payroll && payroll.employee) // Filter out payrolls with null employee
+    .map((payroll: PayrollData) => {
       // Create the base payroll object
       const convertedPayroll: Payroll = {
         _id: payroll._id,
         employee: {
-          _id: payroll.employee._id,
-          firstName: payroll.employee.firstName,
-          lastName: payroll.employee.lastName,
-          email: payroll.employee.employeeId,
+          _id: payroll.employee?._id || "",
+          firstName: payroll.employee?.firstName || "Unknown",
+          lastName: payroll.employee?.lastName || "Employee",
+          email: payroll.employee?.employeeId || "",
         },
         month: payroll.month,
         year: payroll.year,
         status: payroll.status,
         frequency: "monthly", // Default to monthly since it's not in PayrollData
-        totalEarnings: payroll.earnings.totalEarnings || 0,
-        totalDeductions: payroll.deductions.totalDeductions || 0,
-        netPay: payroll.totals.netPay || 0,
+        totalEarnings: payroll.earnings?.totalEarnings || 0,
+        totalDeductions: payroll.deductions?.totalDeductions || 0,
+        netPay: payroll.totals?.netPay || 0,
         createdAt: payroll.createdAt,
         updatedAt: payroll.updatedAt,
       };
@@ -774,8 +799,7 @@ const ProcessDepartmentPayroll = () => {
       }
 
       return convertedPayroll;
-    }
-  );
+    });
 
   return (
     <Box sx={{ width: "100%" }}>
@@ -828,21 +852,44 @@ const ProcessDepartmentPayroll = () => {
         <h1 className="text-2xl font-semibold text-gray-900">
           Process Department Payroll
         </h1>
-        {(canProcessPayroll || canProcessHRPayroll) && (
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={
-              isProcessing ? <FaSpinner className="animate-spin" /> : <FaPlus />
-            }
-            onClick={() => {
-              setShowSingleProcessModal(true);
-            }}
-            disabled={isProcessing}
-          >
-            {isProcessing ? "Processing..." : "Create Payroll"}
-          </Button>
-        )}
+        <Box sx={{ display: "flex", gap: 2 }}>
+          {(canProcessPayroll || canProcessHRPayroll) && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={
+                isProcessing ? (
+                  <FaSpinner className="animate-spin" />
+                ) : (
+                  <FaPlus />
+                )
+              }
+              onClick={() => {
+                setShowSingleProcessModal(true);
+              }}
+              disabled={isProcessing}
+            >
+              {isProcessing ? "Processing..." : "Create Payroll"}
+            </Button>
+          )}
+          {user?.role === "SUPER_ADMIN" && (
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={
+                isProcessing ? (
+                  <FaSpinner className="animate-spin" />
+                ) : (
+                  <FaPlus />
+                )
+              }
+              onClick={handleProcessAllPayrolls}
+              disabled={isProcessing}
+            >
+              {isProcessing ? "Processing..." : "Process All"}
+            </Button>
+          )}
+        </Box>
       </Box>
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
         <Tabs

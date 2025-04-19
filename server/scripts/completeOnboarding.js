@@ -7,20 +7,19 @@ dotenv.config();
 
 async function completeOnboarding() {
   try {
-    console.log("🔄 Starting onboarding completion for Olaniyan Emmanuel...");
+    console.log("🔄 Starting onboarding completion for Super Admin...");
 
     // Connect to MongoDB
     await mongoose.connect(process.env.MONGO_URI);
     console.log("📡 Connected to MongoDB");
 
-    // Find Olaniyan Emmanuel by name
+    // Find Super Admin by email
     const user = await User.findOne({
-      firstName: "Olaniyan",
-      lastName: "Emmanuel",
+      email: "superadmin@payrollcistechlab.com",
     });
 
     if (!user) {
-      console.log("❌ User not found");
+      console.log("❌ Super Admin not found");
       return;
     }
 
