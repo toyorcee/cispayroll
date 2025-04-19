@@ -602,7 +602,8 @@ router.post(
 
 // Add route for processing multiple employees payroll
 router.post(
-  "/payroll/process-multiple",
+  "/payroll/process-multiple-employees",
+  requirePermission([Permission.CREATE_PAYROLL]),
   validateSuperAdminMultipleEmployeesPayroll,
   SuperAdminController.processMultipleEmployeesPayroll
 );

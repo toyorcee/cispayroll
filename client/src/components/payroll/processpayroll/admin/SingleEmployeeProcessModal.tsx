@@ -379,17 +379,55 @@ const SingleEmployeeProcessModal = ({
 
     try {
       console.log("📤 Making API call to process payroll");
-      await adminPayrollService.processSingleEmployeePayroll({
-        employeeId: selectedEmployees[0]._id,
-        month: formData.month,
-        year: formData.year,
-        frequency: formData.frequency,
-        departmentId: formData.departmentId,
-        userRole: user?.role,
-      });
 
-      console.log("✅ Payroll processed successfully");
-      toast.success("Payroll processed successfully");
+      if (selectedEmployees.length === 1) {
+        // Process single employee
+        await adminPayrollService.processSingleEmployeePayroll({
+          employeeId: selectedEmployees[0]._id,
+          month: formData.month,
+          year: formData.year,
+          frequency: formData.frequency,
+          departmentId: formData.departmentId,
+          userRole: user?.role,
+        });
+
+        console.log("✅ Single payroll processed successfully");
+        toast.success("Payroll processed successfully");
+      } else {
+        // Process multiple employees
+        const employeeIds = selectedEmployees.map((emp) => emp._id);
+        const multipleResult =
+          await adminPayrollService.processMultipleEmployeesPayroll({
+            employeeIds: employeeIds,
+            month: formData.month,
+            year: formData.year,
+            frequency: formData.frequency,
+            departmentId: formData.departmentId,
+            userRole: user?.role,
+          });
+
+        console.log("✅ Multiple payrolls processed:", multipleResult);
+
+        if (multipleResult.processed > 0) {
+          toast.success(
+            `Successfully processed ${multipleResult.processed} out of ${multipleResult.total} payrolls`
+          );
+
+          if (multipleResult.skipped > 0) {
+            toast.info(
+              `${multipleResult.skipped} payrolls were skipped (already exist)`
+            );
+          }
+
+          if (multipleResult.failed > 0) {
+            toast.error(`${multipleResult.failed} payrolls failed to process`);
+            console.error("Payroll processing errors:", multipleResult.errors);
+          }
+        } else {
+          toast.warning("No payrolls were processed");
+        }
+      }
+
       setShowSuccess(true);
 
       console.log("🔄 Invalidating queries");

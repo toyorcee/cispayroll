@@ -3958,11 +3958,17 @@ export class SuperAdminController {
       } = req.body;
       console.log("🔄 Processing payroll for department:", departmentId);
 
+      // Get department details
+      const department = await DepartmentModel.findById(departmentId);
+      if (!department) {
+        throw new ApiError(404, "Department not found");
+      }
+
       // Get all active employees in the department
       const employees = await UserModel.find({
         department: departmentId,
         status: "active",
-        role: "employee",
+        role: UserRole.USER,
       });
 
       if (!employees.length) {
@@ -4014,16 +4020,37 @@ export class SuperAdminController {
             approvedAt: new Date(),
           });
 
-          // Send notification to employee
-          await NotificationService.createPayrollNotification(
-            newPayroll,
-            NOTIFICATION_TYPES.PAYROLL_COMPLETED,
-            req.user,
-            "Your payroll has been processed and is ready for payment.",
-            {
-              approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-            }
-          );
+          // Send notification to HR Manager
+          const hrManager = await UserModel.findOne({ role: "HR_MANAGER" });
+          if (hrManager) {
+            await NotificationService.createPayrollNotification(
+              newPayroll,
+              NOTIFICATION_TYPES.PAYROLL_COMPLETED,
+              req.user,
+              `Payroll has been processed for ${employee.firstName} ${employee.lastName} in ${department.name} department.`,
+              {
+                approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+                recipientId: hrManager._id,
+              }
+            );
+          }
+
+          // Send notification to Finance Director
+          const financeDirector = await UserModel.findOne({
+            role: "FINANCE_DIRECTOR",
+          });
+          if (financeDirector) {
+            await NotificationService.createPayrollNotification(
+              newPayroll,
+              NOTIFICATION_TYPES.PAYROLL_COMPLETED,
+              req.user,
+              `Payroll has been processed for ${employee.firstName} ${employee.lastName} in ${department.name} department.`,
+              {
+                approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+                recipientId: financeDirector._id,
+              }
+            );
+          }
 
           results.processed++;
           results.processedDetails.push(
@@ -4041,17 +4068,19 @@ export class SuperAdminController {
         }
       }
 
+      // Create summary message
+      const summaryMessage = `Department payroll processing completed. Successfully processed ${results.processed} out of ${results.total} employees. Skipped: ${results.skipped}, Failed: ${results.failed}`;
+
       res.status(200).json({
         success: true,
-        message: "Department payroll processing completed",
+        message: summaryMessage,
         data: results,
       });
     } catch (error) {
       console.error("❌ Error in processDepartmentEmployeesPayroll:", error);
-      res.status(500).json({
+      res.status(error.statusCode || 500).json({
         success: false,
-        message: "Failed to process department payroll",
-        error: error.message,
+        message: error.message || "Error processing department payroll",
       });
     }
   }
@@ -4473,6 +4502,7 @@ export class SuperAdminController {
       let hrManager = null;
       let financeDirector = null;
       const notifiedRoles = [];
+      const notifiedUserIds = new Set(); // Track notified users to prevent duplicates
 
       if (hrDepartment) {
         hrManager = await UserModel.findOne({
@@ -4508,6 +4538,7 @@ export class SuperAdminController {
               },
             }
           );
+          notifiedUserIds.add(hrManager._id.toString());
         }
       }
 
@@ -4545,37 +4576,41 @@ export class SuperAdminController {
               },
             }
           );
+          notifiedUserIds.add(financeDirector._id.toString());
         }
       }
 
-      // Create a single notification for the Super Admin
-      const notificationMessage =
-        notifiedRoles.length > 0
-          ? `You have created and completed a payroll for ${
-              employee.firstName
-            } ${employee.lastName} (${
-              employee.employeeId
-            }) for ${month}/${year}. Notifications have been sent to ${notifiedRoles.join(
-              " and "
-            )}.`
-          : `You have created and completed a payroll for ${employee.firstName} ${employee.lastName} (${employee.employeeId}) for ${month}/${year}.`;
+      // Create a single notification for the Super Admin who created the payroll
+      // Only if they haven't already been notified
+      if (!notifiedUserIds.has(superAdmin._id.toString())) {
+        const notificationMessage =
+          notifiedRoles.length > 0
+            ? `You have created and completed a payroll for ${
+                employee.firstName
+              } ${employee.lastName} (${
+                employee.employeeId
+              }) for ${month}/${year}. Notifications have been sent to ${notifiedRoles.join(
+                " and "
+              )}.`
+            : `You have created and completed a payroll for ${employee.firstName} ${employee.lastName} (${employee.employeeId}) for ${month}/${year}.`;
 
-      await NotificationService.createNotification(
-        superAdmin._id,
-        NOTIFICATION_TYPES.PAYROLL_CREATED,
-        employee,
-        payroll,
-        notificationMessage,
-        {
-          approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-          metadata: {
-            payrollId: payroll._id,
-            employeeId: employee._id,
-            departmentId: employee.department._id,
-            status: payroll.status,
-          },
-        }
-      );
+        await NotificationService.createNotification(
+          superAdmin._id,
+          NOTIFICATION_TYPES.PAYROLL_CREATED,
+          employee,
+          payroll,
+          notificationMessage,
+          {
+            approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+            metadata: {
+              payrollId: payroll._id,
+              employeeId: employee._id,
+              departmentId: employee.department._id,
+              status: payroll.status,
+            },
+          }
+        );
+      }
 
       // Set response headers to trigger UI updates
       res.set({
@@ -4591,227 +4626,6 @@ export class SuperAdminController {
     } catch (error) {
       console.error(`❌ Error processing payroll: ${error.message}`);
       console.error("Stack trace:", error.stack);
-      next(error);
-    }
-  }
-
-  static async processMultipleEmployeesPayroll(req, res, next) {
-    try {
-      console.log("🔄 Processing multiple employees payroll:", req.body);
-      const {
-        month,
-        year,
-        frequency,
-        employeeSalaryGrades,
-        validationErrors = [],
-      } = req.body;
-      const superAdminId = req.user.id;
-
-      console.log(
-        `👤 Super Admin processing payrolls: ${req.user.firstName} ${req.user.lastName} (${superAdminId})`
-      );
-
-      const results = {
-        total: employeeSalaryGrades.length,
-        processed: 0,
-        skipped: 0,
-        failed: 0,
-        errors: [],
-        successful: [],
-        validationErrors: validationErrors,
-        details: [],
-      };
-
-      const processedPayrolls = [];
-      const skippedEmployees = [];
-      const failedEmployees = [];
-
-      // Process each employee's payroll
-      for (const { employeeId, salaryGradeId } of employeeSalaryGrades) {
-        try {
-          console.log(
-            `\n🔄 Processing employee: ${employeeId} with salary grade: ${salaryGradeId}`
-          );
-
-          // Check if payroll already exists
-          const existingPayroll = await PayrollModel.findOne({
-            employee: employeeId,
-            month,
-            year,
-            frequency,
-          });
-
-          if (existingPayroll) {
-            console.log(
-              `⚠️ Payroll already exists for employee ${employeeId}, skipping`
-            );
-            results.skipped++;
-            skippedEmployees.push(employeeId);
-            results.details.push({
-              employeeId,
-              status: "SKIPPED",
-              reason: "Payroll already exists for this period",
-            });
-            continue;
-          }
-
-          // Calculate payroll for this employee
-          console.log(`🧮 Calculating payroll for employee ${employeeId}`);
-          const payrollData = await PayrollService.calculatePayroll(
-            employeeId,
-            salaryGradeId,
-            month,
-            year,
-            frequency
-          );
-
-          if (payrollData) {
-            // Create payroll record
-            const payroll = await PayrollModel.create({
-              ...payrollData,
-              status: PAYROLL_STATUS.PROCESSING,
-              processedBy: superAdminId,
-              createdBy: superAdminId,
-              updatedBy: superAdminId,
-              payment: {
-                accountName: "Pending",
-                accountNumber: "Pending",
-                bankName: "Pending",
-              },
-              approvalFlow: {
-                currentLevel: APPROVAL_LEVELS.PROCESSING,
-                history: [],
-                submittedBy: superAdminId,
-                submittedAt: new Date(),
-                status: PAYROLL_STATUS.PROCESSING,
-                remarks: "Initial payroll creation",
-              },
-            });
-
-            console.log(`✅ Payroll created with ID: ${payroll._id}`);
-            processedPayrolls.push(payroll);
-            results.processed++;
-            results.successful.push({
-              employeeId,
-              payrollId: payroll._id,
-            });
-            results.details.push({
-              employeeId,
-              status: "SUCCESS",
-              payrollId: payroll._id,
-            });
-
-            console.log(
-              `✅ Successfully processed payroll for employee: ${employeeId}`
-            );
-          } else {
-            console.error(
-              `❌ Failed to calculate payroll for employee ${employeeId}`
-            );
-            results.failed++;
-            failedEmployees.push(employeeId);
-            results.details.push({
-              employeeId,
-              status: "FAILED",
-              reason: "Failed to calculate payroll",
-            });
-          }
-        } catch (error) {
-          console.error(
-            `❌ Error processing employee ${employeeId}: ${error.message}`
-          );
-          results.failed++;
-          failedEmployees.push(employeeId);
-          results.details.push({
-            employeeId,
-            status: "FAILED",
-            reason: error.message || "Unknown error occurred",
-          });
-        }
-      }
-
-      // Create a single consolidated notification for the super admin
-      if (
-        processedPayrolls.length > 0 ||
-        skippedEmployees.length > 0 ||
-        failedEmployees.length > 0
-      ) {
-        try {
-          console.log("🔔 Creating consolidated notification for super admin");
-
-          // Get employee details for the notification
-          const employeeDetails = await Promise.all(
-            processedPayrolls.map(async (payroll) => {
-              const employee = await UserModel.findById(payroll.employee);
-              return {
-                id: payroll._id,
-                employeeId: payroll.employee,
-                employeeName: employee
-                  ? `${employee.firstName} ${employee.lastName}`
-                  : "Unknown Employee",
-                status: payroll.status,
-              };
-            })
-          );
-
-          const notificationData = {
-            month,
-            year,
-            frequency,
-            totalProcessed: processedPayrolls.length,
-            totalSkipped: skippedEmployees.length,
-            totalFailed: failedEmployees.length,
-            processedPayrolls: employeeDetails,
-            skippedEmployees,
-            failedEmployees,
-            validationErrors,
-          };
-
-          // Create notification for super admin
-          await NotificationService.createNotification(
-            req.user._id,
-            NOTIFICATION_TYPES.MULTIPLE_PAYROLL_PROCESSING_SUMMARY,
-            req.user,
-            null,
-            `Processed ${processedPayrolls.length} payrolls${
-              skippedEmployees.length > 0
-                ? `, ${skippedEmployees.length} skipped`
-                : ""
-            }${
-              failedEmployees.length > 0
-                ? `, ${failedEmployees.length} failed`
-                : ""
-            }`,
-            notificationData
-          );
-
-          console.log("✅ Consolidated notification created for super admin");
-        } catch (notificationError) {
-          console.error(
-            `❌ Error creating notification: ${notificationError.message}`
-          );
-        }
-      }
-
-      console.log(`\n📊 Payroll processing summary:`);
-      console.log(`- Total employees: ${results.total}`);
-      console.log(`- Successfully processed: ${results.processed}`);
-      console.log(`- Skipped: ${results.skipped}`);
-      console.log(`- Failed: ${results.failed}`);
-      if (validationErrors.length > 0) {
-        console.log(`- Validation errors: ${validationErrors.length}`);
-      }
-
-      res.status(200).json({
-        success: true,
-        message:
-          validationErrors.length > 0
-            ? `Processed ${results.processed} payrolls (${validationErrors.length} failed validation)`
-            : `Processed ${results.processed} payrolls`,
-        data: results,
-      });
-    } catch (error) {
-      console.error(`❌ Error processing multiple payrolls: ${error.message}`);
       next(error);
     }
   }
@@ -5098,20 +4912,395 @@ export class SuperAdminController {
     }
   }
 
-  static async getProcessingStatistics(req, res) {
+  // Process multiple employees payroll
+  static async processMultipleEmployeesPayroll(req, res, next) {
     try {
-      const stats = await PayrollService.getProcessingStatistics();
-      res.json({
+      console.log(
+        "🔄 Starting multiple employees payroll processing (Super Admin)"
+      );
+      const {
+        employeeIds,
+        month,
+        year,
+        frequency = PayrollFrequency.MONTHLY,
+      } = req.body;
+
+      // Get super admin details
+      const superAdmin = await UserModel.findById(req.user.id)
+        .populate("department", "name code")
+        .select("+position +role +department");
+
+      if (!superAdmin) {
+        throw new ApiError(404, "Super Admin not found");
+      }
+
+      const results = {
+        total: employeeIds.length,
+        processed: 0,
+        skipped: 0,
+        failed: 0,
+        errors: [],
+        successful: [],
+        skippedDetails: [],
+        failedDetails: [],
+        processedDetails: [],
+      };
+
+      // Process each employee
+      for (const employeeId of employeeIds) {
+        try {
+          console.log(`Processing payroll for employee: ${employeeId}`);
+          // Get employee with their department
+          const employee = await UserModel.findOne({
+            _id: employeeId,
+            status: "active",
+          }).populate("department");
+
+          if (!employee) {
+            console.log(`Employee ${employeeId} not found or not active`);
+            results.failed++;
+            results.failedDetails.push(
+              `Employee ID ${employeeId} not found or not active`
+            );
+            continue;
+          }
+
+          console.log(
+            `Found employee: ${employee.firstName} ${employee.lastName}`
+          );
+
+          // Check for existing payroll
+          const existingPayroll = await PayrollModel.findOne({
+            employee: employeeId,
+            month,
+            year,
+            frequency,
+          });
+
+          if (existingPayroll) {
+            results.skipped++;
+            results.skippedDetails.push(
+              `${employee.firstName} ${employee.lastName} (${employee.employeeId}): Payroll already exists`
+            );
+            continue;
+          }
+
+          // Get employee's salary grade
+          if (!employee.gradeLevel) {
+            results.failed++;
+            results.failedDetails.push(
+              `${employee.firstName} ${employee.lastName} (${employee.employeeId}): No grade level assigned`
+            );
+            continue;
+          }
+
+          const salaryGrade = await SalaryGrade.findOne({
+            level: employee.gradeLevel,
+            isActive: true,
+          });
+
+          if (!salaryGrade) {
+            results.failed++;
+            results.failedDetails.push(
+              `${employee.firstName} ${employee.lastName} (${employee.employeeId}): No active salary grade found for level ${employee.gradeLevel}`
+            );
+            continue;
+          }
+
+          // Calculate payroll
+          const payrollData = await PayrollService.calculatePayroll(
+            employeeId,
+            salaryGrade._id,
+            month,
+            year,
+            frequency,
+            employee.department._id
+          );
+
+          if (!payrollData) {
+            results.failed++;
+            results.failedDetails.push(
+              `${employee.firstName} ${employee.lastName} (${employee.employeeId}): Failed to calculate payroll`
+            );
+            continue;
+          }
+
+          // Create payroll record with COMPLETED status
+          const payroll = await PayrollModel.create({
+            ...payrollData,
+            employee: employeeId,
+            department: employee.department._id,
+            status: PAYROLL_STATUS.COMPLETED,
+            processedBy: superAdmin._id,
+            createdBy: superAdmin._id,
+            updatedBy: superAdmin._id,
+            payment: {
+              accountName: "Pending",
+              accountNumber: "Pending",
+              bankName: "Pending",
+            },
+            approvalFlow: {
+              currentLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+              history: [
+                {
+                  level: APPROVAL_LEVELS.SUPER_ADMIN,
+                  status: "APPROVED",
+                  action: "APPROVE",
+                  user: superAdmin._id,
+                  timestamp: new Date(),
+                  remarks: "Payroll created and approved by Super Admin",
+                },
+              ],
+              submittedBy: superAdmin._id,
+              submittedAt: new Date(),
+              status: "APPROVED",
+            },
+          });
+
+          console.log(
+            `Created payroll for ${employee.firstName} ${employee.lastName}`
+          );
+
+          // Create audit log
+          await AuditService.logAction(
+            AuditAction.CREATE,
+            AuditEntity.PAYROLL,
+            payroll._id,
+            superAdmin._id,
+            {
+              status: "COMPLETED",
+              action: "PAYROLL_CREATED",
+              employeeId: employee._id,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+              month,
+              year,
+              frequency,
+              departmentId: employee.department._id,
+              createdBy: superAdmin._id,
+              position: superAdmin.position,
+              role: superAdmin.role,
+              message: `Created and completed payroll for ${employee.firstName} ${employee.lastName}`,
+              approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+            }
+          );
+
+          results.processed++;
+          results.processedDetails.push(
+            `${employee.firstName} ${employee.lastName} (${employee.employeeId})`
+          );
+          results.successful.push({
+            employeeId: employee._id,
+            payrollId: payroll._id,
+            department: employee.department._id,
+          });
+        } catch (error) {
+          console.error(`Error processing employee ${employeeId}:`, error);
+          results.failed++;
+          results.failedDetails.push(
+            `Employee ID ${employeeId}: ${error.message}`
+          );
+        }
+      }
+
+      // Create a single audit log for the bulk action
+      if (results.processed > 0) {
+        await AuditService.logAction(
+          AuditAction.CREATE,
+          AuditEntity.PAYROLL,
+          req.body.departmentId,
+          superAdmin._id,
+          new Map([
+            ["status", "COMPLETED"],
+            ["action", "BULK_PAYROLL_CREATED"],
+            ["month", month],
+            ["year", year],
+            ["frequency", frequency],
+            ["createdBy", superAdmin._id],
+            ["position", superAdmin.position],
+            ["role", superAdmin.role],
+            [
+              "message",
+              `Created and completed ${results.processed} payrolls for ${month}/${year}`,
+            ],
+            ["approvalLevel", APPROVAL_LEVELS.SUPER_ADMIN],
+            ["total", results.total],
+            ["processed", results.processed],
+            ["skipped", results.skipped],
+            ["failed", results.failed],
+            ["processedEmployees", results.processedDetails],
+            ["skippedEmployees", results.skippedDetails],
+            ["failedEmployees", results.failedDetails],
+          ])
+        );
+
+        // Get unique departments from processed employees
+        const processedDepartments = [
+          ...new Set(
+            results.processedDetails.map((detail) => {
+              const employee = results.successful.find(
+                (s) =>
+                  s.employeeId.toString() === detail.split("(")[1].split(")")[0]
+              );
+              return employee ? employee.department : null;
+            })
+          ),
+        ].filter(Boolean);
+
+        // Create notification metadata
+        const notificationMetadata = {
+          month,
+          year,
+          totalEmployees: results.total,
+          processedCount: results.processed,
+          skippedCount: results.skipped,
+          failedCount: results.failed,
+          departments: processedDepartments,
+          processedBy: `${superAdmin.firstName} ${superAdmin.lastName}`,
+          processedByRole: "Super Admin",
+          totalAmount: results.successful.reduce(
+            (sum, emp) => sum + (emp.payroll?.totals?.netPay || 0),
+            0
+          ),
+          departmentCode: "MULTI",
+          statusColor: "green",
+          statusIcon: "check-circle",
+          forceRefresh: true,
+          employeeName:
+            results.processed === 1
+              ? results.processedDetails[0]
+              : `${results.processed} employees processed`,
+          employeeDepartment: "Multiple Departments",
+          employeeDepartmentCode: "MULTI",
+          processedEmployees:
+            results.processed === 1
+              ? results.processedDetails
+              : [`${results.processed} employees processed`],
+          skippedEmployees:
+            results.skipped === 1
+              ? results.skippedDetails
+              : [`${results.skipped} employees skipped`],
+          failedEmployees:
+            results.failed === 1
+              ? results.failedDetails
+              : [`${results.failed} employees failed`],
+        };
+
+        // Find HR Manager and Finance Director to notify about all processed payrolls
+        const hrDepartment = await DepartmentModel.findOne({
+          name: { $in: ["Human Resources", "HR"] },
+          status: "active",
+        });
+
+        const financeDepartment = await DepartmentModel.findOne({
+          name: { $in: ["Finance and Accounting", "Finance", "Financial"] },
+          status: "active",
+        });
+
+        // Notify HR Manager
+        if (hrDepartment) {
+          const hrManager = await UserModel.findOne({
+            department: hrDepartment._id,
+            position: {
+              $in: [
+                "Head of Human Resources",
+                "HR Manager",
+                "HR Head",
+                "Human Resources Manager",
+                "HR Director",
+              ],
+            },
+            status: "active",
+          });
+
+          if (hrManager) {
+            await NotificationService.createNotification(
+              hrManager._id,
+              NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED,
+              null,
+              null,
+              `${results.processed} payrolls have been processed and completed by ${superAdmin.firstName} ${superAdmin.lastName} (Super Admin) for ${month}/${year}.`,
+              {
+                approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+                metadata: notificationMetadata,
+              }
+            );
+          }
+        }
+
+        // Notify Finance Director
+        if (financeDepartment) {
+          const financeDirector = await UserModel.findOne({
+            department: financeDepartment._id,
+            position: {
+              $in: [
+                "Head of Finance",
+                "Finance Director",
+                "Finance Head",
+                "Financial Director",
+                "Financial Head",
+              ],
+            },
+            status: "active",
+          });
+
+          if (financeDirector) {
+            await NotificationService.createNotification(
+              financeDirector._id,
+              NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED,
+              null,
+              null,
+              `${results.processed} payrolls have been processed and completed by ${superAdmin.firstName} ${superAdmin.lastName} (Super Admin) for ${month}/${year}.`,
+              {
+                approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+                metadata: notificationMetadata,
+              }
+            );
+          }
+        }
+
+        // Notify Super Admin
+        await NotificationService.createNotification(
+          superAdmin._id,
+          NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED,
+          null,
+          null,
+          `You have processed ${results.processed} payrolls for ${month}/${year}. ${results.skipped} skipped, ${results.failed} failed.`,
+          {
+            approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+            metadata: notificationMetadata,
+          }
+        );
+
+        console.log("Notifications sent to:", {
+          hrManager: hrDepartment ? "Yes" : "No",
+          financeDirector: financeDepartment ? "Yes" : "No",
+          superAdmin: "Yes",
+        });
+      }
+
+      // Set response headers to trigger UI updates
+      res.set({
+        "X-Refresh-Payrolls": "true",
+        "X-Refresh-Audit-Logs": "true",
+      });
+
+      // Send response with detailed results
+      res.status(200).json({
         success: true,
-        data: stats,
+        message: `Processed ${results.processed} payrolls successfully`,
+        data: {
+          total: results.total,
+          processed: results.processed,
+          skipped: results.skipped,
+          failed: results.failed,
+          processedDetails: results.processedDetails,
+          skippedDetails: results.skippedDetails,
+          failedDetails: results.failedDetails,
+        },
       });
     } catch (error) {
-      console.error("Error getting processing statistics:", error);
-      res.status(500).json({
-        success: false,
-        message: "Failed to get processing statistics",
-        error: error.message,
-      });
+      console.error("❌ Error in processMultipleEmployeesPayroll:", error);
+      next(error);
     }
   }
 }

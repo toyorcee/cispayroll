@@ -784,9 +784,40 @@ export class NotificationService {
           }`,
         };
       case NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED:
+        const processedEmployees = data?.metadata?.processedEmployees || [];
+        const firstEmployee = processedEmployees[0] || "Unknown Employee";
+        const remainingCount =
+          processedEmployees.length > 1 ? processedEmployees.length - 1 : 0;
+
         return {
           title: "Bulk Payroll Processed",
-          message: `Bulk payroll processing for ${payrollPeriod} has been completed.`,
+          message: `You have processed ${
+            data?.metadata?.processedCount || 0
+          } payrolls for ${data?.metadata?.month || ""}/${
+            data?.metadata?.year || ""
+          }. ${data?.metadata?.skippedCount || 0} skipped, ${
+            data?.metadata?.failedCount || 0
+          } failed.`,
+          data: {
+            ...data,
+            employeeName: firstEmployee,
+            employeeDepartment:
+              data?.metadata?.employeeDepartment || "Multiple Departments",
+            employeeDepartmentCode:
+              data?.metadata?.employeeDepartmentCode || "MULTI",
+            totalAmount: data?.metadata?.totalAmount || 0,
+            processedCount: data?.metadata?.processedCount || 0,
+            totalEmployees: data?.metadata?.totalEmployees || 0,
+            skippedCount: data?.metadata?.skippedCount || 0,
+            failedCount: data?.metadata?.failedCount || 0,
+            statusColor: "green",
+            statusIcon: "check-circle",
+            forceRefresh: true,
+            processedEmployees:
+              remainingCount > 0
+                ? [firstEmployee, `and ${remainingCount} others`]
+                : [firstEmployee],
+          },
         };
       case NOTIFICATION_TYPES.PAYMENT_FAILED:
         return {

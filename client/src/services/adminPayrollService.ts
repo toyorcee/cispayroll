@@ -626,7 +626,7 @@ export const adminPayrollService = {
     try {
       // Use different endpoint for Super Admin
       const endpoint = isSuperAdmin(data.userRole)
-        ? `${SUPER_ADMIN_BASE_URL}/payroll/process-multiple`
+        ? `${SUPER_ADMIN_BASE_URL}/payroll/process-multiple-employees`
         : `${BASE_URL}/payroll/process-multiple`;
 
       console.log("Making request to:", endpoint); // Debug log
@@ -638,7 +638,6 @@ export const adminPayrollService = {
         throw new Error(response.data.message || "Failed to process payroll");
       }
 
-      // Remove toast from here - will be handled in the component
       return response.data.data;
     } catch (error: any) {
       console.error("Error processing multiple employees payroll:", error);
