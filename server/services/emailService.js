@@ -16,105 +16,114 @@ export class EmailService {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASSWORD,
     },
+    tls: {
+      rejectUnauthorized: false,
+    },
+    debug: true,
   });
 
-  static async sendInvitationEmail(email, invitationToken, role) {
+  static async sendInvitationEmail(email, token, role) {
     try {
-      const inviteLink = `${process.env.CLIENT_URL}/auth/complete-registration/${invitationToken}`;
-      const userType = role === UserRole.ADMIN ? "Admin" : "Employee";
+      const setupLink = `${process.env.CLIENT_URL}/auth/complete-registration/${token}`;
 
-      await EmailService.transporter.sendMail({
-        from: process.env.EMAIL_FROM,
-        to: email,
-        subject: `Welcome to Personnel Management System - Complete Your ${userType} Account Setup`,
-        html: `
-          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
-            <div style="text-align: center; padding: 32px 0; background: linear-gradient(to right, #f8fafc, #ffffff);">
-              <div style="margin: 0 auto; width: fit-content;">
-                <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="48" height="48" viewBox="0 0 32 32">
-                  <image xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAXVJREFUWEdjZICB/wyM4ou9Iv8zMiQz/GcwZWBk4IXLUYPxn+EzAyPDacb/DHNfxm5bzsDI8B9kLCOIEFriycfyn3ENAwODKzXsIsKM3X8Y/4e8i9n+CeQORrElXjvpaDnMfbtfxWxzZxRf5BX1n5FhKRGuproSxv8M0Yxii732MjAwOFHddOIM3McotsjrE9UTHHGWMzD8Z/gMCgFalwoMDQdwM7MylBvlMwQpuQMDrhV9/YyNJ6by/Dz72+SA5KsEGgzzWBIVvdFsWzuzc0MVadn0McBd8JXM/CycqFY9vn3NwaVlaEjxAEDHgUDkggr9GMZMrWCGDiY2fDG84+/vximX1vH0HFxMVHpgahcoM4vx3DIdzpRBsIU2W3OZLj58RFBPUQ5wEpcl2G9awdBw5AVBO6uYDj28jJBPaMOGA2BoRECA54NQXlpQAsigpmZAgVEpQEKzCeodVA0Sge2WT7gHZMB75qBUsnAdk5h6XSAuucAZL/ia4Blq2wAAAAASUVORK5CYII=" x="0" y="0" width="32" height="32"/>
-                </svg>
-                <h1 style="color: #16a34a; font-size: 28px; font-weight: 600; margin: 16px 0 0 0;">Personnel Management System</h1>
-              </div>
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+          <title>Welcome to Personnel Management System</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              margin: 0;
+              padding: 0;
+            }
+            .container {
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .header {
+              background-color: #16a34a;
+              color: white;
+              padding: 20px;
+              text-align: center;
+            }
+            .content {
+              padding: 20px;
+              background-color: #f9f9f9;
+            }
+            .button {
+              display: inline-block;
+              padding: 12px 24px;
+              background-color: #16a34a;
+              color: white;
+              text-decoration: none;
+              border-radius: 4px;
+              margin: 20px 0;
+            }
+            .footer {
+              text-align: center;
+              padding: 20px;
+              font-size: 12px;
+              color: #666;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Welcome to Personnel Management System</h1>
             </div>
-
-            <div style="background: linear-gradient(to bottom right, #ffffff, #f8fafc);
-                        padding: 32px;
-                        border-radius: 16px;
-                        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-                        margin: 0 16px;">
-              <h2 style="color: #334155; text-align: center; font-size: 24px; margin-bottom: 24px; font-weight: 500;">
-                Welcome to Your ${userType} Account
-              </h2>
-              
-              <p style="color: #475569; font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
-                Your Personnel Management System account has been created. To begin your journey with us, please complete your account setup by clicking the button below:
+            <div class="content">
+              <p>Hello,</p>
+              <p>You have been invited to join the Personnel Management System as a ${role}.</p>
+              <p>To complete your account setup, please click the button below:</p>
+              <p style="text-align: center;">
+                <a href="${setupLink}" class="button">Complete Account Setup</a>
               </p>
-              
-              <div style="text-align: center; margin: 32px 0;">
-                <a href="${inviteLink}" 
-                   style="background-color: #16a34a; 
-                          color: white; 
-                          padding: 14px 36px; 
-                          text-decoration: none; 
-                          border-radius: 8px;
-                          font-weight: 500;
-                          display: inline-block;
-                          transition: all 0.3s ease;
-                          font-size: 16px;
-                          box-shadow: 0 2px 4px rgba(22, 163, 74, 0.2);"
-                   target="_blank"
-                   rel="noopener noreferrer">
-                  Complete Account Setup
-                </a>
-              </div>
-              
-              <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e2e8f0;">
-                <p style="color: #475569; font-size: 16px; margin-bottom: 16px; font-weight: 500;">
-                  As a member of our system, you'll have access to:
-                </p>
-                <div style="background-color: #f8fafc; padding: 20px; border-radius: 12px; margin-top: 16px;">
-                  <ul style="list-style-type: none; padding: 0; margin: 0; color: #475569;">
-                    <li style="margin: 12px 0; display: flex; align-items: center;">
-                      <span style="color: #16a34a; margin-right: 12px; font-size: 18px;">✓</span>
-                      <span>Comprehensive Employee Profile Management</span>
-                    </li>
-                    <li style="margin: 12px 0; display: flex; align-items: center;">
-                      <span style="color: #16a34a; margin-right: 12px; font-size: 18px;">✓</span>
-                      <span>Advanced Leave & Attendance System</span>
-                    </li>
-                    <li style="margin: 12px 0; display: flex; align-items: center;">
-                      <span style="color: #16a34a; margin-right: 12px; font-size: 18px;">✓</span>
-                      <span>Performance Review & Feedback Tools</span>
-                    </li>
-                    <li style="margin: 12px 0; display: flex; align-items: center;">
-                      <span style="color: #16a34a; margin-right: 12px; font-size: 18px;">✓</span>
-                      <span>Secure Document Management Portal</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              <p style="color: #64748b; font-size: 14px; margin-top: 24px; text-align: center; font-style: italic;">
-                For security reasons, this invitation link will expire in 7 days.
-              </p>
+              <p>Or copy and paste this link into your browser:</p>
+              <p>${setupLink}</p>
+              <p>This invitation link will expire in 7 days.</p>
+              <p>If you did not request this invitation, please ignore this email.</p>
             </div>
-
-            <div style="text-align: center; margin-top: 32px; padding: 24px;">
-              <p style="color: #64748b; font-size: 14px; margin-bottom: 16px;">
-                If you didn't expect this invitation, please ignore this email or contact your HR department.
-              </p>
-              <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0;">
-                <p style="color: #94a3b8; font-size: 13px; margin: 0;">
-                  Powered by Century Information Systems
-                </p>
-              </div>
+            <div class="footer">
+              <p>This is an automated message, please do not reply to this email.</p>
+              <p>© ${new Date().getFullYear()} Personnel Management System. All rights reserved.</p>
             </div>
           </div>
-        `,
-      });
+        </body>
+        </html>
+      `;
+
+      const mailOptions = {
+        from: {
+          name: "Personnel Management System",
+          address: process.env.EMAIL_FROM,
+        },
+        to: email,
+        subject:
+          "Welcome to Personnel Management System - Complete Your Account Setup",
+        html: html,
+        headers: {
+          "List-Unsubscribe": `<mailto:${process.env.EMAIL_USER}>`,
+          Precedence: "bulk",
+          "X-Auto-Response-Suppress": "OOF, DR, RN, NRN, AutoReply",
+          "X-Mailer": "Personnel Management System",
+          "X-Priority": "1",
+          "X-MSMail-Priority": "High",
+          Importance: "high",
+          "Content-Type": "text/html; charset=UTF-8",
+        },
+      };
+
+      await this.transporter.sendMail(mailOptions);
     } catch (error) {
-      console.error("Failed to send invitation email:", error);
+      console.error("Error sending invitation email:", error);
       throw new ApiError(500, "Failed to send invitation email");
     }
   }

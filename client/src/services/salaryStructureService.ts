@@ -5,7 +5,6 @@ import {
   ISalaryComponent,
   ISalaryComponentInput,
   CreateSalaryGradeDTO,
-  // ComponentType, // Add this import
 } from "../types/salary";
 
 const BASE_URL = "http://localhost:5000/api";
@@ -24,9 +23,8 @@ interface UpdateSalaryGradeInput {
 export const salaryStructureService = {
   getAllSalaryGrades: async (): Promise<ISalaryGrade[]> => {
     try {
-      // Use the new route that's accessible to both super admins and regular admins
       const response = await axios.get<{ data: ISalaryGrade[] }>(
-        `${BASE_URL}/employees/salary-grades`
+        `${BASE_URL}/employee/salary-grades`
       );
 
       // Just return the data directly from backend

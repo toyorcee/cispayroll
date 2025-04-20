@@ -13,6 +13,8 @@ import {
   FaCheckCircle,
   FaUserTie,
   FaBell,
+  FaChartPie,
+  FaUserFriends,
 } from "react-icons/fa";
 import { IconType } from "react-icons";
 
@@ -53,6 +55,21 @@ export interface DashboardStats {
     total: number;
     hodCount: number;
   };
+  departmentSize?: number;
+  activeColleagues?: number;
+  departmentName?: string;
+  teamMembers?: number;
+  recentActivities?: number;
+  unreadNotifications?: number;
+}
+
+export interface UserDashboardStats {
+  departmentSize?: number;
+  activeColleagues?: number;
+  departmentName?: string;
+  teamMembers?: number;
+  recentActivities?: number;
+  unreadNotifications?: number;
 }
 
 // Interfaces
@@ -81,109 +98,129 @@ export interface ActivityItem {
 }
 
 export const getRoleStats = (
-  role?: UserRole,
-  stats?: DashboardStats
+  role: UserRole,
+  stats: DashboardStats | UserDashboardStats | undefined
 ): StatItem[] => {
   if (!stats) return [];
 
   switch (role) {
     case UserRole.SUPER_ADMIN:
-      return [
-        {
-          name: "Total Users",
-          value: stats.employees.total.toString(),
-          subtext: `${stats.employees.byRole.admin} Admins • ${stats.employees.byRole.user} Users`,
-          icon: FaUserShield,
-          href: "/settings/users",
-          color: "blue",
-        },
-        {
-          name: "Departments",
-          value: stats.departments.total.toString(),
-          subtext: `${stats.departments.hodCount} HODs`,
-          icon: FaBuilding,
-          href: "/departments",
-          color: "green",
-        },
-        {
-          name: "Pending Approvals",
-          value: stats.employees.pending.toString(),
-          subtext: "New Employees",
-          icon: FaUserPlus,
-          href: "/employees/pending",
-          color: "yellow",
-        },
-        {
-          name: "Active Employees",
-          value: stats.employees.active.toString(),
-          subtext: "Currently Working",
-          icon: FaUsers,
-          href: "/employees",
-          color: "blue",
-        },
-      ];
+      if ("employees" in stats) {
+        return [
+          {
+            name: "Total Users",
+            value: stats.employees.total.toString(),
+            subtext: `${stats.employees.byRole.admin} Admins • ${stats.employees.byRole.user} Users`,
+            icon: FaUserShield,
+            href: "/settings/users",
+            color: "blue",
+          },
+          {
+            name: "Departments",
+            value: stats.departments.total.toString(),
+            subtext: `${stats.departments.hodCount} HODs`,
+            icon: FaBuilding,
+            href: "/departments",
+            color: "green",
+          },
+          {
+            name: "Pending Approvals",
+            value: stats.employees.pending.toString(),
+            subtext: "New Employees",
+            icon: FaUserPlus,
+            href: "/employees/pending",
+            color: "yellow",
+          },
+          {
+            name: "Active Employees",
+            value: stats.employees.active.toString(),
+            subtext: "Currently Working",
+            icon: FaUsers,
+            href: "/employees",
+            color: "blue",
+          },
+        ];
+      }
+      return [];
+
     case UserRole.ADMIN:
-      return [
-        {
-          name: "Department Staff",
-          value: stats.employees.byRole.user.toString(),
-          subtext: `${stats.employees.pending} Pending`,
-          icon: FaUserTie,
-          href: "/employees",
-          color: "blue",
-        },
-        {
-          name: "Departments",
-          value: stats.departments.total.toString(),
-          subtext: `${stats.departments.hodCount} HODs`,
-          icon: FaBuilding,
-          href: "/departments",
-          color: "green",
-        },
-        {
-          name: "Pending Approvals",
-          value: stats.employees.pending.toString(),
-          subtext: "New Employees",
-          icon: FaUserPlus,
-          href: "/employees/pending",
-          color: "yellow",
-        },
-        {
-          name: "Active Staff",
-          value: stats.employees.active.toString(),
-          subtext: "Currently Working",
-          icon: FaUsers,
-          href: "/employees",
-          color: "blue",
-        },
-      ];
+      if ("employees" in stats) {
+        return [
+          {
+            name: "Department Staff",
+            value: stats.employees.byRole.user.toString(),
+            subtext: `${stats.employees.pending} Pending`,
+            icon: FaUserTie,
+            href: "/employees",
+            color: "blue",
+          },
+          {
+            name: "Departments",
+            value: stats.departments.total.toString(),
+            subtext: `${stats.departments.hodCount} HODs`,
+            icon: FaBuilding,
+            href: "/departments",
+            color: "green",
+          },
+          {
+            name: "Pending Approvals",
+            value: stats.employees.pending.toString(),
+            subtext: "New Employees",
+            icon: FaUserPlus,
+            href: "/employees/pending",
+            color: "yellow",
+          },
+          {
+            name: "Active Staff",
+            value: stats.employees.active.toString(),
+            subtext: "Currently Working",
+            icon: FaUsers,
+            href: "/employees",
+            color: "blue",
+          },
+        ];
+      }
+      return [];
+
     case UserRole.USER:
-      return [
-        {
-          name: "Total Employees",
-          value: stats.employees.total.toString(),
-          subtext: "Including Admins and Staff",
-          icon: FaUsers,
-          href: "/employees",
-          color: "blue",
-        },
-        {
-          name: "Monthly Growth",
-          value: stats.employees.pending.toString(),
-          subtext: "New Employees",
-          icon: FaUserPlus,
-          href: "/employees/pending",
-          color: "yellow",
-        },
-        {
-          name: "Unread Notifications",
-          value: "0", // Placeholder for unread notifications
-          subtext: "Notifications",
-          icon: FaBell,
-          href: "/notifications",
-          color: "red",
-        },
-      ];
+      if ("departmentName" in stats) {
+        return [
+          {
+            name: "Department Size",
+            value: stats.departmentSize?.toString() || "0",
+            subtext: stats.departmentName || "Department",
+            icon: FaBuilding,
+            href: "/departments",
+            color: "blue",
+          },
+          {
+            name: "Active Colleagues",
+            value: stats.activeColleagues?.toString() || "0",
+            subtext: "Currently Working",
+            icon: FaUsers,
+            href: "/employees",
+            color: "green",
+          },
+          {
+            name: "Department Overview",
+            value: stats.departmentName || "Department",
+            subtext: `${stats.teamMembers || 0} Team Members`,
+            icon: FaChartPie,
+            href: "/departments",
+            color: "yellow",
+          },
+          {
+            name: "Team Members",
+            value: stats.teamMembers?.toString() || "0",
+            subtext: "In Your Department",
+            icon: FaUserFriends,
+            href: "/employees",
+            color: "blue",
+          },
+        ];
+      }
+      return [];
+
     default:
       return [];
   }

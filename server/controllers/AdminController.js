@@ -905,7 +905,7 @@ export class AdminController {
       // Create notifications
       await NotificationService.createPayrollNotification(
         payroll,
-        NOTIFICATION_TYPES.PAYROLL_REJECTED,
+          NOTIFICATION_TYPES.PAYROLL_REJECTED,
         admin,
         remarks
       );
@@ -915,13 +915,13 @@ export class AdminController {
         "REJECT",
         "PAYROLL",
         payroll._id,
-        admin._id,
-        {
+          admin._id,
+          {
           status: PAYROLL_STATUS.REJECTED,
           level: payroll.approvalFlow.currentLevel,
           employeeName: `${payroll.employee.firstName} ${payroll.employee.lastName}`,
-          month: payroll.month,
-          year: payroll.year,
+            month: payroll.month,
+            year: payroll.year,
           remarks: remarks,
           departmentId: payroll.department._id,
         }
@@ -1232,8 +1232,8 @@ export class AdminController {
       // Skip department head level only if submitter is HR Manager/Head
       const initialApprovalLevel =
         isHRDepartment && isHRManager
-          ? APPROVAL_LEVELS.HR_MANAGER
-          : APPROVAL_LEVELS.DEPARTMENT_HEAD;
+        ? APPROVAL_LEVELS.HR_MANAGER
+        : APPROVAL_LEVELS.DEPARTMENT_HEAD;
 
       console.log(`📊 Initial approval level: ${initialApprovalLevel}`);
       console.log(`🏢 Is HR Department: ${isHRDepartment}`);
@@ -3005,11 +3005,11 @@ export class AdminController {
 
       // Calculate payroll using PayrollService
       const payrollData = await PayrollService.calculatePayroll(
-        employeeId,
+          employeeId,
         salaryGrade,
-        month,
-        year,
-        frequency,
+            month,
+            year,
+            frequency,
         targetDepartment
       );
 
@@ -3159,7 +3159,7 @@ export class AdminController {
         data: payroll,
       });
     } catch (error) {
-      next(error);
+        next(error);
     }
   }
 
@@ -3684,8 +3684,8 @@ export class AdminController {
           // Skip department head level only if submitter is HR Manager/Head
           const initialApprovalLevel =
             isHRDepartment && isHRManager
-              ? APPROVAL_LEVELS.HR_MANAGER
-              : APPROVAL_LEVELS.DEPARTMENT_HEAD;
+            ? APPROVAL_LEVELS.HR_MANAGER
+            : APPROVAL_LEVELS.DEPARTMENT_HEAD;
 
           // Update payroll status and add to approval flow
           payroll.status = PAYROLL_STATUS.PENDING;
@@ -4295,8 +4295,8 @@ export class AdminController {
         // Skip department head level only if submitter is HR Manager/Head
         const initialApprovalLevel =
           isHRDepartment && isHRManager
-            ? APPROVAL_LEVELS.HR_MANAGER
-            : APPROVAL_LEVELS.DEPARTMENT_HEAD;
+          ? APPROVAL_LEVELS.HR_MANAGER
+          : APPROVAL_LEVELS.DEPARTMENT_HEAD;
 
         // Update payroll status and add to approval flow
         payroll.status = PAYROLL_STATUS.PENDING;

@@ -204,7 +204,6 @@ export const OffboardingType = {
 export const OffboardingStatus = {
   NOT_STARTED: "not_started",
   IN_PROGRESS: "in_progress",
-  PENDING_EXIT: "pending_exit",
   COMPLETED: "completed",
   CANCELLED: "cancelled",
 };
@@ -215,6 +214,29 @@ export const DeductionOptOutReason = {
   ALTERNATIVE_PLAN: "alternative_plan",
   TEMPORARY_SUSPENSION: "temporary_suspension",
   OTHER: "other",
+};
+
+// Add new enum for offboarding task categories
+export const OffboardingTaskCategory = {
+  DOCUMENTATION: "documentation",
+  EQUIPMENT_RETURN: "equipment_return",
+  ACCESS_REVOCATION: "access_revocation",
+  FINANCIAL: "financial",
+  EXIT_INTERVIEW: "exit_interview",
+  KNOWLEDGE_TRANSFER: "knowledge_transfer",
+  OTHER: "other",
+};
+
+// Add new enum for default offboarding tasks
+export const DefaultOffboardingTasks = {
+  EXIT_INTERVIEW: "exit_interview",
+  EQUIPMENT_RETURN: "equipment_return",
+  ACCESS_REVOCATION: "access_revocation",
+  DOCUMENTATION_HANDOVER: "documentation_handover",
+  KNOWLEDGE_TRANSFER: "knowledge_transfer",
+  FINAL_PAYROLL: "final_payroll_processing",
+  BENEFITS_TERMINATION: "benefits_termination",
+  CLEARANCE_FORM: "clearance_form_completion",
 };
 
 // Schema Definition
@@ -385,18 +407,51 @@ const UserSchema = new Schema(
       onboarding: {
         status: {
           type: String,
-          enum: ["NOT_STARTED", "IN_PROGRESS", "COMPLETED"],
-          default: "NOT_STARTED",
+          enum: Object.values(OnboardingStatus),
+          default: OnboardingStatus.NOT_STARTED,
+        },
+        supervisor: {
+          type: Schema.Types.ObjectId,
+          ref: "User",
         },
         startedAt: Date,
+        expectedCompletionDate: Date,
         completedAt: Date,
-        steps: [
+        tasks: [
           {
-            name: String,
-            completed: Boolean,
+            name: {
+              type: String,
+              required: true,
+              enum: [
+                "Welcome Meeting",
+                "Department Introduction",
+                "System Access Setup",
+                "Policy Documentation Review",
+                "Initial Training Session",
+              ],
+            },
+            description: String,
+            category: {
+              type: String,
+              enum: [
+                "orientation",
+                "documentation",
+                "training",
+                "setup",
+                "compliance",
+              ],
+            },
+            deadline: Date,
+            completed: { type: Boolean, default: false },
             completedAt: Date,
+            completedBy: {
+              type: Schema.Types.ObjectId,
+              ref: "User",
+            },
+            notes: String,
           },
         ],
+        progress: { type: Number, default: 0 },
       },
     },
     // Consolidate invitation fields
@@ -423,7 +478,17 @@ const UserSchema = new Schema(
       completedAt: Date,
       tasks: [
         {
-          name: { type: String, required: true },
+          name: {
+            type: String,
+            required: true,
+            enum: [
+              "Welcome Meeting",
+              "Department Introduction",
+              "System Access Setup",
+              "Policy Documentation Review",
+              "Initial Training Session",
+            ],
+          },
           description: String,
           category: {
             type: String,
@@ -457,40 +522,115 @@ const UserSchema = new Schema(
       type: {
         type: String,
         enum: Object.values(OffboardingType),
+        required: function () {
+          return this.status !== OffboardingStatus.NOT_STARTED;
+        },
       },
-      reason: String,
+      reason: {
+        type: String,
+        required: function () {
+          return this.status !== OffboardingStatus.NOT_STARTED;
+        },
+      },
       initiatedAt: Date,
       initiatedBy: {
         type: Schema.Types.ObjectId,
         ref: "User",
       },
-      targetExitDate: Date,
+      targetExitDate: {
+        type: Date,
+        required: function () {
+          return this.status !== OffboardingStatus.NOT_STARTED;
+        },
+      },
       actualExitDate: Date,
-      checklist: [
+      tasks: [
         {
-          task: String,
-          completed: { type: Boolean, default: false },
+          name: {
+            type: String,
+            required: true,
+            enum: Object.values(DefaultOffboardingTasks),
+          },
+          description: String,
+          category: {
+            type: String,
+            enum: Object.values(OffboardingTaskCategory),
+            required: true,
+          },
+          deadline: {
+            type: Date,
+            required: true,
+          },
+          completed: {
+            type: Boolean,
+            default: false,
+          },
           completedAt: Date,
           completedBy: {
             type: Schema.Types.ObjectId,
             ref: "User",
           },
           notes: String,
+          attachments: [
+            {
+              name: String,
+              url: String,
+              uploadedAt: Date,
+              uploadedBy: {
+                type: Schema.Types.ObjectId,
+                ref: "User",
+              },
+            },
+          ],
         },
       ],
+      progress: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 100,
+      },
       exitInterview: {
-        completed: { type: Boolean, default: false },
+        completed: {
+          type: Boolean,
+          default: false,
+        },
         conductedBy: {
           type: Schema.Types.ObjectId,
           ref: "User",
         },
         date: Date,
         notes: String,
+        feedback: {
+          rating: {
+            type: Number,
+            min: 1,
+            max: 5,
+          },
+          comments: String,
+          suggestions: String,
+        },
       },
       rehireEligible: {
         status: Boolean,
         notes: String,
+        decidedBy: {
+          type: Schema.Types.ObjectId,
+          ref: "User",
+        },
+        decidedAt: Date,
       },
+      checklist: [
+        {
+          item: String,
+          completed: Boolean,
+          completedAt: Date,
+          completedBy: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+          },
+        },
+      ],
     },
     salaryGrade: {
       type: Schema.Types.ObjectId,
@@ -1092,22 +1232,22 @@ UserSchema.methods.updateLifecycleState = async function (
   switch (newState) {
     case UserLifecycleState.INVITED:
       this.status = UserStatus.PENDING;
-      this.onboarding.status = OnboardingStatus.NOT_STARTED;
+      this.lifecycle.onboarding.status = OnboardingStatus.NOT_STARTED;
       break;
     case UserLifecycleState.REGISTERED:
       this.isEmailVerified = true;
       break;
     case UserLifecycleState.ONBOARDING:
       this.status = UserStatus.ACTIVE;
-      this.onboarding.status = OnboardingStatus.IN_PROGRESS;
-      if (!this.onboarding.startedAt) {
-        this.onboarding.startedAt = new Date();
+      this.lifecycle.onboarding.status = OnboardingStatus.IN_PROGRESS;
+      if (!this.lifecycle.onboarding.startedAt) {
+        this.lifecycle.onboarding.startedAt = new Date();
       }
       break;
     case UserLifecycleState.ACTIVE:
       this.status = UserStatus.ACTIVE;
-      this.onboarding.status = OnboardingStatus.COMPLETED;
-      this.onboarding.completedAt = new Date();
+      this.lifecycle.onboarding.status = OnboardingStatus.COMPLETED;
+      this.lifecycle.onboarding.completedAt = new Date();
       break;
     case UserLifecycleState.OFFBOARDING:
       this.status = UserStatus.OFFBOARDING;
@@ -1218,6 +1358,129 @@ UserSchema.methods.generateAuthToken = function () {
     process.env.JWT_SECRET,
     { expiresIn: "24h" }
   );
+};
+
+// Add methods for offboarding management
+UserSchema.methods.getDefaultOffboardingTasks = function (type) {
+  // Default tasks for all offboarding types
+  const defaultTasks = [
+    {
+      name: DefaultOffboardingTasks.EXIT_INTERVIEW,
+      category: OffboardingTaskCategory.EXIT_INTERVIEW,
+      deadline: new Date(),
+      completed: false,
+    },
+    {
+      name: DefaultOffboardingTasks.EQUIPMENT_RETURN,
+      category: OffboardingTaskCategory.EQUIPMENT_RETURN,
+      deadline: new Date(),
+      completed: false,
+    },
+    {
+      name: DefaultOffboardingTasks.ACCESS_REVOCATION,
+      category: OffboardingTaskCategory.ACCESS_REVOCATION,
+      deadline: new Date(),
+      completed: false,
+    },
+    {
+      name: DefaultOffboardingTasks.DOCUMENTATION_HANDOVER,
+      category: OffboardingTaskCategory.DOCUMENTATION,
+      deadline: new Date(),
+      completed: false,
+    },
+    {
+      name: DefaultOffboardingTasks.KNOWLEDGE_TRANSFER,
+      category: OffboardingTaskCategory.KNOWLEDGE_TRANSFER,
+      deadline: new Date(),
+      completed: false,
+    },
+    {
+      name: DefaultOffboardingTasks.FINAL_PAYROLL,
+      category: OffboardingTaskCategory.FINANCIAL,
+      deadline: new Date(),
+      completed: false,
+    },
+  ];
+
+  return defaultTasks;
+};
+
+UserSchema.methods.initiateOffboarding = async function (data) {
+  // Set default tasks based on offboarding type
+  const defaultTasks = this.getDefaultOffboardingTasks(data.type);
+
+  // Set the deadline for all tasks to the target exit date
+  defaultTasks.forEach((task) => {
+    task.deadline = data.targetExitDate;
+  });
+
+  // Update offboarding status and details
+  this.offboarding = {
+    status: OffboardingStatus.IN_PROGRESS,
+    type: data.type,
+    reason: data.reason,
+    initiatedAt: new Date(),
+    targetExitDate: data.targetExitDate,
+    tasks: defaultTasks,
+    progress: 0,
+    initiatedBy: data.initiatedBy,
+  };
+
+  // Update lifecycle state
+  this.lifecycle.onboarding.status = "completed";
+  this.lifecycle.currentState = UserLifecycleState.OFFBOARDING;
+
+  await this.save();
+  return this;
+};
+
+UserSchema.methods.completeOffboardingTask = async function (
+  taskName,
+  completedBy
+) {
+  const task = this.offboarding.tasks.find((t) => t.name === taskName);
+  if (!task) {
+    throw new Error(`Task ${taskName} not found`);
+  }
+
+  task.completed = true;
+  task.completedAt = new Date();
+  task.completedBy = completedBy;
+
+  // Calculate progress
+  const completedTasks = this.offboarding.tasks.filter(
+    (t) => t.completed
+  ).length;
+  this.offboarding.progress =
+    (completedTasks / this.offboarding.tasks.length) * 100;
+
+  // If all tasks are completed, update status
+  if (this.offboarding.progress === 100) {
+    this.offboarding.status = OffboardingStatus.COMPLETED;
+    this.offboarding.actualExitDate = new Date();
+
+    // Update lifecycle state to TERMINATED
+    await this.updateLifecycleState(
+      UserLifecycleState.TERMINATED,
+      completedBy,
+      "Offboarding process completed"
+    );
+  }
+
+  return this.save();
+};
+
+UserSchema.methods.cancelOffboarding = async function (reason, cancelledBy) {
+  this.offboarding.status = OffboardingStatus.CANCELLED;
+
+  // Update lifecycle state back to ACTIVE
+  await this.updateLifecycleState(
+    UserLifecycleState.ACTIVE,
+    cancelledBy,
+    `Offboarding cancelled - ${reason}`
+  );
+
+  return this.save();
 };
 
 export default mongoose.model("User", UserSchema);

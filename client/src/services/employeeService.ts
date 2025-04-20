@@ -92,11 +92,6 @@ export const employeeService = {
     filters: EmployeeFilters
   ): Promise<DepartmentEmployeeResponse> => {
     try {
-      console.log("🔄 Service: Starting getDepartmentEmployees", {
-        departmentId,
-        filters,
-      });
-
       const queryParams = new URLSearchParams();
       if (filters.status) queryParams.append("status", filters.status);
       queryParams.append("page", (filters.page || 1).toString());
@@ -105,7 +100,6 @@ export const employeeService = {
       const url = `${BASE_URL}/departments/${departmentId}/employees?${queryParams}`;
       const response = await axios.get(url);
 
-      // Return the data array from the response
       return {
         employees: response.data.data || [],
         total: response.data.total || 0,
@@ -114,14 +108,7 @@ export const employeeService = {
         totalPages: response.data.totalPages || 1,
       };
     } catch (error) {
-      console.error("❌ Service: Error in getDepartmentEmployees:", error);
-      if (axios.isAxiosError(error)) {
-        console.error("Error details:", {
-          status: error.response?.status,
-          data: error.response?.data,
-          url: error.config?.url,
-        });
-      }
+      console.error("Error in getDepartmentEmployees:", error);
       throw error;
     }
   },
@@ -232,18 +219,14 @@ export const employeeService = {
 
   getOnboardingEmployees: async (): Promise<OnboardingEmployee[]> => {
     try {
-      console.log("📤 Fetching onboarding employees");
       const response = await axios.get<{
         success: boolean;
         data: OnboardingEmployee[];
       }>(`${BASE_URL}/super-admin/onboarding-employees`);
 
-      console.log("📥 Onboarding employees response:", response.data);
-
-      // Return the data array from the response
       return response.data.data || [];
     } catch (error: unknown) {
-      console.error("❌ Error fetching onboarding employees:", error);
+      console.error("Error fetching onboarding employees:", error);
       if (axios.isAxiosError(error)) {
         toast.error(
           error.response?.data?.message || "Failed to fetch employees"
@@ -251,7 +234,7 @@ export const employeeService = {
       } else {
         toast.error("Failed to fetch employees");
       }
-      return []; // Return empty array on error
+      return [];
     }
   },
 
@@ -291,14 +274,12 @@ export const employeeService = {
     return response.data.data;
   },
 
-  async getOffboardingEmployees() {
+  getOffboardingEmployees: async () => {
     try {
-      console.log("🔍 Calling getOffboardingEmployees API...");
       const response = await axios.get(
         `${BASE_URL}/super-admin/offboarding-employees`,
         { withCredentials: true }
       );
-      console.log("📥 API Response:", response);
 
       if (!response.data.success) {
         throw new Error(
@@ -308,14 +289,13 @@ export const employeeService = {
 
       return response.data.data;
     } catch (error) {
-      console.error("❌ Error in getOffboardingEmployees:", error);
+      console.error("Error in getOffboardingEmployees:", error);
       throw error;
     }
   },
 
-  async initiateOffboarding(employeeId: string) {
+  initiateOffboarding: async (employeeId: string) => {
     try {
-      console.log("🔄 Initiating offboarding for:", employeeId);
       const response = await axios.post(
         `${BASE_URL}/super-admin/employees/${employeeId}/offboard`,
         {},
@@ -333,11 +313,10 @@ export const employeeService = {
         );
       }
 
-      console.log("✅ Offboarding response:", response.data);
       return response.data;
     } catch (error: unknown) {
       console.error(
-        "❌ Failed to initiate offboarding:",
+        "Failed to initiate offboarding:",
         axios.isAxiosError(error)
           ? error.response?.data || error.message
           : String(error)
@@ -532,7 +511,7 @@ export const employeeService = {
 
   getDashboardStats: async (): Promise<DashboardStats> => {
     try {
-      const response = await axios.get(`${BASE_URL}/employees/dashboard/stats`);
+      const response = await axios.get(`${BASE_URL}/employee/dashboard/stats`);
       return response.data.data;
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
@@ -547,21 +526,6 @@ export const employeeService = {
     );
     return response.data;
   },
-
-  // async getPayrollTrends() {
-  //   const response = await api.get("/api/dashboard/payroll-trends");
-  //   return response.data;
-  // },
-
-  // async getDepartmentDistribution() {
-  //   const response = await api.get("/api/dashboard/department-distribution");
-  //   return response.data;
-  // },
-
-  // async getDepartmentPieData() {
-  //   const response = await api.get("/api/dashboard/department-pie");
-  //   return response.data;
-  // },
 
   getAllEmployees: async (filters?: EmployeeFilters) => {
     try {
@@ -864,53 +828,18 @@ export const employeeService = {
     },
   },
 
-  async getOffboardingUsers() {
-    try {
-      const response = await axios.get(
-        `${BASE_URL}/super-admin/users/offboarding`,
-        { withCredentials: true }
-      );
-
-      if (!response.data.success) {
-        throw new Error(
-          response.data.message || "Failed to fetch offboarding users"
-        );
-      }
-
-      return response.data.data;
-    } catch (error) {
-      console.error("Failed to fetch offboarding users:", error);
-      throw error;
-    }
-  },
-
   // --- Profile Management ---
   getUserProfile: async () => {
-    console.log("LOG: Fetching user profile");
     try {
-      // Always use the /users/profile endpoint - it handles all roles correctly
-      const response = await axios.get(`${BASE_URL}/users/profile`);
-      console.log("LOG: Profile response:", response.data);
+      const response = await axios.get(`${BASE_URL}/employee/profile`);
 
       if (!response.data.success || !response.data.user) {
-        console.error("LOG ERROR: Invalid response format:", response.data);
         throw new Error("Failed to fetch user profile data");
       }
 
-      console.log(
-        "LOG: Successfully fetched user profile for role:",
-        response.data.user.role
-      );
       return response.data.user;
     } catch (error) {
-      console.error("LOG ERROR in getUserProfile:", error);
-      if (axios.isAxiosError(error)) {
-        console.error("LOG ERROR details:", {
-          status: error.response?.status,
-          data: error.response?.data,
-          url: error.config?.url,
-        });
-      }
+      console.error("Error in getUserProfile:", error);
       throw error;
     }
   },
@@ -930,7 +859,6 @@ export const employeeService = {
 
   // --- Profile Image Upload ---
   updateProfileImage: async (file: File): Promise<{ profileImage: string }> => {
-    console.log("LOG: Uploading profile image");
     try {
       const formData = new FormData();
       formData.append("image", file);
@@ -951,17 +879,9 @@ export const employeeService = {
         );
       }
 
-      console.log("LOG: Successfully uploaded profile image");
       return { profileImage: response.data.profileImage };
     } catch (error) {
-      console.error("LOG ERROR in updateProfileImage:", error);
-      if (axios.isAxiosError(error)) {
-        console.error("LOG ERROR details:", {
-          status: error.response?.status,
-          data: error.response?.data,
-          url: error.config?.url,
-        });
-      }
+      console.error("Error in updateProfileImage:", error);
       throw error;
     }
   },
@@ -984,7 +904,6 @@ export const employeeService = {
 
   // --- Payslip Management ---
   getOwnPayslips: async (params?: { page?: number; limit?: number }) => {
-    console.log("🔍 Fetching own payslips with params:", params);
     try {
       const response = await axios.get(`${BASE_URL}/employees/payslips`, {
         params: {
@@ -994,21 +913,12 @@ export const employeeService = {
       });
 
       if (!response.data.success) {
-        console.error("❌ API returned error:", response.data);
         throw new Error(response.data.message || "Failed to fetch payslips");
       }
 
-      console.log("✅ Successfully fetched payslips");
       return response.data;
     } catch (error) {
-      console.error("❌ Error fetching payslips:", error);
-      if (axios.isAxiosError(error)) {
-        console.error("Axios error details:", {
-          status: error.response?.status,
-          data: error.response?.data,
-          url: error.config?.url,
-        });
-      }
+      console.error("Error fetching payslips:", error);
       throw error;
     }
   },

@@ -155,6 +155,20 @@ export class OnboardingController {
       if (user.onboarding.progress === 100) {
         user.onboarding.status = OnboardingStatus.COMPLETED;
         user.onboarding.completedAt = new Date();
+
+        // Update lifecycle state using the proper method
+        await user.updateLifecycleState(
+          UserLifecycleState.ACTIVE,
+          req.user._id,
+          "Onboarding completed - all tasks finished"
+        );
+
+        // Update lifecycle onboarding status
+        user.lifecycle.onboarding.status = "COMPLETED";
+        user.lifecycle.onboarding.completedAt = new Date();
+
+        // Set user status to active for payroll processing
+        user.status = "active";
       } else {
         user.onboarding.status = OnboardingStatus.IN_PROGRESS;
       }

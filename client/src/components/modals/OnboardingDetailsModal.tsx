@@ -125,7 +125,7 @@ interface OnboardingDetailsModalProps {
   employee: OnboardingEmployee;
   isOpen: boolean;
   onClose: () => void;
-  onTaskComplete: () => void;
+  onTaskComplete: (updatedEmployee: OnboardingEmployee) => void;
 }
 
 export const OnboardingDetailsModal: React.FC<OnboardingDetailsModalProps> = ({
@@ -137,45 +137,70 @@ export const OnboardingDetailsModal: React.FC<OnboardingDetailsModalProps> = ({
   const [loadingTasks, setLoadingTasks] = useState<{ [key: string]: boolean }>(
     {}
   );
-  const [localEmployee, setLocalEmployee] = useState(employee);
+  const [localEmployee, setLocalEmployee] =
+    useState<OnboardingEmployee>(employee);
   const navigate = useNavigate();
 
-  // Update local state when prop changes
   useEffect(() => {
     setLocalEmployee(employee);
   }, [employee]);
 
   const handleTaskComplete = async (taskName: string) => {
+    if (!isOpen) return; 
+
     try {
       setLoadingTasks((prev) => ({ ...prev, [taskName]: true }));
 
+      const updatedTasks = localEmployee.onboarding.tasks.map((task) =>
+        task.name === taskName
+          ? { ...task, completed: true, completedAt: new Date().toISOString() }
+          : task
+      );
+
+      const completedTasks = updatedTasks.filter(
+        (task) => task.completed
+      ).length;
+      const newProgress = Math.round(
+        (completedTasks / updatedTasks.length) * 100
+      );
+
+      const updatedEmployee = {
+        ...localEmployee,
+        onboarding: {
+          ...localEmployee.onboarding,
+          tasks: updatedTasks,
+          progress: newProgress,
+        },
+      };
+
+      // Update local state immediately
+      setLocalEmployee(updatedEmployee);
+
+      // Make API call in the background
       const encodedTaskName = encodeURIComponent(taskName);
-      const response = await axios.patch(
+      await axios.patch(
         `/api/onboarding/${employee._id}/tasks/${encodedTaskName}`
       );
 
-      // Update local state immediately
+      onTaskComplete(updatedEmployee);
+      toast.success(`Task "${taskName}" marked as complete`);
+    } catch (error) {
+      console.error("Failed to complete task:", error);
+
       setLocalEmployee((prev) => ({
         ...prev,
         onboarding: {
           ...prev.onboarding,
           tasks: prev.onboarding.tasks.map((task) =>
             task.name === taskName
-              ? {
-                  ...task,
-                  completed: true,
-                  completedAt: new Date().toISOString(),
-                }
+              ? { ...task, completed: false, completedAt: undefined }
               : task
           ),
-          progress: response.data.data.progress,
+          progress: employee.onboarding.progress,
         },
       }));
 
-      // Notify parent component
-      onTaskComplete();
-    } catch (error) {
-      console.error("Failed to complete task:", error);
+      toast.error("Failed to mark task as complete");
     } finally {
       setLoadingTasks((prev) => ({ ...prev, [taskName]: false }));
     }
@@ -185,8 +210,8 @@ export const OnboardingDetailsModal: React.FC<OnboardingDetailsModalProps> = ({
     try {
       await employeeService.initiateOffboarding(employee._id);
       toast.success("Offboarding initiated successfully");
-      onClose(); // Close the modal
-      navigate("/pms/employees/offboarding"); // Navigate to offboarding page
+      onClose();
+      navigate("/pms/employees/offboarding");
     } catch (error) {
       toast.error("Failed to initiate offboarding");
       console.error(error);
@@ -231,7 +256,7 @@ export const OnboardingDetailsModal: React.FC<OnboardingDetailsModalProps> = ({
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2.5">
             <div
-              className="bg-blue-600 h-2.5 rounded-full"
+              className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
               style={{ width: `${localEmployee.onboarding.progress}%` }}
             ></div>
           </div>
@@ -245,7 +270,7 @@ export const OnboardingDetailsModal: React.FC<OnboardingDetailsModalProps> = ({
             >
               <div className="flex items-center space-x-3">
                 <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center
+                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors duration-200
                   ${task.completed ? "bg-green-500" : "bg-gray-200"}`}
                 >
                   {task.completed && (
@@ -276,39 +301,37 @@ export const OnboardingDetailsModal: React.FC<OnboardingDetailsModalProps> = ({
               </div>
 
               {!task.completed && (
-                <button
-                  onClick={() => handleTaskComplete(task.name)}
-                  disabled={loadingTasks[task.name]}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 cursor-pointer"
-                >
-                  {loadingTasks[task.name] ? (
-                    <div className="flex items-center">
-                      <svg
-                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                      Updating...
-                    </div>
-                  ) : (
-                    "Mark Complete"
+                <div className="flex items-center space-x-2">
+                  {loadingTasks[task.name] && (
+                    <svg
+                      className="animate-spin h-4 w-4 text-blue-600"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
                   )}
-                </button>
+                  <button
+                    onClick={() => handleTaskComplete(task.name)}
+                    disabled={loadingTasks[task.name]}
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 cursor-pointer transition-colors duration-200"
+                  >
+                    Mark Complete
+                  </button>
+                </div>
               )}
             </div>
           ))}

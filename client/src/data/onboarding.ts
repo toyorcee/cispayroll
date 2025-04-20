@@ -27,44 +27,44 @@ export const onboardingEmployees: OnboardingEmployee[] = [
           id: "task1",
           name: "contract_signing",
           completed: true,
-          completedAt: "2024-04-15"
+          completedAt: "2024-04-15",
         },
         {
           _id: "task2",
           id: "task2",
           name: "it_setup",
           completed: true,
-          completedAt: "2024-04-15"
+          completedAt: "2024-04-15",
         },
         {
           _id: "task3",
           id: "task3",
           name: "documentation",
-          completed: false
+          completed: false,
         },
         {
           _id: "task4",
           id: "task4",
           name: "training",
-          completed: false
+          completed: false,
         },
         {
           _id: "task5",
           id: "task5",
           name: "bank_setup",
           completed: true,
-          completedAt: "2024-04-15"
+          completedAt: "2024-04-15",
         },
         {
           _id: "task6",
           id: "task6",
           name: "pension_setup",
-          completed: false
-        }
+          completed: false,
+        },
       ],
-      startedAt: "2024-04-15"
+      startedAt: "2024-04-15",
     },
-    fullName: "Folake Adeleke"
+    fullName: "Folake Adeleke",
   },
   {
     _id: "ONB002",
@@ -92,43 +92,43 @@ export const onboardingEmployees: OnboardingEmployee[] = [
           id: "task7",
           name: "contract_signing",
           completed: true,
-          completedAt: "2024-04-10"
+          completedAt: "2024-04-10",
         },
         {
           _id: "task8",
           id: "task8",
           name: "it_setup",
-          completed: false
+          completed: false,
         },
         {
           _id: "task9",
           id: "task9",
           name: "documentation",
-          completed: false
+          completed: false,
         },
         {
           _id: "task10",
           id: "task10",
           name: "training",
-          completed: false
+          completed: false,
         },
         {
           _id: "task11",
           id: "task11",
           name: "bank_setup",
           completed: true,
-          completedAt: "2024-04-10"
+          completedAt: "2024-04-10",
         },
         {
           _id: "task12",
           id: "task12",
           name: "pension_setup",
-          completed: false
-        }
+          completed: false,
+        },
       ],
-      startedAt: "2024-04-10"
+      startedAt: "2024-04-10",
     },
-    fullName: "Taiwo Ogunleye"
+    fullName: "Taiwo Ogunleye",
   },
   {
     _id: "ONB003",
@@ -155,41 +155,41 @@ export const onboardingEmployees: OnboardingEmployee[] = [
           _id: "task13",
           id: "task13",
           name: "contract_signing",
-          completed: false
+          completed: false,
         },
         {
           _id: "task14",
           id: "task14",
           name: "it_setup",
-          completed: false
+          completed: false,
         },
         {
           _id: "task15",
           id: "task15",
           name: "documentation",
-          completed: false
+          completed: false,
         },
         {
           _id: "task16",
           id: "task16",
           name: "training",
-          completed: false
+          completed: false,
         },
         {
           _id: "task17",
           id: "task17",
           name: "bank_setup",
-          completed: false
+          completed: false,
         },
         {
           _id: "task18",
           id: "task18",
           name: "pension_setup",
-          completed: false
-        }
+          completed: false,
+        },
       ],
-      startedAt: "2024-04-20"
+      startedAt: "2024-04-20",
     },
-    fullName: "Yetunde Balogun"
-  }
+    fullName: "Yetunde Balogun",
+  },
 ];

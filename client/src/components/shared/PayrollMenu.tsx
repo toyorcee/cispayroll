@@ -50,11 +50,6 @@ export function ProfileMenu({
     };
   }, [isLocalOpen, isOpen, onToggle]);
 
-  // console.log("User data in ProfileMenu:", user);
-
-  // Add this console log near the top of your component to debug
-  console.log("User profile image:", user?.profileImage);
-
   // Get initials from username
   const getInitials = () => {
     if (!user) return "??";

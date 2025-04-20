@@ -233,6 +233,12 @@ export class SuperAdminController {
       // Add status filter
       if (status) {
         query.status = status;
+      } else {
+        // Exclude offboarded and terminated users by default
+        query.$and = [
+          { status: { $nin: ["offboarding", "terminated"] } },
+          { "lifecycle.currentState": { $ne: "OFFBOARDING" } },
+        ];
       }
 
       // Handle department filter properly

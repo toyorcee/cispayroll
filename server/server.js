@@ -27,6 +27,7 @@ import regularUserRoutes from "./routes/regularUserRoutes.js";
 import employeeRoutes from "./routes/employeeRoutes.js";
 import invitationRoutes from "./routes/invitationRoutes.js";
 import onboardingRoutes from "./routes/onboardingRoutes.js";
+import offboardingRoutes from "./routes/offboardingRoutes.js";
 import disciplinaryRoutes from "./routes/disciplinaryRoutes.js";
 import feedbackRoute from "./routes/feedbackRoutes.js";
 import departmentRoutes from "./routes/departmentRoutes.js";
@@ -184,15 +185,15 @@ const routeErrorWrapper = (handler) => {
   };
 };
 
-// Wrap your route handlers
+// Register routes
 app.use("/api/auth", routeErrorWrapper(authRoutes));
-app.use("/api/admin", routeErrorWrapper(adminRoutes));
 app.use("/api/super-admin", routeErrorWrapper(superAdminRoutes));
-app.use("/api/leave", routeErrorWrapper(leaveRoutes));
-app.use("/api/users", routeErrorWrapper(regularUserRoutes));
-app.use("/api/employees", routeErrorWrapper(employeeRoutes));
+app.use("/api/admin", routeErrorWrapper(adminRoutes));
+app.use("/api/regular-user", routeErrorWrapper(regularUserRoutes));
+app.use("/api/employee", routeErrorWrapper(employeeRoutes));
 app.use("/api/invitation", routeErrorWrapper(invitationRoutes));
 app.use("/api/onboarding", routeErrorWrapper(onboardingRoutes));
+app.use("/api/offboarding", routeErrorWrapper(offboardingRoutes));
 app.use("/api/disciplinary", routeErrorWrapper(disciplinaryRoutes));
 app.use("/api/feedback", routeErrorWrapper(feedbackRoute));
 app.use("/api/departments", routeErrorWrapper(departmentRoutes));

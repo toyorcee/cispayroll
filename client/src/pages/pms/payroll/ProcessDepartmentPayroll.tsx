@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { FaExclamationTriangle, FaPlus, FaSpinner } from "react-icons/fa";
+import {
+  FaExclamationTriangle,
+  FaPlus,
+  FaSpinner,
+  FaTimes,
+} from "react-icons/fa";
 import { adminPayrollService } from "../../../services/adminPayrollService";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
@@ -328,14 +333,14 @@ const ProcessDepartmentPayroll = () => {
       if (data.employeeIds.length === 1) {
         // Process single employee
         console.log("Processing single employee payroll");
-        await adminPayrollService.processSingleEmployeePayroll({
-          employeeId: data.employeeIds[0],
-          departmentId: data.departmentId,
-          month: data.month,
-          year: data.year,
-          frequency: data.frequency,
-          salaryGrade: data.salaryGrade,
-          userRole: user?.role,
+          await adminPayrollService.processSingleEmployeePayroll({
+            employeeId: data.employeeIds[0],
+            departmentId: data.departmentId,
+            month: data.month,
+            year: data.year,
+            frequency: data.frequency,
+            salaryGrade: data.salaryGrade,
+            userRole: user?.role,
         });
 
         // Show toast after processing is complete
@@ -463,7 +468,7 @@ const ProcessDepartmentPayroll = () => {
   const handleReject = async (payrollId: string) => {
     try {
       await adminPayrollService.rejectPayroll({
-        payrollId,
+      payrollId,
         reason: rejectionReason,
         userRole: user?.role,
       });
@@ -601,7 +606,7 @@ const ProcessDepartmentPayroll = () => {
         setApproveDialogData({ remarks: "" });
         setShowApproveDialog(false);
       } catch (error: any) {
-        toast.error(
+          toast.error(
           error.response?.data?.message || "Failed to approve payroll"
         );
       }
@@ -712,19 +717,28 @@ const ProcessDepartmentPayroll = () => {
     departmentId: string;
   } | null>(null);
 
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+  const [processAllData, setProcessAllData] = useState({
+    month: new Date().getMonth() + 1,
+    year: new Date().getFullYear(),
+    frequency: "MONTHLY",
+  });
+
   const handleProcessAllPayrolls = async () => {
     try {
       setIsProcessing(true);
       const response = await adminPayrollService.processAllEmployeesPayroll({
-        month: new Date().getMonth() + 1,
-        year: new Date().getFullYear(),
-        frequency: "monthly",
+        month: processAllData.month,
+        year: processAllData.year,
+        frequency: processAllData.frequency.toLowerCase(),
         userRole: user?.role,
       });
 
       if (response.success) {
         toast.success(`Successfully processed ${response.processed} payrolls`);
-        queryClient.invalidateQueries({ queryKey: ["payrolls"] });
+      } else {
+        toast.warning("No payrolls were processed");
       }
     } catch (error: any) {
       console.error("Error processing all payrolls:", error);
@@ -732,7 +746,21 @@ const ProcessDepartmentPayroll = () => {
         error.response?.data?.message || "Failed to process all payrolls"
       );
     } finally {
+      // Always invalidate queries to ensure UI is up to date
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["payrolls"] }),
+        queryClient.invalidateQueries({ queryKey: ["departmentPayrolls"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["departmentPayrollStats"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["payrollProcessingStats"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+      ]);
+
       setIsProcessing(false);
+      setShowConfirmDialog(false);
     }
   };
 
@@ -841,6 +869,117 @@ const ProcessDepartmentPayroll = () => {
         </Box>
       )}
 
+      {/* Confirmation Dialog */}
+      <Dialog
+        open={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        aria-labelledby="confirm-dialog-title"
+        aria-describedby="confirm-dialog-description"
+      >
+        <DialogTitle id="confirm-dialog-title">
+          Process All Payrolls
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+            <Typography id="confirm-dialog-description">
+              Select the payroll period and frequency for processing all
+              employees.
+            </Typography>
+
+            <Box
+              sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}
+            >
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Month
+                </Typography>
+                <select
+                  className="w-full p-2 border rounded-md"
+                  value={processAllData.month}
+                  onChange={(e) =>
+                    setProcessAllData((prev) => ({
+                      ...prev,
+                      month: Number(e.target.value),
+                    }))
+                  }
+                >
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {new Date(0, i).toLocaleString("default", {
+                        month: "long",
+                      })}
+                    </option>
+                  ))}
+                </select>
+              </Box>
+
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Year
+                </Typography>
+                <input
+                  type="number"
+                  className="w-full p-2 border rounded-md"
+                  value={processAllData.year}
+                  onChange={(e) =>
+                    setProcessAllData((prev) => ({
+                      ...prev,
+                      year: Number(e.target.value),
+                    }))
+                  }
+                  min={2000}
+                  max={2100}
+                />
+              </Box>
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Frequency
+              </Typography>
+              <select
+                className="w-full p-2 border rounded-md"
+                value={processAllData.frequency}
+                onChange={(e) =>
+                  setProcessAllData((prev) => ({
+                    ...prev,
+                    frequency: e.target.value,
+                  }))
+                }
+              >
+                <option value="MONTHLY">Monthly</option>
+                <option value="WEEKLY">Weekly</option>
+                <option value="BIWEEKLY">Bi-weekly</option>
+              </select>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowConfirmDialog(false)} color="primary">
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              handleProcessAllPayrolls();
+              setShowConfirmDialog(false);
+            }}
+            color="primary"
+            variant="contained"
+            disabled={isProcessing}
+            autoFocus
+          >
+            {isProcessing ? (
+              <span className="flex items-center">
+                <FaSpinner className="animate-spin mr-2" />
+                Processing...
+              </span>
+            ) : (
+              "Process All"
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Box
         sx={{
           display: "flex",
@@ -853,25 +992,25 @@ const ProcessDepartmentPayroll = () => {
           Process Department Payroll
         </h1>
         <Box sx={{ display: "flex", gap: 2 }}>
-          {(canProcessPayroll || canProcessHRPayroll) && (
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={
+        {(canProcessPayroll || canProcessHRPayroll) && (
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={
                 isProcessing ? (
                   <FaSpinner className="animate-spin" />
                 ) : (
                   <FaPlus />
                 )
-              }
-              onClick={() => {
-                setShowSingleProcessModal(true);
-              }}
-              disabled={isProcessing}
-            >
-              {isProcessing ? "Processing..." : "Create Payroll"}
-            </Button>
-          )}
+            }
+            onClick={() => {
+              setShowSingleProcessModal(true);
+            }}
+            disabled={isProcessing}
+          >
+            {isProcessing ? "Processing..." : "Create Payroll"}
+          </Button>
+        )}
           {user?.role === "SUPER_ADMIN" && (
             <Button
               variant="contained"
@@ -883,12 +1022,12 @@ const ProcessDepartmentPayroll = () => {
                   <FaPlus />
                 )
               }
-              onClick={handleProcessAllPayrolls}
+              onClick={() => setShowConfirmDialog(true)}
               disabled={isProcessing}
             >
               {isProcessing ? "Processing..." : "Process All"}
-            </Button>
-          )}
+          </Button>
+        )}
         </Box>
       </Box>
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>

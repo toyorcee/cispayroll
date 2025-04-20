@@ -11,6 +11,25 @@ const router = Router();
 // Apply base middleware
 router.use(requireAuth);
 
+// ===== Dashboard Routes =====
+router.get(
+  "/dashboard/stats",
+  requirePermission([Permission.VIEW_PERSONAL_INFO]),
+  RegularUserController.getDashboardStats
+);
+
+router.get(
+  "/department/stats",
+  requirePermission([Permission.VIEW_PERSONAL_INFO]),
+  RegularUserController.getDepartmentStats
+);
+
+router.get(
+  "/team/stats",
+  requirePermission([Permission.VIEW_PERSONAL_INFO]),
+  RegularUserController.getTeamStats
+);
+
 // ===== Profile Management Routes =====
 // These routes are accessible to all authenticated users with the right permissions
 router.get(

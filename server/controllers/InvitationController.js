@@ -2,7 +2,7 @@ import UserModel from "../models/User.js";
 import { handleError, ApiError } from "../utils/errorHandler.js";
 import jwt from "jsonwebtoken";
 import { EmployeeService } from "../services/employeeService.js";
-import { EmailService } from "../services/emailService.js";
+import { EmailService } from "../services/EmailService.js";
 import bcrypt from "bcryptjs";
 import { OnboardingStatus } from "../models/User.js";
 
@@ -33,10 +33,22 @@ export class InvitationController {
                 deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days
               },
               {
-                name: "Document Submission",
-                description: "Submit required documents",
-                category: "documentation",
+                name: "System Access Setup",
+                description: "Set up system access and accounts",
+                category: "setup",
+                deadline: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000), // 4 days
+              },
+              {
+                name: "Policy Documentation Review",
+                description: "Review and acknowledge company policies",
+                category: "compliance",
                 deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days
+              },
+              {
+                name: "Initial Training Session",
+                description: "Complete initial training modules",
+                category: "training",
+                deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
               },
             ],
           },
@@ -69,21 +81,46 @@ export class InvitationController {
 
   static async verifyInvitation(req, res) {
     try {
+      console.log("[verifyInvitation] Starting verification process");
+      console.log("[verifyInvitation] Token:", req.params.token);
+
       const { token } = req.params;
 
+      console.log("[verifyInvitation] Searching for user with token:", token);
       const user = await UserModel.findOne({
         invitationToken: token,
         invitationExpires: { $gt: new Date() },
         status: "pending",
-      }).select("email firstName lastName department");
+      })
+        .select(
+          "email firstName lastName department employeeId position gradeLevel workLocation dateJoined"
+        )
+        .populate("department", "name code");
+
+      console.log("[verifyInvitation] User found:", user ? "Yes" : "No");
+      if (user) {
+        console.log("[verifyInvitation] User details:", {
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          employeeId: user.employeeId,
+          position: user.position,
+          department: user.department,
+          gradeLevel: user.gradeLevel,
+          workLocation: user.workLocation,
+          dateJoined: user.dateJoined,
+        });
+      }
 
       if (!user) {
+        console.log("[verifyInvitation] Invalid or expired token");
         return res.status(400).json({
           success: false,
           message: "Invalid or expired invitation token",
         });
       }
 
+      console.log("[verifyInvitation] Token verified successfully");
       res.status(200).json({
         success: true,
         message: "Invitation token is valid",
@@ -91,10 +128,16 @@ export class InvitationController {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
+          employeeId: user.employeeId,
+          position: user.position,
           department: user.department,
+          gradeLevel: user.gradeLevel,
+          workLocation: user.workLocation,
+          dateJoined: user.dateJoined,
         },
       });
     } catch (error) {
+      console.error("[verifyInvitation] Error:", error);
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
     }
@@ -173,11 +216,41 @@ export class InvitationController {
       user.onboarding = {
         status: OnboardingStatus.NOT_STARTED,
         tasks: [
-          { name: "Welcome Meeting", completed: false },
-          { name: "Department Introduction", completed: false },
-          { name: "System Access Setup", completed: false },
-          { name: "Policy Documentation Review", completed: false },
-          { name: "Initial Training Session", completed: false },
+          {
+            name: "Welcome Meeting",
+            description: "Initial orientation and welcome meeting",
+            category: "orientation",
+            deadline: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+            completed: false,
+          },
+          {
+            name: "Department Introduction",
+            description: "Meet team and understand department workflow",
+            category: "orientation",
+            deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+            completed: false,
+          },
+          {
+            name: "System Access Setup",
+            description: "Set up system access and accounts",
+            category: "setup",
+            deadline: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
+            completed: false,
+          },
+          {
+            name: "Policy Documentation Review",
+            description: "Review and acknowledge company policies",
+            category: "compliance",
+            deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+            completed: false,
+          },
+          {
+            name: "Initial Training Session",
+            description: "Complete initial training modules",
+            category: "training",
+            deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            completed: false,
+          },
         ],
         progress: 0,
         startedAt: new Date(),

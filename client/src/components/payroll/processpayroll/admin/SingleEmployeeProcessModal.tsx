@@ -392,7 +392,7 @@ const SingleEmployeeProcessModal = ({
         });
 
         console.log("✅ Single payroll processed successfully");
-        toast.success("Payroll processed successfully");
+      toast.success("Payroll processed successfully");
       } else {
         // Process multiple employees
         const employeeIds = selectedEmployees.map((emp) => emp._id);
@@ -699,59 +699,59 @@ const SingleEmployeeProcessModal = ({
                                       }
                                     >
                                       <div className="flex items-center">
-                                        {/* Checkbox */}
-                                        <div className="flex-shrink-0 mr-3">
-                                          <input
-                                            type="checkbox"
-                                            checked={isSelected}
-                                            onChange={() =>
-                                              isSelectable &&
-                                              handleCheckboxChange(employee)
-                                            }
-                                            disabled={!isSelectable}
-                                            className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                                      {/* Checkbox */}
+                                      <div className="flex-shrink-0 mr-3">
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={() =>
+                                            isSelectable &&
+                                            handleCheckboxChange(employee)
+                                          }
+                                          disabled={!isSelectable}
+                                          className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
                                             onClick={(e) => e.stopPropagation()}
-                                          />
-                                        </div>
+                                        />
+                                      </div>
 
-                                        <div className="flex-shrink-0 mr-3">
-                                          <div
-                                            className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                                              isSelectable
-                                                ? "bg-green-100 text-green-600"
-                                                : "bg-gray-100 text-gray-600"
-                                            }`}
-                                          >
-                                            {employee.firstName.charAt(0)}
-                                            {employee.lastName.charAt(0)}
-                                          </div>
+                                      <div className="flex-shrink-0 mr-3">
+                                        <div
+                                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                            isSelectable
+                                              ? "bg-green-100 text-green-600"
+                                              : "bg-gray-100 text-gray-600"
+                                          }`}
+                                        >
+                                          {employee.firstName.charAt(0)}
+                                          {employee.lastName.charAt(0)}
                                         </div>
-                                        <div className="flex-1">
-                                          <div className="font-medium text-gray-900">
-                                            {employee.fullName}
-                                          </div>
-                                          <div className="text-sm text-gray-500 flex items-center">
-                                            <FaIdCard className="mr-1 text-gray-400" />
-                                            {employee.employeeId}
-                                          </div>
-                                          <div className="text-sm text-gray-500 flex items-center">
-                                            <FaBriefcase className="mr-1 text-gray-400" />
-                                            {employee.position}
-                                          </div>
+                                      </div>
+                                      <div className="flex-1">
+                                        <div className="font-medium text-gray-900">
+                                          {employee.fullName}
                                         </div>
-                                        <div className="flex-shrink-0">
-                                          <span
-                                            className={`px-2 py-1 text-xs rounded-full ${
-                                              employee.status === "active"
-                                                ? "bg-green-100 text-green-800"
+                                        <div className="text-sm text-gray-500 flex items-center">
+                                          <FaIdCard className="mr-1 text-gray-400" />
+                                          {employee.employeeId}
+                                        </div>
+                                        <div className="text-sm text-gray-500 flex items-center">
+                                          <FaBriefcase className="mr-1 text-gray-400" />
+                                          {employee.position}
+                                        </div>
+                                      </div>
+                                      <div className="flex-shrink-0">
+                                        <span
+                                          className={`px-2 py-1 text-xs rounded-full ${
+                                            employee.status === "active"
+                                              ? "bg-green-100 text-green-800"
                                                 : employee.status ===
                                                   "terminated"
-                                                ? "bg-red-100 text-red-800"
-                                                : "bg-yellow-100 text-yellow-800"
-                                            }`}
-                                          >
-                                            {employee.status}
-                                          </span>
+                                              ? "bg-red-100 text-red-800"
+                                              : "bg-yellow-100 text-yellow-800"
+                                          }`}
+                                        >
+                                          {employee.status}
+                                        </span>
                                         </div>
                                       </div>
                                     </li>

@@ -553,4 +553,12 @@ export const payrollService = {
       );
     }
   },
+
+  markPaymentsPaidBatch: async (data: { payrollIds: string[] }) => {
+    const response = await axios.post(
+      `${BASE_URL}/payroll/mark-paid-batch`,
+      data
+    );
+    return response.data;
+  },
 };

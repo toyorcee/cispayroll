@@ -5,8 +5,157 @@ import { handleError, ApiError } from "../utils/errorHandler.js";
 import Allowance from "../models/Allowance.js";
 import { AllowanceStatus } from "../models/Allowance.js";
 import Deduction from "../models/Deduction.js";
+import Department from "../models/Department.js";
+import Notification from "../models/Notification.js";
 
 export class RegularUserController {
+  // ===== Dashboard Statistics Methods =====
+  static async getDashboardStats(req, res) {
+    try {
+      const userId = req.user._id;
+      const user = await UserModel.findById(userId).populate("department");
+
+      if (!user) {
+        throw new ApiError(404, "User not found");
+      }
+
+      // Get department size
+      const departmentSize = await UserModel.countDocuments({
+        department: user.department._id,
+        status: "active",
+      });
+
+      // Get active colleagues count
+      const activeColleagues = await UserModel.countDocuments({
+        department: user.department._id,
+        status: "active",
+        _id: { $ne: userId }, // Exclude current user
+      });
+
+      // Get team members count (users in the same department)
+      const teamMembers = await UserModel.countDocuments({
+        department: user.department._id,
+        _id: { $ne: userId }, // Exclude current user
+      });
+
+      // Get recent activities count (last 7 days)
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const recentActivities = await LeaveModel.countDocuments({
+        employee: userId,
+        createdAt: { $gte: sevenDaysAgo },
+      });
+
+      // Get unread notifications count
+      const unreadNotifications = await Notification.countDocuments({
+        recipient: userId,
+        read: false,
+      });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          departmentSize,
+          activeColleagues,
+          departmentName: user.department.name,
+          teamMembers,
+          recentActivities,
+          unreadNotifications,
+        },
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message,
+      });
+    }
+  }
+
+  static async getDepartmentStats(req, res) {
+    try {
+      const userId = req.user._id;
+      const user = await UserModel.findById(userId).populate("department");
+
+      if (!user) {
+        throw new ApiError(404, "User not found");
+      }
+
+      // Get department statistics
+      const department = await Department.findById(user.department._id);
+
+      // Get department employees by role
+      const employeesByRole = await UserModel.aggregate([
+        { $match: { department: user.department._id, status: "active" } },
+        { $group: { _id: "$role", count: { $sum: 1 } } },
+      ]);
+
+      // Get department employees by status
+      const employeesByStatus = await UserModel.aggregate([
+        { $match: { department: user.department._id } },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          department,
+          employeesByRole,
+          employeesByStatus,
+        },
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message,
+      });
+    }
+  }
+
+  static async getTeamStats(req, res) {
+    try {
+      const userId = req.user._id;
+      const user = await UserModel.findById(userId).populate("department");
+
+      if (!user) {
+        throw new ApiError(404, "User not found");
+      }
+
+      // Get team members
+      const teamMembers = await UserModel.find({
+        department: user.department._id,
+        _id: { $ne: userId }, // Exclude current user
+        status: "active",
+      })
+        .select("firstName lastName employeeId position profileImage")
+        .limit(10);
+
+      // Get team members on leave
+      const teamOnLeave = await LeaveModel.find({
+        employee: { $in: teamMembers.map((member) => member._id) },
+        status: "APPROVED",
+        startDate: { $lte: new Date() },
+        endDate: { $gte: new Date() },
+      }).populate("employee", "firstName lastName employeeId");
+
+      res.status(200).json({
+        success: true,
+        data: {
+          teamMembers,
+          teamOnLeave,
+        },
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message,
+      });
+    }
+  }
+
   // ===== Profile Management Methods =====
   static async getOwnProfile(req, res, next) {
     try {

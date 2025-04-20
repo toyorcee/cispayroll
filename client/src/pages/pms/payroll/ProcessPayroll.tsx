@@ -14,6 +14,7 @@ import {
   FaEdit,
   FaHistory,
   FaFileInvoiceDollar,
+  FaUsers,
 } from "react-icons/fa";
 import {
   PayrollStatus,
@@ -40,6 +41,12 @@ import {
   TableRow,
   TableCell,
   Paper,
+  Button,
+  Checkbox,
+  FormControlLabel,
+  Tooltip,
+  Box,
+  Typography,
 } from "@mui/material";
 import { RunPayrollModal } from "../../../components/payroll/processpayroll/RunPayrollModal";
 
@@ -181,6 +188,19 @@ export default function ProcessPayroll() {
   const [selectedPayrollForEdit, setSelectedPayrollForEdit] =
     useState<PayrollData | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [selectedPayrolls, setSelectedPayrolls] = useState<string[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
+  const [isMarkingBatch, setIsMarkingBatch] = useState(false);
+  const [isMarkingAll, setIsMarkingAll] = useState(false);
+  const [showMarkAllDialog, setShowMarkAllDialog] = useState(false);
+  const [markAllAction, setMarkAllAction] = useState<
+    "approve" | "reject" | null
+  >(null);
+  const [markAllData, setMarkAllData] = useState({
+    month: new Date().getMonth() + 1,
+    year: new Date().getFullYear(),
+    frequency: "MONTHLY",
+  });
 
   const queryClient = useQueryClient();
 
@@ -325,6 +345,8 @@ export default function ProcessPayroll() {
 
   const handlePageChange = (newPage: number) => {
     setFilters((prev) => ({ ...prev, page: newPage }));
+    // Reset selectAll state when changing pages, but keep selectedPayrolls
+    setSelectAll(false);
   };
 
   const handleViewPayslip = async (payrollId: string) => {
@@ -379,12 +401,71 @@ export default function ProcessPayroll() {
 
   const PayrollTable = () => (
     <div className="space-y-4">
+      <Box
+        sx={{
+          mb: 2,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <>
+          <Typography variant="h6">Payroll List</Typography>
+          <div className="flex gap-2">
+            <Tooltip title="Select all payrolls across all pages">
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={handleMarkAll}
+                disabled={isMarkingAll}
+              >
+                {isMarkingAll ? "Loading..." : "Mark All"}
+              </Button>
+            </Tooltip>
+            {selectedPayrolls.length > 0 && (
+              <Tooltip title="Initiate payments for selected payrolls">
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleMarkSelectedAsPaid}
+                  disabled={isMarkingBatch}
+                >
+                  {isMarkingBatch ? (
+                    <>
+                      <FaSpinner className="animate-spin mr-2" />
+                      Initiating Payments...
+                    </>
+                  ) : (
+                    `Initiate Payments (${selectedPayrolls.length})`
+                  )}
+                </Button>
+              </Tooltip>
+            )}
+          </div>
+        </>
+      </Box>
       <TableContainer component={Paper} className="rounded-lg shadow">
         <Table>
           <TableHead className="bg-blue-50">
             <TableRow>
+              <TableCell padding="checkbox">
+                <Tooltip title="Select all payrolls in current view">
+                  <Checkbox
+                    checked={selectAll}
+                    onChange={handleSelectAll}
+                    indeterminate={
+                      selectedPayrolls.length > 0 &&
+                      selectedPayrolls.length <
+                        (payrollsData?.data?.payrolls?.length || 0)
+                    }
+                  />
+                </Tooltip>
+              </TableCell>
               <TableCell className="text-lg font-extrabold text-blue-700 py-5 uppercase tracking-wider">
                 Employee Name
+              </TableCell>
+              <TableCell className="text-lg font-extrabold text-blue-700 py-5 uppercase tracking-wider">
+                Department
               </TableCell>
               <TableCell className="text-lg font-extrabold text-blue-700 py-5 uppercase tracking-wider">
                 Salary Grade
@@ -410,8 +491,17 @@ export default function ProcessPayroll() {
             {(payrollsData?.data?.payrolls ?? []).length > 0 ? (
               payrollsData?.data?.payrolls?.map((payroll: PayrollData) => (
                 <TableRow key={payroll._id} className="hover:bg-gray-50">
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={selectedPayrolls.includes(payroll._id)}
+                      onChange={() => handleSelectPayroll(payroll._id)}
+                    />
+                  </TableCell>
                   <TableCell>
                     {payroll.employee?.fullName ?? "Unassigned"}
+                  </TableCell>
+                  <TableCell>
+                    {payroll.department?.name ?? "Unassigned"}
                   </TableCell>
                   <TableCell>{payroll.salaryGrade.level}</TableCell>
                   <TableCell>{formatCurrency(payroll.totals.netPay)}</TableCell>
@@ -821,6 +911,136 @@ export default function ProcessPayroll() {
     markAsFailedMutation.mutate(payrollId);
   };
 
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const currentPagePayrollIds =
+      payrollsData?.data?.payrolls?.map((p) => p._id) || [];
+
+    if (event.target.checked) {
+      // Add current page payrolls to existing selections
+      const newSelectedPayrolls = [
+        ...new Set([...selectedPayrolls, ...currentPagePayrollIds]),
+      ];
+      setSelectedPayrolls(newSelectedPayrolls);
+      setSelectAll(true);
+    } else {
+      // Remove only current page payrolls from selections
+      const newSelectedPayrolls = selectedPayrolls.filter(
+        (id) => !currentPagePayrollIds.includes(id)
+      );
+      setSelectedPayrolls(newSelectedPayrolls);
+      setSelectAll(false);
+    }
+  };
+
+  const handleSelectPayroll = (payrollId: string) => {
+    setSelectedPayrolls((prev) =>
+      prev.includes(payrollId)
+        ? prev.filter((id) => id !== payrollId)
+        : [...prev, payrollId]
+    );
+  };
+
+  const handleMarkSelectedAsPaid = async () => {
+    try {
+      setIsMarkingBatch(true);
+
+      // Process all selected payrolls
+      const results = {
+        success: 0,
+        failed: 0,
+        failedDetails: [] as string[],
+      };
+
+      // First initiate payments for all selected payrolls
+      for (const payrollId of selectedPayrolls) {
+        try {
+          await payrollService.initiatePayment(payrollId);
+          results.success++;
+        } catch (error) {
+          results.failed++;
+          // Get employee name from the payrolls data
+          const payroll = payrollsData?.data?.payrolls?.find(
+            (p) => p._id === payrollId
+          );
+          if (payroll?.employee?.fullName) {
+            results.failedDetails.push(payroll.employee.fullName);
+          }
+        }
+      }
+
+      // Show appropriate success/error message
+      if (results.success > 0) {
+        toast.success(
+          `Successfully initiated payments for ${results.success} payrolls${
+            results.failed > 0 ? ` (${results.failed} failed)` : ""
+          }`
+        );
+      }
+
+      if (results.failed > 0) {
+        toast.error(
+          `Failed to initiate payments for: ${results.failedDetails.join(", ")}`
+        );
+      }
+
+      setSelectedPayrolls([]);
+      setSelectAll(false);
+      queryClient.invalidateQueries({ queryKey: ["payrolls"] });
+      queryClient.invalidateQueries({ queryKey: ["payrollStatistics"] });
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message || "Failed to initiate payments"
+      );
+    } finally {
+      setIsMarkingBatch(false);
+    }
+  };
+
+  const handleMarkAll = async () => {
+    try {
+      setIsMarkingAll(true);
+      setShowMarkAllDialog(true);
+    } catch (error) {
+      toast.error("Failed to fetch all payrolls");
+    } finally {
+      setIsMarkingAll(false);
+    }
+  };
+
+  const handleConfirmMarkAll = async () => {
+    if (!markAllAction || selectedPayrolls.length === 0) return;
+
+    try {
+      if (markAllAction === "approve") {
+        await Promise.all(
+          selectedPayrolls.map((id) =>
+            approveMutation.mutateAsync({ payrollId: id })
+          )
+        );
+        toast.success(
+          `Successfully approved ${selectedPayrolls.length} payrolls`
+        );
+      } else {
+        await Promise.all(
+          selectedPayrolls.map((id) =>
+            rejectMutation.mutateAsync({
+              payrollId: id,
+              remarks: "Bulk rejection",
+            })
+          )
+        );
+        toast.success(
+          `Successfully rejected ${selectedPayrolls.length} payrolls`
+        );
+      }
+      setShowMarkAllDialog(false);
+      setMarkAllAction(null);
+      setSelectedPayrolls([]);
+    } catch (error) {
+      toast.error("Failed to process bulk action");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -1110,6 +1330,163 @@ export default function ProcessPayroll() {
               </motion.div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showMarkAllDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-gray-500/75 backdrop-blur-sm flex items-center justify-center z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ type: "spring", duration: 0.5 }}
+              className="bg-white rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-blue-100 rounded-full">
+                  <FaUsers className="h-6 w-6 text-blue-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900">
+                  Mark All Payrolls
+                </h3>
+              </div>
+              <p className="text-gray-600 mb-8 text-base leading-relaxed">
+                Select the payroll period and frequency:
+              </p>
+              <div className="flex flex-col gap-4 mb-8">
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Month
+                  </Typography>
+                  <select
+                    className="w-full p-2 border rounded-md"
+                    value={markAllData.month}
+                    onChange={(e) =>
+                      setMarkAllData((prev) => ({
+                        ...prev,
+                        month: Number(e.target.value),
+                      }))
+                    }
+                  >
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        {new Date(0, i).toLocaleString("default", {
+                          month: "long",
+                        })}
+                      </option>
+                    ))}
+                  </select>
+                </Box>
+
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Year
+                  </Typography>
+                  <input
+                    type="number"
+                    className="w-full p-2 border rounded-md"
+                    value={markAllData.year}
+                    onChange={(e) =>
+                      setMarkAllData((prev) => ({
+                        ...prev,
+                        year: Number(e.target.value),
+                      }))
+                    }
+                    min={2000}
+                    max={2100}
+                  />
+                </Box>
+
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Frequency
+                  </Typography>
+                  <select
+                    className="w-full p-2 border rounded-md"
+                    value={markAllData.frequency}
+                    onChange={(e) =>
+                      setMarkAllData((prev) => ({
+                        ...prev,
+                        frequency: e.target.value,
+                      }))
+                    }
+                  >
+                    <option value="MONTHLY">Monthly</option>
+                    <option value="WEEKLY">Weekly</option>
+                    <option value="BIWEEKLY">Bi-weekly</option>
+                  </select>
+                </Box>
+
+                <Box sx={{ mt: 4 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Choose an action:
+                  </Typography>
+                  <button
+                    onClick={() => setMarkAllAction("approve")}
+                    className={`w-full p-4 rounded-lg border-2 transition-all ${
+                      markAllAction === "approve"
+                        ? "border-green-500 bg-green-50"
+                        : "border-gray-200 hover:border-green-500"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <FaCheck className="h-5 w-5 text-green-600" />
+                      <span className="font-medium">Approve All</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setMarkAllAction("reject")}
+                    className={`w-full p-4 rounded-lg border-2 transition-all mt-2 ${
+                      markAllAction === "reject"
+                        ? "border-red-500 bg-red-50"
+                        : "border-gray-200 hover:border-red-500"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <FaTimes className="h-5 w-5 text-red-600" />
+                      <span className="font-medium">Reject All</span>
+                    </div>
+                  </button>
+                </Box>
+              </div>
+              <div className="flex justify-end gap-4">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    setShowMarkAllDialog(false);
+                    setMarkAllAction(null);
+                    setSelectedPayrolls([]);
+                  }}
+                  className="px-6 py-2.5 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors duration-200"
+                >
+                  Cancel
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleConfirmMarkAll}
+                  disabled={!markAllAction}
+                  className={`px-6 py-2.5 text-white rounded-lg transition-colors duration-200 shadow-lg ${
+                    markAllAction === "approve"
+                      ? "bg-green-600 hover:bg-green-700 shadow-green-500/25"
+                      : markAllAction === "reject"
+                      ? "bg-red-600 hover:bg-red-700 shadow-red-500/25"
+                      : "bg-gray-400 cursor-not-allowed"
+                  }`}
+                >
+                  Confirm {markAllAction === "approve" ? "Approve" : "Reject"}{" "}
+                  All
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

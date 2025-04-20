@@ -1,11 +1,19 @@
 import { useState, useEffect } from "react";
-import { FaBuilding, FaPlus, FaEdit, FaTimes, FaSpinner } from "react-icons/fa";
+import {
+  FaBuilding,
+  FaPlus,
+  FaEdit,
+  FaTimes,
+  FaSpinner,
+  FaSignOutAlt,
+  FaExclamationTriangle,
+} from "react-icons/fa";
 import { Employee, EmployeeFilters } from "../../../types/employee";
 import { Status } from "../../../types/common";
 import { useAuth } from "../../../context/AuthContext";
 import { UserRole, Permission } from "../../../types/auth";
 import { motion } from "framer-motion";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 // Component imports
 import { EmployeeSearch } from "../../../components/employees/EmployeeSearch";
@@ -17,10 +25,14 @@ import { DepartmentModal } from "../../../components/departments/DepartmentModal
 import { EditEmployeeModal } from "../../../components/employees/EditEmployeeModal";
 
 // Service imports
-import { employeeService } from "../../../services/employeeService";
+import {
+  employeeService,
+  EMPLOYEES_QUERY_KEY,
+} from "../../../services/employeeService";
 import { departmentService } from "../../../services/departmentService";
 // import { mapEmployeeToDetails } from "../../../utils/mappers";
 import { salaryStructureService } from "../../../services/salaryStructureService";
+import { offboardingService } from "../../../services/offboardingService";
 
 // Additional imports
 import { toast } from "react-toastify";
@@ -28,6 +40,8 @@ import { Dialog } from "@headlessui/react";
 import { Department } from "../../../types/department";
 import type { AdminResponse } from "../../../services/employeeService";
 import { ISalaryGrade } from "../../../types/salary";
+import { Tooltip } from "@mui/material";
+import { OffboardingType } from "../../../types/offboarding";
 
 const LoadingDots = () => (
   <div className="flex space-x-1 items-center px-2">
@@ -64,6 +78,7 @@ interface EmployeeFormData {
 
 export default function AllEmployees() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filters, setFilters] = useState<EmployeeFilters>({
     page: 1,
@@ -81,6 +96,11 @@ export default function AllEmployees() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDepartmentModal, setShowDepartmentModal] = useState(false);
+  const [showOffboardingModal, setShowOffboardingModal] = useState(false);
+  const [showOffboardingConfirm, setShowOffboardingConfirm] = useState(false);
+  const [employeeToOffboard, setEmployeeToOffboard] = useState<Employee | null>(
+    null
+  );
   const [formData, setFormData] = useState<EmployeeFormData>({
     firstName: "",
     lastName: "",
@@ -95,6 +115,12 @@ export default function AllEmployees() {
   });
   const [isCreating, setIsCreating] = useState(false);
   const [admins, setAdmins] = useState<AdminResponse[]>([]);
+  const [offboardingData, setOffboardingData] = useState({
+    type: "",
+    reason: "",
+    targetExitDate: new Date().toISOString().split("T")[0],
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
   const isAdmin = user?.role === UserRole.ADMIN;
@@ -128,6 +154,15 @@ export default function AllEmployees() {
   } = isSuperAdmin
     ? employeeService.useGetEmployees(filters)
     : employeeService.adminService.useGetEmployees(filters);
+
+  // Update query configuration
+  useEffect(() => {
+    queryClient.setQueryDefaults([...EMPLOYEES_QUERY_KEY, filters], {
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    });
+  }, [filters, queryClient]);
 
   const { data: salaryGrades, isLoading: salaryGradesLoading } = useQuery<
     ISalaryGrade[]
@@ -238,20 +273,86 @@ export default function AllEmployees() {
     }
   };
 
+  const handleInitiateOffboarding = (
+    e: React.MouseEvent,
+    employee: Employee
+  ) => {
+    e.stopPropagation();
+    console.log("[OFFBOARDING UI] Initiating offboarding for employee:", {
+      id: employee._id,
+      name: `${employee.firstName} ${employee.lastName}`,
+      email: employee.email,
+    });
+    setEmployeeToOffboard(employee);
+    setShowOffboardingConfirm(true);
+  };
+
+  const handleConfirmOffboarding = () => {
+    if (employeeToOffboard) {
+      console.log("[OFFBOARDING UI] Confirming offboarding for employee:", {
+        id: employeeToOffboard._id,
+        name: `${employeeToOffboard.firstName} ${employeeToOffboard.lastName}`,
+      });
+      setSelectedEmployeeId(employeeToOffboard._id);
+      setShowOffboardingConfirm(false);
+      setShowOffboardingModal(true);
+    }
+  };
+
+  const handleOffboardingSubmit = async () => {
+    try {
+      if (!selectedEmployeeId) return;
+
+      setIsSubmitting(true);
+      console.log("[OFFBOARDING UI] Submitting offboarding form with data:", {
+        employeeId: selectedEmployeeId,
+        type: offboardingData.type,
+        reason: offboardingData.reason,
+        targetExitDate: offboardingData.targetExitDate,
+      });
+
+      await offboardingService.initiateOffboarding(selectedEmployeeId, {
+        type: offboardingData.type as OffboardingType,
+        reason: offboardingData.reason,
+        targetExitDate: new Date(offboardingData.targetExitDate),
+      });
+
+      console.log(
+        "[OFFBOARDING UI] Offboarding process initiated successfully"
+      );
+      toast.success("Offboarding process initiated successfully");
+      setShowOffboardingModal(false);
+      // Only refetch once after successful offboarding
+      refetch();
+    } catch (error) {
+      console.error("[OFFBOARDING UI] Error initiating offboarding:", error);
+      toast.error("Failed to initiate offboarding process");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const renderActions = (employee: Employee) => (
     <div
-      className="flex justify-end space-x-3"
+      className="flex justify-end items-center gap-2"
       onClick={(e) => e.stopPropagation()}
     >
-      {canEdit && (
+      <Tooltip title="Edit employee details" arrow>
         <button
           onClick={(e) => handleEditClick(e, employee)}
-          className="text-blue-600 hover:text-blue-900 flex items-center"
+          className="text-blue-600 hover:text-blue-900 flex items-center cursor-pointer transition-colors"
         >
-          <FaEdit className="w-4 h-4 mr-1" />
-          Edit
+          <FaEdit className="h-5 w-5" />
         </button>
-      )}
+      </Tooltip>
+      <Tooltip title="Initiate offboarding process" arrow>
+        <button
+          onClick={(e) => handleInitiateOffboarding(e, employee)}
+          className="text-red-600 hover:text-red-900 flex items-center cursor-pointer transition-colors"
+        >
+          <FaSignOutAlt className="h-5 w-5" />
+        </button>
+      </Tooltip>
     </div>
   );
 
@@ -974,6 +1075,199 @@ export default function AllEmployees() {
           await refreshDepartments();
         }}
       />
+
+      <Dialog
+        open={showOffboardingModal}
+        onClose={() => setShowOffboardingModal(false)}
+        className="relative z-50"
+      >
+        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="mx-auto max-w-md w-full rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex justify-between items-center mb-6">
+              <Dialog.Title className="text-xl font-semibold text-gray-900">
+                Initiate Offboarding
+              </Dialog.Title>
+              <button
+                onClick={() => setShowOffboardingModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleOffboardingSubmit();
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Type
+                </label>
+                <select
+                  required
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  value={offboardingData.type}
+                  onChange={(e) =>
+                    setOffboardingData((prev) => ({
+                      ...prev,
+                      type: e.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Select Type</option>
+                  <option value="voluntary_resignation">
+                    Voluntary Resignation
+                  </option>
+                  <option value="involuntary_termination">
+                    Involuntary Termination
+                  </option>
+                  <option value="retirement">Retirement</option>
+                  <option value="contract_end">Contract End</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Reason
+                </label>
+                <textarea
+                  required
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  value={offboardingData.reason}
+                  onChange={(e) =>
+                    setOffboardingData((prev) => ({
+                      ...prev,
+                      reason: e.target.value,
+                    }))
+                  }
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Target Exit Date
+                </label>
+                <input
+                  type="date"
+                  required
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  value={offboardingData.targetExitDate}
+                  onChange={(e) =>
+                    setOffboardingData((prev) => ({
+                      ...prev,
+                      targetExitDate: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <div className="flex justify-end space-x-4 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowOffboardingModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <svg
+                        className="animate-spin h-5 w-5 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Initiating...
+                    </>
+                  ) : (
+                    "Initiate Offboarding"
+                  )}
+                </button>
+              </div>
+            </form>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={showOffboardingConfirm}
+        onClose={() => setShowOffboardingConfirm(false)}
+        className="relative z-50"
+      >
+        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="mx-auto max-w-md w-full rounded-xl bg-white p-6 shadow-xl">
+            <Dialog.Title className="text-xl font-semibold text-gray-900 mb-4">
+              Confirm Offboarding
+            </Dialog.Title>
+            <div className="mb-6">
+              <p className="text-gray-700 mb-4">
+                Are you sure you want to initiate the offboarding process for{" "}
+                <span className="font-semibold">
+                  {employeeToOffboard?.firstName} {employeeToOffboard?.lastName}
+                </span>
+                ?
+              </p>
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <FaExclamationTriangle className="h-5 w-5 text-yellow-400" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-yellow-700">
+                      This will start the offboarding workflow. The employee
+                      will be moved to the offboarding process, and you'll need
+                      to complete all required tasks before finalizing their
+                      departure.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={() => setShowOffboardingConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmOffboarding}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                Proceed with Offboarding
+              </button>
+            </div>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
     </motion.div>
   );
 }

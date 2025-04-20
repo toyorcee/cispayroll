@@ -122,23 +122,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserData = async () => {
     try {
-      const { data } = await axios.get("/api/auth/me");
-      if (data.user) {
-        setUser(parseUserData(data.user));
-        await prefetchDepartments(queryClient);
+      setLoading(true);
+      // Add timestamp to prevent caching
+      const timestamp = new Date().getTime();
+      const response = await axios.get(`/api/auth/me?_t=${timestamp}`, {
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      });
+
+      if (response.data.success) {
+        const userData = parseUserData(response.data.user);
+        setUser(userData);
+        setLoading(false);
       } else {
-        setUser(null);
+        console.error("Failed to fetch user data:", response.data.message);
+        setLoading(false);
       }
-    } catch (error: unknown) {
-      // Only show error toast if not on registration completion page
-      if (!window.location.pathname.includes("/auth/complete-registration")) {
-        console.error(
-          "❌ Auth check failed:",
-          axios.isAxiosError(error) ? error.response?.data || error : error
-        );
-      }
-      setUser(null);
-    } finally {
+    } catch (error) {
+      console.error("Error fetching user data:", error);
       setLoading(false);
     }
   };
@@ -400,11 +404,28 @@ const parseUserData = (data: Partial<User>): User => ({
     accountName: data.bankDetails?.accountName || "",
   },
   profileImage: data.profileImage || "",
+  profileImageUrl: data.profileImageUrl || "",
   reportingTo: data.reportingTo || undefined,
   isEmailVerified: Boolean(data.isEmailVerified),
   lastLogin: data.lastLogin ? new Date(data.lastLogin) : undefined,
   createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
   updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
+  personalDetails: data.personalDetails
+    ? {
+        address: {
+          street: data.personalDetails.address?.street || "",
+          city: data.personalDetails.address?.city || "",
+          state: data.personalDetails.address?.state || "",
+          country: data.personalDetails.address?.country || "",
+          zipCode: data.personalDetails.address?.zipCode || "",
+        },
+        middleName: data.personalDetails.middleName || "",
+        dateOfBirth: data.personalDetails.dateOfBirth || "",
+        maritalStatus: data.personalDetails.maritalStatus || "",
+        nationality: data.personalDetails.nationality || "",
+        qualifications: data.personalDetails.qualifications || [],
+      }
+    : undefined,
 });
 
 // Handle authentication errors from API

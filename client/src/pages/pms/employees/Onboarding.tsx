@@ -173,7 +173,6 @@ const useOnboardingData = () => {
   };
 };
 
-// Add these constants at the top of the file
 const ONBOARDING_STAGES = {
   NOT_STARTED: "not_started",
   CONTRACT_STAGE: "contract_stage",
@@ -187,7 +186,6 @@ type OnboardingStage =
   (typeof ONBOARDING_STAGES)[keyof typeof ONBOARDING_STAGES];
 
 export default function Onboarding() {
-  // Move ALL hooks to the top, before any conditional returns
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showDepartmentModal, setShowDepartmentModal] = useState(false);
@@ -215,6 +213,7 @@ export default function Onboarding() {
     departments,
     setDepartments,
     onboardingEmployees,
+    setOnboardingEmployees,
     isLoading,
     error,
     fetchData,
@@ -339,7 +338,19 @@ export default function Onboarding() {
       .join(" ");
   };
 
-  // Now you can safely use conditional rendering
+  const handleTaskComplete = (updatedEmployee: OnboardingEmployee) => {
+    const updatedEmployees = onboardingEmployees.map((emp) =>
+      emp._id === updatedEmployee._id ? updatedEmployee : emp
+    );
+
+    // Update the state with the new employee data
+    setOnboardingEmployees(updatedEmployees);
+
+    if (selectedEmployee?._id === updatedEmployee._id) {
+      setSelectedEmployee(updatedEmployee);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -860,7 +871,7 @@ export default function Onboarding() {
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           employee={selectedEmployee}
-          onTaskComplete={fetchData}
+          onTaskComplete={handleTaskComplete}
         />
       )}
     </motion.div>

@@ -48,7 +48,17 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ onImageSelect }) => {
   const { getRootProps, getInputProps } = useDropzone({
     onDrop,
     accept: {
-      "image/*": [".jpeg", ".jpg", ".png", ".gif"],
+      "image/*": [
+        ".jpeg",
+        ".jpg",
+        ".png",
+        ".gif",
+        ".webp",
+        ".bmp",
+        ".tiff",
+        ".svg",
+        ".avif",
+      ],
     },
     multiple: false,
   });
@@ -99,7 +109,9 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ onImageSelect }) => {
                 </span>
                 <p className="pl-1">or drag and drop</p>
               </div>
-              <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+              <p className="text-xs text-gray-500">
+                PNG, JPG, GIF, AVIF, WebP, BMP, TIFF, SVG up to 10MB
+              </p>
             </>
           )}
         </div>

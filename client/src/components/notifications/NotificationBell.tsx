@@ -1,4 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, {
+  useState,
+  useEffect,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import { FaBell, FaUser, FaBuilding, FaCalendarAlt } from "react-icons/fa";
 import { format } from "date-fns";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -21,35 +26,49 @@ interface Notification {
   };
 }
 
-export const NotificationBell = React.memo(() => {
-  const [isOpen, setIsOpen] = useState(false);
+export interface NotificationBellRef {
+  checkForNewNotifications: () => void;
+}
+
+export const NotificationBell = forwardRef<NotificationBellRef>(
+  (props, ref) => {
+    const [isOpen, setIsOpen] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
-  const queryClient = useQueryClient();
+    const queryClient = useQueryClient();
 
-  const { data: notificationsData, isLoading } = useQuery({
-    queryKey: ["notifications"],
-    queryFn: async () => {
-      const response = await getNotifications();
-      if (response.headers?.["x-refresh-notifications"] === "true") {
-        queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    const {
+      data: notificationsData,
+      isLoading,
+      refetch,
+    } = useQuery({
+      queryKey: ["notifications"],
+      queryFn: async () => {
+        const response = await getNotifications();
+        if (response.headers?.["x-refresh-notifications"] === "true") {
+          queryClient.invalidateQueries({ queryKey: ["notifications"] });
+        }
+        return response.data;
+      },
+      refetchInterval: 30000,
+    });
+
+    useImperativeHandle(ref, () => ({
+      checkForNewNotifications: () => {
+        refetch();
+      },
+    }));
+
+    useEffect(() => {
+      if (notificationsData?.data) {
+        setNotifications(notificationsData.data.notifications || []);
+        setUnreadCount(notificationsData.data.unreadCount || 0);
       }
-      return response.data;
-    },
-    refetchInterval: 30000, // Poll every 30 seconds
-  });
-
-  // Update notifications and unread count when data changes
-  useEffect(() => {
-    if (notificationsData?.data) {
-      setNotifications(notificationsData.data.notifications || []);
-      setUnreadCount(notificationsData.data.unreadCount || 0);
-    }
-  }, [notificationsData]);
+    }, [notificationsData]);
 
     const markAsRead = async (notificationId: string) => {
       try {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
         await fetch(`${apiUrl}/api/notifications/${notificationId}/read`, {
           method: "PATCH",
           credentials: "include",
@@ -70,7 +89,7 @@ export const NotificationBell = React.memo(() => {
 
     const markAllAsRead = async () => {
       try {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
         await fetch(`${apiUrl}/api/notifications/read-all`, {
           method: "PATCH",
           credentials: "include",
@@ -118,11 +137,11 @@ export const NotificationBell = React.memo(() => {
             unreadCount > 0 ? "animate-pulse" : ""
           }`}
         >
-        <FaBell
-          className={`w-5 h-5 text-gray-600 cursor-pointer ${
-            isLoading ? "animate-spin" : ""
-          }`}
-        />
+          <FaBell
+            className={`w-5 h-5 text-gray-600 cursor-pointer ${
+              isLoading ? "animate-spin" : ""
+            }`}
+          />
           {unreadCount > 0 && (
             <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
               {unreadCount}
@@ -144,15 +163,17 @@ export const NotificationBell = React.memo(() => {
               )}
             </div>
             <div className="max-h-96 overflow-y-auto">
-            {isLoading ? (
-              <div className="p-4 text-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500 mx-auto"></div>
-                <p className="mt-2 text-xs text-gray-500">
-                  Updating notifications...
+              {isLoading ? (
+                <div className="p-4 text-center">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500 mx-auto"></div>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Updating notifications...
+                  </p>
+                </div>
+              ) : notifications.length === 0 ? (
+                <p className="text-center text-gray-500 py-4">
+                  No notifications
                 </p>
-              </div>
-            ) : notifications.length === 0 ? (
-              <p className="text-center text-gray-500 py-4">No notifications</p>
               ) : (
                 <div className="divide-y divide-gray-200">
                   {notifications.map((notification) => (
@@ -193,14 +214,17 @@ export const NotificationBell = React.memo(() => {
                               {notification.data.departmentName && (
                                 <div className="flex items-center bg-gray-100 px-2 py-1 rounded">
                                   <FaBuilding className="mr-1 text-gray-500" />
-                                <span>{notification.data.departmentName}</span>
+                                  <span>
+                                    {notification.data.departmentName}
+                                  </span>
                                 </div>
                               )}
                             </div>
                           )}
 
                           {/* Payroll Period */}
-                        {notification.data.month && notification.data.year && (
+                          {notification.data.month &&
+                            notification.data.year && (
                               <div className="flex items-center text-xs bg-gray-100 px-2 py-1 rounded w-fit">
                                 <FaCalendarAlt className="mr-1 text-gray-500" />
                                 <span>
@@ -240,4 +264,5 @@ export const NotificationBell = React.memo(() => {
         )}
       </div>
     );
-});
+  }
+);

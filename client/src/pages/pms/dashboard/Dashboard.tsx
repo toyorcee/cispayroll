@@ -23,6 +23,10 @@ import {
   adminPayrollService,
   AdminPayrollProcessingStats,
 } from "../../../services/adminPayrollService";
+import userService, {
+  UserDashboardStats,
+  ProcessingStats,
+} from "../../../services/userService";
 
 // Lazy load chart components
 const LineChart = lazy(() => import("../../../components/charts/LineChart"));
@@ -89,12 +93,13 @@ export default function Dashboard() {
   const { user, hasPermission, hasAnyPermission } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [dashboardStats, setDashboardStats] = useState<
-    DashboardStats | undefined
+    DashboardStats | UserDashboardStats | undefined
   >(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
   const [processingStats, setProcessingStats] =
     useState<AdminPayrollProcessingStats | null>(null);
+  const [userRecentActivities, setUserRecentActivities] = useState<number>(0);
 
   // Only fetch the appropriate chart stats based on user role
   const { data: chartStatsData } =
@@ -265,28 +270,63 @@ export default function Dashboard() {
       }
     : null;
 
-  useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setError(null);
         setIsLoading(true);
-        const [stats, unreadCount, procStats] = await Promise.all([
-          employeeService.getDashboardStats(),
-          getUnreadNotificationCount(),
-          adminPayrollService.getProcessingStatistics(),
-        ]);
+
+      // Use different services based on user role
+      let stats;
+
+      if (user?.role === UserRole.USER) {
+        // For regular users, just get the dashboard stats
+        try {
+          stats = await userService.getUserDashboardStats();
+          // Set recent activities from the dashboard stats
+          setUserRecentActivities(stats.recentActivities || 0);
+        } catch (err) {
+          console.error("Error fetching user dashboard stats:", err);
+          // Fallback to employee service if user service fails
+          stats = await employeeService.getDashboardStats();
+          setUserRecentActivities(0);
+        }
+      } else if (user?.role === UserRole.ADMIN) {
+        // For admins
+        stats = await employeeService.getDashboardStats();
+        try {
+          const adminStats =
+            await adminPayrollService.getProcessingStatistics();
+          setProcessingStats(adminStats);
+        } catch (err) {
+          console.error("Error fetching admin processing stats:", err);
+          setProcessingStats(null);
+        }
+      } else {
+        // For super admins
+        stats = await employeeService.getDashboardStats();
+        try {
+          const adminStats =
+            await adminPayrollService.getProcessingStatistics();
+          setProcessingStats(adminStats);
+        } catch (err) {
+          console.error("Error fetching admin processing stats:", err);
+          setProcessingStats(null);
+        }
+      }
+
+      const unreadCount = await getUnreadNotificationCount();
+
         setDashboardStats(stats);
         setUnreadNotifications(unreadCount);
-        setProcessingStats(procStats);
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load dashboard data"
-        );
+      console.error("Error fetching dashboard data:", err);
+      setError("Failed to load dashboard data. Please try again later.");
       } finally {
         setIsLoading(false);
       }
     };
 
+  useEffect(() => {
     fetchDashboardData();
   }, [user?.role]);
 
@@ -324,7 +364,10 @@ export default function Dashboard() {
       },
       {
         name: "Recent Activities",
-        value: processingStats?.recentActivityCount?.toString() || "0",
+        value:
+          user?.role === UserRole.USER
+            ? userRecentActivities.toString()
+            : processingStats?.recentActivityCount?.toString() || "0",
         subtext: "In the last 24 hours",
         icon: FaHistory,
         href: "/audit-logs",
@@ -341,9 +384,18 @@ export default function Dashboard() {
     ];
   };
 
+  // Helper function to get recent activities count based on user role
+  const getRecentActivitiesCount = () => {
+    if (user?.role === UserRole.USER) {
+      return userRecentActivities;
+    } else {
+      return processingStats?.recentActivityCount || 0;
+    }
+  };
+
   // Render different charts based on permissions
   const renderPermissionBasedCharts = () => {
-    const isAdmin = user?.role === "ADMIN";
+    const isAdmin = user?.role === UserRole.ADMIN;
 
     if (isAdmin) {
       if (adminChartStatsData) {
@@ -407,24 +459,61 @@ export default function Dashboard() {
 
     if (user?.role === UserRole.USER) {
       return (
-        <>
-          <div className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]">
-            <h2 className="text-lg font-semibold mb-4">
-              Department Size Distribution
-            </h2>
-            <Suspense fallback={<ChartLoading />}>
-              {pieChartData && <PieChart data={pieChartData} />}
-            </Suspense>
+        <div className="bg-white p-6 rounded-lg shadow-lg min-h-[400px] col-span-2">
+          <h2 className="text-lg font-semibold mb-6">Department Overview</h2>
+          <div className="flex flex-col items-center justify-center h-full">
+            <p className="text-gray-600 mb-6 text-center max-w-2xl">
+              Welcome to your department dashboard. Here you can see information
+              about your team and department.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-4xl mx-auto">
+              <div className="bg-blue-50 p-6 rounded-lg flex flex-col">
+                <h3 className="font-medium text-blue-800 text-sm mb-2">
+                  Department
+                </h3>
+                <p className="text-xl font-bold text-blue-600 truncate">
+                  {dashboardStats?.departmentName || "Your Department"}
+                </p>
+                <p className="text-blue-500 text-sm mt-1">
+                  Finance and Accounting
+                </p>
+              </div>
+              <div className="bg-green-50 p-6 rounded-lg flex flex-col">
+                <h3 className="font-medium text-green-800 text-sm mb-2">
+                  Team Size
+                </h3>
+                <p className="text-xl font-bold text-green-600">
+                  {dashboardStats?.teamMembers || 0}
+                </p>
+                <p className="text-green-500 text-sm mt-1">
+                  In Your Department
+                </p>
+              </div>
+              <div className="bg-yellow-50 p-6 rounded-lg flex flex-col">
+                <h3 className="font-medium text-yellow-800 text-sm mb-2">
+                  Active Colleagues
+                </h3>
+                <p className="text-xl font-bold text-yellow-600">
+                  {dashboardStats?.activeColleagues || 0}
+                </p>
+                <p className="text-yellow-500 text-sm mt-1">
+                  Currently Working
+                </p>
+              </div>
+              <div className="bg-purple-50 p-6 rounded-lg flex flex-col">
+                <h3 className="font-medium text-purple-800 text-sm mb-2">
+                  Recent Activities
+                </h3>
+                <p className="text-xl font-bold text-purple-600">
+                  {getRecentActivitiesCount()}
+                </p>
+                <p className="text-purple-500 text-sm mt-1">
+                  In the last 24 hours
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="bg-white p-6 rounded-lg shadow-lg min-h-[400px]">
-            <h2 className="text-lg font-semibold mb-4">
-              Employee Role Distribution
-            </h2>
-            <Suspense fallback={<ChartLoading />}>
-              {barChartData && <BarChart data={barChartData} />}
-            </Suspense>
           </div>
-        </>
       );
     }
 
@@ -519,13 +608,14 @@ export default function Dashboard() {
                 </motion.div>
               ))
             : // Other roles stats
-              getRoleStats(user?.role, dashboardStats).map((stat, index) => (
+              getRoleStats(user?.role ?? UserRole.USER, dashboardStats).map(
+                (stat, index) => (
                 <motion.div
                   key={stat.name}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="w-full"
+                    className="w-full"
                 >
                   <StatCard
                     {...stat}
@@ -535,7 +625,8 @@ export default function Dashboard() {
                     color={stat.color}
                   />
                 </motion.div>
-              ))}
+                )
+              )}
         </div>
 
         {/* Charts Section */}

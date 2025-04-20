@@ -1,5 +1,11 @@
 import { Allowance, Deduction } from "./common";
 import { Permission } from "./auth";
+import { Department } from "./department";
+import {
+  OffboardingType,
+  OffboardingTask as ImportedOffboardingTask,
+} from "./offboarding";
+
 export enum LeaveStatus {
   pending = "pending",
   approved = "approved",
@@ -36,12 +42,6 @@ export interface Task {
   completedAt?: string;
 }
 
-export interface Department {
-  _id: string;
-  name: string;
-  code: string;
-}
-
 export interface BankDetails {
   bankName: string;
   accountNumber: string;
@@ -64,13 +64,24 @@ export interface OnboardingDetails {
 }
 
 export interface OffboardingDetails {
-  exitInterview: {
-    completed: boolean;
-  };
-  status: "pending_exit" | "in_progress" | "completed";
-  initiatedAt: string;
+  status: OffboardingStatus;
+  type: string;
+  reason: string;
+  targetExitDate: Date;
+  initiatedAt: Date;
   initiatedBy: string;
-  checklist: OffboardingChecklist[];
+  tasks: {
+    name: string;
+    description: string;
+    category: string;
+    deadline: Date;
+    completed: boolean;
+    completedAt?: Date;
+    completedBy?: string;
+    notes?: string;
+  }[];
+  progress: number;
+  actualExitDate?: Date;
 }
 
 export interface DeductionPreferences {
@@ -120,12 +131,32 @@ export interface Employee {
   email: string;
   phone: string;
   role: string;
-  department: Department;
+  department: Department | string;
   position: string;
   gradeLevel: string;
   workLocation: string;
   status: string;
-  offboarding?: OffboardingDetails;
+  offboarding?: {
+    status: "not_started" | "in_progress" | "completed" | "cancelled";
+    type: OffboardingType;
+    reason: string;
+    initiatedAt?: Date;
+    initiatedBy?: string;
+    targetExitDate: Date;
+    actualExitDate?: Date;
+    tasks: ImportedOffboardingTask[];
+    progress: number;
+    exitInterview?: {
+      completed: boolean;
+      conductedBy?: string;
+      date?: Date;
+      notes?: string;
+    };
+    rehireEligible?: {
+      status: boolean;
+      notes?: string;
+    };
+  };
   permissions: Permission[];
   progress: number;
   dateJoined: string;
@@ -191,12 +222,11 @@ export type OnboardingStatus =
   | "contract_pending"
   | "completed";
 export type OnboardingTaskName =
-  | "contract_signing"
-  | "it_setup"
-  | "documentation"
-  | "training"
-  | "bank_setup"
-  | "pension_setup";
+  | "Welcome Meeting"
+  | "Department Introduction"
+  | "System Access Setup"
+  | "Policy Documentation Review"
+  | "Initial Training Session";
 
 export interface OnboardingTask {
   _id: string;
@@ -238,7 +268,12 @@ export interface ExtendedOnboardingEmployee extends OnboardingEmployee {
   // If there are no additional properties, you might not need this interface at all
 }
 
-export type OffboardingStatus = "pending_exit" | "in_progress" | "completed";
+export type OffboardingStatus =
+  | "not_started"
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "cancelled";
 
 export type OffboardingTaskName =
   | "exit_interview"

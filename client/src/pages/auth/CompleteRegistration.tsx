@@ -21,8 +21,7 @@ import { useForm } from "react-hook-form";
 import { useFieldArray } from "react-hook-form";
 
 const api = axios.create({
-  baseURL:
-    import.meta.env.VITE_API_URL || "http://localhost:5000",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000",
   withCredentials: true,
 });
 
@@ -121,7 +120,14 @@ interface UserData {
   email: string;
   employeeId: string;
   position: string;
-  department?: string;
+  department?: {
+    _id: string;
+    name: string;
+    code: string;
+  };
+  gradeLevel?: string;
+  workLocation?: string;
+  dateJoined?: string;
 }
 
 type FormData = {
@@ -190,18 +196,24 @@ const CompleteRegistration = () => {
     const verifyToken = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get(`/api/invitation/verify/${token}`);
-        console.log(response);
+        const response = await api.get(`/api/invitation/verify/${token}`);
 
         if (response.data.success) {
           setUserData(response.data.user);
           setIsTokenValid(true);
+          toast.success(
+            "Invitation verified successfully. Please complete your registration."
+          );
         } else {
           setIsTokenValid(false);
+          toast.error(
+            response.data.message || "Invalid or expired invitation link"
+          );
         }
-      } catch (error) {
+      } catch (error: any) {
+        console.error("Error verifying token:", error);
         setIsTokenValid(false);
-        // Handle error appropriately
+        toast.error("Invalid or expired invitation link");
       } finally {
         setIsLoading(false);
       }
@@ -212,21 +224,8 @@ const CompleteRegistration = () => {
     } else {
       setIsTokenValid(false);
       setIsLoading(false);
+      toast.error("No invitation token provided");
     }
-  }, [token]);
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const response = await api.get(`/auth/verify-invitation/${token}`);
-        console.log("User Data Received:", response.data);
-        setUserData(response.data.user);
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-        toast.error("Failed to load user information");
-      }
-    };
-    fetchUserData();
   }, [token]);
 
   if (isLoading) {
@@ -235,13 +234,27 @@ const CompleteRegistration = () => {
 
   if (!isTokenValid) {
     return (
-      <div>
-        <h1>Invalid or Expired Link</h1>
-        <p>The invitation link is invalid or has expired.</p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">
+            Invalid or Expired Link
+          </h1>
+          <p className="text-gray-600 mb-6">
+            The invitation link is invalid or has expired. Please contact your
+            administrator for a new invitation.
+          </p>
+          <Link
+            to="/auth/signin"
+            className="text-green-600 hover:text-green-800 font-medium"
+          >
+            Return to Sign In
+          </Link>
+        </div>
       </div>
     );
   }
 
+  // Show loading state if user data is not available
   if (!userData) {
     return <AuthSkeleton />;
   }
@@ -266,6 +279,17 @@ const CompleteRegistration = () => {
       if (profileImage) {
         formDataToSend.append("profileImage", profileImage);
       }
+
+      // Log the form data being sent
+      console.log("Form data being sent:", {
+        token,
+        password: "********", // Masked for security
+        confirmPassword: "********", // Masked for security
+        emergencyContact: data.emergencyContact,
+        bankDetails: data.bankDetails,
+        personalDetails: data.personalDetails,
+        hasProfileImage: !!profileImage,
+      });
 
       const response = await api.post(
         "/api/invitation/complete-registration",
@@ -391,11 +415,29 @@ const CompleteRegistration = () => {
                   <span className="text-white/80">Position:</span>
                   <span className="font-medium">{userData?.position}</span>
                 </p>
+                <p className="flex justify-between items-center">
+                  <span className="text-white/80">Grade Level:</span>
+                  <span className="font-medium">{userData?.gradeLevel}</span>
+                </p>
+                <p className="flex justify-between items-center">
+                  <span className="text-white/80">Work Location:</span>
+                  <span className="font-medium">{userData?.workLocation}</span>
+                </p>
+                <p className="flex justify-between items-center">
+                  <span className="text-white/80">Date Joined:</span>
+                  <span className="font-medium">
+                    {userData?.dateJoined
+                      ? new Date(userData.dateJoined).toLocaleDateString()
+                      : "N/A"}
+                  </span>
+                </p>
                 {userData?.department && (
                   <p className="flex justify-between items-center">
                     <span className="text-white/80">Department:</span>
                     <span className="font-medium">
-                      {renderDepartmentName(userData.department)}
+                      {typeof userData.department === "object"
+                        ? userData.department.name
+                        : "No Department"}
                     </span>
                   </p>
                 )}
@@ -423,7 +465,7 @@ const CompleteRegistration = () => {
                 {/* Personal Details Section */}
                 <div className="bg-white p-6 rounded-lg shadow">
                   <h3 className="text-lg font-medium mb-4">Personal Details</h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* Middle Name */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
@@ -496,7 +538,7 @@ const CompleteRegistration = () => {
                   {/* Address Section */}
                   <div className="mt-6">
                     <h4 className="text-md font-medium mb-3">Address</h4>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {/* Street */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700">
@@ -565,7 +607,7 @@ const CompleteRegistration = () => {
                   <h3 className="text-lg font-medium mb-4">
                     Emergency Contact
                   </h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* Name */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
@@ -622,7 +664,7 @@ const CompleteRegistration = () => {
                 {/* Bank Details Section */}
                 <div className="bg-white p-6 rounded-lg shadow">
                   <h3 className="text-lg font-medium mb-4">Bank Details</h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* Bank Name */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
@@ -696,7 +738,7 @@ const CompleteRegistration = () => {
                 {/* Password Section */}
                 <div className="bg-white p-6 rounded-lg shadow">
                   <h3 className="text-lg font-medium mb-4">Set Password</h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* Password */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
@@ -738,7 +780,7 @@ const CompleteRegistration = () => {
                   <h3 className="text-lg font-medium mb-4">Qualifications</h3>
                   {fields.map((field, index) => (
                     <div key={field.id} className="mb-4 p-4 border rounded-lg">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700">
                             Highest Education
@@ -775,14 +817,14 @@ const CompleteRegistration = () => {
                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
                           />
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => remove(index)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          Remove
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => remove(index)}
-                        className="mt-2 text-red-600 hover:text-red-800"
-                      >
-                        Remove
-                      </button>
                     </div>
                   ))}
                   <button
@@ -804,9 +846,35 @@ const CompleteRegistration = () => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
+                  className="w-full bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50 flex items-center justify-center"
                 >
-                  {isSubmitting ? "Submitting..." : "Complete Registration"}
+                  {isSubmitting ? (
+                    <>
+                      <svg
+                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Submitting...
+                    </>
+                  ) : (
+                    "Complete Registration"
+                  )}
                 </button>
               </form>
             </div>

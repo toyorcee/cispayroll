@@ -242,23 +242,23 @@ class BaseApprovalController {
       // If rejected, we'll preserve the history but reset the approval flow
       const updateQuery = isApproved
         ? {
-            $set: {
+          $set: {
               status:
                 nextLevel === "COMPLETED"
-                  ? PAYROLL_STATUS.COMPLETED
+                ? PAYROLL_STATUS.COMPLETED
                   : PAYROLL_STATUS.PENDING,
-              "approvalFlow.currentLevel": nextLevel,
-              "approvalFlow.statusMessage": statusMessage,
-              "approvalFlow.nextApprovalLevel":
-                nextLevel === "COMPLETED" ? null : nextLevel,
-              [`approvalFlow.${currentLevel}`]: {
+            "approvalFlow.currentLevel": nextLevel,
+            "approvalFlow.statusMessage": statusMessage,
+            "approvalFlow.nextApprovalLevel":
+              nextLevel === "COMPLETED" ? null : nextLevel,
+            [`approvalFlow.${currentLevel}`]: {
                 status: "APPROVED",
-                approvedBy: admin._id,
-                approvedAt: new Date(),
-                reason: reason,
-              },
+              approvedBy: admin._id,
+              approvedAt: new Date(),
+              reason: reason,
             },
-            $push: {
+          },
+          $push: {
               "approvalFlow.history": historyEntry,
             },
           }
@@ -279,7 +279,7 @@ class BaseApprovalController {
               "approvalFlow.SUPER_ADMIN": null,
               // Track rejection state
               "approvalFlow.rejectionState": {
-                level: currentLevel,
+              level: currentLevel,
                 timestamp: new Date(),
                 reason: reason || "No reason provided",
                 rejectedBy: admin._id,
@@ -292,9 +292,9 @@ class BaseApprovalController {
                   if: { $exists: ["$approvalFlow.rejectionCount"] },
                   then: { $add: ["$approvalFlow.rejectionCount", 1] },
                   else: 1,
-                },
-              },
             },
+          },
+        },
             $push: {
               "approvalFlow.history": historyEntry,
             },
@@ -321,8 +321,8 @@ class BaseApprovalController {
             updatedPayroll.employee,
             updatedPayroll,
             `Payroll rejected by ${currentLevel.replace(
-              /_/g,
-              " "
+                /_/g,
+                " "
             )}. Please review and resubmit.`,
             {
               data: {

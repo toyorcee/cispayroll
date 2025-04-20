@@ -80,6 +80,24 @@ export class EmployeeService {
               category: "orientation",
               deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
             },
+            {
+              name: "System Access Setup",
+              description: "Set up system access and accounts",
+              category: "setup",
+              deadline: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
+            },
+            {
+              name: "Policy Documentation Review",
+              description: "Review and acknowledge company policies",
+              category: "compliance",
+              deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+            },
+            {
+              name: "Initial Training Session",
+              description: "Complete initial training modules",
+              category: "training",
+              deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            },
           ],
         },
       };
@@ -169,7 +187,14 @@ export class EmployeeService {
       const skip = (page - 1) * limit;
 
       // Build query
-      const query = {};
+      const query = {
+        "lifecycle.currentState": { $ne: UserLifecycleState.OFFBOARDING },
+      };
+
+      console.log(
+        "EmployeeService.getEmployees - Initial query:",
+        JSON.stringify(query, null, 2)
+      );
 
       // Add search filter
       if (search) {
@@ -179,11 +204,19 @@ export class EmployeeService {
           { email: { $regex: search, $options: "i" } },
           { employeeId: { $regex: search, $options: "i" } },
         ];
+        console.log(
+          "EmployeeService.getEmployees - After search filter:",
+          JSON.stringify(query, null, 2)
+        );
       }
 
       // Add status filter
       if (status) {
         query.status = status;
+        console.log(
+          "EmployeeService.getEmployees - After status filter:",
+          JSON.stringify(query, null, 2)
+        );
       }
 
       // Add department filter
@@ -193,6 +226,10 @@ export class EmployeeService {
         } else {
           query.department = department;
         }
+        console.log(
+          "EmployeeService.getEmployees - After department filter:",
+          JSON.stringify(query, null, 2)
+        );
       }
 
       // Execute query with pagination
@@ -204,6 +241,15 @@ export class EmployeeService {
           .limit(limit),
         UserModel.countDocuments(query),
       ]);
+
+      console.log(
+        "EmployeeService.getEmployees - Found employees:",
+        employees.length
+      );
+      console.log(
+        "EmployeeService.getEmployees - First employee lifecycle state:",
+        employees[0]?.lifecycle?.currentState
+      );
 
       return {
         data: employees.map((emp) => this.formatEmployeeResponse(emp)),
@@ -233,6 +279,7 @@ export class EmployeeService {
       throw error;
     }
   }
+
   static async deleteEmployee(employeeId) {
     try {
       const employee = await UserModel.findByIdAndDelete(employeeId);
