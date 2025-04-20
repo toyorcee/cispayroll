@@ -205,19 +205,16 @@ export class EmailService {
   static getBaseEmailTemplate(content) {
     return `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
-        <div style="text-align: center; padding: 32px 0; background: linear-gradient(to right, #f8fafc, #ffffff);">
+        <div style="text-align: center; padding: 32px 0; background: #ffffff;">
           <div style="margin: 0 auto; width: fit-content;">
-            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="48" height="48" viewBox="0 0 32 32">
-              <image xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAXVJREFUWEdjZICB/wyM4ou9Iv8zMiQz/GcwZWBk4IXLUYPxn+EzAyPDacb/DHNfxm5bzsDI8B9kLCOIEFriycfyn3ENAwODKzXsIsKM3X8Y/4e8i9n+CeQORrElXjvpaDnMfbtfxWxzZxRf5BX1n5FhKRGuproSxv8M0Yxii732MjAwOFHddOIM3McotsjrE9UTHHGWMzD8Z/gMCgFalwoMDQdwM7MylBvlMwQpuQMDrhV9/YyNJ6by/Dz72+SA5KsEGgzzWBIVvdFsWzuzc0MVadn0McBd8JXM/CycqFY9vn3NwaVlaEjxAEDHgUDkggr9GMZMrWCGDiY2fDG84+/vximX1vH0HFxMVHpgahcoM4vx3DIdzpRBsIU2W3OZLj58RFBPUQ5wEpcl2G9awdBw5AVBO6uYDj28jJBPaMOGA2BoRECA54NQXlpQAsigpmZAgVEpQEKzCeodVA0Sge2WT7gHZMB75qBUsnAdk5h6XSAuucAZL/ia4Blq2wAAAAASUVORK5CYII=" x="0" y="0" width="32" height="32"/>
-            </svg>
-            <h1 style="color: #16a34a; font-size: 28px; font-weight: 600; margin: 16px 0 0 0;">Personnel Management System</h1>
+            <h1 style="color: #16a34a; font-size: 28px; font-weight: 600; margin: 16px 0 0 0;">PMS</h1>
           </div>
         </div>
         ${content}
         <div style="text-align: center; margin-top: 32px; padding: 24px;">
           <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0;">
             <p style="color: #94a3b8; font-size: 13px; margin: 0;">
-              Powered by Century Information Systems
+              © ${new Date().getFullYear()} Century Information Systems
             </p>
           </div>
         </div>
@@ -676,7 +673,6 @@ export class EmailService {
         totals,
       } = payslipData;
 
-      // Convert ArrayBuffer to Buffer if needed
       const pdfContent = Buffer.from(pdfBuffer);
 
       const html = `
@@ -704,14 +700,14 @@ export class EmailService {
             .header {
               text-align: center;
               padding: 20px 0;
-              background-color: #1a237e;
-              color: white;
+              background-color: #ffffff;
+              color: #16a34a;
               border-radius: 5px 5px 0 0;
             }
-            .header img {
-              max-width: 150px;
-              height: auto;
-              margin-bottom: 10px;
+            .header h2 {
+              color: #16a34a;
+              font-size: 28px;
+              margin: 10px 0;
             }
             .content {
               padding: 20px;
@@ -722,7 +718,7 @@ export class EmailService {
             .greeting {
               font-size: 18px;
               margin-bottom: 20px;
-              color: #1a237e;
+              color: #16a34a;
             }
             .payslip-details {
               background-color: #f8f9fa;
@@ -732,6 +728,7 @@ export class EmailService {
             }
             .payslip-details p {
               margin: 5px 0;
+              color: #475569;
             }
             .summary {
               margin: 20px 0;
@@ -747,29 +744,29 @@ export class EmailService {
               border-bottom: 1px solid #ddd;
             }
             .summary-table th {
-              background-color: #f8f9fa;
-              color: #1a237e;
+              background-color: #16a34a;
+              color: #ffffff;
             }
             .earnings {
-              color: #2e7d32;
+              color: #16a34a;
             }
             .deductions {
-              color: #c62828;
+              color: #475569;
             }
             .net-pay {
               font-size: 18px;
               font-weight: bold;
-              color: #1a237e;
+              color: #16a34a;
               text-align: right;
               margin-top: 20px;
               padding: 10px;
-              background-color: #e8eaf6;
+              background-color: #f8f9fa;
               border-radius: 5px;
             }
             .footer {
               text-align: center;
               padding: 20px;
-              color: #666;
+              color: #94a3b8;
               font-size: 12px;
               margin-top: 20px;
               border-top: 1px solid #eee;
@@ -778,7 +775,7 @@ export class EmailService {
               margin: 5px 0;
             }
             .contact-info {
-              color: #1a237e;
+              color: #16a34a;
               font-weight: bold;
             }
           </style>
@@ -786,8 +783,8 @@ export class EmailService {
         <body>
           <div class="container">
             <div class="header">
-              <img src="https://neovarsity.com/assets/images/logo.png" alt="Neovarsity Logo">
-              <h2>Payslip for ${month} ${year}</h2>
+              <h2>PMS</h2>
+              <h3>Payslip for ${month} ${year}</h3>
             </div>
             
             <div class="content">
@@ -805,7 +802,7 @@ export class EmailService {
               </div>
               
               <div class="summary">
-                <h3>Salary Summary</h3>
+                <h3 style="color: #16a34a;">Salary Summary</h3>
                 <table class="summary-table">
                   <tr>
                     <th>Description</th>
@@ -818,24 +815,24 @@ export class EmailService {
                   ${
                     earnings?.overtime?.amount > 0
                       ? `
-                    <tr>
-                      <td>Overtime (${earnings.overtime.hours}hrs)</td>
-                      <td class="earnings">₦${earnings.overtime.amount.toFixed(
-                        2
-                      )}</td>
-                    </tr>
-                  `
+                  <tr>
+                    <td>Overtime (${earnings.overtime.hours}hrs)</td>
+                    <td class="earnings">₦${earnings.overtime.amount.toFixed(
+                      2
+                    )}</td>
+                  </tr>
+                `
                       : ""
                   }
                   ${
                     earnings?.bonus
                       ?.map(
                         (bonus) => `
-                    <tr>
-                      <td>${bonus.description}</td>
-                      <td class="earnings">₦${bonus.amount.toFixed(2)}</td>
-                    </tr>
-                  `
+                  <tr>
+                    <td>${bonus.description}</td>
+                    <td class="earnings">₦${bonus.amount.toFixed(2)}</td>
+                  </tr>
+                `
                       )
                       .join("") || ""
                   }
@@ -861,11 +858,11 @@ export class EmailService {
                     deductions?.loans
                       ?.map(
                         (loan) => `
-                    <tr>
-                      <td>${loan.description}</td>
-                      <td class="deductions">-₦${loan.amount.toFixed(2)}</td>
-                    </tr>
-                  `
+                  <tr>
+                    <td>${loan.description}</td>
+                    <td class="deductions">-₦${loan.amount.toFixed(2)}</td>
+                  </tr>
+                `
                       )
                       .join("") || ""
                   }
@@ -873,13 +870,11 @@ export class EmailService {
                     deductions?.others
                       ?.map(
                         (deduction) => `
-                    <tr>
-                      <td>${deduction.description}</td>
-                      <td class="deductions">-₦${deduction.amount.toFixed(
-                        2
-                      )}</td>
-                    </tr>
-                  `
+                  <tr>
+                    <td>${deduction.description}</td>
+                    <td class="deductions">-₦${deduction.amount.toFixed(2)}</td>
+                  </tr>
+                `
                       )
                       .join("") || ""
                   }
@@ -892,12 +887,11 @@ export class EmailService {
             </div>
             
             <div class="footer">
-              <p>This is an automated message. Please do not reply to this email.</p>
+              <p>This is a computer generated document</p>
               <p>For any queries, please contact:</p>
               <p class="contact-info">HR Department</p>
               <p>Email: hr@centuryinfosystems.com</p>
-              <p>Phone: +91 1234567890</p>
-              <p>© ${new Date().getFullYear()} Century Information Systems. All rights reserved.</p>
+              <p>© ${new Date().getFullYear()} Century Information Systems</p>
             </div>
           </div>
         </body>

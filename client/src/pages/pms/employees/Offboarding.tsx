@@ -19,6 +19,7 @@ import {
   DialogActions,
   CircularProgress,
   Tooltip,
+  Pagination,
 } from "@mui/material";
 import { motion } from "framer-motion";
 import {
@@ -36,13 +37,8 @@ import {
 } from "react-icons/fa";
 import { offboardingService } from "../../../services/offboardingService";
 import { toast } from "react-toastify";
-import {
-  Employee,
-  OffboardingStatus,
-  OffboardingDetails,
-} from "../../../types/employee";
+import { Employee, OffboardingStatus } from "../../../types/employee";
 import { OffboardingTask as ImportedOffboardingTask } from "../../../types/offboarding";
-import { generateFinalSettlementPDF } from "../../../utils/pdfGenerator";
 
 // Use the imported OffboardingTask type
 type OffboardingTask = ImportedOffboardingTask;
@@ -56,10 +52,14 @@ export default function Offboarding() {
   const [localEmployee, setLocalEmployee] = useState<Employee | null>(null);
   const [showTasksModal, setShowTasksModal] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalEmployees, setTotalEmployees] = useState(0);
+  const limit = 6;
 
   useEffect(() => {
     fetchOffboardingEmployees();
-  }, []);
+  }, [page]);
 
   // Update local employee when selected employee changes
   useEffect(() => {
@@ -71,15 +71,27 @@ export default function Offboarding() {
   const fetchOffboardingEmployees = async () => {
     try {
       setLoading(true);
-      const employees = await offboardingService.getOffboardingUsers();
-      console.log("Fetched offboarding employees:", employees);
-      setEmployees(employees || []);
+      const response = await offboardingService.getOffboardingUsers(
+        page,
+        limit
+      );
+      console.log("Fetched offboarding employees:", response);
+      setEmployees(response.data || []);
+      setTotalPages(response.pagination?.totalPages || 1);
+      setTotalEmployees(response.pagination?.total || 0);
     } catch (error) {
       console.error("Failed to fetch offboarding employees:", error);
       toast.error("Failed to fetch offboarding employees");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePageChange = (
+    event: React.ChangeEvent<unknown>,
+    value: number
+  ) => {
+    setPage(value);
   };
 
   const getStatusColor = (status?: OffboardingStatus) => {
@@ -151,8 +163,13 @@ export default function Offboarding() {
       // Refresh employee list in the background without showing loading spinner
       const refreshEmployees = async () => {
         try {
-          const employees = await offboardingService.getOffboardingUsers();
-          setEmployees(employees || []);
+          const response = await offboardingService.getOffboardingUsers(
+            page,
+            limit
+          );
+          setEmployees(response.data || []);
+          setTotalPages(response.pagination?.totalPages || 1);
+          setTotalEmployees(response.pagination?.total || 0);
         } catch (error) {
           console.error("❌ Error refreshing employee list:", error);
         }
@@ -209,7 +226,7 @@ export default function Offboarding() {
     if (!selectedEmployee) return;
 
     try {
-      setLoading(true);
+      setGeneratingReport(true);
       const response = await offboardingService.getFinalSettlementReport(
         selectedEmployee._id
       );
@@ -250,7 +267,7 @@ export default function Offboarding() {
       console.error("Error generating final settlement report:", error);
       toast.error("Failed to generate final settlement report");
     } finally {
-      setLoading(false);
+      setGeneratingReport(false);
     }
   };
 
@@ -565,143 +582,328 @@ export default function Offboarding() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" sx={{ mb: 4, fontWeight: "bold" }}>
-        Offboarding Employees
-      </Typography>
+      <Box
+        sx={{
+          mb: 4,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <Typography
+          variant="h5"
+          sx={{
+            color: "#16a34a",
+            fontWeight: 500,
+            fontSize: "1.8rem",
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            "& svg": {
+              fontSize: "1.8rem",
+            },
+          }}
+        >
+          <FaUserCircle /> Offboarding Management
+        </Typography>
+        <Chip
+          label="✨ Onboarding & Offboarding Ready"
+          sx={{
+            backgroundColor: "#ecfdf5",
+            color: "#16a34a",
+            fontWeight: 500,
+            fontSize: "0.95rem",
+            height: "36px",
+            "& .MuiChip-label": {
+              px: 2.5,
+              py: 0.8,
+            },
+          }}
+        />
+      </Box>
 
       {employees.length > 0 ? (
-        <Grid container spacing={3}>
-          {employees.map((employee) => (
-            <Grid item xs={12} sm={6} md={4} key={employee._id}>
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <Card
-                  sx={{
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    position: "relative",
-                    "&:hover": {
-                      boxShadow: 6,
-                      transform: "translateY(-4px)",
-                      transition: "all 0.3s",
-                    },
-                  }}
+        <>
+          <Grid container spacing={3}>
+            {employees.map((employee) => (
+              <Grid item xs={12} sm={6} md={4} key={employee._id}>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  <CardContent>
-                    <Chip
-                      label={employee.offboarding?.status || "pending"}
-                      color={getStatusColor(employee.offboarding?.status)}
-                      size="small"
-                      sx={{ position: "absolute", top: 16, right: 16 }}
+                  <Card
+                    sx={{
+                      height: "100%",
+                      display: "flex",
+                      flexDirection: "column",
+                      position: "relative",
+                      borderRadius: 2,
+                      overflow: "hidden",
+                      "&:hover": {
+                        boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+                        transform: "translateY(-4px)",
+                        transition: "all 0.3s ease",
+                      },
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: "4px",
+                        background: (theme) => {
+                          const status =
+                            employee.offboarding?.status?.toLowerCase();
+                          switch (status) {
+                            case "completed":
+                              return "#16a34a";
+                            case "in_progress":
+                              return "#f59e0b";
+                            case "pending":
+                              return "#3b82f6";
+                            case "cancelled":
+                              return "#ef4444";
+                            default:
+                              return "#94a3b8";
+                          }
+                        },
+                      }}
                     />
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200">
-                          {employee.profileImage ? (
-                            <img
-                              src={`http://localhost:5000/${employee.profileImage}`}
-                              alt={employee.fullName}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src =
-                                  "https://ui-avatars.com/api/?name=" +
-                                  encodeURIComponent(employee.fullName);
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-primary/10">
-                              <span className="text-primary font-medium">
-                                {employee.firstName.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <Box sx={{ ml: 2 }}>
-                          <Typography variant="h6" component="div">
-                            {employee.fullName}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {employee.email}
-                          </Typography>
-                        </Box>
-                      </div>
-                    </Box>
-                    <Box sx={{ mb: 2 }}>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", mb: 1 }}
-                      >
-                        <FaBuilding size={16} style={{ marginRight: 8 }} />
-                        <Typography variant="body2">
-                          {typeof employee.department === "object"
-                            ? employee.department?.name
-                            : "No Department"}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: "flex", alignItems: "center" }}>
-                        <FaBriefcase size={16} style={{ marginRight: 8 }} />
-                        <Typography variant="body2">
-                          {employee.position}
-                        </Typography>
-                      </Box>
-                    </Box>
-
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                      <FaCalendarAlt size={16} style={{ marginRight: 8 }} />
-                      <Typography variant="body2">
-                        Exit Date:{" "}
-                        {employee.offboarding?.targetExitDate
-                          ? new Date(
-                              employee.offboarding.targetExitDate
-                            ).toLocaleDateString()
-                          : "Not set"}
-                      </Typography>
-                    </Box>
-
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        Offboarding Progress:{" "}
-                        {calculateProgress(employee.offboarding?.tasks)}%
-                      </Typography>
-                      <LinearProgress
-                        variant="determinate"
-                        value={calculateProgress(employee.offboarding?.tasks)}
+                    <CardContent sx={{ p: 3 }}>
+                      <Chip
+                        label={employee.offboarding?.status || "pending"}
+                        color={getStatusColor(employee.offboarding?.status)}
+                        size="small"
                         sx={{
-                          height: 8,
-                          borderRadius: 4,
-                          backgroundColor: "#e0e0e0",
-                          "& .MuiLinearProgress-bar": {
-                            borderRadius: 4,
+                          position: "absolute",
+                          top: 16,
+                          right: 16,
+                          textTransform: "capitalize",
+                          "& .MuiChip-label": {
+                            fontWeight: 500,
                           },
                         }}
                       />
-                    </Box>
-
-                    <Box sx={{ display: "flex", gap: 1, mt: "auto" }}>
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        fullWidth
-                        onClick={() => handleViewTasks(employee)}
-                        startIcon={<FaTasks />}
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", mb: 3 }}
                       >
-                        Manage Tasks
-                      </Button>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </Grid>
-          ))}
-        </Grid>
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200">
+                            {employee.profileImage ? (
+                              <img
+                                src={`http://localhost:5000/${employee.profileImage}`}
+                                alt={employee.fullName}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src =
+                                    "https://ui-avatars.com/api/?name=" +
+                                    encodeURIComponent(employee.fullName);
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-primary/10">
+                                <span className="text-primary font-medium">
+                                  {employee.firstName.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <Box sx={{ ml: 2 }}>
+                            <Typography
+                              variant="h6"
+                              component="div"
+                              sx={{
+                                fontSize: "1.1rem",
+                                fontWeight: 500,
+                                color: "#1e293b",
+                              }}
+                            >
+                              {employee.fullName}
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                color: "#64748b",
+                                fontSize: "0.875rem",
+                              }}
+                            >
+                              {employee.email}
+                            </Typography>
+                          </Box>
+                        </div>
+                      </Box>
+                      <Box sx={{ mb: 3 }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            mb: 1.5,
+                            color: "#475569",
+                          }}
+                        >
+                          <FaBuilding size={14} style={{ marginRight: 8 }} />
+                          <Typography variant="body2">
+                            {typeof employee.department === "object"
+                              ? employee.department?.name
+                              : "No Department"}
+                          </Typography>
+                        </Box>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            color: "#475569",
+                          }}
+                        >
+                          <FaBriefcase size={14} style={{ marginRight: 8 }} />
+                          <Typography variant="body2">
+                            {employee.position}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          mb: 3,
+                          color: "#475569",
+                        }}
+                      >
+                        <FaCalendarAlt size={14} style={{ marginRight: 8 }} />
+                        <Typography variant="body2">
+                          Exit Date:{" "}
+                          <span style={{ color: "#16a34a", fontWeight: 500 }}>
+                            {employee.offboarding?.targetExitDate
+                              ? new Date(
+                                  employee.offboarding.targetExitDate
+                                ).toLocaleDateString()
+                              : "Not set"}
+                          </span>
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ mb: 3 }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            mb: 1,
+                          }}
+                        >
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: "#475569",
+                              fontWeight: 500,
+                            }}
+                          >
+                            Progress
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: "#16a34a",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {calculateProgress(employee.offboarding?.tasks)}%
+                          </Typography>
+                        </Box>
+                        <LinearProgress
+                          variant="determinate"
+                          value={calculateProgress(employee.offboarding?.tasks)}
+                          sx={{
+                            height: 6,
+                            borderRadius: 3,
+                            backgroundColor: "#f1f5f9",
+                            "& .MuiLinearProgress-bar": {
+                              borderRadius: 3,
+                              backgroundColor: "#16a34a",
+                            },
+                          }}
+                        />
+                      </Box>
+
+                      <Box sx={{ display: "flex", gap: 1, mt: "auto" }}>
+                        <Button
+                          variant="contained"
+                          fullWidth
+                          onClick={() => handleViewTasks(employee)}
+                          startIcon={<FaTasks />}
+                          sx={{
+                            backgroundColor: "#16a34a",
+                            "&:hover": {
+                              backgroundColor: "#15803d",
+                            },
+                            textTransform: "none",
+                            borderRadius: 1.5,
+                            py: 1,
+                          }}
+                        >
+                          Manage Tasks
+                        </Button>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <Box
+              sx={{ display: "flex", justifyContent: "center", mt: 4, mb: 2 }}
+            >
+              <Pagination
+                count={totalPages}
+                page={page}
+                onChange={handlePageChange}
+                color="primary"
+                size="large"
+                showFirstButton
+                showLastButton
+              />
+            </Box>
+          )}
+
+          {/* Pagination Info */}
+          <Box sx={{ textAlign: "center", mb: 4 }}>
+            <Typography variant="body2" color="text.secondary">
+              Showing {employees.length} of {totalEmployees} employees
+            </Typography>
+          </Box>
+        </>
       ) : (
-        <Typography variant="h6" sx={{ textAlign: "center", mt: 4 }}>
-          No employees in offboarding process
-        </Typography>
+        <Box
+          sx={{
+            textAlign: "center",
+            mt: 8,
+            p: 4,
+            backgroundColor: "#f8fafc",
+            borderRadius: 2,
+          }}
+        >
+          <Typography
+            variant="h6"
+            sx={{
+              color: "#64748b",
+              fontWeight: 500,
+              mb: 1,
+            }}
+          >
+            No Offboarding Employees
+          </Typography>
+          <Typography variant="body2" sx={{ color: "#94a3b8" }}>
+            There are currently no employees in the offboarding process
+          </Typography>
+        </Box>
       )}
 
       <TasksModal />

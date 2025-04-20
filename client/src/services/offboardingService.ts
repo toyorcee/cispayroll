@@ -123,11 +123,12 @@ export const offboardingService = {
   },
 
   // Get all offboarding users
-  getOffboardingUsers: async () => {
+  getOffboardingUsers: async (page: number = 1, limit: number = 10) => {
     try {
-      logOffboardingAction("Fetching all offboarding users", {});
+      logOffboardingAction("Fetching all offboarding users", { page, limit });
 
       const response = await axios.get(`${BASE_URL}/offboarding/employees`, {
+        params: { page, limit },
         withCredentials: true,
       });
 
@@ -139,7 +140,7 @@ export const offboardingService = {
         );
       }
 
-      return response.data.data;
+      return response.data;
     } catch (error: any) {
       logOffboardingAction("Error fetching offboarding users", {
         error: error.message || error,
