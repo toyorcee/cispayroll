@@ -7,6 +7,8 @@ import {
   approveBonusRequest,
   rejectBonusRequest,
   deleteBonusRequest,
+  createDepartmentEmployeeBonus,
+  createDepartmentWideBonus,
 } from "../controllers/BonusController.js";
 
 const router = express.Router();
@@ -21,5 +23,9 @@ router.get("/requests/:id", getBonusRequestById);
 router.put("/requests/:id/approve", approveBonusRequest);
 router.put("/requests/:id/reject", rejectBonusRequest);
 router.delete("/requests/:id", deleteBonusRequest);
+
+// Department-specific bonus routes
+router.post("/department/employee", createDepartmentEmployeeBonus);
+router.post("/department/all", createDepartmentWideBonus);
 
 export default router;

@@ -312,6 +312,182 @@ const deleteBonusRequest = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Create a bonus for a specific employee in the HOD's department
+ * Only HODs and super admins can use this
+ */
+const createDepartmentEmployeeBonus = asyncHandler(async (req, res) => {
+  const { employeeId, amount, reason, paymentDate, type } = req.body;
+  const userId = req.user._id;
+  const userRole = req.user.role;
+
+  // Validate required fields
+  if (!employeeId || !amount || !reason || !paymentDate) {
+    throw new ApiError(
+      400,
+      "Employee ID, amount, reason, and payment date are required"
+    );
+  }
+
+  // Check if user is a super admin or HOD
+  if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    throw new ApiError(
+      403,
+      "Only department heads and super admins can create department employee bonuses"
+    );
+  }
+
+  // Get the employee
+  const employee = await User.findById(employeeId);
+  if (!employee) {
+    throw new ApiError(404, "Employee not found");
+  }
+
+  // If user is a HOD, verify they are the head of the employee's department
+  if (userRole === "ADMIN") {
+    // Check if the user is a HOD
+    const department = await Department.findOne({ headOfDepartment: userId });
+    if (!department) {
+      throw new ApiError(403, "You are not a head of department");
+    }
+
+    // Verify the employee belongs to the HOD's department
+    if (employee.department.toString() !== department._id.toString()) {
+      throw new ApiError(
+        403,
+        "You can only create bonuses for employees in your department"
+      );
+    }
+  }
+
+  try {
+    const bonus = await Bonus.create({
+      employee: employeeId,
+      type: type || BonusType.SPECIAL,
+      amount,
+      reason,
+      paymentDate: new Date(paymentDate),
+      department: employee.department,
+      createdBy: userId,
+      updatedBy: userId,
+    });
+
+    // Log only after successful creation
+    console.log(
+      `[BONUS REQUEST SUCCESS] User ${userId} created a department employee bonus for employee ${employeeId} with amount ${amount}`
+    );
+
+    return res.status(201).json({
+      success: true,
+      data: bonus,
+      message: "Department employee bonus created successfully",
+    });
+  } catch (error) {
+    console.error(
+      `[BONUS REQUEST FAILED] User ${userId} failed to create department employee bonus: ${error.message}`
+    );
+    throw new ApiError(500, "Failed to create department employee bonus");
+  }
+});
+
+/**
+ * Create a bonus for all employees in the HOD's department
+ * Only HODs and super admins can use this
+ */
+const createDepartmentWideBonus = asyncHandler(async (req, res) => {
+  const { amount, reason, paymentDate, type, departmentId } = req.body;
+  const userId = req.user._id;
+  const userRole = req.user.role;
+
+  // Validate required fields
+  if (!amount || !reason || !paymentDate) {
+    throw new ApiError(400, "Amount, reason, and payment date are required");
+  }
+
+  // Check if user is a super admin or HOD
+  if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    throw new ApiError(
+      403,
+      "Only department heads and super admins can create department-wide bonuses"
+    );
+  }
+
+  let department;
+
+  // If user is a HOD, get their department
+  if (userRole === "ADMIN") {
+    // First try to find department by headOfDepartment field
+    department = await Department.findOne({ headOfDepartment: userId });
+
+    // If not found by headOfDepartment, check if user's position indicates they're a head of department
+    if (
+      !department &&
+      req.user.position &&
+      req.user.position.toLowerCase().includes("head of")
+    ) {
+      // Find department by user's department field
+      department = await Department.findById(req.user.department);
+    }
+
+    if (!department) {
+      throw new ApiError(403, "You are not a head of department");
+    }
+  }
+  // If user is a super admin, they can specify a department
+  else if (userRole === "SUPER_ADMIN" && departmentId) {
+    department = await Department.findById(departmentId);
+    if (!department) {
+      throw new ApiError(404, "Department not found");
+    }
+  } else {
+    throw new ApiError(400, "Department ID is required for super admins");
+  }
+
+  // Get all employees in the department
+  const employees = await User.find({
+    department: department._id,
+    status: "active",
+  });
+
+  if (!employees || employees.length === 0) {
+    throw new ApiError(404, "No active employees found in this department");
+  }
+
+  try {
+    // Create a bonus for each employee
+    const bonusPromises = employees.map((employee) =>
+      Bonus.create({
+        employee: employee._id,
+        type: type || BonusType.SPECIAL,
+        amount,
+        reason,
+        paymentDate: new Date(paymentDate),
+        department: department._id,
+        createdBy: userId,
+        updatedBy: userId,
+      })
+    );
+
+    const bonuses = await Promise.all(bonusPromises);
+
+    // Log only after successful creation
+    console.log(
+      `[BONUS REQUEST SUCCESS] User ${userId} created department-wide bonuses for ${bonuses.length} employees in department ${department._id}`
+    );
+
+    return res.status(201).json({
+      success: true,
+      data: bonuses,
+      message: `Department-wide bonus created successfully for ${bonuses.length} employees`,
+    });
+  } catch (error) {
+    console.error(
+      `[BONUS REQUEST FAILED] User ${userId} failed to create department-wide bonus: ${error.message}`
+    );
+    throw new ApiError(500, "Failed to create department-wide bonus");
+  }
+});
+
 export {
   createPersonalBonus,
   getBonusRequests,
@@ -319,4 +495,6 @@ export {
   approveBonusRequest,
   rejectBonusRequest,
   deleteBonusRequest,
+  createDepartmentEmployeeBonus,
+  createDepartmentWideBonus,
 };
