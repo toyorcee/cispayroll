@@ -25,6 +25,7 @@ import {
 import AuditService from "../services/AuditService.js";
 import BaseApprovalController from "./BaseApprovalController.js";
 import { AuditAction, AuditEntity } from "../models/Audit.js";
+import SalaryGrade from "../models/SalaryStructure.js";
 
 // Define the order of approval levels
 const APPROVAL_ORDER = [
@@ -93,6 +94,54 @@ const getNextApprovalLevel = (currentLevel) => {
       return null;
     default:
       throw new ApiError(400, "Invalid approval level");
+  }
+};
+
+// Add this function before the AdminController class
+const getApproverForAllowance = async (departmentId) => {
+  try {
+    console.log("🔍 Finding approver for department:", departmentId);
+
+    // First try to find a department head
+    const departmentHead = await UserModel.findOne({
+      department: departmentId,
+      position: { $regex: /head|hod/i },
+      status: "active",
+    });
+
+    if (departmentHead) {
+      console.log("✅ Found department head:", departmentHead._id);
+      return { approverId: departmentHead._id, approverRole: "hod" };
+    }
+
+    // If no department head, find an HR manager
+    const hrManager = await UserModel.findOne({
+      department: { $regex: /hr|human resources/i },
+      position: { $regex: /manager|head/i },
+      status: "active",
+    });
+
+    if (hrManager) {
+      console.log("✅ Found HR manager:", hrManager._id);
+      return { approverId: hrManager._id, approverRole: "hr" };
+    }
+
+    // If no HR manager, find a super admin
+    const superAdmin = await UserModel.findOne({
+      role: "SUPER_ADMIN",
+      status: "active",
+    });
+
+    if (superAdmin) {
+      console.log("✅ Found super admin:", superAdmin._id);
+      return { approverId: superAdmin._id, approverRole: "super_admin" };
+    }
+
+    console.log("❌ No approver found");
+    throw new Error("No approver found for allowance request");
+  } catch (error) {
+    console.error("❌ Error finding approver:", error);
+    throw error;
   }
 };
 
@@ -905,7 +954,7 @@ export class AdminController {
       // Create notifications
       await NotificationService.createPayrollNotification(
         payroll,
-          NOTIFICATION_TYPES.PAYROLL_REJECTED,
+        NOTIFICATION_TYPES.PAYROLL_REJECTED,
         admin,
         remarks
       );
@@ -915,13 +964,13 @@ export class AdminController {
         "REJECT",
         "PAYROLL",
         payroll._id,
-          admin._id,
-          {
+        admin._id,
+        {
           status: PAYROLL_STATUS.REJECTED,
           level: payroll.approvalFlow.currentLevel,
           employeeName: `${payroll.employee.firstName} ${payroll.employee.lastName}`,
-            month: payroll.month,
-            year: payroll.year,
+          month: payroll.month,
+          year: payroll.year,
           remarks: remarks,
           departmentId: payroll.department._id,
         }
@@ -1232,8 +1281,8 @@ export class AdminController {
       // Skip department head level only if submitter is HR Manager/Head
       const initialApprovalLevel =
         isHRDepartment && isHRManager
-        ? APPROVAL_LEVELS.HR_MANAGER
-        : APPROVAL_LEVELS.DEPARTMENT_HEAD;
+          ? APPROVAL_LEVELS.HR_MANAGER
+          : APPROVAL_LEVELS.DEPARTMENT_HEAD;
 
       console.log(`📊 Initial approval level: ${initialApprovalLevel}`);
       console.log(`🏢 Is HR Department: ${isHRDepartment}`);
@@ -1591,10 +1640,11 @@ export class AdminController {
 
       const allowances = await Allowance.find({
         department: req.user.department,
-        scope: { $in: ["department", "grade"] },
       })
         .populate("department", "name")
         .populate("salaryGrade", "level basicSalary")
+        .populate("createdBy", "firstName lastName")
+        .populate("updatedBy", "firstName lastName")
         .sort({ createdAt: -1 });
 
       res.status(200).json({
@@ -1604,6 +1654,124 @@ export class AdminController {
     } catch (error) {
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async requestAllowance(req, res) {
+    try {
+      const {
+        name,
+        type,
+        amount,
+        description,
+        calculationMethod,
+        frequency,
+        effectiveDate,
+        scope,
+      } = req.body;
+      const adminId = req.user._id;
+
+      // Log admin details
+      const admin = await UserModel.findById(adminId).populate("department");
+      console.log("🔍 Found admin:", JSON.stringify(admin, null, 2));
+
+      if (!admin) {
+        console.log("❌ Admin not found");
+        return res.status(404).json({ message: "Admin not found" });
+      }
+
+      // Log grade level check
+      console.log("📊 Checking admin grade level:", admin.gradeLevel);
+      if (!admin.gradeLevel) {
+        console.log("❌ No grade level found for admin");
+        return res.status(400).json({ message: "Admin grade level not found" });
+      }
+
+      // Log salary grade check
+      const salaryGrade = await SalaryGrade.findOne({
+        level: admin.gradeLevel,
+      });
+      console.log(
+        "💰 Found salary grade:",
+        JSON.stringify(salaryGrade, null, 2)
+      );
+      if (!salaryGrade) {
+        console.log("❌ No salary grade found for level:", admin.gradeLevel);
+        return res
+          .status(400)
+          .json({ message: "Salary grade not found for admin's grade level" });
+      }
+
+      // Extract year and month from effectiveDate
+      const effectiveDateObj = new Date(effectiveDate);
+      const year = effectiveDateObj.getFullYear();
+      const month = effectiveDateObj.getMonth() + 1; // JavaScript months are 0-indexed
+
+      // Create allowance request
+      const allowanceRequest = {
+        name,
+        type,
+        amount,
+        description,
+        calculationMethod,
+        frequency,
+        effectiveDate,
+        employee: adminId,
+        department: admin.department._id,
+        scope: "individual",
+        status: "PENDING", // Use uppercase as per enum
+        salaryGrade: salaryGrade._id, // Add the salary grade ID
+        year, // Add the year
+        month, // Add the month
+        createdBy: adminId,
+        updatedBy: adminId,
+      };
+
+      console.log(
+        "📄 Creating allowance request:",
+        JSON.stringify(allowanceRequest, null, 2)
+      );
+      const allowance = new Allowance(allowanceRequest);
+      await allowance.save();
+      console.log("✅ Allowance request created successfully:", allowance._id);
+
+      // Get approver
+      const approver = await getApproverForAllowance(admin.department._id);
+      console.log("👥 Found approver:", JSON.stringify(approver, null, 2));
+
+      res.status(201).json({
+        message: "Allowance request submitted successfully",
+        data: allowance,
+      });
+    } catch (error) {
+      console.error("❌ Error in requestAllowance:", error);
+      res.status(500).json({ message: error.message });
+    }
+  }
+
+  static async getAllowanceHistory(req, res) {
+    try {
+      const adminId = req.user._id;
+
+      // Get all allowances created by this admin
+      const allowances = await Allowance.find({
+        createdBy: adminId,
+      })
+        .sort({ createdAt: -1 })
+        .populate("employee", "firstName lastName employeeId")
+        .populate("department", "name")
+        .populate("salaryGrade", "level");
+
+      res.status(200).json({
+        success: true,
+        data: allowances,
+      });
+    } catch (error) {
+      console.error("Error fetching admin allowance history:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message,
+      });
     }
   }
 
@@ -3005,11 +3173,11 @@ export class AdminController {
 
       // Calculate payroll using PayrollService
       const payrollData = await PayrollService.calculatePayroll(
-          employeeId,
+        employeeId,
         salaryGrade,
-            month,
-            year,
-            frequency,
+        month,
+        year,
+        frequency,
         targetDepartment
       );
 
@@ -3159,7 +3327,7 @@ export class AdminController {
         data: payroll,
       });
     } catch (error) {
-        next(error);
+      next(error);
     }
   }
 
@@ -3684,8 +3852,8 @@ export class AdminController {
           // Skip department head level only if submitter is HR Manager/Head
           const initialApprovalLevel =
             isHRDepartment && isHRManager
-            ? APPROVAL_LEVELS.HR_MANAGER
-            : APPROVAL_LEVELS.DEPARTMENT_HEAD;
+              ? APPROVAL_LEVELS.HR_MANAGER
+              : APPROVAL_LEVELS.DEPARTMENT_HEAD;
 
           // Update payroll status and add to approval flow
           payroll.status = PAYROLL_STATUS.PENDING;
@@ -4295,8 +4463,8 @@ export class AdminController {
         // Skip department head level only if submitter is HR Manager/Head
         const initialApprovalLevel =
           isHRDepartment && isHRManager
-          ? APPROVAL_LEVELS.HR_MANAGER
-          : APPROVAL_LEVELS.DEPARTMENT_HEAD;
+            ? APPROVAL_LEVELS.HR_MANAGER
+            : APPROVAL_LEVELS.DEPARTMENT_HEAD;
 
         // Update payroll status and add to approval flow
         payroll.status = PAYROLL_STATUS.PENDING;

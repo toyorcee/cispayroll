@@ -72,6 +72,18 @@ export const NOTIFICATION_TYPES = {
   PAYROLL_ERROR_DUPLICATE_PAYROLL: "PAYROLL_ERROR_DUPLICATE_PAYROLL",
   PAYROLL_ERROR_CALCULATION_FAILED: "PAYROLL_ERROR_CALCULATION_FAILED",
   PAYROLL_ERROR_PERMISSION_DENIED: "PAYROLL_ERROR_PERMISSION_DENIED",
+
+  // Allowance specific notifications
+  ALLOWANCE_REQUESTED: "ALLOWANCE_REQUESTED",
+  ALLOWANCE_APPROVED: "ALLOWANCE_APPROVED",
+  ALLOWANCE_REJECTED: "ALLOWANCE_REJECTED",
+  ALLOWANCE_UPDATED: "ALLOWANCE_UPDATED",
+  ALLOWANCE_PENDING_APPROVAL: "ALLOWANCE_PENDING_APPROVAL",
+  ALLOWANCE_PENDING_HOD_APPROVAL: "ALLOWANCE_PENDING_HOD_APPROVAL",
+  ALLOWANCE_PENDING_HR_APPROVAL: "ALLOWANCE_PENDING_HR_APPROVAL",
+  ALLOWANCE_PENDING_ADMIN_APPROVAL: "ALLOWANCE_PENDING_ADMIN_APPROVAL",
+  ALLOWANCE_ERROR: "ALLOWANCE_ERROR",
+  ALLOWANCE_COMPLETED: "ALLOWANCE_COMPLETED",
 };
 
 // Message templates for different notification types
@@ -817,11 +829,170 @@ export class NotificationService {
           title: "Payment Archived",
           message: `Payment record for ${employeeName}'s payroll (${payrollPeriod}) has been archived.`,
         };
+      case NOTIFICATION_TYPES.ALLOWANCE_REQUESTED:
+        return {
+          title: "New Allowance Request",
+          message: `${employee?.firstName} ${employee?.lastName} has requested a new ${data.allowance?.type} allowance of ${data.allowance?.amount}.`,
+        };
+      case NOTIFICATION_TYPES.ALLOWANCE_APPROVED:
+        return {
+          title: "Allowance Approved",
+          message: `Your ${data.allowance?.type} allowance request has been approved.`,
+        };
+      case NOTIFICATION_TYPES.ALLOWANCE_REJECTED:
+        return {
+          title: "Allowance Rejected",
+          message: `Your ${
+            data.allowance?.type
+          } allowance request has been rejected. ${remarks || ""}`,
+        };
+      case NOTIFICATION_TYPES.ALLOWANCE_UPDATED:
+        return {
+          title: "Allowance Updated",
+          message: `Your ${data.allowance?.type} allowance has been updated.`,
+        };
+      case NOTIFICATION_TYPES.ALLOWANCE_PENDING_APPROVAL:
+        return {
+          title: "Allowance Pending Approval",
+          message: `Your ${data.allowance?.type} allowance request is pending approval.`,
+        };
+      case NOTIFICATION_TYPES.ALLOWANCE_PENDING_HOD_APPROVAL:
+        return {
+          title: "Allowance Pending HOD Approval",
+          message: `${employee?.firstName} ${employee?.lastName}'s ${data.allowance?.type} allowance request is pending your approval.`,
+        };
+      case NOTIFICATION_TYPES.ALLOWANCE_PENDING_HR_APPROVAL:
+        return {
+          title: "Allowance Pending HR Approval",
+          message: `${employee?.firstName} ${employee?.lastName}'s ${data.allowance?.type} allowance request is pending HR approval.`,
+        };
+      case NOTIFICATION_TYPES.ALLOWANCE_PENDING_ADMIN_APPROVAL:
+        return {
+          title: "Allowance Pending Admin Approval",
+          message: `${employee?.firstName} ${employee?.lastName}'s ${data.allowance?.type} allowance request is pending admin approval.`,
+        };
+      case NOTIFICATION_TYPES.ALLOWANCE_ERROR:
+        return {
+          title: "Allowance Error",
+          message: `There was an error processing your ${
+            data.allowance?.type
+          } allowance request. ${remarks || ""}`,
+        };
+      case NOTIFICATION_TYPES.ALLOWANCE_COMPLETED:
+        return {
+          title: "Allowance Completed",
+          message: `Your ${data.allowance?.type} allowance request has been completed successfully.`,
+        };
       default:
         return {
           title: "Payroll Notification",
           message: `A notification of type ${type} for ${employeeName} (${payrollPeriod})`,
         };
+    }
+  }
+
+  // static async createAllowanceRequestNotification(employee, allowance) {
+  //   return this.createNotification(
+  //     employee._id,
+  //     NOTIFICATION_TYPES.ALLOWANCE_REQUESTED,
+  //     employee,
+  //     null,
+  //     null,
+  //     { allowance }
+  //   );
+  // }
+
+  // static async createAllowanceApprovalNotification(
+  //   employee,
+  //   allowance,
+  //   approver
+  // ) {
+  //   return this.createNotification(
+  //     employee._id,
+  //     NOTIFICATION_TYPES.ALLOWANCE_APPROVED,
+  //     employee,
+  //     null,
+  //     null,
+  //     { allowance, approver }
+  //   );
+  // }
+
+  // static async createAllowanceRejectionNotification(
+  //   employee,
+  //   allowance,
+  //   approver,
+  //   remarks
+  // ) {
+  //   return this.createNotification(
+  //     employee._id,
+  //     NOTIFICATION_TYPES.ALLOWANCE_REJECTED,
+  //     employee,
+  //     null,
+  //     remarks,
+  //     { allowance, approver }
+  //   );
+  // }
+
+  // static async createAllowanceUpdateNotification(employee, allowance) {
+  //   return this.createNotification(
+  //     employee._id,
+  //     NOTIFICATION_TYPES.ALLOWANCE_UPDATED,
+  //     employee,
+  //     null,
+  //     null,
+  //     { allowance }
+  //   );
+  // }
+
+  // static async createAllowancePendingNotification(
+  //   employee,
+  //   allowance,
+  //   approverRole,
+  //   approverId = null
+  // ) {
+  //   const type = this.getPendingApprovalType(approverRole);
+  //   return this.createNotification(
+  //     approverId || (approverRole === "employee" ? employee._id : null),
+  //     type,
+  //     employee,
+  //     null,
+  //     null,
+  //     { allowance }
+  //   );
+  // }
+
+  // static async createAllowanceErrorNotification(employee, allowance, error) {
+  //   return this.createNotification(
+  //     employee._id,
+  //     NOTIFICATION_TYPES.ALLOWANCE_ERROR,
+  //     employee,
+  //     null,
+  //     error.message,
+  //     { allowance }
+  //   );
+  // }
+
+  // static async createAllowanceCompletedNotification(employee, allowance) {
+  //   return this.createNotification(
+  //     employee._id,
+  //     NOTIFICATION_TYPES.ALLOWANCE_COMPLETED,
+  //     employee,
+  //     null,
+  //     null,
+  //     { allowance }
+  //   );
+  // }
+
+  static getPendingApprovalType(approverRole) {
+    switch (approverRole.toLowerCase()) {
+      case "hod":
+        return NOTIFICATION_TYPES.ALLOWANCE_PENDING_HOD_APPROVAL;
+      case "hr":
+        return NOTIFICATION_TYPES.ALLOWANCE_PENDING_HR_APPROVAL;
+      case "admin":
+        return NOTIFICATION_TYPES.ALLOWANCE_PENDING_ADMIN_APPROVAL;
+      default:
+        return NOTIFICATION_TYPES.ALLOWANCE_PENDING_APPROVAL;
     }
   }
 }

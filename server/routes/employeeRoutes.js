@@ -94,12 +94,6 @@ router.post(
   EmployeeController.createLeaveRequest
 );
 
-router.put(
-  "/leave/:id/cancel",
-  requirePermission([Permission.CANCEL_OWN_LEAVE]),
-  EmployeeController.cancelLeaveRequest
-);
-
 router.post(
   "/profile/image",
   requirePermission([Permission.EDIT_PERSONAL_INFO]),

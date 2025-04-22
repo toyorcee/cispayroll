@@ -57,6 +57,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       toast.error("Access denied: Cannot view personal payslips");
       return <Navigate to="/pms/dashboard" replace />;
     }
+    if (
+      path.includes("/my-leave") &&
+      !user.permissions?.includes(Permission.VIEW_OWN_LEAVE)
+    ) {
+      toast.error("Access denied: Cannot view personal leave");
+      return <Navigate to="/pms/dashboard" replace />;
+    }
     return <>{children || element}</>;
   }
 
@@ -80,14 +87,36 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     // Leave Management Routes
     if (path.startsWith("/pms/employees/leave")) {
-      const leavePermissions = [
-        Permission.REQUEST_LEAVE,
-        Permission.VIEW_OWN_LEAVE,
-        Permission.CANCEL_OWN_LEAVE,
-      ];
-      if (!leavePermissions.some((p) => user.permissions?.includes(p))) {
-        toast.error("Access denied: No leave management permissions");
-        return <Navigate to="/pms/dashboard" replace />;
+      // Check for team leave management access
+      if (path.includes("/team-leave")) {
+        // Only SUPER_ADMIN and ADMIN can access team leave management
+        const allowedRoles = [UserRole.SUPER_ADMIN, UserRole.ADMIN];
+        if (!allowedRoles.includes(user.role)) {
+          toast.error(
+            "Access denied: Only Super Admin and Admin can access team leave management"
+          );
+          return <Navigate to="/pms/dashboard" replace />;
+        }
+
+        const teamLeavePermissions = [
+          Permission.VIEW_TEAM_LEAVE,
+          Permission.APPROVE_LEAVE,
+        ];
+        if (!teamLeavePermissions.some((p) => user.permissions?.includes(p))) {
+          toast.error("Access denied: No team leave management permissions");
+          return <Navigate to="/pms/dashboard" replace />;
+        }
+      } else {
+        // Personal leave management
+        const userLeavePermissions = [
+          Permission.REQUEST_LEAVE,
+          Permission.VIEW_OWN_LEAVE,
+          Permission.CANCEL_OWN_LEAVE,
+        ];
+        if (!userLeavePermissions.some((p) => user.permissions?.includes(p))) {
+          toast.error("Access denied: No leave management access");
+          return <Navigate to="/pms/dashboard" replace />;
+        }
       }
     }
 
@@ -186,87 +215,24 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         }
 
         // Check specific permissions for each settings page
-        if (path.includes("/departments")) {
-          if (
-            !user.permissions?.includes(Permission.MANAGE_DEPARTMENT_SETTINGS)
-          ) {
-            toast.error("Access denied: No department settings permissions");
-            return <Navigate to="/pms/dashboard" replace />;
-          }
-          return <>{children || element}</>;
-        }
-
-        if (path.includes("/users")) {
-          if (!user.permissions?.includes(Permission.MANAGE_USER_SETTINGS)) {
-            toast.error("Access denied: No user settings permissions");
-            return <Navigate to="/pms/dashboard" replace />;
-          }
-          return <>{children || element}</>;
-        }
-
-        if (path.includes("/payroll")) {
-          if (!user.permissions?.includes(Permission.MANAGE_PAYROLL_SETTINGS)) {
-            toast.error("Access denied: No payroll settings permissions");
-            return <Navigate to="/pms/dashboard" replace />;
-          }
-          return <>{children || element}</>;
-        }
-
-        if (path.includes("/leave")) {
-          if (!user.permissions?.includes(Permission.MANAGE_LEAVE_SETTINGS)) {
-            toast.error("Access denied: No leave settings permissions");
-            return <Navigate to="/pms/dashboard" replace />;
-          }
-          return <>{children || element}</>;
-        }
-
-        if (path.includes("/documents")) {
-          if (
-            !user.permissions?.includes(Permission.MANAGE_DOCUMENT_SETTINGS)
-          ) {
-            toast.error("Access denied: No document settings permissions");
-            return <Navigate to="/pms/dashboard" replace />;
-          }
-          return <>{children || element}</>;
-        }
-
-        if (path.includes("/notifications")) {
-          if (
-            !user.permissions?.includes(Permission.MANAGE_NOTIFICATION_SETTINGS)
-          ) {
-            toast.error("Access denied: No notification settings permissions");
+        if (path.includes("/general")) {
+          if (!user.permissions?.includes(Permission.MANAGE_SYSTEM_SETTINGS)) {
+            toast.error("Access denied: No system settings permissions");
             return <Navigate to="/pms/dashboard" replace />;
           }
           return <>{children || element}</>;
         }
 
         // Block access to settings pages that are only for Super Admin
-        if (
-          path.includes("/company") ||
-          path.includes("/integrations") ||
-          path.includes("/tax") ||
-          path.includes("/compliance")
-        ) {
+        if (path.includes("/company") || path.includes("/integrations")) {
           toast.error(
             "Access denied: This setting is only available for Super Admin"
           );
           return <Navigate to="/pms/dashboard" replace />;
         }
       } else if (user.role === UserRole.USER) {
-        if (path.includes("/notifications")) {
-          if (
-            !user.permissions?.includes(Permission.MANAGE_NOTIFICATION_SETTINGS)
-          ) {
-            toast.error("Access denied: No notification settings permissions");
-            return <Navigate to="/pms/dashboard" replace />;
-          }
-          return <>{children || element}</>;
-        } else {
-          toast.error(
-            "Access denied: Users can only access Notification Settings"
-          );
-          return <Navigate to="/pms/dashboard" replace />;
-        }
+        toast.error("Access denied: Users cannot access settings");
+        return <Navigate to="/pms/dashboard" replace />;
       }
     }
 
@@ -275,8 +241,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       const reportPermissions = [
         Permission.VIEW_REPORTS,
         Permission.VIEW_PAYROLL_REPORTS,
-        Permission.VIEW_EMPLOYEE_REPORTS,
-        Permission.VIEW_TAX_REPORTS,
       ];
       if (!reportPermissions.some((p) => user.permissions?.includes(p))) {
         toast.error("Access denied: No report viewing permissions");
@@ -332,14 +296,36 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     // Leave Management
     if (path.startsWith("/pms/employees/leave")) {
-      const userLeavePermissions = [
-        Permission.REQUEST_LEAVE,
-        Permission.VIEW_OWN_LEAVE,
-        Permission.CANCEL_OWN_LEAVE,
-      ];
-      if (!userLeavePermissions.some((p) => user.permissions?.includes(p))) {
-        toast.error("Access denied: No leave management access");
-        return <Navigate to="/pms/dashboard" replace />;
+      // Check for team leave management access
+      if (path.includes("/team-leave")) {
+        // Only SUPER_ADMIN and ADMIN can access team leave management
+        const allowedRoles = [UserRole.SUPER_ADMIN, UserRole.ADMIN];
+        if (!allowedRoles.includes(user.role)) {
+          toast.error(
+            "Access denied: Only Super Admin and Admin can access team leave management"
+          );
+          return <Navigate to="/pms/dashboard" replace />;
+        }
+
+        const teamLeavePermissions = [
+          Permission.VIEW_TEAM_LEAVE,
+          Permission.APPROVE_LEAVE,
+        ];
+        if (!teamLeavePermissions.some((p) => user.permissions?.includes(p))) {
+          toast.error("Access denied: No team leave management permissions");
+          return <Navigate to="/pms/dashboard" replace />;
+        }
+      } else {
+        // Personal leave management
+        const userLeavePermissions = [
+          Permission.REQUEST_LEAVE,
+          Permission.VIEW_OWN_LEAVE,
+          Permission.CANCEL_OWN_LEAVE,
+        ];
+        if (!userLeavePermissions.some((p) => user.permissions?.includes(p))) {
+          toast.error("Access denied: No leave management access");
+          return <Navigate to="/pms/dashboard" replace />;
+        }
       }
     }
 
@@ -393,7 +379,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
   }
 
-  // Process Payroll - Only for SUPER_ADMIN
+  // Process Payment - Only for SUPER_ADMIN
   if (path.includes("/process")) {
     // Use the auth context's isSuperAdmin method
     if (!isSuperAdmin()) {
@@ -403,7 +389,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       return <Navigate to="/pms/dashboard" replace />;
     }
 
-    const processPayrollPermissions = [
+    const processPaymentPermissions = [
       Permission.CREATE_PAYROLL,
       Permission.EDIT_PAYROLL,
       Permission.DELETE_PAYROLL,
@@ -412,7 +398,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       Permission.GENERATE_PAYSLIP,
     ];
 
-    if (!processPayrollPermissions.some((p) => user.permissions?.includes(p))) {
+    if (!processPaymentPermissions.some((p) => user.permissions?.includes(p))) {
       toast.error(
         "Access denied: Insufficient permissions for Process Payroll"
       );
@@ -420,7 +406,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
   }
 
-  // Process Department Payroll - Only for ADMIN
   if (path.includes("/department-process")) {
     const allowedRoles = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
     if (!allowedRoles.includes(user.role)) {

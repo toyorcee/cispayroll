@@ -1,6 +1,8 @@
 import { AuthService } from "../services/authService.js";
 import { handleError } from "../utils/errorHandler.js";
 import { UserRole } from "../models/User.js";
+import jwt from "jsonwebtoken";
+import User from "../models/User.js";
 
 export class AuthController {
   static async login(req, res) {
@@ -27,8 +29,9 @@ export class AuthController {
       const cookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        sameSite: "lax",
         maxAge: 24 * 60 * 60 * 1000,
+        path: "/",
       };
 
       res.cookie("token", token, cookieOptions);
@@ -131,15 +134,58 @@ export class AuthController {
 
   static async getCurrentUser(req, res) {
     try {
-      const user = await AuthService.getCurrentUser(req.user.id);
+      console.log(
+        "🔍 [AuthController] Getting current user for ID:",
+        req.user._id
+      );
+      const user = await User.findById(req.user._id)
+        .select("-password")
+        .populate("department", "name code")
+        .populate("reportingTo", "firstName lastName employeeId");
 
-      res.status(200).json({
+      if (!user) {
+        console.log("❌ [AuthController] User not found for ID:", req.user._id);
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      console.log("✅ [AuthController] Current user found:", {
+        id: user._id,
+        email: user.email,
+        role: user.role,
+        department: user.department?.name,
+      });
+
+      res.json({
         success: true,
-        user,
+        user: {
+          _id: user._id,
+          email: user.email,
+          role: user.role,
+          permissions: user.permissions,
+          department: user.department,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          employeeId: user.employeeId,
+          position: user.position,
+          gradeLevel: user.gradeLevel,
+          workLocation: user.workLocation,
+          dateJoined: user.dateJoined,
+          status: user.status,
+          profileImage: user.profileImage,
+          profileImageUrl: user.profileImageUrl,
+          reportingTo: user.reportingTo,
+          isEmailVerified: user.isEmailVerified,
+          lastLogin: user.lastLogin,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+          personalDetails: user.personalDetails,
+          emergencyContact: user.emergencyContact,
+          bankDetails: user.bankDetails,
+        },
       });
     } catch (error) {
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
+      console.error("❌ [AuthController] Error getting current user:", error);
+      res.status(500).json({ message: "Error getting current user" });
     }
   }
 
@@ -153,6 +199,74 @@ export class AuthController {
     } catch (error) {
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async refreshToken(req, res) {
+    try {
+      console.log("🔄 [AuthController] Starting token refresh process");
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        console.log("❌ [AuthController] No refresh token provided");
+        return res.status(400).json({ message: "Refresh token is required" });
+      }
+
+      console.log("🔍 [AuthController] Verifying refresh token");
+      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+      console.log(
+        "✅ [AuthController] Refresh token verified for user:",
+        decoded.userId
+      );
+
+      const user = await User.findById(decoded.userId);
+      if (!user) {
+        console.log("❌ [AuthController] User not found for refresh token");
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      console.log(
+        "🔑 [AuthController] Generating new access token for user:",
+        user._id
+      );
+      const accessToken = user.generateAuthToken();
+      console.log(
+        "✅ [AuthController] New access token generated successfully"
+      );
+
+      res.json({
+        success: true,
+        accessToken,
+        user: {
+          _id: user._id,
+          email: user.email,
+          role: user.role,
+          permissions: user.permissions,
+          department: user.department,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          employeeId: user.employeeId,
+          position: user.position,
+          gradeLevel: user.gradeLevel,
+          workLocation: user.workLocation,
+          dateJoined: user.dateJoined,
+          status: user.status,
+          profileImage: user.profileImage,
+          profileImageUrl: user.profileImageUrl,
+          reportingTo: user.reportingTo,
+          isEmailVerified: user.isEmailVerified,
+          lastLogin: user.lastLogin,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+          personalDetails: user.personalDetails,
+          emergencyContact: user.emergencyContact,
+          bankDetails: user.bankDetails,
+        },
+      });
+      console.log("✅ [AuthController] Token refresh completed successfully");
+    } catch (error) {
+      console.error("❌ [AuthController] Token refresh failed:", error);
+      res.status(401).json({ message: "Invalid refresh token" });
     }
   }
 }

@@ -217,6 +217,12 @@ router.get(
 );
 
 router.post(
+  "/allowances/request",
+  requirePermission([Permission.REQUEST_ALLOWANCES]),
+  AdminController.requestAllowance
+);
+
+router.post(
   "/allowances",
   requirePermission([Permission.CREATE_ALLOWANCES]),
   AdminController.createDepartmentAllowance
@@ -244,6 +250,12 @@ router.patch(
   "/allowances/:id/reject",
   requirePermission([Permission.APPROVE_ALLOWANCES]),
   AdminController.rejectAllowance
+);
+
+router.get(
+  "/allowances/history",
+  requirePermission([Permission.VIEW_ALLOWANCES]),
+  AdminController.getAllowanceHistory
 );
 
 // ===== Deduction Management Routes =====

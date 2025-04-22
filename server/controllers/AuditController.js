@@ -95,10 +95,11 @@ class AuditController {
       const filters = {};
 
       // Apply role-based filtering
-      if (currentUser.role !== "SUPERADMIN") {
+      if (currentUser.role === "USER") {
+        filters.performedBy = currentUser._id;
+      } else if (currentUser.role === "ADMIN") {
         filters.$or = [
           { "details.departmentId": currentUser.department },
-          { performedBy: currentUser._id },
           { "details.department": currentUser.department },
         ];
       }

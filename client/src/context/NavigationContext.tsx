@@ -65,6 +65,11 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
             Permission.MANAGE_OFFBOARDING,
             Permission.VIEW_OFFBOARDING,
             Permission.APPROVE_OFFBOARDING,
+            Permission.REQUEST_LEAVE,
+            Permission.VIEW_OWN_LEAVE,
+            Permission.CANCEL_OWN_LEAVE,
+            Permission.VIEW_TEAM_LEAVE,
+            Permission.APPROVE_LEAVE,
           ].includes(p)
         )
       ) {
@@ -108,12 +113,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       // Reports
       if (
         user.permissions.some((p) =>
-          [
-            Permission.VIEW_REPORTS,
-            Permission.VIEW_PAYROLL_REPORTS,
-            Permission.VIEW_EMPLOYEE_REPORTS,
-            Permission.VIEW_TAX_REPORTS,
-          ].includes(p)
+          [Permission.VIEW_REPORTS, Permission.VIEW_PAYROLL_REPORTS].includes(p)
         )
       ) {
         availableMenus.push("Reports");
@@ -154,8 +154,6 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
             Permission.REQUEST_LEAVE,
             Permission.VIEW_OWN_LEAVE,
             Permission.CANCEL_OWN_LEAVE,
-            Permission.APPROVE_LEAVE,
-            Permission.VIEW_TEAM_LEAVE,
           ].includes(p)
         )
       ) {
@@ -250,15 +248,21 @@ export const menuItems: NavigationItem[] = [
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
       },
       {
-        name: "Leave Management",
-        href: "/pms/employees/leave",
+        name: "Team Leave Management",
+        href: "/pms/employees/team-leave",
+        permissions: [Permission.VIEW_TEAM_LEAVE, Permission.APPROVE_LEAVE],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        requireAllPermissions: false,
+      },
+      {
+        name: "My Leave",
+        href: "/pms/employees/my-leave",
         permissions: [
           Permission.REQUEST_LEAVE,
           Permission.VIEW_OWN_LEAVE,
           Permission.CANCEL_OWN_LEAVE,
-          Permission.APPROVE_LEAVE,
-          Permission.VIEW_TEAM_LEAVE,
         ],
+        roles: [UserRole.ADMIN, UserRole.USER],
         requireAllPermissions: false,
       },
     ],
@@ -337,7 +341,7 @@ export const menuItems: NavigationItem[] = [
         requireAllPermissions: false,
       },
       {
-        name: "Process Payroll",
+        name: "Process Payment",
         href: "/pms/payroll/process",
         permissions: [
           Permission.CREATE_PAYROLL,
@@ -396,28 +400,13 @@ export const menuItems: NavigationItem[] = [
     href: "/pms/reports",
     icon: DocumentTextIcon,
     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    permissions: [
-      Permission.VIEW_REPORTS,
-      Permission.VIEW_PAYROLL_REPORTS,
-      Permission.VIEW_EMPLOYEE_REPORTS,
-      Permission.VIEW_TAX_REPORTS,
-    ],
+    permissions: [Permission.VIEW_REPORTS, Permission.VIEW_PAYROLL_REPORTS],
     requireAllPermissions: false,
     subItems: [
       {
         name: "Payroll Reports",
         href: "/pms/reports/payroll",
         permissions: [Permission.VIEW_PAYROLL_REPORTS],
-      },
-      {
-        name: "Employee Reports",
-        href: "/pms/reports/employees",
-        permissions: [Permission.VIEW_EMPLOYEE_REPORTS],
-      },
-      {
-        name: "Tax Reports",
-        href: "/pms/reports/tax",
-        permissions: [Permission.VIEW_TAX_REPORTS],
       },
       {
         name: "Audit Logs",
@@ -431,7 +420,7 @@ export const menuItems: NavigationItem[] = [
     name: "Settings",
     href: "/pms/settings",
     icon: CogIcon,
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
     permissions: [],
     requireAllPermissions: false,
     subItems: [
@@ -448,58 +437,10 @@ export const menuItems: NavigationItem[] = [
         permissions: [Permission.MANAGE_COMPANY_PROFILE],
       },
       {
-        name: "Department Management",
-        href: "/pms/settings/departments",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.MANAGE_DEPARTMENT_SETTINGS],
-      },
-      {
-        name: "User Management",
-        href: "/pms/settings/users",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.MANAGE_USER_SETTINGS],
-      },
-      {
-        name: "Payroll Settings",
-        href: "/pms/settings/payroll",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.MANAGE_PAYROLL_SETTINGS],
-      },
-      {
-        name: "Leave Settings",
-        href: "/pms/settings/leave",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.MANAGE_LEAVE_SETTINGS],
-      },
-      {
-        name: "Document Settings",
-        href: "/pms/settings/documents",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.MANAGE_DOCUMENT_SETTINGS],
-      },
-      {
-        name: "Notification Settings",
-        href: "/pms/settings/notifications",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-        permissions: [Permission.MANAGE_NOTIFICATION_SETTINGS],
-      },
-      {
         name: "Integration Settings",
         href: "/pms/settings/integrations",
         roles: [UserRole.SUPER_ADMIN],
         permissions: [Permission.MANAGE_INTEGRATION_SETTINGS],
-      },
-      {
-        name: "Tax Settings",
-        href: "/pms/settings/tax",
-        roles: [UserRole.SUPER_ADMIN],
-        permissions: [Permission.MANAGE_TAX_SETTINGS],
-      },
-      {
-        name: "Compliance Settings",
-        href: "/pms/settings/compliance",
-        roles: [UserRole.SUPER_ADMIN],
-        permissions: [Permission.MANAGE_COMPLIANCE_SETTINGS],
       },
     ],
   },

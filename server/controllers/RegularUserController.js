@@ -1,12 +1,14 @@
+import { ApiError } from "../utils/errorHandler.js";
+import { handleError } from "../utils/errorHandler.js";
 import UserModel from "../models/User.js";
 import PayrollModel from "../models/Payroll.js";
 import LeaveModel, { LEAVE_STATUS } from "../models/Leave.js";
-import { handleError, ApiError } from "../utils/errorHandler.js";
-import Allowance from "../models/Allowance.js";
-import { AllowanceStatus } from "../models/Allowance.js";
+import Allowance, { AllowanceStatus } from "../models/Allowance.js";
 import Deduction from "../models/Deduction.js";
 import Department from "../models/Department.js";
 import Notification from "../models/Notification.js";
+import SalaryGrade from "../models/SalaryStructure.js";
+import { NotificationService } from "../services/NotificationService.js";
 
 export class RegularUserController {
   // ===== Dashboard Statistics Methods =====
@@ -329,21 +331,58 @@ export class RegularUserController {
 
   static async requestAllowance(req, res) {
     try {
-      const allowance = await Allowance.create({
-        ...req.body,
-        employee: req.user._id,
-        department: req.user.department,
-        scope: "individual",
-        status: AllowanceStatus.PENDING,
-        createdBy: req.user._id,
-        updatedBy: req.user._id,
+      const userId = req.user._id;
+      const user = await UserModel.findById(userId);
+      if (!user) {
+        throw new ApiError(404, "User not found");
+      }
+
+      if (!user.gradeLevel) {
+        throw new ApiError(400, "User does not have a grade level assigned");
+      }
+
+      // Find salary grade for the user's grade level
+      const salaryGrade = await SalaryGrade.findOne({
+        level: user.gradeLevel,
+        isActive: true,
       });
+
+      if (!salaryGrade) {
+        throw new ApiError(
+          400,
+          `No active salary grade found for level ${user.gradeLevel}`
+        );
+      }
+
+      // Create the allowance request
+      const allowanceRequest = {
+        ...req.body,
+        employee: userId,
+        department: user.department,
+        salaryGrade: salaryGrade._id,
+        year: new Date(req.body.effectiveDate).getFullYear(),
+        month: new Date(req.body.effectiveDate).getMonth() + 1,
+        createdBy: userId,
+        updatedBy: userId,
+      };
+
+      const allowance = await Allowance.create(allowanceRequest);
+      console.log("Allowance created successfully with ID:", allowance._id);
+
+      // Get the appropriate approver based on department and allowance type
+      const approver = await getApproverForAllowance(user, allowance);
 
       res.status(201).json({
         success: true,
-        data: allowance,
+        message: "Allowance request submitted successfully",
+        data: {
+          ...allowance.toObject(),
+          approverId: approver.approverId,
+          approverRole: approver.approverRole,
+        },
       });
     } catch (error) {
+      console.error("ERROR in requestAllowance:", error);
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({
         success: false,
@@ -429,4 +468,83 @@ export class RegularUserController {
       });
     }
   }
+}
+
+// Replace the determineApproverRole function with a more professional approach
+async function getApproverForAllowance(user, allowance) {
+  console.log("=== DETERMINING APPROVER ===");
+  console.log("User ID:", user._id);
+  console.log("User department:", user.department);
+  console.log("Allowance type:", allowance.type);
+  console.log("Allowance amount:", allowance.amount);
+
+  // Get the user's department
+  const department = await Department.findById(user.department);
+  console.log("Department found:", department ? "Yes" : "No");
+  console.log("Department name:", department?.name);
+
+  if (!department) {
+    console.log("Department not found, throwing error");
+    throw new ApiError(404, "User department not found");
+  }
+
+  // Get the department head - look for position title instead of role
+  console.log("Looking for department head...");
+  const departmentHead = await UserModel.findOne({
+    department: department._id,
+    position: {
+      $in: [
+        "Head of Department",
+        "Department Head",
+        "Head",
+        "Director",
+        "Manager",
+      ],
+    },
+    status: "active",
+  });
+  console.log("Department head found:", departmentHead ? "Yes" : "No");
+  console.log("Department head ID:", departmentHead?._id);
+
+  if (!departmentHead) {
+    // If no department head, find HR manager
+    console.log("No department head found, looking for HR manager...");
+    const hrDepartment = await Department.findOne({
+      name: { $in: ["Human Resources", "HR"] },
+      status: "active",
+    });
+
+    if (!hrDepartment) {
+      console.log("HR department not found");
+      throw new ApiError(404, "HR department not found");
+    }
+
+    const hrManager = await UserModel.findOne({
+      department: hrDepartment._id,
+      position: {
+        $in: [
+          "Head of Human Resources",
+          "HR Manager",
+          "HR Head",
+          "Human Resources Manager",
+          "HR Director",
+          "HRM",
+        ],
+      },
+      status: "active",
+    });
+
+    if (!hrManager) {
+      console.log("HR manager not found");
+      throw new ApiError(404, "HR manager not found");
+    }
+
+    console.log("HR manager found:", hrManager._id);
+    return { approverId: hrManager._id, approverRole: "hr" };
+  }
+
+  // For most allowances, the department head is the first approver
+  console.log("Department head found, setting approver to HOD");
+  console.log("=== APPROVER DETERMINED ===");
+  return { approverId: departmentHead._id, approverRole: "hod" };
 }

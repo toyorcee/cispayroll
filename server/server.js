@@ -36,6 +36,7 @@ import deductionRoutes from "./routes/deductionRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import approvalRoutes from "./routes/approvalRoutes.js";
 import auditRoutes from "./routes/auditRoutes.js";
+import bonusRoutes from "./routes/BonusRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -193,7 +194,7 @@ app.use("/api/regular-user", routeErrorWrapper(regularUserRoutes));
 app.use("/api/employee", routeErrorWrapper(employeeRoutes));
 app.use("/api/invitation", routeErrorWrapper(invitationRoutes));
 app.use("/api/onboarding", routeErrorWrapper(onboardingRoutes));
-app.use("/api/offboarding", routeErrorWrapper(offboardingRoutes));
+app.use("/api/bonus", routeErrorWrapper(bonusRoutes));
 app.use("/api/disciplinary", routeErrorWrapper(disciplinaryRoutes));
 app.use("/api/feedback", routeErrorWrapper(feedbackRoute));
 app.use("/api/departments", routeErrorWrapper(departmentRoutes));
@@ -202,6 +203,7 @@ app.use("/api/deductions", routeErrorWrapper(deductionRoutes));
 app.use("/api/notifications", routeErrorWrapper(notificationRoutes));
 app.use("/api/approvals", routeErrorWrapper(approvalRoutes));
 app.use("/api/audit", routeErrorWrapper(auditRoutes));
+app.use("/api/leaves", routeErrorWrapper(leaveRoutes));
 
 // Enhanced health check
 app.get("/api/health", (_req, res) => {

@@ -4,7 +4,6 @@ import type { IBonus, BonusType, IBonusFilters } from "../types/payroll";
 
 const BASE_URL = "http://localhost:5000/api";
 
-
 interface CreateBonusData {
   employee: string;
   type: BonusType;
@@ -14,13 +13,16 @@ interface CreateBonusData {
   paymentDate: Date;
 }
 
+interface CreatePersonalBonusData {
+  amount: number;
+  reason: string;
+  paymentDate: Date;
+}
+
 export const bonusService = {
   createBonus: async (data: Partial<IBonus>): Promise<{ data: IBonus }> => {
     try {
-      const response = await axios.post(
-        `${BASE_URL}/super-admin/bonuses`,
-        data
-      );
+      const response = await axios.post(`${BASE_URL}/bonus/personal`, data);
       return response.data;
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
@@ -31,8 +33,56 @@ export const bonusService = {
       } else {
         toast.error("An unexpected error occurred");
       }
+      throw error;
+    }
+  },
+
+  createPersonalBonus: async (
+    data: CreatePersonalBonusData
+  ): Promise<{ data: IBonus }> => {
+    try {
+      const response = await axios.post(`${BASE_URL}/bonus/personal`, data);
+      return response.data;
+    } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
-        toast.error(error.response?.data?.message || "Failed to create bonus");
+        const errorMessage =
+          error.response?.data?.message ||
+          "Failed to create personal bonus request";
+        toast.error(errorMessage);
+      } else {
+        toast.error("An unexpected error occurred");
+      }
+      throw error;
+    }
+  },
+
+  getMyBonuses: async (): Promise<{
+    data: { bonuses: IBonus[]; pagination: any };
+  }> => {
+    try {
+      const response = await axios.get(`${BASE_URL}/bonus/requests`);
+      return response.data;
+    } catch (error: unknown) {
+      console.error("❌ Error fetching personal bonuses:", error);
+      if (axios.isAxiosError(error)) {
+        toast.error(
+          error.response?.data?.message || "Failed to fetch your bonus requests"
+        );
+      } else {
+        toast.error("An unexpected error occurred");
+      }
+      throw error;
+    }
+  },
+
+  getBonusById: async (id: string): Promise<{ data: IBonus }> => {
+    try {
+      const response = await axios.get(`${BASE_URL}/bonus/requests/${id}`);
+      return response.data;
+    } catch (error: unknown) {
+      console.error("❌ Error fetching bonus:", error);
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to fetch bonus");
       } else {
         toast.error("An unexpected error occurred");
       }
@@ -44,7 +94,7 @@ export const bonusService = {
     filters?: IBonusFilters
   ): Promise<{ data: IBonus[] }> => {
     try {
-      const response = await axios.get(`${BASE_URL}/super-admin/bonuses`, {
+      const response = await axios.get(`${BASE_URL}/bonus/requests`, {
         params: filters,
       });
       return response.data;
@@ -65,7 +115,7 @@ export const bonusService = {
   ): Promise<{ data: IBonus }> => {
     try {
       const response = await axios.patch(
-        `${BASE_URL}/super-admin/bonuses/${id}`,
+        `${BASE_URL}/bonus/requests/${id}`,
         data
       );
       return response.data;
@@ -85,9 +135,8 @@ export const bonusService = {
     approved: boolean
   ): Promise<{ data: IBonus }> => {
     try {
-      const response = await axios.patch(
-        `${BASE_URL}/super-admin/bonuses/${id}/approve`,
-        { approved }
+      const response = await axios.put(
+        `${BASE_URL}/bonus/requests/${id}/approve`
       );
       return response.data;
     } catch (error: unknown) {
@@ -101,11 +150,30 @@ export const bonusService = {
     }
   },
 
+  rejectBonus: async (
+    id: string,
+    rejectionReason: string
+  ): Promise<{ data: IBonus }> => {
+    try {
+      const response = await axios.put(
+        `${BASE_URL}/bonus/requests/${id}/reject`,
+        { rejectionReason }
+      );
+      return response.data;
+    } catch (error: unknown) {
+      console.error("❌ Error rejecting bonus:", error);
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to reject bonus");
+      } else {
+        toast.error("An unexpected error occurred");
+      }
+      throw error;
+    }
+  },
+
   deleteBonus: async (id: string) => {
     try {
-      const response = await axios.delete(
-        `${BASE_URL}/super-admin/bonuses/${id}`
-      );
+      const response = await axios.delete(`${BASE_URL}/bonus/requests/${id}`);
       return response.data;
     } catch (error: unknown) {
       console.error("❌ Error deleting bonus:", error);

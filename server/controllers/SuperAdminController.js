@@ -4034,13 +4034,13 @@ export class SuperAdminController {
           // Send notification to HR Manager
           const hrManager = await UserModel.findOne({ role: "HR_MANAGER" });
           if (hrManager) {
-          await NotificationService.createPayrollNotification(
-            newPayroll,
-            NOTIFICATION_TYPES.PAYROLL_COMPLETED,
-            req.user,
+            await NotificationService.createPayrollNotification(
+              newPayroll,
+              NOTIFICATION_TYPES.PAYROLL_COMPLETED,
+              req.user,
               `Payroll has been processed for ${employee.firstName} ${employee.lastName} in ${department.name} department.`,
-            {
-              approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+              {
+                approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
                 recipientId: hrManager._id,
               }
             );
@@ -4434,9 +4434,9 @@ export class SuperAdminController {
       const payrollData = await PayrollService.calculatePayroll(
         employeeId,
         salaryGrade._id,
-          month,
-          year,
-          frequency,
+        month,
+        year,
+        frequency,
         departmentId
       );
 
@@ -4537,18 +4537,18 @@ export class SuperAdminController {
             hrManager._id,
             NOTIFICATION_TYPES.PAYROLL_CREATED,
             employee,
-        payroll,
+            payroll,
             `A new payroll has been completed for ${employee.firstName} ${employee.lastName} (${employee.employeeId}) by ${superAdmin.firstName} ${superAdmin.lastName} (Super Admin).`,
-        {
+            {
               approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-          metadata: {
-            payrollId: payroll._id,
+              metadata: {
+                payrollId: payroll._id,
                 employeeId: employee._id,
                 departmentId: employee.department._id,
                 status: payroll.status,
-          },
-        }
-      );
+              },
+            }
+          );
           notifiedUserIds.add(hrManager._id.toString());
         }
       }
@@ -4580,7 +4580,7 @@ export class SuperAdminController {
             {
               approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
               metadata: {
-              payrollId: payroll._id,
+                payrollId: payroll._id,
                 employeeId: employee._id,
                 departmentId: employee.department._id,
                 status: payroll.status,
@@ -4617,7 +4617,7 @@ export class SuperAdminController {
               payrollId: payroll._id,
               employeeId: employee._id,
               departmentId: employee.department._id,
-                status: payroll.status,
+              status: payroll.status,
             },
           }
         );

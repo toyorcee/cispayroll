@@ -70,19 +70,14 @@ export const ENTITY_HISTORY_QUERY_KEY = "entityHistory";
 export const FAILED_PAYROLLS_QUERY_KEY = "failedPayrolls";
 
 // Use the same BASE_URL pattern as other services
-const baseURL = "/api/audit";
-const SUPER_ADMIN_BASE_URL = "http://localhost:5000/api/super-admin";
-
-const isSuperAdmin = (userRole?: string): boolean => {
-  return userRole === UserRole.SUPER_ADMIN;
-};
+const baseURL = "/api";
 
 class AuditService {
   private baseUrl: string;
   private queryClient: any;
 
   constructor() {
-    this.baseUrl = baseURL;
+    this.baseUrl = `${baseURL}/audit`;
   }
 
   // Method to set the query client
@@ -102,7 +97,8 @@ class AuditService {
 
   // Method to set the base URL based on user role
   setUserRole(userRole?: string) {
-    this.baseUrl = isSuperAdmin(userRole) ? SUPER_ADMIN_BASE_URL : baseURL;
+    // Always use /api/audit regardless of role
+    this.baseUrl = `${baseURL}/audit`;
   }
 
   // Get recent activities

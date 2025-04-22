@@ -108,6 +108,7 @@ export const Permission = {
   VIEW_PAYROLL_REPORTS: "VIEW_PAYROLL_REPORTS",
   VIEW_EMPLOYEE_REPORTS: "VIEW_EMPLOYEE_REPORTS",
   VIEW_TAX_REPORTS: "VIEW_TAX_REPORTS",
+  VIEW_EMPLOYEE_DETAILS: "VIEW_EMPLOYEE_DETAILS",
 
   // Additional System Settings
   MANAGE_TAX_CONFIG: "MANAGE_TAX_CONFIG",
@@ -901,6 +902,7 @@ UserSchema.pre("save", function (next) {
           Permission.EDIT_USER,
           Permission.DELETE_USER,
           Permission.VIEW_ALL_USERS,
+          Permission.VIEW_EMPLOYEE_DETAILS,
 
           // Department Management
           Permission.CREATE_DEPARTMENT,
@@ -985,6 +987,7 @@ UserSchema.pre("save", function (next) {
           Permission.VIEW_PAYROLL_REPORTS,
           Permission.VIEW_EMPLOYEE_REPORTS,
           Permission.VIEW_TAX_REPORTS,
+          Permission.VIEW_EMPLOYEE_DETAILS,
 
           // Additional System Settings
           Permission.MANAGE_TAX_CONFIG,
@@ -1032,6 +1035,7 @@ UserSchema.pre("save", function (next) {
           Permission.EDIT_USER,
           Permission.DELETE_USER,
           Permission.VIEW_ALL_USERS,
+          Permission.VIEW_EMPLOYEE_DETAILS,
 
           // Department Management
           Permission.VIEW_ALL_DEPARTMENTS,
@@ -1101,6 +1105,7 @@ UserSchema.pre("save", function (next) {
           Permission.VIEW_PAYROLL_REPORTS,
           Permission.VIEW_EMPLOYEE_REPORTS,
           Permission.VIEW_TAX_REPORTS,
+          Permission.VIEW_EMPLOYEE_DETAILS,
 
           // New permissions
           Permission.MANAGE_DEPARTMENT_DEDUCTIONS,

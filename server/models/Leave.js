@@ -19,6 +19,12 @@ export const LEAVE_STATUS = {
   CANCELLED: "cancelled",
 };
 
+export const APPROVAL_LEVEL = {
+  DEPARTMENT_HEAD: "DEPARTMENT_HEAD",
+  HR_MANAGER: "HR_MANAGER",
+  SENIOR_MANAGEMENT: "SENIOR_MANAGEMENT",
+};
+
 const LeaveSchema = new Schema({
   user: {
     type: Schema.Types.ObjectId,
@@ -47,13 +53,44 @@ const LeaveSchema = new Schema({
     enum: Object.values(LEAVE_STATUS),
     default: LEAVE_STATUS.PENDING,
   },
+  department: {
+    type: Schema.Types.ObjectId,
+    ref: "Department",
+    required: [true, "Department is required"],
+  },
   attachments: [String],
+  // Approval tracking
+  approvalLevel: {
+    type: Number,
+    default: 1, // 1 = Department Head, 2 = HR, 3 = Senior Management
+  },
+  currentApprover: {
+    type: String,
+    enum: Object.values(APPROVAL_LEVEL),
+    default: APPROVAL_LEVEL.DEPARTMENT_HEAD,
+  },
   approvedBy: {
     type: Schema.Types.ObjectId,
     ref: "User",
   },
   approvalDate: Date,
   approvalNotes: String,
+  // Track approval history
+  approvalHistory: [
+    {
+      level: Number,
+      approver: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+      status: {
+        type: String,
+        enum: Object.values(LEAVE_STATUS),
+      },
+      notes: String,
+      date: Date,
+    },
+  ],
   createdAt: {
     type: Date,
     default: Date.now,
@@ -72,5 +109,6 @@ LeaveSchema.pre("save", function (next) {
 LeaveSchema.index({ user: 1, startDate: 1 });
 LeaveSchema.index({ status: 1 });
 LeaveSchema.index({ department: 1 });
+LeaveSchema.index({ currentApprover: 1 });
 
 export default mongoose.model("Leave", LeaveSchema);

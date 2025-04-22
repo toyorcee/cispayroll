@@ -600,14 +600,14 @@ export default function Offboarding() {
             alignItems: "center",
             gap: 1.5,
             "& svg": {
-              fontSize: "1.8rem",
+              fontSize: "1.4rem",
             },
           }}
         >
           <FaUserCircle /> Offboarding Management
-        </Typography>
+      </Typography>
         <Chip
-          label="✨ Onboarding & Offboarding Ready"
+          label="✨ Manage Offboarding"
           sx={{
             backgroundColor: "#ecfdf5",
             color: "#16a34a",
@@ -624,29 +624,29 @@ export default function Offboarding() {
 
       {employees.length > 0 ? (
         <>
-          <Grid container spacing={3}>
-            {employees.map((employee) => (
-              <Grid item xs={12} sm={6} md={4} key={employee._id}>
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Card
-                    sx={{
-                      height: "100%",
-                      display: "flex",
-                      flexDirection: "column",
-                      position: "relative",
+        <Grid container spacing={3}>
+          {employees.map((employee) => (
+            <Grid item xs={12} sm={6} md={4} key={employee._id}>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Card
+                  sx={{
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    position: "relative",
                       borderRadius: 2,
                       overflow: "hidden",
-                      "&:hover": {
+                    "&:hover": {
                         boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
-                        transform: "translateY(-4px)",
+                      transform: "translateY(-4px)",
                         transition: "all 0.3s ease",
-                      },
-                    }}
-                  >
+                    },
+                  }}
+                >
                     <Box
                       sx={{
                         position: "absolute",
@@ -673,10 +673,10 @@ export default function Offboarding() {
                       }}
                     />
                     <CardContent sx={{ p: 3 }}>
-                      <Chip
+                    <Chip
                         label={employee.offboarding?.status || "pending"}
-                        color={getStatusColor(employee.offboarding?.status)}
-                        size="small"
+                      color={getStatusColor(employee.offboarding?.status)}
+                      size="small"
                         sx={{
                           position: "absolute",
                           top: 16,
@@ -712,7 +712,7 @@ export default function Offboarding() {
                               </div>
                             )}
                           </div>
-                          <Box sx={{ ml: 2 }}>
+                      <Box sx={{ ml: 2 }}>
                             <Typography
                               variant="h6"
                               component="div"
@@ -722,8 +722,8 @@ export default function Offboarding() {
                                 color: "#1e293b",
                               }}
                             >
-                              {employee.fullName}
-                            </Typography>
+                          {employee.fullName}
+                        </Typography>
                             <Typography
                               variant="body2"
                               sx={{
@@ -732,7 +732,7 @@ export default function Offboarding() {
                               }}
                             >
                               {employee.email}
-                            </Typography>
+                        </Typography>
                           </Box>
                         </div>
                       </Box>
@@ -746,12 +746,12 @@ export default function Offboarding() {
                           }}
                         >
                           <FaBuilding size={14} style={{ marginRight: 8 }} />
-                          <Typography variant="body2">
+                        <Typography variant="body2">
                             {typeof employee.department === "object"
                               ? employee.department?.name
                               : "No Department"}
-                          </Typography>
-                        </Box>
+                        </Typography>
+                      </Box>
                         <Box
                           sx={{
                             display: "flex",
@@ -760,11 +760,11 @@ export default function Offboarding() {
                           }}
                         >
                           <FaBriefcase size={14} style={{ marginRight: 8 }} />
-                          <Typography variant="body2">
-                            {employee.position}
-                          </Typography>
-                        </Box>
+                        <Typography variant="body2">
+                          {employee.position}
+                        </Typography>
                       </Box>
+                    </Box>
 
                       <Box
                         sx={{
@@ -775,7 +775,7 @@ export default function Offboarding() {
                         }}
                       >
                         <FaCalendarAlt size={14} style={{ marginRight: 8 }} />
-                        <Typography variant="body2">
+                      <Typography variant="body2">
                           Exit Date:{" "}
                           <span style={{ color: "#16a34a", fontWeight: 500 }}>
                             {employee.offboarding?.targetExitDate
@@ -784,8 +784,8 @@ export default function Offboarding() {
                                 ).toLocaleDateString()
                               : "Not set"}
                           </span>
-                        </Typography>
-                      </Box>
+                      </Typography>
+                    </Box>
 
                       <Box sx={{ mb: 3 }}>
                         <Box
@@ -813,27 +813,27 @@ export default function Offboarding() {
                             }}
                           >
                             {calculateProgress(employee.offboarding?.tasks)}%
-                          </Typography>
+                      </Typography>
                         </Box>
-                        <LinearProgress
-                          variant="determinate"
+                      <LinearProgress
+                        variant="determinate"
                           value={calculateProgress(employee.offboarding?.tasks)}
-                          sx={{
+                        sx={{
                             height: 6,
                             borderRadius: 3,
                             backgroundColor: "#f1f5f9",
-                            "& .MuiLinearProgress-bar": {
+                          "& .MuiLinearProgress-bar": {
                               borderRadius: 3,
                               backgroundColor: "#16a34a",
-                            },
-                          }}
-                        />
-                      </Box>
+                          },
+                        }}
+                      />
+                    </Box>
 
-                      <Box sx={{ display: "flex", gap: 1, mt: "auto" }}>
-                        <Button
+                    <Box sx={{ display: "flex", gap: 1, mt: "auto" }}>
+                      <Button
                           variant="contained"
-                          fullWidth
+                        fullWidth
                           onClick={() => handleViewTasks(employee)}
                           startIcon={<FaTasks />}
                           sx={{
@@ -847,14 +847,14 @@ export default function Offboarding() {
                           }}
                         >
                           Manage Tasks
-                        </Button>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              </Grid>
-            ))}
-          </Grid>
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </Grid>
+          ))}
+        </Grid>
 
           {/* Pagination Controls */}
           {totalPages > 1 && (

@@ -117,7 +117,8 @@ const getActionIcon = (action: string) => {
   return actionIcons[action] || actionIcons.default;
 };
 
-const getStatusConfig = (status: string) => {
+const getStatusConfig = (status: string | undefined) => {
+  if (!status) return statusConfig.pending;
   return statusConfig[status.toLowerCase()] || statusConfig.pending;
 };
 
@@ -226,7 +227,7 @@ export const RecentActivities: React.FC = () => {
         ) : (
           <div className="divide-y divide-emerald-100">
             {activities.map((activity) => {
-              const status = getStatusConfig(activity.details.status);
+              const status = getStatusConfig(activity.details?.status);
               const actionIcon = getActionIcon(activity.action);
 
               return (

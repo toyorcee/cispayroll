@@ -122,9 +122,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserData = async () => {
     try {
+      console.log("🔄 [AuthContext] Starting fetchUserData");
       setLoading(true);
       // Add timestamp to prevent caching
       const timestamp = new Date().getTime();
+      console.log(
+        "🔍 [AuthContext] Making request to /api/auth/me with timestamp:",
+        timestamp
+      );
+
       const response = await axios.get(`/api/auth/me?_t=${timestamp}`, {
         headers: {
           "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -133,16 +139,105 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       });
 
+      console.log("✅ [AuthContext] Received response from /api/auth/me:", {
+        success: response.data.success,
+        hasUser: !!response.data.user,
+      });
+
       if (response.data.success) {
         const userData = parseUserData(response.data.user);
+        console.log("👤 [AuthContext] Parsed user data:", {
+          id: userData._id,
+          email: userData.email,
+          role: userData.role,
+          permissions: userData.permissions?.length,
+        });
         setUser(userData);
         setLoading(false);
       } else {
-        console.error("Failed to fetch user data:", response.data.message);
+        console.error(
+          "❌ [AuthContext] Failed to fetch user data:",
+          response.data.message
+        );
         setLoading(false);
       }
     } catch (error) {
-      console.error("Error fetching user data:", error);
+      console.error("❌ [AuthContext] Error fetching user data:", error);
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        console.log("🔑 [AuthContext] Received 401, attempting token refresh");
+        if (!error.config?.headers?.["x-refresh-attempt"]) {
+          try {
+            console.log("🔄 [AuthContext] Starting token refresh process");
+            const refreshResponse = await axios.post(
+              "/api/auth/refresh",
+              {},
+              {
+                headers: {
+                  "x-refresh-attempt": "true",
+                  "Cache-Control": "no-cache, no-store, must-revalidate",
+                  Pragma: "no-cache",
+                  Expires: "0",
+                },
+              }
+            );
+
+            console.log("✅ [AuthContext] Token refresh response:", {
+              success: refreshResponse.data.success,
+              hasAccessToken: !!refreshResponse.data.accessToken,
+              hasUser: !!refreshResponse.data.user,
+            });
+
+            if (refreshResponse.data.success) {
+              console.log(
+                "🔄 [AuthContext] Token refresh successful, retrying user data fetch"
+              );
+              // Retry the original request with new token
+              const retryResponse = await axios.get(
+                `/api/auth/me?_t=${new Date().getTime()}`,
+                {
+                  headers: {
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    Pragma: "no-cache",
+                    Expires: "0",
+                  },
+                }
+              );
+
+              console.log("✅ [AuthContext] Retry response:", {
+                success: retryResponse.data.success,
+                hasUser: !!retryResponse.data.user,
+              });
+
+              if (retryResponse.data.success) {
+                const userData = parseUserData(retryResponse.data.user);
+                console.log(
+                  "👤 [AuthContext] Parsed user data after refresh:",
+                  {
+                    id: userData._id,
+                    email: userData.email,
+                    role: userData.role,
+                    permissions: userData.permissions?.length,
+                  }
+                );
+                setUser(userData);
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (refreshError) {
+            console.error(
+              "❌ [AuthContext] Token refresh failed:",
+              refreshError
+            );
+            // Clear auth state on refresh failure
+            setUser(null);
+            localStorage.removeItem("token");
+          }
+        }
+        // If we get here, either refresh failed or wasn't attempted
+        console.log("❌ [AuthContext] Clearing user state due to auth failure");
+        setUser(null);
+      }
       setLoading(false);
     }
   };

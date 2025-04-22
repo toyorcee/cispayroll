@@ -9,7 +9,6 @@ import { employeeService } from "../../../services/employeeService";
 import StatCard from "../../../components/dashboard/StatCard";
 import { departmentService } from "../../../services/departmentService";
 import DepartmentStats from "../../../components/dashboard/DepartmentStats";
-import { RecentActivities } from "../../../components/dashboard/RecentActivities";
 import {
   FaUsers,
   FaUserPlus,
@@ -25,7 +24,6 @@ import {
 } from "../../../services/adminPayrollService";
 import userService, {
   UserDashboardStats,
-  ProcessingStats,
 } from "../../../services/userService";
 
 // Lazy load chart components
@@ -33,10 +31,37 @@ const LineChart = lazy(() => import("../../../components/charts/LineChart"));
 const BarChart = lazy(() => import("../../../components/charts/BarChart"));
 const PieChart = lazy(() => import("../../../components/charts/PieChart"));
 
+const LazyRecentActivities = lazy(() =>
+  import("../../../components/dashboard/RecentActivities").then((module) => ({
+    default: module.RecentActivities,
+  }))
+);
+
 // Loading component for charts
 const ChartLoading = () => (
   <div className="w-full h-[300px] flex items-center justify-center bg-gray-50 rounded-lg">
     <div className="animate-pulse text-gray-400">Loading chart...</div>
+  </div>
+);
+
+// Loading component for RecentActivities
+const RecentActivitiesLoading = () => (
+  <div className="bg-white p-6 rounded-lg shadow-lg animate-pulse">
+    <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+    <div className="space-y-4">
+      {[1, 2, 3].map((index) => (
+        <div
+          key={index}
+          className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg"
+        >
+          <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+          <div className="flex-1">
+            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+            <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+          </div>
+        </div>
+      ))}
+    </div>
   </div>
 );
 
@@ -270,10 +295,10 @@ export default function Dashboard() {
       }
     : null;
 
-    const fetchDashboardData = async () => {
-      try {
-        setError(null);
-        setIsLoading(true);
+  const fetchDashboardData = async () => {
+    try {
+      setError(null);
+      setIsLoading(true);
 
       // Use different services based on user role
       let stats;
@@ -316,15 +341,15 @@ export default function Dashboard() {
 
       const unreadCount = await getUnreadNotificationCount();
 
-        setDashboardStats(stats);
-        setUnreadNotifications(unreadCount);
-      } catch (err) {
+      setDashboardStats(stats);
+      setUnreadNotifications(unreadCount);
+    } catch (err) {
       console.error("Error fetching dashboard data:", err);
       setError("Failed to load dashboard data. Please try again later.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchDashboardData();
@@ -513,7 +538,7 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          </div>
+        </div>
       );
     }
 
@@ -610,21 +635,21 @@ export default function Dashboard() {
             : // Other roles stats
               getRoleStats(user?.role ?? UserRole.USER, dashboardStats).map(
                 (stat, index) => (
-                <motion.div
-                  key={stat.name}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
+                  <motion.div
+                    key={stat.name}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
                     className="w-full"
-                >
-                  <StatCard
-                    {...stat}
-                    icon={stat.icon}
-                    subtext={stat.subtext}
-                    href={stat.href}
-                    color={stat.color}
-                  />
-                </motion.div>
+                  >
+                    <StatCard
+                      {...stat}
+                      icon={stat.icon}
+                      subtext={stat.subtext}
+                      href={stat.href}
+                      color={stat.color}
+                    />
+                  </motion.div>
                 )
               )}
         </div>
@@ -656,7 +681,9 @@ export default function Dashboard() {
 
         {/* Recent Activities Section - At the end */}
         <div className="mb-6">
-          <RecentActivities />
+          <Suspense fallback={<RecentActivitiesLoading />}>
+            <LazyRecentActivities />
+          </Suspense>
         </div>
       </motion.div>
     </GlobalErrorBoundary>

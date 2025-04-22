@@ -57,12 +57,6 @@ router.post(
   RegularUserController.createLeaveRequest
 );
 
-router.patch(
-  "/leave/:id/cancel",
-  requirePermission([Permission.CANCEL_OWN_LEAVE]),
-  RegularUserController.cancelLeaveRequest
-);
-
 // ===== Salary Structure & Allowances Management Routes =====
 router.get(
   "/allowances",

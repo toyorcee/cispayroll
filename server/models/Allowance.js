@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 const { Schema } = mongoose;
 
-// Constants
 export const AllowanceType = {
   FIXED: "fixed",
   PERCENTAGE: "percentage",
@@ -42,13 +41,64 @@ const AllowanceSchema = new Schema(
     },
     type: {
       type: String,
-      enum: Object.values(AllowanceType),
-      required: [true, "Allowance type is required"],
+      enum: ["TRANSPORT", "HOUSING", "MEAL", "MEDICAL", "OTHER"],
+      required: true,
     },
-    value: {
+    amount: {
       type: Number,
-      required: [true, "Value is required"],
-      min: [0, "Value cannot be negative"],
+      required: true,
+      min: 0,
+    },
+    description: {
+      type: String,
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ["PENDING", "APPROVED", "REJECTED"],
+      default: "PENDING",
+    },
+    approvedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
+    approvedAt: {
+      type: Date,
+    },
+    rejectedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
+    rejectedAt: {
+      type: Date,
+    },
+    rejectionReason: {
+      type: String,
+    },
+    documents: [
+      {
+        name: String,
+        url: String,
+        uploadedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+    month: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 12,
+    },
+    year: {
+      type: Number,
+      required: true,
+    },
+    employee: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
     },
     calculationMethod: {
       type: String,
@@ -69,19 +119,9 @@ const AllowanceSchema = new Schema(
       required: [true, "Frequency is required"],
       default: PayrollFrequency.MONTHLY,
     },
-    description: {
-      type: String,
-      trim: true,
-    },
     taxable: {
       type: Boolean,
       default: true,
-    },
-    status: {
-      type: String,
-      enum: Object.values(AllowanceStatus),
-      default: AllowanceStatus.PENDING,
-      required: true,
     },
     isActive: {
       type: Boolean,
@@ -112,14 +152,6 @@ const AllowanceSchema = new Schema(
         return this.scope === "department";
       },
     },
-    // Employee reference for individual allowances
-    employee: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: function () {
-        return this.scope === "individual";
-      },
-    },
     // Priority level for calculation order
     priority: {
       type: Number,
@@ -144,13 +176,6 @@ const AllowanceSchema = new Schema(
       min: [0, "Rating cannot be negative"],
       max: [5, "Rating cannot exceed 5"],
     },
-    // For tracking approval workflow
-    approvedBy: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-    },
-    approvedAt: Date,
-    rejectionReason: String,
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
@@ -161,6 +186,11 @@ const AllowanceSchema = new Schema(
       ref: "User",
       required: [true, "Updater is required"],
     },
+    attachments: [
+      {
+        type: String,
+      },
+    ],
   },
   { timestamps: true }
 );
@@ -168,9 +198,9 @@ const AllowanceSchema = new Schema(
 // Methods
 AllowanceSchema.methods.calculateValue = function (baseSalary) {
   if (this.calculationMethod === CalculationMethod.FIXED) {
-    return this.value;
+    return this.amount;
   }
-  return (baseSalary * this.value) / 100;
+  return (baseSalary * this.amount) / 100;
 };
 
 AllowanceSchema.methods.isValidForPeriod = function (startDate, endDate) {
@@ -258,6 +288,15 @@ AllowanceSchema.index({ salaryGrade: 1 });
 AllowanceSchema.index({ effectiveDate: 1 });
 AllowanceSchema.index({ expiryDate: 1 });
 AllowanceSchema.index({ priority: 1 });
+AllowanceSchema.index({ month: 1, year: 1 });
+
+// Virtual for formatted amount
+AllowanceSchema.virtual("formattedAmount").get(function () {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(this.amount);
+});
 
 // Pre-save validation
 AllowanceSchema.pre("save", function (next) {
@@ -274,6 +313,13 @@ AllowanceSchema.pre("save", function (next) {
   }
   if (this.scope === "individual" && !this.employee) {
     next(new Error("Employee is required for individual allowances"));
+  }
+  const currentDate = new Date();
+  if (
+    this.year < currentDate.getFullYear() - 1 ||
+    this.year > currentDate.getFullYear() + 1
+  ) {
+    next(new Error("Invalid year"));
   }
   next();
 });

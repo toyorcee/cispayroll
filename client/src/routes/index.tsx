@@ -6,27 +6,19 @@ import { ProtectedRoute } from "../components/auth/ProtectedRoute";
 import DashboardLayout from "../components/shared/DashboardLayout";
 import AllEmployees from "../pages/pms/employees/AllEmployees";
 import Onboarding from "../pages/pms/employees/Onboarding";
-import LeaveManagement from "../pages/pms/employees/LeaveManagement";
-import ProcessPayroll from "../pages/pms/payroll/ProcessPayroll";
+import TeamLeaveManagement from "../pages/pms/employees/TeamLeaveManagement";
+import ProcessPayment from "../pages/pms/payroll/ProcessPayment";
 import ProcessDepartmentPayroll from "../pages/pms/payroll/ProcessDepartmentPayroll";
 import SalaryStructure from "../pages/pms/payroll/SalaryStructure";
 import Deductions from "../pages/pms/payroll/Deductions";
 import PayrollReports from "../pages/pms/reports/PayrollReports";
-import EmployeeReports from "../pages/pms/reports/EmployeeReports";
-import TaxReports from "../pages/pms/reports/TaxReports";
 import AuditLogs from "../pages/pms/reports/AuditLogs";
 import GeneralSettings from "../pages/pms/settings/General";
 import CompanyProfile from "../pages/pms/settings/CompanyProfile";
-import TaxConfiguration from "../pages/pms/settings/TaxConfiguration";
-import Compliance from "../pages/pms/settings/Compliance";
-import UserManagement from "../pages/pms/settings/UserManagement";
-import Notifications from "../pages/pms/settings/Notifications";
 import Integrations from "../pages/pms/settings/Integrations";
 import { UserRole, Permission } from "../types/auth";
-import DepartmentManagement from "../pages/pms/settings/DepartmentManagement";
 import Offboarding from "../pages/pms/employees/Offboarding";
 import { GlobalErrorBoundary } from "../components/error/GlobalErrorBoundary";
-import { SkeletonProvider } from "../components/skeletons/SkeletonProvider";
 import { useSkeleton } from "../components/skeletons/SkeletonProvider";
 import Dashboard from "../pages/pms/dashboard/Dashboard";
 import AllowanceManagement from "../pages/pms/payroll/AllowanceManagement";
@@ -39,13 +31,8 @@ import UserProfile from "../pages/pms/profile/UserProfile";
 import { RouteErrorFallback } from "../components/error/RouteErrorFallback";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorFallback } from "../components/error/ErrorFallback";
-import { AuthProvider } from "../context/AuthContext";
-
-// Import new settings components
-import PayrollSettings from "../pages/pms/settings/PayrollSettings";
-import LeaveSettings from "../pages/pms/settings/LeaveSettings";
-import DocumentSettings from "../pages/pms/settings/DocumentSettings";
-import SystemSettings from "../pages/pms/settings/SystemSettings";
+import { NavigationProvider } from "../context/NavigationContext";
+import PersonalLeaveManagement from "../pages/pms/employees/PersonalLeaveManagement";
 import MyAllowances from "../pages/pms/payroll/MyAllowances";
 import MyDeductions from "../pages/pms/payroll/MyDeductions";
 import MyBonus from "../pages/pms/payroll/MyBonus";
@@ -146,18 +133,24 @@ export const routes: RouteConfig[] = [
         element: <Offboarding />,
       },
       {
-        path: "leave",
-        label: "Leave Management",
+        path: "team-leave",
+        label: "Team Leave Management",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.VIEW_TEAM_LEAVE, Permission.APPROVE_LEAVE],
+        requireAllPermissions: false,
+        element: <TeamLeaveManagement />,
+      },
+      {
+        path: "my-leave",
+        label: "My Leave",
         roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
         permissions: [
           Permission.REQUEST_LEAVE,
           Permission.VIEW_OWN_LEAVE,
           Permission.CANCEL_OWN_LEAVE,
-          Permission.APPROVE_LEAVE,
-          Permission.VIEW_TEAM_LEAVE,
         ],
         requireAllPermissions: false,
-        element: <LeaveManagement />,
+        element: <PersonalLeaveManagement />,
       },
     ],
   },
@@ -242,7 +235,7 @@ export const routes: RouteConfig[] = [
       },
       {
         path: "process",
-        label: "Process Payroll",
+        label: "Process Payment",
         roles: [UserRole.SUPER_ADMIN],
         permissions: [
           Permission.CREATE_PAYROLL,
@@ -253,7 +246,7 @@ export const routes: RouteConfig[] = [
           Permission.GENERATE_PAYSLIP,
         ],
         requireAllPermissions: false,
-        element: <ProcessPayroll />,
+        element: <ProcessPayment />,
       },
       {
         path: "department-process",
@@ -311,12 +304,7 @@ export const routes: RouteConfig[] = [
     path: "reports",
     label: "Reports",
     roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    permissions: [
-      Permission.VIEW_REPORTS,
-      Permission.VIEW_PAYROLL_REPORTS,
-      Permission.VIEW_EMPLOYEE_REPORTS,
-      Permission.VIEW_TAX_REPORTS,
-    ],
+    permissions: [Permission.VIEW_REPORTS, Permission.VIEW_PAYROLL_REPORTS],
     requireAllPermissions: false,
     element: <Outlet />,
     children: [
@@ -327,22 +315,6 @@ export const routes: RouteConfig[] = [
         permissions: [Permission.VIEW_PAYROLL_REPORTS],
         requireAllPermissions: true,
         element: <PayrollReports />,
-      },
-      {
-        path: "employees",
-        label: "Employee Reports",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.VIEW_EMPLOYEE_REPORTS],
-        requireAllPermissions: true,
-        element: <EmployeeReports />,
-      },
-      {
-        path: "tax",
-        label: "Tax Reports",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.VIEW_TAX_REPORTS],
-        requireAllPermissions: true,
-        element: <TaxReports />,
       },
       {
         path: "audit",
@@ -379,84 +351,12 @@ export const routes: RouteConfig[] = [
         element: <CompanyProfile />,
       },
       {
-        path: "departments",
-        label: "Department Management",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.MANAGE_DEPARTMENT_SETTINGS],
-        requireAllPermissions: true,
-        element: <DepartmentManagement />,
-      },
-      {
-        path: "users",
-        label: "User Management",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.MANAGE_USER_SETTINGS],
-        requireAllPermissions: true,
-        element: <UserManagement />,
-      },
-      {
-        path: "payroll",
-        label: "Payroll Settings",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.MANAGE_PAYROLL_SETTINGS],
-        requireAllPermissions: true,
-        element: <PayrollSettings />,
-      },
-      {
-        path: "leave",
-        label: "Leave Settings",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.MANAGE_LEAVE_SETTINGS],
-        requireAllPermissions: true,
-        element: <LeaveSettings />,
-      },
-      {
-        path: "documents",
-        label: "Document Settings",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.MANAGE_DOCUMENT_SETTINGS],
-        requireAllPermissions: true,
-        element: <DocumentSettings />,
-      },
-      {
-        path: "notifications",
-        label: "Notification Settings",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
-        permissions: [Permission.MANAGE_NOTIFICATION_SETTINGS],
-        requireAllPermissions: true,
-        element: <Notifications />,
-      },
-      {
         path: "integrations",
         label: "Integration Settings",
         roles: [UserRole.SUPER_ADMIN],
         permissions: [Permission.MANAGE_INTEGRATION_SETTINGS],
         requireAllPermissions: true,
         element: <Integrations />,
-      },
-      {
-        path: "tax",
-        label: "Tax Settings",
-        roles: [UserRole.SUPER_ADMIN],
-        permissions: [Permission.MANAGE_TAX_SETTINGS],
-        requireAllPermissions: true,
-        element: <TaxConfiguration />,
-      },
-      {
-        path: "compliance",
-        label: "Compliance Settings",
-        roles: [UserRole.SUPER_ADMIN],
-        permissions: [Permission.MANAGE_COMPLIANCE_SETTINGS],
-        requireAllPermissions: true,
-        element: <Compliance />,
-      },
-      {
-        path: "system",
-        label: "System Settings",
-        roles: [UserRole.SUPER_ADMIN],
-        permissions: [Permission.MANAGE_SYSTEM_SETTINGS],
-        requireAllPermissions: true,
-        element: <SystemSettings />,
       },
     ],
   },
@@ -544,7 +444,9 @@ export const router = createBrowserRouter([
             permissions={[Permission.VIEW_DASHBOARD]}
             requireAllPermissions={true}
           >
-            <DashboardLayout />
+            <NavigationProvider>
+              <DashboardLayout />
+            </NavigationProvider>
           </ProtectedRoute>
         ),
         children: routes.map((route) => ({

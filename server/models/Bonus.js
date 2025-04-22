@@ -3,6 +3,7 @@ const { Schema } = mongoose;
 
 // Constants
 export const BonusType = {
+  PERSONAL: "personal",
   PERFORMANCE: "performance",
   THIRTEENTH_MONTH: "thirteenth_month",
   SPECIAL: "special",
@@ -33,7 +34,10 @@ const BonusSchema = new Schema(
       type: Number,
       required: [true, "Amount is required"],
     },
-    description: String,
+    reason: {
+      type: String,
+      required: [true, "Reason is required"],
+    },
     paymentDate: {
       type: Date,
       required: [true, "Payment date is required"],
@@ -42,7 +46,6 @@ const BonusSchema = new Schema(
       type: String,
       enum: Object.values(ApprovalStatus),
       default: ApprovalStatus.PENDING,
-      required: [true, "Approval status is required"],
     },
     approvedBy: {
       type: Schema.Types.ObjectId,
