@@ -29,9 +29,13 @@ export class AuthController {
       const cookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        sameSite: process.env.NODE_ENV === "production" ? "lax" : "none",
         maxAge: 24 * 60 * 60 * 1000,
         path: "/",
+        domain:
+          process.env.NODE_ENV === "production"
+            ? ".digitalentshub.net"
+            : undefined,
       };
 
       res.cookie("token", token, cookieOptions);
@@ -65,10 +69,13 @@ export class AuthController {
 
       res.cookie("token", token, {
         httpOnly: true,
-        secure: true,
-        sameSite: "none",
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 24 * 60 * 60 * 1000,
-        domain: ".digitalentshub.net",
+        domain:
+          process.env.NODE_ENV === "production"
+            ? ".digitalentshub.net"
+            : undefined,
       });
 
       res.status(201).json({
@@ -115,10 +122,13 @@ export class AuthController {
 
       res.cookie("token", token, {
         httpOnly: true,
-        secure: true,
-        sameSite: "none",
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 24 * 60 * 60 * 1000,
-        domain: ".digitalentshub.net",
+        domain:
+          process.env.NODE_ENV === "production"
+            ? ".digitalentshub.net"
+            : undefined,
       });
 
       res.status(201).json({
@@ -205,6 +215,8 @@ export class AuthController {
   static async refreshToken(req, res) {
     try {
       console.log("🔄 [AuthController] Starting token refresh process");
+      console.log("📝 [AuthController] Request cookies:", req.cookies);
+      console.log("📝 [AuthController] Request headers:", req.headers);
       const { refreshToken } = req.body;
 
       if (!refreshToken) {
@@ -233,6 +245,24 @@ export class AuthController {
       console.log(
         "✅ [AuthController] New access token generated successfully"
       );
+
+      const cookieOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "lax" : "none",
+        maxAge: 24 * 60 * 60 * 1000,
+        path: "/",
+        domain:
+          process.env.NODE_ENV === "production"
+            ? ".digitalentshub.net"
+            : undefined,
+      };
+      console.log(
+        "🍪 [AuthController] Setting cookie with options:",
+        cookieOptions
+      );
+
+      res.cookie("token", accessToken, cookieOptions);
 
       res.json({
         success: true,
@@ -266,6 +296,11 @@ export class AuthController {
       console.log("✅ [AuthController] Token refresh completed successfully");
     } catch (error) {
       console.error("❌ [AuthController] Token refresh failed:", error);
+      console.error("❌ [AuthController] Error details:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      });
       res.status(401).json({ message: "Invalid refresh token" });
     }
   }

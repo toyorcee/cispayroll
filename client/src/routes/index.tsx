@@ -34,7 +34,6 @@ import { ErrorFallback } from "../components/error/ErrorFallback";
 import { NavigationProvider } from "../context/NavigationContext";
 import PersonalLeaveManagement from "../pages/pms/employees/PersonalLeaveManagement";
 import MyAllowances from "../pages/pms/payroll/MyAllowances";
-import MyDeductions from "../pages/pms/payroll/MyDeductions";
 import MyBonus from "../pages/pms/payroll/MyBonus";
 
 export interface RouteConfig {
@@ -282,14 +281,14 @@ export const routes: RouteConfig[] = [
         requireAllPermissions: true,
         element: <MyAllowances />,
       },
-      {
-        path: "my-deductions",
-        label: "My Deductions",
-        roles: [UserRole.ADMIN, UserRole.USER],
-        permissions: [Permission.VIEW_OWN_DEDUCTIONS],
-        requireAllPermissions: true,
-        element: <MyDeductions />,
-      },
+      // {
+      //   path: "my-deductions",
+      //   label: "My Deductions",
+      //   roles: [UserRole.ADMIN, UserRole.USER],
+      //   permissions: [Permission.VIEW_OWN_DEDUCTIONS],
+      //   requireAllPermissions: true,
+      //   element: <MyDeductions />,
+      // },
       {
         path: "my-bonus",
         label: "My Bonus",

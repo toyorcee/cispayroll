@@ -24,7 +24,7 @@ export const salaryStructureService = {
   getAllSalaryGrades: async (): Promise<ISalaryGrade[]> => {
     try {
       const response = await axios.get<{ data: ISalaryGrade[] }>(
-        `${BASE_URL}/employee/salary-grades`
+        `${BASE_URL}/super-admin/salary-grades`
       );
 
       // Just return the data directly from backend

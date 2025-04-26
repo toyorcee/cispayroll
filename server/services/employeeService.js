@@ -102,6 +102,11 @@ export class EmployeeService {
         },
       };
 
+      console.log(
+        "Creating employee with offboarding data:",
+        JSON.stringify(employeeData.offboarding, null, 2)
+      );
+
       const employee = await UserModel.create(employeeData);
       await EmailService.sendInvitationEmail(
         employee.email,
@@ -109,7 +114,6 @@ export class EmployeeService {
         employee.role
       );
 
-      // Return formatted response with populated department
       const populatedEmployee = await UserModel.findById(employee._id)
         .populate("department", "name code")
         .select("-password");

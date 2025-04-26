@@ -57,9 +57,4 @@ const PaymentMethodSchema = new Schema(
   }
 );
 
-// Indexes
-PaymentMethodSchema.index({ name: 1 }, { unique: true });
-PaymentMethodSchema.index({ type: 1 });
-PaymentMethodSchema.index({ isActive: 1 });
-
 export default mongoose.model("PaymentMethod", PaymentMethodSchema);

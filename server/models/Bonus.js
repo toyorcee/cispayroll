@@ -74,9 +74,4 @@ const BonusSchema = new Schema(
   { timestamps: true }
 );
 
-// Indexes
-BonusSchema.index({ employee: 1, type: 1 });
-BonusSchema.index({ department: 1 });
-BonusSchema.index({ approvalStatus: 1 });
-
 export default mongoose.model("Bonus", BonusSchema);

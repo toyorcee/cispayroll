@@ -1,11 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import {
-  FaExclamationTriangle,
-  FaPlus,
-  FaSpinner,
-  FaTimes,
-} from "react-icons/fa";
+import { FaExclamationTriangle, FaPlus, FaSpinner } from "react-icons/fa";
 import { adminPayrollService } from "../../../services/adminPayrollService";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../context/AuthContext";
@@ -33,16 +28,6 @@ import {
 import ApprovalTimeline from "../../../components/payroll/processpayroll/admin/ApprovalTimeline";
 import PayrollDashboard from "../../../components/payroll/processpayroll/PayrollDashboard";
 import TableSkeleton from "../../../components/skeletons/TableSkeleton";
-
-interface ApiError {
-  response?: {
-    status?: number;
-    data?: {
-      message?: string;
-    };
-  };
-  message: string;
-}
 
 const ProcessDepartmentPayroll = () => {
   const { user, hasPermission } = useAuth();
@@ -114,15 +99,15 @@ const ProcessDepartmentPayroll = () => {
   });
 
   // Add state for details and reject dialog
-  const [showRejectDialog, setShowRejectDialog] = useState(false);
-  const [rejectingPayrollId, setRejectingPayrollId] = useState<string | null>(
-    null
-  );
-  const [rejectDialogData, setRejectDialogData] = useState<{
-    reason: string;
-  }>({
-    reason: "",
-  });
+  // const [showRejectDialog, setShowRejectDialog] = useState(false);
+  // const [rejectingPayrollId, setRejectingPayrollId] = useState<string | null>(
+  //   null
+  // );
+  // const [rejectDialogData, setRejectDialogData] = useState<{
+  //   reason: string;
+  // }>({
+  //   reason: "",
+  // });
 
   // Add state for approve dialog
   const [, setShowApproveDialog] = useState(false);
@@ -135,13 +120,8 @@ const ProcessDepartmentPayroll = () => {
     remarks: "",
   });
 
-  // Add state for processing payment
-  // const [processingPayrollId, setProcessingPayrollId] = useState<string | null>(
-  //   null
-  // );
-
   const [isApproving, setIsApproving] = useState(false);
-  const [isRejecting, setIsRejecting] = useState(false);
+  // const [isRejecting, setIsRejecting] = useState(false);
 
   // Add statistics query
   const { data: processingStats } = useQuery({
@@ -193,7 +173,6 @@ const ProcessDepartmentPayroll = () => {
     currentLevel: string,
     level: string
   ): boolean => {
-    // Special case: If payroll is created by HR and it's Department Head level
     if (level === "DEPARTMENT_HEAD") {
       const hrSubmission = history.find(
         (h) =>
@@ -202,27 +181,12 @@ const ProcessDepartmentPayroll = () => {
           h.action === "SUBMIT"
       );
       if (hrSubmission) {
-        return false; // Department Head is never pending if HR submitted
+        return false; 
       }
     }
     if (currentLevel === level) return true;
     if (!history.some((h) => h.level === level)) return true;
     return false;
-  };
-
-  // Add this helper function near the other helper functions
-  const isHRManagerApproved = (
-    history: Array<{
-      level: string;
-      status: string;
-      action?: string;
-      timestamp?: string;
-      remarks?: string;
-    }>
-  ): boolean => {
-    return history.some(
-      (h) => h.level === "HR_MANAGER" && h.status === "APPROVED"
-    );
   };
 
   // Add this helper function near the other helper functions
@@ -240,21 +204,6 @@ const ProcessDepartmentPayroll = () => {
         h.level === "HR_MANAGER" &&
         h.status === "PENDING" &&
         h.action === "SUBMIT"
-    );
-  };
-
-  // Add this helper function near the other helper functions
-  const isFinanceDirectorApproved = (
-    history: Array<{
-      level: string;
-      status: string;
-      action?: string;
-      timestamp?: string;
-      remarks?: string;
-    }>
-  ): boolean => {
-    return history.some(
-      (h) => h.level === "FINANCE_DIRECTOR" && h.status === "APPROVED"
     );
   };
 
@@ -333,14 +282,14 @@ const ProcessDepartmentPayroll = () => {
       if (data.employeeIds.length === 1) {
         // Process single employee
         console.log("Processing single employee payroll");
-          await adminPayrollService.processSingleEmployeePayroll({
-            employeeId: data.employeeIds[0],
-            departmentId: data.departmentId,
-            month: data.month,
-            year: data.year,
-            frequency: data.frequency,
-            salaryGrade: data.salaryGrade,
-            userRole: user?.role,
+        await adminPayrollService.processSingleEmployeePayroll({
+          employeeId: data.employeeIds[0],
+          departmentId: data.departmentId,
+          month: data.month,
+          year: data.year,
+          frequency: data.frequency,
+          salaryGrade: data.salaryGrade,
+          userRole: user?.role,
         });
 
         // Show toast after processing is complete
@@ -468,7 +417,7 @@ const ProcessDepartmentPayroll = () => {
   const handleReject = async (payrollId: string) => {
     try {
       await adminPayrollService.rejectPayroll({
-      payrollId,
+        payrollId,
         reason: rejectionReason,
         userRole: user?.role,
       });
@@ -548,30 +497,28 @@ const ProcessDepartmentPayroll = () => {
         return;
       }
 
-      let response;
-
       try {
         switch (payroll.approvalFlow?.currentLevel) {
           case "DEPARTMENT_HEAD":
-            response = await approvalService.approveAsDepartmentHead(
+            await approvalService.approveAsDepartmentHead(
               approvingPayrollId,
               approveDialogData.remarks
             );
             break;
           case "HR_MANAGER":
-            response = await approvalService.approveAsHRManager(
+            await approvalService.approveAsHRManager(
               approvingPayrollId,
               approveDialogData.remarks
             );
             break;
           case "FINANCE_DIRECTOR":
-            response = await approvalService.approveAsFinanceDirector(
+            await approvalService.approveAsFinanceDirector(
               approvingPayrollId,
               approveDialogData.remarks
             );
             break;
           case "SUPER_ADMIN":
-            response = await approvalService.approveAsSuperAdmin(
+            await approvalService.approveAsSuperAdmin(
               approvingPayrollId,
               approveDialogData.remarks
             );
@@ -606,7 +553,7 @@ const ProcessDepartmentPayroll = () => {
         setApproveDialogData({ remarks: "" });
         setShowApproveDialog(false);
       } catch (error: any) {
-          toast.error(
+        toast.error(
           error.response?.data?.message || "Failed to approve payroll"
         );
       }
@@ -709,13 +656,13 @@ const ProcessDepartmentPayroll = () => {
 
   const payrollsData = payrolls?.data?.payrolls ?? [];
 
-  const [singleProcessData, setSingleProcessData] = useState<{
-    employeeIds: string[];
-    month: number;
-    year: number;
-    frequency: string;
-    departmentId: string;
-  } | null>(null);
+  // const [_, setSingleProcessData] = useState<{
+  //   employeeIds: string[];
+  //   month: number;
+  //   year: number;
+  //   frequency: string;
+  //   departmentId: string;
+  // } | null>(null);
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
@@ -992,25 +939,25 @@ const ProcessDepartmentPayroll = () => {
           Process Department Payroll
         </h1>
         <Box sx={{ display: "flex", gap: 2 }}>
-        {(canProcessPayroll || canProcessHRPayroll) && (
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={
+          {(canProcessPayroll || canProcessHRPayroll) && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={
                 isProcessing ? (
                   <FaSpinner className="animate-spin" />
                 ) : (
                   <FaPlus />
                 )
-            }
-            onClick={() => {
-              setShowSingleProcessModal(true);
-            }}
-            disabled={isProcessing}
-          >
-            {isProcessing ? "Processing..." : "Create Payroll"}
-          </Button>
-        )}
+              }
+              onClick={() => {
+                setShowSingleProcessModal(true);
+              }}
+              disabled={isProcessing}
+            >
+              {isProcessing ? "Processing..." : "Create Payroll"}
+            </Button>
+          )}
           {user?.role === "SUPER_ADMIN" && (
             <Button
               variant="contained"
@@ -1026,8 +973,8 @@ const ProcessDepartmentPayroll = () => {
               disabled={isProcessing}
             >
               {isProcessing ? "Processing..." : "Process All"}
-          </Button>
-        )}
+            </Button>
+          )}
         </Box>
       </Box>
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>

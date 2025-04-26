@@ -63,8 +63,6 @@ const SuccessAnimation = () => (
 const SingleEmployeeProcessModal = ({
   isOpen,
   onClose,
-  // onSubmit,
-  onSuccess,
 }: SingleEmployeeProcessModalProps) => {
   const { isSuperAdmin } = useAuth();
   const [formData, setFormData] = useState({
@@ -83,7 +81,7 @@ const SingleEmployeeProcessModal = ({
   const [selectAll, setSelectAll] = useState(false);
   const [showEmployeeList, setShowEmployeeList] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [, setErrorMessage] = useState<string | undefined>(undefined);
+  const [, _setErrorMessage] = useState<string | undefined>(undefined);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 

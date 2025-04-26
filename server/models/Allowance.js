@@ -277,19 +277,6 @@ AllowanceSchema.statics.getEmployeeAllowances = async function (
   return uniqueAllowances;
 };
 
-// Indexes
-AllowanceSchema.index({ name: 1 });
-AllowanceSchema.index({ type: 1 });
-AllowanceSchema.index({ department: 1 });
-AllowanceSchema.index({ employee: 1 });
-AllowanceSchema.index({ isActive: 1 });
-AllowanceSchema.index({ status: 1 });
-AllowanceSchema.index({ salaryGrade: 1 });
-AllowanceSchema.index({ effectiveDate: 1 });
-AllowanceSchema.index({ expiryDate: 1 });
-AllowanceSchema.index({ priority: 1 });
-AllowanceSchema.index({ month: 1, year: 1 });
-
 // Virtual for formatted amount
 AllowanceSchema.virtual("formattedAmount").get(function () {
   return new Intl.NumberFormat("en-US", {

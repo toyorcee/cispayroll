@@ -84,7 +84,7 @@ export class OffboardingController {
 
       // Check if user is already in offboarding
       if (
-        user.offboarding &&
+        user.offboarding?.status &&
         user.offboarding.status !== OffboardingStatus.NOT_STARTED
       ) {
         console.log(
@@ -95,10 +95,14 @@ export class OffboardingController {
 
       // Call the model method to initiate offboarding
       const updatedUser = await user.initiateOffboarding({
-        type,
-        reason,
-        targetExitDate: new Date(targetExitDate),
-        initiatedBy: req.user._id,
+        type: {
+          status: OffboardingStatus.INITIATED,
+          type: type,
+          reason: reason,
+          targetExitDate: new Date(targetExitDate),
+          initiatedBy: req.user._id,
+          initiatedAt: new Date(),
+        },
       });
 
       console.log(

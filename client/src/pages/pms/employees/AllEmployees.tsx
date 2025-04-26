@@ -30,7 +30,6 @@ import {
   EMPLOYEES_QUERY_KEY,
 } from "../../../services/employeeService";
 import { departmentService } from "../../../services/departmentService";
-// import { mapEmployeeToDetails } from "../../../utils/mappers";
 import { salaryStructureService } from "../../../services/salaryStructureService";
 import { offboardingService } from "../../../services/offboardingService";
 
@@ -141,7 +140,7 @@ export default function AllEmployees() {
     };
   };
 
-  const { canCreate, canEdit } = getActionPermissions();
+  const { canCreate } = getActionPermissions();
 
   const { data: departmentsData, isLoading: departmentsLoading } =
     departmentService.useGetDepartments();
@@ -376,14 +375,9 @@ export default function AllEmployees() {
         formData.department = userDepartment;
       }
 
-      // For admin users, we need to ensure the role is set to USER
       if (isAdmin) {
         formData.role = "USER";
       }
-
-      console.log("User role:", user?.role);
-      console.log("Is admin:", isAdmin);
-      console.log("Is super admin:", isSuperAdmin);
 
       let response;
       if (isSuperAdmin) {

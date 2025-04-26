@@ -214,13 +214,4 @@ DeductionSchema.pre("save", function (next) {
   next();
 });
 
-// Indexes
-DeductionSchema.index({ name: 1 }, { unique: true });
-DeductionSchema.index({ type: 1 });
-DeductionSchema.index({ isActive: 1 });
-DeductionSchema.index({ applicability: 1 });
-DeductionSchema.index({ assignedEmployees: 1 });
-DeductionSchema.index({ category: 1 });
-DeductionSchema.index({ type: 1, isCustom: 1 });
-
 export default mongoose.model("Deduction", DeductionSchema);

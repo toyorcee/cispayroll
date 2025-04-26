@@ -34,7 +34,6 @@ import {
   AccessTime as AccessTimeIcon,
   Block as BlockIcon,
   Done as DoneIcon,
-  Timeline as TimelineIcon,
   HourglassTop as HourglassTopIcon,
   ErrorOutline as ErrorOutlineIcon,
 } from "@mui/icons-material";
@@ -93,7 +92,7 @@ interface PayrollTableProps {
   user?: User | null;
 }
 
-const RotatingHourglass = styled(HourglassTopIcon)(({ theme }) => ({
+const RotatingHourglass = styled(HourglassTopIcon)(() => ({
   animation: "rotate 2s linear infinite",
   "@keyframes rotate": {
     "0%": {
@@ -289,7 +288,7 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
 
   const getStatusIcon = (
     status: string,
-    approvalFlow?: { currentLevel: string }
+    _approvalFlow?: { currentLevel: string }
   ) => {
     switch (status) {
       case PayrollStatus.DRAFT:
@@ -346,29 +345,6 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
     }
   };
 
-  // Update the shouldShowActions function
-  const shouldShowActions = (payroll: Payroll) => {
-    // Don't show actions for rejected or completed payrolls
-    if (payroll.status === "REJECTED" || payroll.status === "COMPLETED") {
-      return false;
-    }
-
-    if (payroll.status === "DRAFT") {
-      return true;
-    }
-
-    if (payroll.status === "PENDING") {
-      return isCurrentApprover(payroll);
-    }
-
-    return false;
-  };
-
-  // Add this helper function to check approval status
-  const isLevelApproved = (history: any[], level: string) => {
-    return history.some((h) => h.level === level && h.status === "APPROVED");
-  };
-
   // Update the getNextLevelLabel function to handle undefined values
   const getNextLevelLabel = (currentLevel: string | undefined) => {
     if (!currentLevel) return "Pending Approval";
@@ -385,19 +361,6 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
       default:
         return "Pending Approval";
     }
-  };
-
-  // Add this helper function to check if all levels are approved
-  const isFullyApproved = (history: any[]) => {
-    const requiredLevels = [
-      "DEPARTMENT_HEAD",
-      "HR_MANAGER",
-      "FINANCE_DIRECTOR",
-      "SUPER_ADMIN",
-    ];
-    return requiredLevels.every((level) =>
-      history.some((h) => h.level === level && h.status === "APPROVED")
-    );
   };
 
   // Add this helper function to check if payroll is rejected
@@ -567,10 +530,10 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                   <TableCell>{`${payroll.month}/${payroll.year}`}</TableCell>
                   <TableCell>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Chip
-                      label={payroll.status}
-                      color={getStatusColor(payroll.status) as any}
-                      size="small"
+                      <Chip
+                        label={payroll.status}
+                        color={getStatusColor(payroll.status) as any}
+                        size="small"
                         icon={getStatusIcon(
                           payroll.status,
                           payroll.approvalFlow
@@ -641,26 +604,26 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                               </IconButton>
                             </Tooltip>
                           ) : isCurrentApprover(payroll) ? (
-                        <>
-                          <Tooltip title="Approve">
-                            <IconButton
-                              size="small"
-                              onClick={() => onApprove(payroll)}
-                              color="success"
-                            >
-                              <CheckCircleIcon />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Reject">
-                            <IconButton
-                              size="small"
-                              onClick={() => onReject(payroll)}
-                              color="error"
-                            >
-                              <CancelIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </>
+                            <>
+                              <Tooltip title="Approve">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => onApprove(payroll)}
+                                  color="success"
+                                >
+                                  <CheckCircleIcon />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Reject">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => onReject(payroll)}
+                                  color="error"
+                                >
+                                  <CancelIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </>
                           ) : (
                             <Tooltip
                               title={`Click to view approval journey - ${getNextLevelLabel(

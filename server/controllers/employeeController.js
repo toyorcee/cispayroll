@@ -290,7 +290,7 @@ export class EmployeeController {
             path: "employee",
             select: "firstName lastName employeeId bankDetails",
           },
-        { path: "department", select: "name code" },
+          { path: "department", select: "name code" },
           { path: "salaryGrade", select: "level description" },
         ])
         .lean();
@@ -456,16 +456,24 @@ export class EmployeeController {
         }
       }
 
-      // 4. Update user with new image path (Works for both initial and update)
+      // 4. Update user with new image path (relative only)
+      const relativePath = `uploads/profiles/${req.file.filename}`;
       const user = await UserModel.findByIdAndUpdate(
         req.user.id,
         {
           $set: {
-            profileImage: req.file.path,
+            profileImage: relativePath,
           },
         },
         { new: true }
       ).select("-password");
+
+      console.log(
+        "✅ Uploaded image:",
+        req.file.filename,
+        "Saved as:",
+        relativePath
+      );
 
       if (!user) {
         throw new ApiError(404, "Employee not found");
@@ -475,7 +483,8 @@ export class EmployeeController {
       res.status(200).json({
         success: true,
         message: "Profile image updated successfully",
-        profileImage: user.profileImage,
+        profileImage: relativePath,
+        imageUrl: `${process.env.BASE_URL}/${relativePath}`,
       });
     } catch (error) {
       if (req.file) {

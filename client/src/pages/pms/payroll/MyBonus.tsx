@@ -265,12 +265,12 @@ const MyBonus: React.FC = () => {
   return (
     <div className="p-4">
       <div className="flex justify-between items-center mb-4">
-        <Typography variant="h5" component="h1">
+        <Typography variant="h5" component="h1" className="text-gray-800">
           My Bonuses
         </Typography>
         <Button
           variant="contained"
-          color="primary"
+          className="bg-green-600 hover:bg-green-700 text-white"
           onClick={handleOpenDialog}
           startIcon={<span>+</span>}
         >
@@ -281,17 +281,20 @@ const MyBonus: React.FC = () => {
       <div className="grid gap-4">
         {bonuses &&
           bonuses.map((bonus: Bonus) => (
-            <Card className="mb-4 hover:shadow-lg transition-shadow duration-200 border border-gray-100">
+            <Card
+              key={bonus._id}
+              className="mb-4 hover:shadow-lg transition-shadow duration-200 border border-green-600 bg-green-600"
+            >
               <CardContent>
                 <Box className="flex justify-between items-start mb-4">
                   <Box className="flex items-center gap-3">
                     <Typography
                       className={`px-4 py-1.5 rounded-full text-sm font-medium ${
                         bonus.status.toLowerCase() === "approved"
-                          ? "bg-green-100 text-green-800"
+                          ? "bg-green-500 text-white"
                           : bonus.status.toLowerCase() === "pending"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-red-100 text-red-800"
+                          ? "bg-yellow-500 text-white"
+                          : "bg-red-500 text-white"
                       }`}
                     >
                       {bonus.status}
@@ -299,51 +302,44 @@ const MyBonus: React.FC = () => {
                     {bonus.status.toLowerCase() === "pending" && (
                       <Tooltip title="Delete request">
                         <IconButton
-                          color="error"
+                          className="text-white hover:bg-green-500"
                           size="small"
                           onClick={() => handleDeleteClick(bonus._id)}
-                          className="hover:bg-red-50"
                         >
                           <DeleteIcon />
                         </IconButton>
                       </Tooltip>
                     )}
                   </Box>
-                  <Typography variant="body2" className="text-gray-500">
+                  <Typography variant="body2" className="text-white">
                     {new Date(bonus.createdAt).toLocaleDateString()}
                   </Typography>
                 </Box>
-                <Box className="grid grid-cols-2 gap-6 bg-green-50 p-4 rounded-lg">
+                <Box className="grid grid-cols-2 gap-6 bg-green-500 p-4 rounded-lg">
                   <Box>
-                    <Typography variant="body2" className="text-gray-600 mb-1">
+                    <Typography variant="body2" className="text-white mb-1">
                       Amount
                     </Typography>
-                    <Typography
-                      variant="h6"
-                      className="font-bold text-green-700"
-                    >
+                    <Typography variant="h6" className="font-bold text-white">
                       ₦{bonus.amount.toLocaleString()}
                     </Typography>
                   </Box>
                   <Box>
-                    <Typography variant="body2" className="text-gray-600 mb-1">
+                    <Typography variant="body2" className="text-white mb-1">
                       Payment Date
                     </Typography>
-                    <Typography
-                      variant="h6"
-                      className="font-bold text-gray-800"
-                    >
+                    <Typography variant="h6" className="font-bold text-white">
                       {new Date(bonus.paymentDate).toLocaleDateString()}
                     </Typography>
                   </Box>
                 </Box>
                 <Box className="mt-4">
-                  <Typography variant="body2" className="text-gray-600 mb-1">
+                  <Typography variant="body2" className="text-white mb-1">
                     Reason
                   </Typography>
                   <Typography
                     variant="body1"
-                    className="font-medium text-gray-800 bg-white p-3 rounded-lg border border-gray-100"
+                    className="font-medium text-white bg-green-500 p-3 rounded-lg"
                   >
                     {bonus.reason}
                   </Typography>
@@ -353,7 +349,7 @@ const MyBonus: React.FC = () => {
           ))}
 
         {(!bonuses || bonuses.length === 0) && (
-          <Card>
+          <Card className="border border-gray-100">
             <CardContent>
               <Typography color="textSecondary" align="center">
                 No bonuses found
@@ -370,9 +366,9 @@ const MyBonus: React.FC = () => {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>Select Bonus Type</DialogTitle>
+        <DialogTitle className="text-gray-800">Select Bonus Type</DialogTitle>
         <DialogContent>
-          <Typography variant="body1" sx={{ mb: 2 }}>
+          <Typography variant="body1" sx={{ mb: 2 }} className="text-gray-600">
             Choose the type of bonus you want to request:
           </Typography>
           <Grid container spacing={2}>
@@ -385,17 +381,19 @@ const MyBonus: React.FC = () => {
                     cursor: "pointer",
                     border:
                       selectedType === type.id
-                        ? "2px solid #1976d2"
+                        ? "2px solid #059669" // green-600
                         : "1px solid #e0e0e0",
                     "&:hover": {
-                      border: "2px solid #1976d2",
-                      backgroundColor: "rgba(25, 118, 210, 0.04)",
+                      border: "2px solid #059669",
+                      backgroundColor: "rgba(5, 150, 105, 0.04)", // green-600 with opacity
                     },
                   }}
                   onClick={() => handleSelectType(type.id)}
                 >
-                  <Typography variant="h6">{type.label}</Typography>
-                  <Typography variant="body2" color="textSecondary">
+                  <Typography variant="h6" className="text-gray-800">
+                    {type.label}
+                  </Typography>
+                  <Typography variant="body2" className="text-gray-600">
                     {type.description}
                   </Typography>
                 </Paper>
@@ -404,7 +402,9 @@ const MyBonus: React.FC = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseTypeDialog}>Cancel</Button>
+          <Button onClick={handleCloseTypeDialog} className="text-gray-600">
+            Cancel
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -415,7 +415,7 @@ const MyBonus: React.FC = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>
+        <DialogTitle className="text-gray-800">
           Request{" "}
           {selectedType
             ? BONUS_TYPES.find((t) => t.id === selectedType)?.label
@@ -424,7 +424,11 @@ const MyBonus: React.FC = () => {
         <DialogContent>
           <Box sx={{ mt: 2 }}>
             {selectedType && (
-              <Alert severity="info" sx={{ mb: 3 }}>
+              <Alert
+                severity="info"
+                sx={{ mb: 3 }}
+                className="bg-green-50 text-green-800"
+              >
                 You selected:{" "}
                 <strong>
                   {BONUS_TYPES.find((t) => t.id === selectedType)?.label}
@@ -446,6 +450,7 @@ const MyBonus: React.FC = () => {
                 startAdornment: <Typography sx={{ mr: 1 }}>₦</Typography>,
               }}
               sx={{ mb: 3 }}
+              className="text-gray-800"
             />
 
             <TextField
@@ -461,6 +466,7 @@ const MyBonus: React.FC = () => {
               helperText={errors.reason}
               placeholder="Please provide a detailed explanation of why you deserve this bonus..."
               sx={{ mb: 3 }}
+              className="text-gray-800"
             />
 
             <LocalizationProvider dateAdapter={AdapterDateFns}>
@@ -476,23 +482,29 @@ const MyBonus: React.FC = () => {
                     fullWidth: true,
                     error: !!errors.paymentDate,
                     helperText: errors.paymentDate,
+                    className: "text-gray-800",
                   },
                 }}
               />
             </LocalizationProvider>
 
-            <Alert severity="info" sx={{ mt: 3 }}>
+            <Alert
+              severity="info"
+              sx={{ mt: 3 }}
+              className="bg-green-50 text-green-800"
+            >
               Your request will be reviewed by HR. Please provide a clear reason
               for your bonus request.
             </Alert>
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseFormDialog}>Cancel</Button>
+          <Button onClick={handleCloseFormDialog} className="text-gray-600">
+            Cancel
+          </Button>
           <Button
             onClick={handleSubmit}
-            variant="contained"
-            color="primary"
+            className="bg-green-600 hover:bg-green-700 text-white"
             disabled={createBonusMutation.isPending}
           >
             {createBonusMutation.isPending ? "Submitting..." : "Submit Request"}
@@ -507,19 +519,22 @@ const MyBonus: React.FC = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Delete Bonus Request</DialogTitle>
+        <DialogTitle className="text-gray-800">
+          Delete Bonus Request
+        </DialogTitle>
         <DialogContent>
-          <Typography>
+          <Typography className="text-gray-600">
             Are you sure you want to delete this bonus request? This action
             cannot be undone.
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCancelDelete}>Cancel</Button>
+          <Button onClick={handleCancelDelete} className="text-gray-600">
+            Cancel
+          </Button>
           <Button
             onClick={handleConfirmDelete}
-            variant="contained"
-            color="error"
+            className="bg-red-600 hover:bg-red-700 text-white"
             disabled={deleteBonusMutation.isPending}
           >
             {deleteBonusMutation.isPending ? "Deleting..." : "Delete"}

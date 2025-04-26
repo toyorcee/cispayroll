@@ -151,7 +151,7 @@ app.use((req, res, next) => {
 // Multer configuration for profile images
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "uploads/profiles/"); // Make sure this directory exists
+    cb(null, path.join(__dirname, "uploads", "profiles")); // Use absolute path
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -194,6 +194,7 @@ app.use("/api/regular-user", routeErrorWrapper(regularUserRoutes));
 app.use("/api/employee", routeErrorWrapper(employeeRoutes));
 app.use("/api/invitation", routeErrorWrapper(invitationRoutes));
 app.use("/api/onboarding", routeErrorWrapper(onboardingRoutes));
+app.use("/api/offboarding", routeErrorWrapper(offboardingRoutes));
 app.use("/api/bonus", routeErrorWrapper(bonusRoutes));
 app.use("/api/disciplinary", routeErrorWrapper(disciplinaryRoutes));
 app.use("/api/feedback", routeErrorWrapper(feedbackRoute));
@@ -219,15 +220,27 @@ app.get("/api/health", (_req, res) => {
   res.json(health);
 });
 
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 app.get(
   "/uploads/profiles/:filename",
   (req, res, next) => {
+    console.log("📸 Profile image request:", {
+      filename: req.params.filename,
+      path: path.join(
+        process.cwd(),
+        "uploads",
+        "profiles",
+        req.params.filename
+      ),
+      exists: fs.existsSync(
+        path.join(process.cwd(), "uploads", "profiles", req.params.filename)
+      ),
+    });
     res.setHeader("Cache-Control", "public, max-age=31536000");
     next();
   },
-  express.static(path.join(__dirname, "uploads/profiles"))
+  express.static(path.join(process.cwd(), "uploads", "profiles"))
 );
 
 // Enhanced error handler

@@ -226,10 +226,4 @@ SalaryGradeSchema.statics.getEmployeeSalaryDetails = async function (
   };
 };
 
-// Indexes
-SalaryGradeSchema.index({ level: 1 });
-SalaryGradeSchema.index({ department: 1 });
-SalaryGradeSchema.index({ isActive: 1 });
-SalaryGradeSchema.index({ "defaultAllowances.name": 1 });
-
 export default mongoose.model("SalaryGrade", SalaryGradeSchema);

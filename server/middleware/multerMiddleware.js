@@ -4,7 +4,7 @@ import { ApiError } from "../utils/errorHandler.js";
 import fs from "fs";
 
 // Ensure upload directory exists
-const uploadDir = "uploads/profiles";
+const uploadDir = path.join(process.cwd(), "uploads", "profiles");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }

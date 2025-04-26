@@ -354,7 +354,11 @@ export const EmployeeFormModal = ({
                 </label>
                 <select
                   name="department"
-                  value={formData.department?._id || ""}
+                  value={
+                    typeof formData.department === "string"
+                      ? formData.department
+                      : formData.department?._id || ""
+                  }
                   onChange={handleChange}
                   required
                   className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:!border-green-500 focus:!ring-green-500"

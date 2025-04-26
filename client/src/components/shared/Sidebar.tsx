@@ -14,7 +14,7 @@ import {
   UserCircleIcon,
 } from "@heroicons/react/24/outline";
 import { motion, AnimatePresence } from "framer-motion";
-import { ProfileMenu } from "./PayrollMenu";
+import { ProfileMenu } from "./ProfileMenu";
 import { useAuth } from "../../context/AuthContext";
 import { UserRole } from "../../types/auth";
 import { menuItems } from "../../context/NavigationContext";
@@ -44,8 +44,7 @@ export function Sidebar() {
   const { hasPermission, hasRole } = useAuth();
   const location = useLocation();
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
-  const { setActiveMenuText, getAvailableMenus } =
-    useNavigation();
+  const { setActiveMenuText, getAvailableMenus } = useNavigation();
 
   // Get the list of available menus from the NavigationContext
   const availableMenus = getAvailableMenus();

@@ -54,9 +54,4 @@ const DepartmentSchema = new Schema(
   { timestamps: true }
 );
 
-// Indexes
-DepartmentSchema.index({ name: 1 });
-DepartmentSchema.index({ code: 1 });
-DepartmentSchema.index({ status: 1 });
-
 export default mongoose.model("Department", DepartmentSchema);

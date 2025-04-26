@@ -5,7 +5,7 @@ import { FaBars, FaMoneyCheckAlt } from "react-icons/fa";
 import { useNavigation } from "../../context/NavigationContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sidebar } from "./Sidebar";
-import { ProfileMenu } from "./PayrollMenu";
+import { ProfileMenu } from "./ProfileMenu";
 import {
   NotificationBell,
   NotificationBellRef,

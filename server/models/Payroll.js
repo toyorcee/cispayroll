@@ -569,10 +569,4 @@ PayrollSchema.methods.returnForRevision = function (user, remarks) {
   return this;
 };
 
-// Indexes
-PayrollSchema.index({ employee: 1, month: 1, year: 1 }, { unique: true });
-PayrollSchema.index({ department: 1 });
-PayrollSchema.index({ status: 1 });
-PayrollSchema.index({ createdAt: 1 });
-
 export default mongoose.model("Payroll", PayrollSchema);

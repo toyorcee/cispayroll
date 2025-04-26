@@ -12,7 +12,6 @@ import {
   FaExclamationTriangle,
   FaCheckCircle,
   FaUserTie,
-  FaBell,
   FaChartPie,
   FaUserFriends,
 } from "react-icons/fa";

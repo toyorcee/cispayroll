@@ -409,3 +409,5 @@ export interface Offboarding {
   initiatedBy: string;
   checklist: OffboardingChecklist[];
 }
+
+export type { Department };

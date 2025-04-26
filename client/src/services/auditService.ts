@@ -95,9 +95,7 @@ class AuditService {
     }
   }
 
-  // Method to set the base URL based on user role
-  setUserRole(userRole?: string) {
-    // Always use /api/audit regardless of role
+  setUserRole(_userRole?: string) {
     this.baseUrl = `${baseURL}/audit`;
   }
 

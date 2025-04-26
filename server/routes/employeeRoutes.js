@@ -96,7 +96,7 @@ router.post(
 
 router.post(
   "/profile/image",
-  requirePermission([Permission.EDIT_PERSONAL_INFO]),
+  requireAuth,
   upload.single("image"),
   EmployeeController.updateProfileImage
 );

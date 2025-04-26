@@ -1,25 +1,18 @@
 import { useState } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   FaMoneyBill,
-  FaSpinner,
   FaExclamationTriangle,
   FaFileAlt,
   FaCheck,
   FaTimes,
   FaChevronLeft,
   FaChevronRight,
-  FaPaperPlane,
-  FaEdit,
   FaHistory,
   FaFileInvoiceDollar,
-  FaUsers,
 } from "react-icons/fa";
 import {
   PayrollStatus,
-  type PayrollPeriod,
-  type PayrollStats,
   type PayrollData,
   type Payslip,
   type PayrollFilters,
@@ -41,10 +34,6 @@ import {
   TableRow,
   TableCell,
   Paper,
-  Button,
-  Checkbox,
-  FormControlLabel,
-  Tooltip,
   Box,
   Typography,
 } from "@mui/material";
@@ -178,22 +167,7 @@ export default function ProcessPayment() {
   } | null>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedEmployeeHistory, setSelectedEmployeeHistory] = useState(null);
-  const [selectedPayrollId, setSelectedPayrollId] = useState<string | null>(
-    null
-  );
-  const [selectedPayrolls, setSelectedPayrolls] = useState<string[]>([]);
-  const [selectAll, setSelectAll] = useState(false);
-  const [isMarkingBatch, setIsMarkingBatch] = useState(false);
-  const [isMarkingAll, setIsMarkingAll] = useState(false);
-  const [showMarkAllDialog, setShowMarkAllDialog] = useState(false);
-  const [markAllAction, setMarkAllAction] = useState<
-    "approve" | "reject" | null
-  >(null);
-  const [markAllData, setMarkAllData] = useState({
-    month: new Date().getMonth() + 1,
-    year: new Date().getFullYear(),
-    frequency: "MONTHLY",
-  });
+  const [_, setSelectAll] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -293,16 +267,6 @@ export default function ProcessPayment() {
     queryFn: () => payrollService.getAllPayrolls(filters),
   });
 
-  const { isLoading: isPeriodsLoading } = useQuery<PayrollPeriod[]>({
-    queryKey: ["payrollPeriods"],
-    queryFn: () => payrollService.getPayrollPeriods(),
-  });
-
-  const { isLoading: isStatsLoading } = useQuery<PayrollStats>({
-    queryKey: ["payrollStats"],
-    queryFn: () => payrollService.getPayrollStats(),
-  });
-
   const { data: statistics } = useQuery<Statistics>({
     queryKey: ["payrollStatistics"],
     queryFn: () => payrollService.getProcessingStatistics(),
@@ -315,7 +279,7 @@ export default function ProcessPayment() {
     setFilters((prev: PayrollFilters) => ({
       ...prev,
       [key]: value,
-      page: 1, // Reset to first page when filters change
+      page: 1, 
     }));
   };
 
@@ -372,8 +336,6 @@ export default function ProcessPayment() {
       </div>
     </div>
   );
-
-  const isLoading = isPeriodsLoading || isStatsLoading;
 
   const PayrollTable = () => (
     <div className="space-y-4">

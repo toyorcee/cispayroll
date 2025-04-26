@@ -65,11 +65,4 @@ const AuditSchema = new Schema(
   }
 );
 
-// Indexes
-AuditSchema.index({ action: 1 });
-AuditSchema.index({ entity: 1 });
-AuditSchema.index({ entityId: 1 });
-AuditSchema.index({ performedBy: 1 });
-AuditSchema.index({ createdAt: 1 });
-
 export default mongoose.model("Audit", AuditSchema);

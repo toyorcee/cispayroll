@@ -74,11 +74,4 @@ const PaymentSchema = new Schema(
   }
 );
 
-// Indexes
-PaymentSchema.index({ payrollId: 1 });
-PaymentSchema.index({ employeeId: 1 });
-PaymentSchema.index({ status: 1 });
-PaymentSchema.index({ processedAt: 1 });
-PaymentSchema.index({ reference: 1 }, { unique: true });
-
 export default mongoose.model("Payment", PaymentSchema);

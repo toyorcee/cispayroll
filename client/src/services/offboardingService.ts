@@ -2,7 +2,6 @@ import axios from "axios";
 import {
   OffboardingType,
   OffboardingData,
-  OffboardingTask,
 } from "../types/offboarding";
 
 const BASE_URL = "http://localhost:5000/api";

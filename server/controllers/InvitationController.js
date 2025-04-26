@@ -81,12 +81,7 @@ export class InvitationController {
 
   static async verifyInvitation(req, res) {
     try {
-      console.log("[verifyInvitation] Starting verification process");
-      console.log("[verifyInvitation] Token:", req.params.token);
-
       const { token } = req.params;
-
-      console.log("[verifyInvitation] Searching for user with token:", token);
       const user = await UserModel.findOne({
         invitationToken: token,
         invitationExpires: { $gt: new Date() },
@@ -97,7 +92,6 @@ export class InvitationController {
         )
         .populate("department", "name code");
 
-      console.log("[verifyInvitation] User found:", user ? "Yes" : "No");
       if (user) {
         console.log("[verifyInvitation] User details:", {
           email: user.email,
@@ -113,14 +107,12 @@ export class InvitationController {
       }
 
       if (!user) {
-        console.log("[verifyInvitation] Invalid or expired token");
         return res.status(400).json({
           success: false,
           message: "Invalid or expired invitation token",
         });
       }
 
-      console.log("[verifyInvitation] Token verified successfully");
       res.status(200).json({
         success: true,
         message: "Invitation token is valid",

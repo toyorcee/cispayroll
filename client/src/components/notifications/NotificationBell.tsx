@@ -1,9 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  forwardRef,
-  useImperativeHandle,
-} from "react";
+import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { FaBell, FaUser, FaBuilding, FaCalendarAlt } from "react-icons/fa";
 import { format } from "date-fns";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -31,7 +26,7 @@ export interface NotificationBellRef {
 }
 
 export const NotificationBell = forwardRef<NotificationBellRef>(
-  (props, ref) => {
+  (_props, ref) => {
     const [isOpen, setIsOpen] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -111,24 +106,6 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
       return date.toLocaleString("default", { month: "long" });
     };
 
-    // Get status badge color
-    const getStatusColor = (status: string) => {
-      switch (status?.toLowerCase()) {
-        case "draft":
-          return "bg-gray-100 text-gray-800";
-        case "pending":
-          return "bg-yellow-100 text-yellow-800";
-        case "approved":
-          return "bg-green-100 text-green-800";
-        case "rejected":
-          return "bg-red-100 text-red-800";
-        case "paid":
-          return "bg-blue-100 text-blue-800";
-        default:
-          return "bg-gray-100 text-gray-800";
-      }
-    };
-
     return (
       <div className="relative">
         <button
@@ -150,13 +127,13 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
         </button>
 
         {isOpen && (
-          <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="font-semibold text-gray-800">Notifications</h3>
+          <div className="fixed top-16 left-0 right-0 w-full max-w-xs mx-auto sm:absolute sm:top-auto sm:mt-2 sm:right-0 sm:left-auto sm:w-96 bg-green-600 text-white rounded-lg shadow-lg border border-green-700 z-50">
+            <div className="p-4 border-b border-green-700 flex justify-between items-center">
+              <h3 className="font-semibold text-white">Notifications</h3>
               {unreadCount > 0 && (
                 <button
                   onClick={markAllAsRead}
-                  className="text-sm text-green-600 hover:text-green-800"
+                  className="text-sm text-green-100 hover:text-white"
                 >
                   Mark all as read
                 </button>
@@ -165,37 +142,37 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
             <div className="max-h-96 overflow-y-auto">
               {isLoading ? (
                 <div className="p-4 text-center">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500 mx-auto"></div>
-                  <p className="mt-2 text-xs text-gray-500">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-200 mx-auto"></div>
+                  <p className="mt-2 text-xs text-green-100">
                     Updating notifications...
                   </p>
                 </div>
               ) : notifications.length === 0 ? (
-                <p className="text-center text-gray-500 py-4">
+                <p className="text-center text-green-100 py-4">
                   No notifications
                 </p>
               ) : (
-                <div className="divide-y divide-gray-200">
+                <div className="divide-y divide-green-700/60">
                   {notifications.map((notification) => (
                     <div
                       key={notification._id}
-                      className={`p-4 hover:bg-gray-50 cursor-pointer ${
-                        !notification.read ? "bg-green-50" : ""
+                      className={`p-4 bg-green-700/80 rounded mb-2 cursor-pointer ${
+                        !notification.read ? "ring-2 ring-green-200" : ""
                       }`}
                       onClick={() => markAsRead(notification._id)}
                     >
                       <div className="flex justify-between items-start">
-                        <h4 className="font-medium text-gray-800">
+                        <h4 className="font-medium text-white">
                           {notification.title}
                         </h4>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-green-100">
                           {format(
                             new Date(notification.createdAt),
                             "MMM d, h:mm a"
                           )}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="text-sm text-green-100 mt-1">
                         {notification.message}
                       </p>
 
@@ -206,14 +183,14 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
                             notification.data.departmentName) && (
                             <div className="flex flex-wrap gap-2 text-xs">
                               {notification.data.employeeName && (
-                                <div className="flex items-center bg-gray-100 px-2 py-1 rounded">
-                                  <FaUser className="mr-1 text-gray-500" />
+                                <div className="flex items-center bg-green-800/80 px-2 py-1 rounded">
+                                  <FaUser className="mr-1 text-green-200" />
                                   <span>{notification.data.employeeName}</span>
                                 </div>
                               )}
                               {notification.data.departmentName && (
-                                <div className="flex items-center bg-gray-100 px-2 py-1 rounded">
-                                  <FaBuilding className="mr-1 text-gray-500" />
+                                <div className="flex items-center bg-green-800/80 px-2 py-1 rounded">
+                                  <FaBuilding className="mr-1 text-green-200" />
                                   <span>
                                     {notification.data.departmentName}
                                   </span>
@@ -225,8 +202,8 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
                           {/* Payroll Period */}
                           {notification.data.month &&
                             notification.data.year && (
-                              <div className="flex items-center text-xs bg-gray-100 px-2 py-1 rounded w-fit">
-                                <FaCalendarAlt className="mr-1 text-gray-500" />
+                              <div className="flex items-center text-xs bg-green-800/80 px-2 py-1 rounded w-fit">
+                                <FaCalendarAlt className="mr-1 text-green-200" />
                                 <span>
                                   {getMonthName(notification.data.month)}{" "}
                                   {notification.data.year}
@@ -238,9 +215,7 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
                           {notification.data.status && (
                             <div className="flex items-center text-xs mt-1">
                               <span
-                                className={`px-2 py-1 rounded ${getStatusColor(
-                                  notification.data.status
-                                )}`}
+                                className={`px-2 py-1 rounded bg-green-900 text-green-100`}
                               >
                                 {notification.data.status}
                               </span>
@@ -249,7 +224,7 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
 
                           {/* Remarks if any */}
                           {notification.data.remarks && (
-                            <div className="text-xs text-gray-600 mt-1 italic">
+                            <div className="text-xs text-green-100 mt-1 italic">
                               "{notification.data.remarks}"
                             </div>
                           )}

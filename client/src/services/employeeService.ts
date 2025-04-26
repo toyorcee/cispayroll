@@ -116,8 +116,7 @@ export const employeeService = {
   // Create new employee
   async createEmployee(employeeData: CreateEmployeeData): Promise<Employee> {
     try {
-      // Ensure we're sending the exact structure expected by the API
-      const response = await axios.post(`${BASE_URL}/employees/create`, {
+      const response = await axios.post(`${BASE_URL}/employee/create`, {
         firstName: employeeData.firstName,
         lastName: employeeData.lastName,
         email: employeeData.email,
@@ -290,37 +289,6 @@ export const employeeService = {
       return response.data.data;
     } catch (error) {
       console.error("Error in getOffboardingEmployees:", error);
-      throw error;
-    }
-  },
-
-  initiateOffboarding: async (employeeId: string) => {
-    try {
-      const response = await axios.post(
-        `${BASE_URL}/super-admin/employees/${employeeId}/offboard`,
-        {},
-        {
-          withCredentials: true,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.data.success) {
-        throw new Error(
-          response.data.message || "Failed to initiate offboarding"
-        );
-      }
-
-      return response.data;
-    } catch (error: unknown) {
-      console.error(
-        "Failed to initiate offboarding:",
-        axios.isAxiosError(error)
-          ? error.response?.data || error.message
-          : String(error)
-      );
       throw error;
     }
   },
@@ -864,7 +832,7 @@ export const employeeService = {
       formData.append("image", file);
 
       const response = await axios.post(
-        `${BASE_URL}/employees/profile/image`,
+        `${BASE_URL}/employee/profile/image`,
         formData,
         {
           headers: {

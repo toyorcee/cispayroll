@@ -132,7 +132,7 @@ export const bonusService = {
 
   approveBonus: async (
     id: string,
-    approved: boolean
+    // approved: boolean
   ): Promise<{ data: IBonus }> => {
     try {
       const response = await axios.put(

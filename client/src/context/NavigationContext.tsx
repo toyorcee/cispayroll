@@ -382,12 +382,6 @@ export const menuItems: NavigationItem[] = [
         roles: [UserRole.ADMIN, UserRole.USER],
       },
       {
-        name: "My Deductions",
-        href: "/pms/payroll/my-deductions",
-        permissions: [Permission.VIEW_OWN_DEDUCTIONS],
-        roles: [UserRole.ADMIN, UserRole.USER],
-      },
-      {
         name: "My Bonus",
         href: "/pms/payroll/my-bonus",
         permissions: [Permission.VIEW_OWN_BONUS],

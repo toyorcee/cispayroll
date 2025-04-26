@@ -59,7 +59,6 @@ const LeaveSchema = new Schema({
     required: [true, "Department is required"],
   },
   attachments: [String],
-  // Approval tracking
   approvalLevel: {
     type: Number,
     default: 1, // 1 = Department Head, 2 = HR, 3 = Senior Management
@@ -104,11 +103,5 @@ LeaveSchema.pre("save", function (next) {
   }
   next();
 });
-
-// Indexes
-LeaveSchema.index({ user: 1, startDate: 1 });
-LeaveSchema.index({ status: 1 });
-LeaveSchema.index({ department: 1 });
-LeaveSchema.index({ currentApprover: 1 });
 
 export default mongoose.model("Leave", LeaveSchema);

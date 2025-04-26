@@ -1,23 +1,23 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { FaUserPlus, FaUsers, FaBuildingColumns } from "react-icons/fa6";
+import { FaUserPlus, FaBuildingColumns } from "react-icons/fa6";
 import { FaTimes, FaSpinner } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { employeeService } from "../../../services/employeeService";
+import { salaryStructureService } from "../../../services/salaryStructureService";
 import { Dialog } from "@headlessui/react";
 import { DepartmentModal } from "../../../components/departments/DepartmentModal";
 import { Department } from "../../../types/department";
 import { useAuth } from "../../../context/AuthContext";
 import { UserRole, User, Permission } from "../../../types/auth";
-import { AxiosError } from "axios";
 import {
   CreateEmployeeData,
   OnboardingEmployee,
   ExtendedOnboardingEmployee,
+  SalaryGrade,
 } from "../../../types/employee";
 import { Pagination } from "@mui/material";
 import { Grid } from "@mui/material";
-import CreateAdminModal from "../../../components/modals/CreateAdminModal";
 import { departmentService } from "../../../services/departmentService";
 import {
   onboardingService,
@@ -25,7 +25,6 @@ import {
 } from "../../../services/onboardingService";
 import { OnboardingDetailsModal } from "../../../components/modals/OnboardingDetailsModal";
 
-// Update the AdminUser interface to match User type exactly
 interface AdminUser {
   _id: string;
   id: string;
@@ -187,9 +186,10 @@ type OnboardingStage =
 
 export default function Onboarding() {
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showAdminModal, setShowAdminModal] = useState(false);
   const [showDepartmentModal, setShowDepartmentModal] = useState(false);
-  const [isCreating] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [salaryGrades, setSalaryGrades] = useState<SalaryGrade[]>([]);
+  const [isLoadingGrades, setIsLoadingGrades] = useState(false);
   const [filters, setFilters] = useState<OnboardingFilters>({
     status: "",
     department: "",
@@ -217,6 +217,7 @@ export default function Onboarding() {
     isLoading,
     error,
     fetchData,
+    user,
     pagination,
     stats,
   } = useOnboardingData();
@@ -231,6 +232,10 @@ export default function Onboarding() {
     useState<OnboardingEmployee | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Add role checks
+  const isAdmin = user?.role === "ADMIN";
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
 
   // Update the fetchAdmins function to properly type the permissions
   useEffect(() => {
@@ -263,6 +268,25 @@ export default function Onboarding() {
     fetchAdmins();
   }, []);
 
+  // Fetch salary grades
+  const fetchSalaryGrades = useCallback(async () => {
+    try {
+      setIsLoadingGrades(true);
+      const grades = await salaryStructureService.getAllSalaryGrades();
+      setSalaryGrades(grades);
+    } catch (error) {
+      console.error("Error fetching salary grades:", error);
+      toast.error("Failed to load salary grades");
+    } finally {
+      setIsLoadingGrades(false);
+    }
+  }, []);
+
+  // Fetch salary grades when component mounts
+  useEffect(() => {
+    fetchSalaryGrades();
+  }, [fetchSalaryGrades]);
+
   // All useEffect hooks
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -283,21 +307,49 @@ export default function Onboarding() {
     return filtered;
   };
 
-  const handleCreateEmployee = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateEmployee = async (formData: CreateEmployeeData) => {
     try {
-      await employeeService.createEmployee(formData);
-      toast.success("Employee created successfully");
+      setIsCreating(true);
+      console.log("Creating employee with data:", formData);
+
+      // Ensure department is set for admin users
+      if (!formData.department && isAdmin) {
+        const userDepartment =
+          typeof user?.department === "object"
+            ? user.department._id
+            : user?.department;
+
+        if (!userDepartment) {
+          toast.error("No department assigned to admin user");
+          return;
+        }
+
+        formData.department = userDepartment;
+      }
+
+      if (isAdmin) {
+        formData.role = "USER";
+      }
+
+      let response;
+      if (isSuperAdmin) {
+        console.log("Using super admin service to create employee");
+        response = await employeeService.createEmployee(formData);
+      } else {
+        console.log("Using admin service to create employee");
+        response = await employeeService.adminService.createEmployee(formData);
+      }
+
+      console.log("Employee creation response:", response);
+
+      toast.success("Employee created successfully. Invitation sent.");
       setShowCreateModal(false);
       fetchData();
     } catch (error) {
-      if (error instanceof AxiosError) {
-        toast.error(
-          error.response?.data?.message || "Failed to create employee"
-        );
-      } else {
-        toast.error("An unexpected error occurred");
-      }
+      console.error("Error creating employee:", error);
+      toast.error("Failed to create employee. Please try again.");
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -400,14 +452,6 @@ export default function Onboarding() {
         >
           <FaUserPlus className="text-lg" />
           <span>Create Employee</span>
-        </button>
-
-        <button
-          onClick={() => setShowAdminModal(true)}
-          className="!bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors duration-200"
-        >
-          <FaUsers className="text-lg" />
-          <span>Create Admin</span>
         </button>
 
         <button
@@ -575,7 +619,6 @@ export default function Onboarding() {
           className="relative z-50"
         >
           <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-
           <div className="fixed inset-0 flex items-center justify-center p-4">
             <Dialog.Panel className="mx-auto max-w-2xl w-full rounded-xl bg-white p-6 shadow-xl">
               <div className="flex justify-between items-center mb-6">
@@ -590,15 +633,23 @@ export default function Onboarding() {
                 </button>
               </div>
 
-              <form onSubmit={handleCreateEmployee} className="space-y-4">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleCreateEmployee(formData);
+                }}
+                className="space-y-4"
+              >
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      First Name
+                      First Name *
                     </label>
                     <input
                       type="text"
                       required
+                      pattern="[A-Za-z\s]+"
+                      title="Please enter a valid name (letters and spaces only)"
                       className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
                       value={formData.firstName}
                       onChange={(e) =>
@@ -612,11 +663,13 @@ export default function Onboarding() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Last Name
+                      Last Name *
                     </label>
                     <input
                       type="text"
                       required
+                      pattern="[A-Za-z\s]+"
+                      title="Please enter a valid name (letters and spaces only)"
                       className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
                       value={formData.lastName}
                       onChange={(e) =>
@@ -630,7 +683,7 @@ export default function Onboarding() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Email
+                      Email *
                     </label>
                     <input
                       type="email"
@@ -640,7 +693,7 @@ export default function Onboarding() {
                       onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
-                          email: e.target.value,
+                          email: e.target.value.toLowerCase(),
                         }))
                       }
                     />
@@ -648,11 +701,13 @@ export default function Onboarding() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Phone
+                      Phone *
                     </label>
                     <input
                       type="tel"
                       required
+                      pattern="[\+]?[0-9\s\-]+"
+                      title="Please enter a valid phone number"
                       className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
                       value={formData.phone}
                       onChange={(e) =>
@@ -661,12 +716,13 @@ export default function Onboarding() {
                           phone: e.target.value,
                         }))
                       }
+                      placeholder="+234 XXX XXX XXXX"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Position
+                      Position *
                     </label>
                     <input
                       type="text"
@@ -684,25 +740,37 @@ export default function Onboarding() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Grade Level
+                      Grade Level *
                     </label>
-                    <input
-                      type="text"
-                      required
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                      value={formData.gradeLevel}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          gradeLevel: e.target.value,
-                        }))
-                      }
-                    />
+                    <div className="relative">
+                      <select
+                        required
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                        value={formData.gradeLevel}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            gradeLevel: e.target.value,
+                          }))
+                        }
+                      >
+                        <option value="">
+                          {isLoadingGrades
+                            ? "Loading grades..."
+                            : "Select Grade Level"}
+                        </option>
+                        {salaryGrades.map((grade) => (
+                          <option key={grade._id} value={grade.level}>
+                            {grade.level} - {grade.description}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Work Location
+                      Work Location *
                     </label>
                     <input
                       type="text"
@@ -712,15 +780,16 @@ export default function Onboarding() {
                       onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
-                          workLocation: e.target.value,
+                          workLocation: e.target.value.toUpperCase(),
                         }))
                       }
+                      placeholder="HQ-3F-IT"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Date Joined
+                      Date Joined *
                     </label>
                     <input
                       type="date"
@@ -733,31 +802,35 @@ export default function Onboarding() {
                           dateJoined: e.target.value,
                         }))
                       }
+                      max={new Date().toISOString().split("T")[0]}
                     />
                   </div>
 
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700">
-                      Department
+                      Department *
                     </label>
-                    <select
-                      required
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                      value={formData.department}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          department: e.target.value,
-                        }))
-                      }
-                    >
-                      <option value="">Select Department</option>
-                      {departments.map((dept) => (
-                        <option key={dept._id} value={dept._id}>
-                          {dept.name}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <select
+                        required
+                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                        value={formData.department}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
+                          setFormData((prev) => ({
+                            ...prev,
+                            department: selectedId,
+                          }));
+                        }}
+                      >
+                        <option value="">Select Department</option>
+                        {departments?.map((dept) => (
+                          <option key={dept._id} value={dept._id}>
+                            {dept.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
 
@@ -789,14 +862,6 @@ export default function Onboarding() {
             </Dialog.Panel>
           </div>
         </Dialog>
-      )}
-
-      {showAdminModal && (
-        <CreateAdminModal
-          isOpen={showAdminModal}
-          onClose={() => setShowAdminModal(false)}
-          departments={departments.map((dept) => dept.name)}
-        />
       )}
 
       <DepartmentModal

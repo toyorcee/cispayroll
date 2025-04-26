@@ -164,13 +164,6 @@ type FormData = {
   };
 };
 
-const renderDepartmentName = (department: any) => {
-  if (typeof department === "object" && department !== null) {
-    return department.name || "No Department";
-  }
-  return "No Department";
-};
-
 const CompleteRegistration = () => {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
@@ -201,32 +194,19 @@ const CompleteRegistration = () => {
         if (response.data.success) {
           setUserData(response.data.user);
           setIsTokenValid(true);
-          toast.success(
-            "Invitation verified successfully. Please complete your registration."
-          );
-        } else {
-          setIsTokenValid(false);
-          toast.error(
-            response.data.message || "Invalid or expired invitation link"
-          );
+          toast.success("Invitation verified successfully. Please complete your registration.");
         }
-      } catch (error: any) {
-        console.error("Error verifying token:", error);
+      } catch (error) {
         setIsTokenValid(false);
-        toast.error("Invalid or expired invitation link");
+        toast.error("Invalid or expired invitation link.");
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (token) {
-      verifyToken();
-    } else {
-      setIsTokenValid(false);
-      setIsLoading(false);
-      toast.error("No invitation token provided");
-    }
-  }, [token]);
+    verifyToken();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   if (isLoading) {
     return <LoadingSpinner />;

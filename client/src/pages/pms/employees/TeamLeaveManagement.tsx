@@ -42,7 +42,7 @@ type SortOrder = "asc" | "desc";
 
 const TeamLeaveManagement: React.FC = () => {
   const { hasPermission, user } = useAuth();
-  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [_rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState<LeaveRequest | null>(null);
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
   const [isRejectionModalOpen, setIsRejectionModalOpen] = useState(false);

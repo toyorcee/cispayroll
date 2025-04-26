@@ -10,7 +10,6 @@ import { User, UserRole, Permission } from "../types/auth";
 import { toast } from "react-toastify";
 import { useQueryClient, QueryClient } from "@tanstack/react-query";
 import {
-  prefetchDepartments,
   departmentService,
   DEPARTMENTS_QUERY_KEY,
 } from "../services/departmentService";
@@ -47,6 +46,12 @@ axios.interceptors.response.use(
     return response;
   },
   (error) => {
+    console.log("🔍 [AuthContext] Interceptor caught error:", {
+      status: error.response?.status,
+      url: error.config?.url,
+      method: error.config?.method,
+      headers: error.config?.headers,
+    });
     return Promise.reject(error);
   }
 );
@@ -123,8 +128,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUserData = async () => {
     try {
       console.log("🔄 [AuthContext] Starting fetchUserData");
+      console.log("📝 [AuthContext] Current user state:", user);
       setLoading(true);
-      // Add timestamp to prevent caching
+
       const timestamp = new Date().getTime();
       console.log(
         "🔍 [AuthContext] Making request to /api/auth/me with timestamp:",
@@ -146,25 +152,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (response.data.success) {
         const userData = parseUserData(response.data.user);
-        console.log("👤 [AuthContext] Parsed user data:", {
-          id: userData._id,
-          email: userData.email,
-          role: userData.role,
-          permissions: userData.permissions?.length,
-        });
+        console.log("👤 [AuthContext] Parsed user data:", userData);
         setUser(userData);
-        setLoading(false);
       } else {
         console.error(
           "❌ [AuthContext] Failed to fetch user data:",
           response.data.message
         );
-        setLoading(false);
+        setUser(null);
       }
-    } catch (error) {
-      console.error("❌ [AuthContext] Error fetching user data:", error);
+    } catch (err: unknown) {
+      const error = err as any; // 👈 handle 'unknown' type
+      console.error("❌ [AuthContext] Error fetching user data:", {
+        status: error?.response?.status,
+        message: error?.message,
+        url: error?.config?.url,
+        headers: error?.config?.headers,
+      });
+
       if (axios.isAxiosError(error) && error.response?.status === 401) {
         console.log("🔑 [AuthContext] Received 401, attempting token refresh");
+        console.log("📝 [AuthContext] Current cookies:", document.cookie);
+
         if (!error.config?.headers?.["x-refresh-attempt"]) {
           try {
             console.log("🔄 [AuthContext] Starting token refresh process");
@@ -191,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               console.log(
                 "🔄 [AuthContext] Token refresh successful, retrying user data fetch"
               );
-              // Retry the original request with new token
+
               const retryResponse = await axios.get(
                 `/api/auth/me?_t=${new Date().getTime()}`,
                 {
@@ -220,24 +229,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   }
                 );
                 setUser(userData);
-                setLoading(false);
                 return;
               }
             }
-          } catch (refreshError) {
+          } catch (refreshError: unknown) {
             console.error(
               "❌ [AuthContext] Token refresh failed:",
               refreshError
             );
-            // Clear auth state on refresh failure
+            // Clear auth state and token on refresh failure
             setUser(null);
-            localStorage.removeItem("token");
+            document.cookie =
+              "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
           }
         }
-        // If we get here, either refresh failed or wasn't attempted
         console.log("❌ [AuthContext] Clearing user state due to auth failure");
         setUser(null);
+        document.cookie =
+          "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       }
+    } finally {
       setLoading(false);
     }
   };
