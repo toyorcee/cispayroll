@@ -20,8 +20,7 @@ import { salaryStructureService } from "./salaryStructureService";
 import { mapEmployeeToDetails } from "../utils/mappers";
 import { useAuth } from "../context/AuthContext";
 
-// Moved BASE_URL declaration to the top
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
 
 // Set default axios config to always include credentials
 axios.defaults.withCredentials = true;

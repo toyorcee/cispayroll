@@ -12,7 +12,7 @@ import type {
 } from "../types/payroll";
 import { salaryStructureService } from "./salaryStructureService";
 
-const BASE_URL = "http://localhost:5000/api/super-admin";
+const BASE_URL = `${import.meta.env.VITE_API_URL}/api/super-admin`;
 
 interface PayrollFilters {
   dateRange?: string;
@@ -134,7 +134,7 @@ export const payrollService = {
     remarks?: string
   ): Promise<ApprovalResponse> => {
     const response = await axios.patch(
-      `http://localhost:5000/api/approvals/super-admin/${payrollId}/approve`,
+      `https://payrollapi.digitalentshub.net/api/approvals/super-admin/${payrollId}/approve`,
       { remarks },
       { headers: { "Content-Type": "application/json" } }
     );

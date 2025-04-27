@@ -124,7 +124,7 @@ const SingleEmployeeProcessModal = ({
             }
 
             const employeesResponse = await fetch(
-              `http://localhost:5000/api/admin/departments/${departmentId}/employees`,
+              `https://payrollapi.digitalentshub.net/admin/departments/${departmentId}/employees`,
               {
                 credentials: "include",
               }

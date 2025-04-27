@@ -2,7 +2,7 @@ import axios from "axios";
 
 // Base URL for notifications API
 const BASE_URL = `${
-  import.meta.env.VITE_API_URL || "http://localhost:5000"
+  import.meta.env.VITE_API_URL 
 }/api/notifications`;
 
 // Fetch unread notification count

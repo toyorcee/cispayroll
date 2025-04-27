@@ -460,16 +460,19 @@ export default function UserProfile() {
                     >
                       Personal Information
                     </Typography>
-                    <Typography
-                      variant="body2"
-                      className="text-gray-700 text-sm sm:text-base"
-                    >
+                    <div>
                       {user?.personalDetails?.middleName && (
-                        <div>
+                        <Typography
+                          variant="body2"
+                          className="text-gray-700 text-sm sm:text-base"
+                        >
                           Middle Name: {user.personalDetails.middleName}
-                        </div>
+                        </Typography>
                       )}
-                      <div>
+                      <Typography
+                        variant="body2"
+                        className="text-gray-700 text-sm sm:text-base"
+                      >
                         Date of Birth:{" "}
                         {user?.personalDetails?.dateOfBirth
                           ? new Date(
@@ -480,8 +483,11 @@ export default function UserProfile() {
                               year: "numeric",
                             })
                           : "Not set"}
-                      </div>
-                      <div>
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        className="text-gray-700 text-sm sm:text-base"
+                      >
                         Marital Status:{" "}
                         {user?.personalDetails?.maritalStatus
                           ? user.personalDetails.maritalStatus
@@ -489,12 +495,15 @@ export default function UserProfile() {
                               .toUpperCase() +
                             user.personalDetails.maritalStatus.slice(1)
                           : "Not set"}
-                      </div>
-                      <div>
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        className="text-gray-700 text-sm sm:text-base"
+                      >
                         Nationality:{" "}
                         {user?.personalDetails?.nationality || "Not set"}
-                      </div>
-                    </Typography>
+                      </Typography>
+                    </div>
                   </div>
                 </div>
 

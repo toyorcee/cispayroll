@@ -21,7 +21,7 @@ import { useForm } from "react-hook-form";
 import { useFieldArray } from "react-hook-form";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000",
+  baseURL: import.meta.env.VITE_API_URL,
   withCredentials: true,
 });
 
@@ -259,17 +259,6 @@ const CompleteRegistration = () => {
       if (profileImage) {
         formDataToSend.append("profileImage", profileImage);
       }
-
-      // Log the form data being sent
-      console.log("Form data being sent:", {
-        token,
-        password: "********", // Masked for security
-        confirmPassword: "********", // Masked for security
-        emergencyContact: data.emergencyContact,
-        bankDetails: data.bankDetails,
-        personalDetails: data.personalDetails,
-        hasProfileImage: !!profileImage,
-      });
 
       const response = await api.post(
         "/api/invitation/complete-registration",

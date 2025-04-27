@@ -63,7 +63,7 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
 
     const markAsRead = async (notificationId: string) => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+        const apiUrl = import.meta.env.VITE_API_URL;
         await fetch(`${apiUrl}/api/notifications/${notificationId}/read`, {
           method: "PATCH",
           credentials: "include",
@@ -84,7 +84,7 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
 
     const markAllAsRead = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+        const apiUrl = import.meta.env.VITE_API_URL;
         await fetch(`${apiUrl}/api/notifications/read-all`, {
           method: "PATCH",
           credentials: "include",

@@ -1,4 +1,3 @@
-// server.ts
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -12,13 +11,11 @@ import { traceError, ApiError } from "./utils/errorHandler.js";
 import multer from "multer";
 import fs from "fs";
 
-// Create uploads directory if it doesn't exist
 const uploadsDir = path.join(process.cwd(), "uploads", "profiles");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Route Imports
 import authRoutes from "./routes/authRoutes.js";
 import superAdminRoutes from "./routes/superAdminRoutes.js";
 import leaveRoutes from "./routes/leaveRoutes.js";
@@ -38,10 +35,8 @@ import approvalRoutes from "./routes/approvalRoutes.js";
 import auditRoutes from "./routes/auditRoutes.js";
 import bonusRoutes from "./routes/BonusRoutes.js";
 
-// Load environment variables
 dotenv.config();
 
-// Enhanced error tracking
 const logServerError = (error, context) => {
   console.error(`🔴 ${context}:`, {
     message: error.message,
@@ -50,13 +45,11 @@ const logServerError = (error, context) => {
   });
 };
 
-// Request logger middleware
 const requestLogger = (req, _res, next) => {
   console.log(`📥 ${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 };
 
-// Response logger middleware
 const responseLogger = (req, res, next) => {
   const oldJson = res.json;
   res.json = function (data) {
@@ -70,13 +63,11 @@ const responseLogger = (req, res, next) => {
   next();
 };
 
-// Database connection with enhanced logging
 const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGO_URI);
     console.log(`🟢 MongoDB Connected: ${conn.connection.host}`);
 
-    // Monitor database events
     mongoose.connection.on("error", (error) => {
       logServerError(error, "MongoDB Error");
     });
@@ -98,7 +89,6 @@ const PORT = process.env.PORT || 5000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Global error handlers with more detail
 process.on("unhandledRejection", (reason, promise) => {
   logServerError({ reason, promise }, "Unhandled Promise Rejection");
   console.error("🔴 Promise details:", promise);
@@ -109,21 +99,30 @@ process.on("uncaughtException", (error) => {
   console.error("🔴 Error details:", error);
 });
 
-// Middleware with logging
 app.use(requestLogger);
 app.use(responseLogger);
+const allowedOrigins = [
+  "http://localhost:5173",
+];
+
 app.use(
   cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
 app.use(cookieParser());
 app.use(express.json());
 
-// Add session middleware
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "your-secret-key",
@@ -131,27 +130,23 @@ app.use(
     saveUninitialized: true,
     cookie: {
       secure: process.env.NODE_ENV === "production",
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 24 * 60 * 60 * 1000, 
     },
   })
 );
 
-// Add this after other middleware declarations (after app.use(express.json()))
 app.use((req, res, next) => {
-  // Set security headers
   res.setHeader("X-Content-Type-Options", "nosniff");
 
-  // Set correct MIME types for TypeScript files
   if (req.url.endsWith(".ts")) {
     res.setHeader("Content-Type", "application/typescript");
   }
   next();
 });
 
-// Multer configuration for profile images
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, "uploads", "profiles")); // Use absolute path
+    cb(null, path.join(__dirname, "uploads", "profiles")); 
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -162,7 +157,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 5 * 1024 * 1024, 
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
@@ -259,10 +254,8 @@ app.use((err, req, res, next) => {
     headers: req.headers,
   });
 
-  // Determine status code
   const statusCode = error.statusCode || 500;
 
-  // Determine error message
   let errorMessage = "Internal server error";
 
   if (error instanceof ApiError) {
@@ -284,19 +277,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler should be last
 app.use((_req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// Your test route for development
 if (process.env.NODE_ENV === "development") {
   import("./routes/testRoutes.js").then((testRoutes) => {
     app.use("/api/test", testRoutes.default);
   });
 }
 
-// Start server with enhanced logging
 const startServer = async () => {
   try {
     await connectDB();
@@ -305,7 +295,7 @@ const startServer = async () => {
 🚀 Server is running!
 📡 Port: ${PORT}
 🌍 Environment: ${process.env.NODE_ENV}
-🔗 Client URL: ${process.env.CLIENT_URL || "http://localhost:5173"}
+🔗 Client URL: ${process.env.CLIENT_URL}
       `);
     });
   } catch (error) {

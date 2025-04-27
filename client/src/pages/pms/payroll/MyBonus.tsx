@@ -283,7 +283,7 @@ const MyBonus: React.FC = () => {
           bonuses.map((bonus: Bonus) => (
             <Card
               key={bonus._id}
-              className="mb-4 hover:shadow-lg transition-shadow duration-200 border border-green-600 bg-green-600"
+              className="mb-4 hover:shadow-lg transition-shadow duration-200 border border-green-600 bg-white"
             >
               <CardContent>
                 <Box className="flex justify-between items-start mb-4">

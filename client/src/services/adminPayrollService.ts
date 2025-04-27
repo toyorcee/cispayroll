@@ -83,9 +83,9 @@ export interface AdminPayrollResponse {
 }
 
 // Base URL for admin API
-const BASE_URL = "http://localhost:5000/api/admin";
-const SUPER_ADMIN_BASE_URL = "http://localhost:5000/api/super-admin";
-const APPROVAL_BASE_URL = "http://localhost:5000/api/approvals";
+const BASE_URL = `${import.meta.env.VITE_API_URL}/api/admin`;
+const SUPER_ADMIN_BASE_URL = `${import.meta.env.VITE_API_URL}/api/super-admin`;
+const APPROVAL_BASE_URL = `${import.meta.env.VITE_API_URL}/api/approvals`;
 
 // Helper function to determine if user is Super Admin
 const isSuperAdmin = (userRole?: string): boolean => {
@@ -111,13 +111,11 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll`
         : `${BASE_URL}/payroll`;
 
-      console.log("Making request to:", endpoint); // Debug log
       const response = await axios.get(endpoint, {
         params,
-        withCredentials: true, // Important! This ensures cookies are sent
+        withCredentials: true,
       });
 
-      console.log("Response:", response.data); // Debug log
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to fetch payrolls");
@@ -138,7 +136,6 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/stats`
         : `${BASE_URL}/payroll/stats`;
 
-      console.log("Making request to:", endpoint); // Debug log
       const response = await axios.get(endpoint, { withCredentials: true });
 
       if (!response.data.success) {
@@ -167,7 +164,6 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/periods`
         : `${BASE_URL}/payroll/periods`;
 
-      console.log("Making request to:", endpoint);
       const response = await axios.get(endpoint, { withCredentials: true });
 
       if (!response.data.success) {
@@ -212,7 +208,6 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/${payrollId}/submit`
         : `${BASE_URL}/payroll/${payrollId}/submit`;
 
-      console.log("Making request to:", endpoint); // Debug log
       const response = await axios.patch(
         endpoint,
         { remarks },
@@ -243,7 +238,6 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/${payrollId}/approve`
         : `${BASE_URL}/payroll/${payrollId}/approve`;
 
-      console.log("Making request to:", endpoint); // Debug log
       const response = await axios.post(
         endpoint,
         {},
@@ -279,7 +273,6 @@ export const adminPayrollService = {
         ? `${APPROVAL_BASE_URL}/super-admin/${payrollId}/reject`
         : `${BASE_URL}/payroll/${payrollId}/reject`;
 
-      console.log("Making request to:", endpoint); // Debug log
       const response = await axios.patch(
         endpoint,
         { reason },
@@ -312,16 +305,10 @@ export const adminPayrollService = {
         ? `${BASE_URL}/payroll/${payrollId}/resubmit`
         : `${BASE_URL}/payroll/${payrollId}/resubmit`;
 
-      console.log("🔄 Resubmitting payroll:", {
-        payrollId,
-        salaryGrade: payroll.salaryGrade,
-      });
-
       const res = await axios.post(endpoint, {
         salaryGrade: payroll.salaryGrade,
       });
 
-      console.log("✅ Resubmission request completed");
       return res.data;
     } catch (error) {
       console.error("❌ Error in resubmitPayroll:", error);
@@ -340,7 +327,6 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/${payrollId}/process-payment`
         : `${BASE_URL}/payroll/${payrollId}/process-payment`;
 
-      console.log("Making request to:", endpoint); // Debug log
       const response = await axios.patch(
         endpoint,
         {},
@@ -371,7 +357,6 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/employee/${employeeId}/history`
         : `${BASE_URL}/payroll/employee/${employeeId}/history`;
 
-      console.log("Making request to:", endpoint); // Debug log
       const response = await axios.get(endpoint, { withCredentials: true });
 
       if (!response.data.success) {
@@ -458,7 +443,6 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/process-department`
         : `${BASE_URL}/payroll/process-department`;
 
-      console.log("Making request to:", endpoint); // Debug log
       const response = await axios.post(endpoint, data, {
         withCredentials: true,
       });
@@ -489,7 +473,6 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/submit-bulk`
         : `${BASE_URL}/payroll/submit-bulk`;
 
-      console.log("Making request to:", endpoint);
       const response = await axios.post(endpoint, data, {
         withCredentials: true,
       });
@@ -524,7 +507,6 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/submit-department`
         : `${BASE_URL}/payroll/submit-department`;
 
-      console.log("Making request to:", endpoint); // Debug log
       const response = await axios.post(endpoint, data, {
         withCredentials: true,
       });
@@ -563,7 +545,6 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/approve-department`
         : `${BASE_URL}/payroll/approve-department`;
 
-      console.log("Making request to:", endpoint); // Debug log
       const response = await axios.post(endpoint, data, {
         withCredentials: true,
       });
@@ -597,7 +578,6 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/reject-department`
         : `${BASE_URL}/payroll/reject-department`;
 
-      console.log("Making request to:", endpoint); // Debug log
       const response = await axios.post(endpoint, data, {
         withCredentials: true,
       });
@@ -629,7 +609,6 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/process-multiple-employees`
         : `${BASE_URL}/payroll/process-multiple`;
 
-      console.log("Making request to:", endpoint); // Debug log
       const response = await axios.post(endpoint, data, {
         withCredentials: true,
       });
@@ -660,7 +639,6 @@ export const adminPayrollService = {
 
       const endpoint = `${SUPER_ADMIN_BASE_URL}/payroll/process-all-employees`;
 
-      console.log("Making request to:", endpoint); 
       const response = await axios.post(endpoint, data, {
         withCredentials: true,
       });
@@ -686,7 +664,6 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/${payrollId}/process`
         : `${BASE_URL}/payroll/${payrollId}/process`;
 
-      console.log("Making request to:", endpoint); 
       const response = await axios.post(
         endpoint,
         {},
@@ -719,12 +696,7 @@ export const adminPayrollService = {
       // Add timestamp to prevent caching
       const url = timestamp ? `${endpoint}?t=${timestamp}` : endpoint;
 
-      console.log("Making request to:", url);
-      console.log("User role:", userRole);
-      console.log("Is super admin:", isSuperAdmin(userRole));
-
       const response = await axios.get(url, { withCredentials: true });
-      console.log("API response:", response.data);
 
       if (!response.data.success) {
         throw new Error(

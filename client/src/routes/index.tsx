@@ -11,8 +11,6 @@ import ProcessPayment from "../pages/pms/payroll/ProcessPayment";
 import ProcessDepartmentPayroll from "../pages/pms/payroll/ProcessDepartmentPayroll";
 import SalaryStructure from "../pages/pms/payroll/SalaryStructure";
 import Deductions from "../pages/pms/payroll/Deductions";
-import PayrollReports from "../pages/pms/reports/PayrollReports";
-import AuditLogs from "../pages/pms/reports/AuditLogs";
 import GeneralSettings from "../pages/pms/settings/General";
 import CompanyProfile from "../pages/pms/settings/CompanyProfile";
 import Integrations from "../pages/pms/settings/Integrations";
@@ -299,32 +297,32 @@ export const routes: RouteConfig[] = [
       },
     ],
   },
-  {
-    path: "reports",
-    label: "Reports",
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    permissions: [Permission.VIEW_REPORTS, Permission.VIEW_PAYROLL_REPORTS],
-    requireAllPermissions: false,
-    element: <Outlet />,
-    children: [
-      {
-        path: "payroll",
-        label: "Payroll Reports",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.VIEW_PAYROLL_REPORTS],
-        requireAllPermissions: true,
-        element: <PayrollReports />,
-      },
-      {
-        path: "audit",
-        label: "Audit Logs",
-        roles: [UserRole.SUPER_ADMIN],
-        permissions: [Permission.VIEW_AUDIT_LOGS],
-        requireAllPermissions: true,
-        element: <AuditLogs />,
-      },
-    ],
-  },
+  // {
+  //   path: "reports",
+  //   label: "Reports",
+  //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+  //   permissions: [Permission.VIEW_REPORTS, Permission.VIEW_PAYROLL_REPORTS],
+  //   requireAllPermissions: false,
+  //   element: <Outlet />,
+  //   children: [
+  //     {
+  //       path: "payroll",
+  //       label: "Payroll Reports",
+  //       roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+  //       permissions: [Permission.VIEW_PAYROLL_REPORTS],
+  //       requireAllPermissions: true,
+  //       element: <PayrollReports />,
+  //     },
+  //     {
+  //       path: "audit",
+  //       label: "Audit Logs",
+  //       roles: [UserRole.SUPER_ADMIN],
+  //       permissions: [Permission.VIEW_AUDIT_LOGS],
+  //       requireAllPermissions: true,
+  //       element: <AuditLogs />,
+  //     },
+  //   ],
+  // },
   {
     path: "settings",
     label: "Settings",

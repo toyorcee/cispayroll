@@ -101,7 +101,7 @@ export interface ProcessingStats {
   recentActivityCount?: number;
 }
 
-const BASE_URL = "http://localhost:5000/api/regular-user";
+const BASE_URL = `${import.meta.env.VITE_API_URL}/api/regular-user`;
 
 const userService = {
   /**

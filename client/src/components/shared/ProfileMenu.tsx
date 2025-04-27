@@ -120,17 +120,9 @@ export function ProfileMenu({
                    }`}
       >
         <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center overflow-hidden">
-          {user?.profileImageUrl || user?.profileImage ? (
+          {user?.profileImageUrl ? (
             <img
-              src={
-                user?.profileImageUrl
-                  ? user.profileImageUrl.replace(/\\/g, "/")
-                  : user?.profileImage
-                  ? `${
-                      import.meta.env.VITE_API_URL
-                    }/${user.profileImage.replace(/\\/g, "/")}`
-                  : undefined
-              }
+              src={user.profileImageUrl.replace(/\\/g, "/")}
               alt={getFullName()}
               className="w-full h-full object-cover"
               onError={(e) => {

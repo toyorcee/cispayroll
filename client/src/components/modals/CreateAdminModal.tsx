@@ -52,7 +52,7 @@ const CreateAdminModal = ({
       setIsLoading(true);
 
       await axios.post(
-        "http://localhost:5000/api/employees/create",
+        "https://payrollapi.digitalentshub.net/api/employees/create",
         {
           ...data,
           role: UserRole.ADMIN,

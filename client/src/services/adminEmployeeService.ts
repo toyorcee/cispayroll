@@ -3,8 +3,8 @@ import { Employee } from "../types/employee";
 import { UserRole } from "../types/auth";
 
 // Use the same BASE_URL pattern as adminPayrollService
-const BASE_URL = "http://localhost:5000/api/admin";
-const SUPER_ADMIN_BASE_URL = "http://localhost:5000/api/super-admin";
+const BASE_URL = `${import.meta.env.VITE_API_URL}/api/admin`;
+const SUPER_ADMIN_BASE_URL = `${import.meta.env.VITE_API_URL}/api/super-admin`;
 
 // Helper function to determine if user is Super Admin
 const isSuperAdmin = (userRole?: string): boolean => {
@@ -28,7 +28,6 @@ export const adminEmployeeService = {
     userRole?: string;
   }): Promise<DepartmentEmployeeResponse> => {
     try {
-      // Validate departmentId
       if (!data.departmentId) {
         throw new Error("Department ID is required");
       }

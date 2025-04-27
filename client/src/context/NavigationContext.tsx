@@ -7,7 +7,6 @@ import {
   ChartBarIcon,
   UsersIcon,
   CurrencyDollarIcon,
-  DocumentTextIcon,
   CogIcon,
   UserIcon,
 } from "@heroicons/react/24/outline";
@@ -389,27 +388,27 @@ export const menuItems: NavigationItem[] = [
       },
     ],
   },
-  {
-    name: "Reports",
-    href: "/pms/reports",
-    icon: DocumentTextIcon,
-    roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-    permissions: [Permission.VIEW_REPORTS, Permission.VIEW_PAYROLL_REPORTS],
-    requireAllPermissions: false,
-    subItems: [
-      {
-        name: "Payroll Reports",
-        href: "/pms/reports/payroll",
-        permissions: [Permission.VIEW_PAYROLL_REPORTS],
-      },
-      {
-        name: "Audit Logs",
-        href: "/pms/reports/audit",
-        roles: [UserRole.SUPER_ADMIN],
-        permissions: [Permission.VIEW_AUDIT_LOGS],
-      },
-    ],
-  },
+  // {
+  //   name: "Reports",
+  //   href: "/pms/reports",
+  //   icon: DocumentTextIcon,
+  //   roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+  //   permissions: [Permission.VIEW_REPORTS, Permission.VIEW_PAYROLL_REPORTS],
+  //   requireAllPermissions: false,
+  //   subItems: [
+  //     {
+  //       name: "Payroll Reports",
+  //       href: "/pms/reports/payroll",
+  //       permissions: [Permission.VIEW_PAYROLL_REPORTS],
+  //     },
+  //     {
+  //       name: "Audit Logs",
+  //       href: "/pms/reports/audit",
+  //       roles: [UserRole.SUPER_ADMIN],
+  //       permissions: [Permission.VIEW_AUDIT_LOGS],
+  //     },
+  //   ],
+  // },
   {
     name: "Settings",
     href: "/pms/settings",

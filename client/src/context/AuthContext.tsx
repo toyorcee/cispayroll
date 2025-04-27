@@ -14,8 +14,7 @@ import {
   DEPARTMENTS_QUERY_KEY,
 } from "../services/departmentService";
 
-axios.defaults.baseURL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
+axios.defaults.baseURL = import.meta.env.VITE_API_URL;
 axios.defaults.withCredentials = true;
 
 axios.interceptors.response.use(
@@ -128,129 +127,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUserData = async () => {
     try {
       console.log("🔄 [AuthContext] Starting fetchUserData");
-      console.log("📝 [AuthContext] Current user state:", user);
       setLoading(true);
 
-      const timestamp = new Date().getTime();
-      console.log(
-        "🔍 [AuthContext] Making request to /api/auth/me with timestamp:",
-        timestamp
-      );
-
-      const response = await axios.get(`/api/auth/me?_t=${timestamp}`, {
-        headers: {
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          Pragma: "no-cache",
-          Expires: "0",
-        },
-      });
-
-      console.log("✅ [AuthContext] Received response from /api/auth/me:", {
-        success: response.data.success,
-        hasUser: !!response.data.user,
+      const response = await axios.get(`/api/auth/me`, {
+        withCredentials: true, 
       });
 
       if (response.data.success) {
         const userData = parseUserData(response.data.user);
-        console.log("👤 [AuthContext] Parsed user data:", userData);
         setUser(userData);
       } else {
         console.error(
           "❌ [AuthContext] Failed to fetch user data:",
           response.data.message
         );
-        setUser(null);
+        setUser(null); 
       }
-    } catch (err: unknown) {
-      const error = err as any; // 👈 handle 'unknown' type
-      console.error("❌ [AuthContext] Error fetching user data:", {
-        status: error?.response?.status,
-        message: error?.message,
-        url: error?.config?.url,
-        headers: error?.config?.headers,
-      });
+    } catch (error) {
+      console.error("❌ [AuthContext] Error fetching user data:", error);
 
       if (axios.isAxiosError(error) && error.response?.status === 401) {
-        console.log("🔑 [AuthContext] Received 401, attempting token refresh");
-        console.log("📝 [AuthContext] Current cookies:", document.cookie);
+        console.log("🔑 [AuthContext] 401, attempting token refresh");
 
-        if (!error.config?.headers?.["x-refresh-attempt"]) {
-          try {
-            console.log("🔄 [AuthContext] Starting token refresh process");
-            const refreshResponse = await axios.post(
-              "/api/auth/refresh",
-              {},
-              {
-                headers: {
-                  "x-refresh-attempt": "true",
-                  "Cache-Control": "no-cache, no-store, must-revalidate",
-                  Pragma: "no-cache",
-                  Expires: "0",
-                },
-              }
+        try {
+          const refreshResponse = await axios.post(
+            "/api/auth/refresh",
+            {},
+            {
+              withCredentials: true, 
+            }
+          );
+
+          if (refreshResponse.data.success) {
+            console.log(
+              "✅ [AuthContext] Token refresh successful, retrying user data fetch"
             );
 
-            console.log("✅ [AuthContext] Token refresh response:", {
-              success: refreshResponse.data.success,
-              hasAccessToken: !!refreshResponse.data.accessToken,
-              hasUser: !!refreshResponse.data.user,
+            const retryResponse = await axios.get(`/api/auth/me`, {
+              withCredentials: true, 
             });
 
-            if (refreshResponse.data.success) {
-              console.log(
-                "🔄 [AuthContext] Token refresh successful, retrying user data fetch"
-              );
-
-              const retryResponse = await axios.get(
-                `/api/auth/me?_t=${new Date().getTime()}`,
-                {
-                  headers: {
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
-                    Pragma: "no-cache",
-                    Expires: "0",
-                  },
-                }
-              );
-
-              console.log("✅ [AuthContext] Retry response:", {
-                success: retryResponse.data.success,
-                hasUser: !!retryResponse.data.user,
-              });
-
-              if (retryResponse.data.success) {
-                const userData = parseUserData(retryResponse.data.user);
-                console.log(
-                  "👤 [AuthContext] Parsed user data after refresh:",
-                  {
-                    id: userData._id,
-                    email: userData.email,
-                    role: userData.role,
-                    permissions: userData.permissions?.length,
-                  }
-                );
-                setUser(userData);
-                return;
-              }
+            if (retryResponse.data.success) {
+              const userData = parseUserData(retryResponse.data.user);
+              setUser(userData);
+              return;
             }
-          } catch (refreshError: unknown) {
-            console.error(
-              "❌ [AuthContext] Token refresh failed:",
-              refreshError
-            );
-            // Clear auth state and token on refresh failure
-            setUser(null);
-            document.cookie =
-              "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
           }
+        } catch (refreshError) {
+          console.error("❌ [AuthContext] Token refresh failed:", refreshError);
+          setUser(null); // Clear auth state if token refresh fails
+          // No need to clear anything manually from localStorage, since you're relying on cookies.
         }
-        console.log("❌ [AuthContext] Clearing user state due to auth failure");
-        setUser(null);
-        document.cookie =
-          "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       }
-    } finally {
-      setLoading(false);
     }
+
+    setLoading(false);
   };
 
   const signIn = async (email: string, password: string) => {
@@ -480,59 +411,77 @@ export function useAuth() {
 }
 
 // Helper function to map API response to User type
-const parseUserData = (data: Partial<User>): User => ({
-  _id: data._id || "",
-  employeeId: data.employeeId || "",
-  firstName: data.firstName || "",
-  lastName: data.lastName || "",
-  email: data.email || "",
-  phone: data.phone || "",
-  role: data.role || UserRole.USER,
-  permissions: Array.isArray(data.permissions) ? data.permissions : [],
-  department: data.department || {
-    _id: "",
-    name: "",
-    code: "",
-  },
-  position: data.position || "",
-  status: data.status || "active",
-  gradeLevel: data.gradeLevel || "",
-  workLocation: data.workLocation || "",
-  dateJoined: data.dateJoined ? new Date(data.dateJoined) : new Date(),
-  emergencyContact: {
-    name: data.emergencyContact?.name || "",
-    relationship: data.emergencyContact?.relationship || "",
-    phone: data.emergencyContact?.phone || "",
-  },
-  bankDetails: {
-    bankName: data.bankDetails?.bankName || "",
-    accountNumber: data.bankDetails?.accountNumber || "",
-    accountName: data.bankDetails?.accountName || "",
-  },
-  profileImage: data.profileImage || "",
-  profileImageUrl: data.profileImageUrl || "",
-  reportingTo: data.reportingTo || undefined,
-  isEmailVerified: Boolean(data.isEmailVerified),
-  lastLogin: data.lastLogin ? new Date(data.lastLogin) : undefined,
-  createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
-  updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
-  personalDetails: data.personalDetails
-    ? {
-        address: {
-          street: data.personalDetails.address?.street || "",
-          city: data.personalDetails.address?.city || "",
-          state: data.personalDetails.address?.state || "",
-          country: data.personalDetails.address?.country || "",
-          zipCode: data.personalDetails.address?.zipCode || "",
-        },
-        middleName: data.personalDetails.middleName || "",
-        dateOfBirth: data.personalDetails.dateOfBirth || "",
-        maritalStatus: data.personalDetails.maritalStatus || "",
-        nationality: data.personalDetails.nationality || "",
-        qualifications: data.personalDetails.qualifications || [],
-      }
-    : undefined,
-});
+const parseUserData = (data: Partial<User>): User => {
+  console.log("parseUserData - Raw profile image data:", {
+    profileImage: data.profileImage,
+    profileImageUrl: data.profileImageUrl,
+    fullData: data,
+  });
+
+  // Construct profileImageUrl if not provided
+  const profileImageUrl =
+    data.profileImageUrl ||
+    (data.profileImage
+      ? `${import.meta.env.VITE_API_URL}/${data.profileImage.replace(
+          /\\/g,
+          "/"
+        )}`
+      : "");
+
+  return {
+    _id: data._id || "",
+    employeeId: data.employeeId || "",
+    firstName: data.firstName || "",
+    lastName: data.lastName || "",
+    email: data.email || "",
+    phone: data.phone || "",
+    role: data.role || UserRole.USER,
+    permissions: Array.isArray(data.permissions) ? data.permissions : [],
+    department: data.department || {
+      _id: "",
+      name: "",
+      code: "",
+    },
+    position: data.position || "",
+    status: data.status || "active",
+    gradeLevel: data.gradeLevel || "",
+    workLocation: data.workLocation || "",
+    dateJoined: data.dateJoined ? new Date(data.dateJoined) : new Date(),
+    emergencyContact: {
+      name: data.emergencyContact?.name || "",
+      relationship: data.emergencyContact?.relationship || "",
+      phone: data.emergencyContact?.phone || "",
+    },
+    bankDetails: {
+      bankName: data.bankDetails?.bankName || "",
+      accountNumber: data.bankDetails?.accountNumber || "",
+      accountName: data.bankDetails?.accountName || "",
+    },
+    profileImage: data.profileImage || "",
+    profileImageUrl: profileImageUrl,
+    reportingTo: data.reportingTo || undefined,
+    isEmailVerified: Boolean(data.isEmailVerified),
+    lastLogin: data.lastLogin ? new Date(data.lastLogin) : undefined,
+    createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+    updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
+    personalDetails: data.personalDetails
+      ? {
+          address: {
+            street: data.personalDetails.address?.street || "",
+            city: data.personalDetails.address?.city || "",
+            state: data.personalDetails.address?.state || "",
+            country: data.personalDetails.address?.country || "",
+            zipCode: data.personalDetails.address?.zipCode || "",
+          },
+          middleName: data.personalDetails.middleName || "",
+          dateOfBirth: data.personalDetails.dateOfBirth || "",
+          maritalStatus: data.personalDetails.maritalStatus || "",
+          nationality: data.personalDetails.nationality || "",
+          qualifications: data.personalDetails.qualifications || [],
+        }
+      : undefined,
+  };
+};
 
 // Handle authentication errors from API
 const handleAuthError = (error: unknown) => {

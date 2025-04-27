@@ -3,6 +3,7 @@ import { Dialog } from "@headlessui/react";
 import { EmployeeDetails, Department } from "../../types/employee";
 import { FaTimes, FaPhone, FaEnvelope } from "react-icons/fa";
 import { format } from "date-fns";
+import avatar from "../../assets/user-avatar.png";
 
 interface EmployeeDetailsModalProps {
   employee: EmployeeDetails | null;
@@ -66,9 +67,9 @@ export const EmployeeDetailsModal = ({
     );
   }
 
-  const DEFAULT_AVATAR = "/images/default-avatar.png";
+  const DEFAULT_AVATAR = avatar;
   const imageUrl = employee.profileImage
-    ? `http://localhost:5000/${employee.profileImage}`
+    ? `https://payrollapi.digitalentshub.net/${employee.profileImage}`
     : DEFAULT_AVATAR;
 
   const renderDepartmentName = (department: any) => {

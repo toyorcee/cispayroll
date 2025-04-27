@@ -15,7 +15,7 @@ import {
 } from "@mui/material";
 import { OffboardingType } from "../../types/offboarding";
 
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = "https://payrollapi.digitalentshub.net/api";
 
 export interface OnboardingFilters {
   page?: number;

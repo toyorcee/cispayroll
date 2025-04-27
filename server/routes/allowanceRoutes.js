@@ -14,17 +14,19 @@ router.post(
   requirePermission([Permission.REQUEST_ALLOWANCES]),
   RegularUserController.requestAllowance
 );
-router.get(
-  "/my-allowances",
-  requireAuth,
-  requirePermission([Permission.VIEW_OWN_ALLOWANCES]),
-  RegularUserController.getMyAllowances
-);
+
 router.get(
   "/my-allowances/:id",
   requireAuth,
   requirePermission([Permission.VIEW_OWN_ALLOWANCES]),
   RegularUserController.getAllowanceHistory
+);
+
+router.get(
+  "/my-allowances",
+  requireAuth,
+  requirePermission([Permission.VIEW_OWN_ALLOWANCES]),
+  RegularUserController.getMyAllowances
 );
 
 // Admin routes (for managing department allowances)

@@ -18,23 +18,21 @@ export class AuthController {
 
       const { user, token } = await AuthService.loginUser({ email, password });
 
-      // Debug log
       console.log("User data:", {
         id: user._id,
         email: user.email,
         department: user.department,
       });
 
-      // Set cookie options based on environment
       const cookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "lax" : "none",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 24 * 60 * 60 * 1000,
         path: "/",
         domain:
           process.env.NODE_ENV === "production"
-            ? ".digitalentshub.net"
+            ? "payroll.cistechlab.com"
             : undefined,
       };
 
@@ -74,7 +72,7 @@ export class AuthController {
         maxAge: 24 * 60 * 60 * 1000,
         domain:
           process.env.NODE_ENV === "production"
-            ? ".digitalentshub.net"
+            ? ".payroll.cistechlab.com"
             : undefined,
       });
 
@@ -127,7 +125,7 @@ export class AuthController {
         maxAge: 24 * 60 * 60 * 1000,
         domain:
           process.env.NODE_ENV === "production"
-            ? ".digitalentshub.net"
+            ? ".payroll.cistechlab.com"
             : undefined,
       });
 
@@ -146,8 +144,17 @@ export class AuthController {
     try {
       console.log(
         "🔍 [AuthController] Getting current user for ID:",
-        req.user._id
+        req.user?._id
       );
+
+      if (!req.user || !req.user._id) {
+        console.log("❌ [AuthController] No user ID found in request");
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized",
+        });
+      }
+
       const user = await User.findById(req.user._id)
         .select("-password")
         .populate("department", "name code")
@@ -155,7 +162,10 @@ export class AuthController {
 
       if (!user) {
         console.log("❌ [AuthController] User not found for ID:", req.user._id);
-        return res.status(404).json({ message: "User not found" });
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
       }
 
       console.log("✅ [AuthController] Current user found:", {
@@ -165,7 +175,7 @@ export class AuthController {
         department: user.department?.name,
       });
 
-      res.json({
+      res.status(200).json({
         success: true,
         user: {
           _id: user._id,
@@ -195,28 +205,15 @@ export class AuthController {
       });
     } catch (error) {
       console.error("❌ [AuthController] Error getting current user:", error);
-      res.status(500).json({ message: "Error getting current user" });
-    }
-  }
-
-  static async logout(req, res) {
-    try {
-      res.clearCookie("token");
-      res.status(200).json({
-        success: true,
-        message: "Logged out successfully",
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
       });
-    } catch (error) {
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
     }
   }
 
   static async refreshToken(req, res) {
     try {
-      console.log("🔄 [AuthController] Starting token refresh process");
-      console.log("📝 [AuthController] Request cookies:", req.cookies);
-      console.log("📝 [AuthController] Request headers:", req.headers);
       const { refreshToken } = req.body;
 
       if (!refreshToken) {
@@ -249,12 +246,12 @@ export class AuthController {
       const cookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "lax" : "none",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 24 * 60 * 60 * 1000,
         path: "/",
         domain:
           process.env.NODE_ENV === "production"
-            ? ".digitalentshub.net"
+            ? ".payroll.cistechlab.com"
             : undefined,
       };
       console.log(
@@ -302,6 +299,19 @@ export class AuthController {
         stack: error.stack,
       });
       res.status(401).json({ message: "Invalid refresh token" });
+    }
+  }
+
+  static async logout(req, res) {
+    try {
+      res.clearCookie("token");
+      res.status(200).json({
+        success: true,
+        message: "Logged out successfully",
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
     }
   }
 }
