@@ -2,6 +2,7 @@ import Bonus, { BonusType, ApprovalStatus } from "../models/Bonus.js";
 import User from "../models/User.js";
 import Department from "../models/Department.js";
 import { handleError, ApiError, asyncHandler } from "../utils/errorHandler.js";
+import mongoose from "mongoose";
 
 /**
  * Create a personal bonus request
@@ -48,7 +49,15 @@ const createPersonalBonus = asyncHandler(async (req, res) => {
  * Get all bonus requests with filtering options
  */
 const getBonusRequests = asyncHandler(async (req, res) => {
-  const { status, employeeId, departmentId, startDate, endDate } = req.query;
+  const {
+    status,
+    employeeId,
+    departmentId,
+    startDate,
+    endDate,
+    employee,
+    type,
+  } = req.query;
   const userId = req.user._id;
   const isAdmin = req.user.role === "SUPER_ADMIN" || req.user.role === "ADMIN";
   const isHRManager = req.user.role === "HR_MANAGER";
@@ -74,11 +83,32 @@ const getBonusRequests = asyncHandler(async (req, res) => {
 
   // Apply additional filters
   if (status) query.approvalStatus = status;
+  if (type) query.type = type;
   if (startDate && endDate) {
     query.createdAt = {
       $gte: new Date(startDate),
       $lte: new Date(endDate),
     };
+  }
+
+  // If employee is provided and not a valid ObjectId, treat as name/email search
+  if (employee) {
+    const isObjectId = mongoose.Types.ObjectId.isValid(employee);
+    if (!isObjectId) {
+      // Find users by name or email (case-insensitive)
+      const users = await User.find({
+        $or: [
+          { fullName: { $regex: employee, $options: "i" } },
+          { email: { $regex: employee, $options: "i" } },
+          { firstName: { $regex: employee, $options: "i" } },
+          { lastName: { $regex: employee, $options: "i" } },
+        ],
+      }).select("_id");
+      const userIds = users.map((u) => u._id);
+      query.employee = { $in: userIds };
+    } else {
+      query.employee = employee;
+    }
   }
 
   // Get bonus requests with pagination
@@ -87,12 +117,20 @@ const getBonusRequests = asyncHandler(async (req, res) => {
   const skip = (page - 1) * limit;
 
   const bonuses = await Bonus.find(query)
-    .populate("employee", "fullName email")
+    .populate("employee", "firstName lastName email")
     .populate("department", "name")
     .populate("approvedBy", "fullName")
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit);
+
+  bonuses.forEach((bonus) => {
+    if (bonus.employee && typeof bonus.employee === "object") {
+      bonus.employee.fullName = `${bonus.employee.firstName || ""} ${
+        bonus.employee.lastName || ""
+      }`.trim();
+    }
+  });
 
   const total = await Bonus.countDocuments(query);
 
@@ -329,7 +367,6 @@ const createDepartmentEmployeeBonus = asyncHandler(async (req, res) => {
     );
   }
 
-  // Check if user is a super admin or HOD
   if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
     throw new ApiError(
       403,
@@ -337,21 +374,17 @@ const createDepartmentEmployeeBonus = asyncHandler(async (req, res) => {
     );
   }
 
-  // Get the employee
   const employee = await User.findById(employeeId);
   if (!employee) {
     throw new ApiError(404, "Employee not found");
   }
 
-  // If user is a HOD, verify they are the head of the employee's department
   if (userRole === "ADMIN") {
-    // Check if the user is a HOD
     const department = await Department.findOne({ headOfDepartment: userId });
     if (!department) {
       throw new ApiError(403, "You are not a head of department");
     }
 
-    // Verify the employee belongs to the HOD's department
     if (employee.department.toString() !== department._id.toString()) {
       throw new ApiError(
         403,
@@ -359,6 +392,10 @@ const createDepartmentEmployeeBonus = asyncHandler(async (req, res) => {
       );
     }
   }
+
+  const approvalStatus = "approved";
+  const approvedBy = userId;
+  const approvedAt = new Date();
 
   try {
     const bonus = await Bonus.create({
@@ -370,6 +407,9 @@ const createDepartmentEmployeeBonus = asyncHandler(async (req, res) => {
       department: employee.department,
       createdBy: userId,
       updatedBy: userId,
+      approvalStatus,
+      approvedBy,
+      approvedAt,
     });
 
     // Log only after successful creation
@@ -453,6 +493,10 @@ const createDepartmentWideBonus = asyncHandler(async (req, res) => {
     throw new ApiError(404, "No active employees found in this department");
   }
 
+  const approvalStatus = "approved";
+  const approvedBy = userId;
+  const approvedAt = new Date();
+
   try {
     // Create a bonus for each employee
     const bonusPromises = employees.map((employee) =>
@@ -465,6 +509,9 @@ const createDepartmentWideBonus = asyncHandler(async (req, res) => {
         department: department._id,
         createdBy: userId,
         updatedBy: userId,
+        approvalStatus,
+        approvedBy,
+        approvedAt,
       })
     );
 

@@ -33,6 +33,7 @@ import notificationRoutes from "./routes/notificationRoutes.js";
 import approvalRoutes from "./routes/approvalRoutes.js";
 import auditRoutes from "./routes/auditRoutes.js";
 import bonusRoutes from "./routes/BonusRoutes.js";
+import allowanceRoutes from "./routes/allowanceRoutes.js";
 
 dotenv.config();
 
@@ -100,9 +101,7 @@ process.on("uncaughtException", (error) => {
 
 app.use(requestLogger);
 app.use(responseLogger);
-const allowedOrigins = [
-  process.env.CLIENT_URL
-];
+const allowedOrigins = [process.env.CLIENT_URL];
 
 app.use(
   cors({
@@ -199,6 +198,7 @@ app.use("/api/notifications", routeErrorWrapper(notificationRoutes));
 app.use("/api/approvals", routeErrorWrapper(approvalRoutes));
 app.use("/api/audit", routeErrorWrapper(auditRoutes));
 app.use("/api/leaves", routeErrorWrapper(leaveRoutes));
+app.use("/api/allowances", routeErrorWrapper(allowanceRoutes));
 
 // Enhanced health check
 app.get("/api/health", (_req, res) => {

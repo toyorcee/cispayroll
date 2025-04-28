@@ -1,8 +1,9 @@
 import axios from "axios";
 import { toast } from "react-toastify";
-import type { IBonus, BonusType, IBonusFilters } from "../types/payroll";
+import type { IBonus, BonusType } from "../types/payroll";
 
 const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
+
 interface CreateBonusData {
   employee: string;
   type: BonusType;
@@ -16,6 +17,17 @@ interface CreatePersonalBonusData {
   amount: number;
   reason: string;
   paymentDate: Date;
+}
+
+interface BonusFilters {
+  page?: number;
+  limit?: number;
+  employee?: string;
+  departmentId?: string;
+  status?: string;
+  type?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export const bonusService = {
@@ -89,12 +101,28 @@ export const bonusService = {
     }
   },
 
-  getAllBonuses: async (
-    filters?: IBonusFilters
-  ): Promise<{ data: IBonus[] }> => {
+  getAllBonuses: async ({
+    page = 1,
+    limit = 10,
+    employee,
+    departmentId,
+    status,
+    type,
+    startDate,
+    endDate,
+  }: BonusFilters = {}): Promise<{
+    data: { bonuses: IBonus[]; pagination: any };
+  }> => {
+    const params: any = { page, limit };
+    if (employee) params.employee = employee;
+    if (departmentId) params.departmentId = departmentId;
+    if (status) params.status = status;
+    if (type) params.type = type;
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
     try {
       const response = await axios.get(`${BASE_URL}/bonus/requests`, {
-        params: filters,
+        params,
       });
       return response.data;
     } catch (error: unknown) {
@@ -130,7 +158,7 @@ export const bonusService = {
   },
 
   approveBonus: async (
-    id: string,
+    id: string
     // approved: boolean
   ): Promise<{ data: IBonus }> => {
     try {
@@ -178,6 +206,58 @@ export const bonusService = {
       console.error("❌ Error deleting bonus:", error);
       if (axios.isAxiosError(error)) {
         toast.error(error.response?.data?.message || "Failed to delete bonus");
+      } else {
+        toast.error("An unexpected error occurred");
+      }
+      throw error;
+    }
+  },
+
+  createDepartmentEmployeeBonus: async (data: {
+    employeeId: string;
+    amount: number;
+    reason: string;
+    paymentDate: string;
+    type: string;
+  }) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/bonus/department/employee`,
+        data
+      );
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        toast.error(
+          error.response?.data?.message ||
+            "Failed to create department employee bonus"
+        );
+      } else {
+        toast.error("An unexpected error occurred");
+      }
+      throw error;
+    }
+  },
+
+  createDepartmentWideBonus: async (data: {
+    amount: number;
+    reason: string;
+    paymentDate: string;
+    type: string;
+    departmentId: string;
+  }) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/bonus/department/all`,
+        data
+      );
+      return response.data;
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        toast.error(
+          error.response?.data?.message ||
+            "Failed to create department-wide bonus"
+        );
       } else {
         toast.error("An unexpected error occurred");
       }

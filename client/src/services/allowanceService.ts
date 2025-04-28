@@ -1,6 +1,10 @@
 import axios from "axios";
 import { toast } from "react-toastify";
-import type { Allowance, CreateAllowanceRequest } from "../types/allowance";
+import type {
+  Allowance,
+  CreateAllowanceRequest,
+  AllowancesListResponse,
+} from "../types/allowance";
 
 const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
 
@@ -189,17 +193,34 @@ export const allowanceService = {
     }
   },
 
-  createDepartmentAllowance: async (
-    data: CreateAllowanceRequest
-  ): Promise<{ data: Allowance }> => {
+  createDepartmentAllowance: async (data: {
+    departmentId: string;
+    amount: string;
+    reason: string;
+    paymentDate: string;
+    type: string;
+  }): Promise<{ data: Allowance[]; message: string }> => {
     try {
-      const response = await axios.post(`${BASE_URL}/admin/allowances`, data, {
-        withCredentials: true,
-      });
-      toast.success("Department allowance created successfully");
+      console.log("Making API call to create department allowance:", data);
+      const response = await axios.post(
+        `${BASE_URL}/allowances/department/all`,
+        data,
+        {
+          withCredentials: true,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      console.log("Department allowance response:", response);
       return response.data;
     } catch (error: any) {
       console.error("❌ Error creating department allowance:", error);
+      console.error("Full error details:", {
+        status: error.response?.status,
+        data: error.response?.data,
+        headers: error.response?.headers,
+      });
       toast.error(
         error.response?.data?.message || "Failed to create department allowance"
       );
@@ -309,5 +330,74 @@ export const allowanceService = {
       );
       throw error;
     }
+  },
+
+  createDepartmentEmployeeAllowance: async (data: {
+    employeeId: string;
+    amount: string;
+    reason: string;
+    paymentDate: string;
+    type: string;
+  }): Promise<{ data: Allowance; message: string }> => {
+    try {
+      console.log("Making API call to create employee allowance:", data);
+      const response = await axios.post(
+        `${BASE_URL}/allowances/department/employee`,
+        data,
+        {
+          withCredentials: true,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      console.log("Employee allowance response:", response);
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ Error creating employee allowance:", error);
+      console.error("Full error details:", {
+        status: error.response?.status,
+        data: error.response?.data,
+        headers: error.response?.headers,
+      });
+      toast.error(
+        error.response?.data?.message || "Failed to create employee allowance"
+      );
+      throw error;
+    }
+  },
+
+  getAllowanceRequests: async (params: {
+    page?: number;
+    limit?: number;
+    employee?: string;
+    departmentId?: string;
+    status?: string;
+    type?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<AllowancesListResponse> => {
+    const queryParams = new URLSearchParams();
+
+    if (params.page) queryParams.append("page", params.page.toString());
+    if (params.limit) queryParams.append("limit", params.limit.toString());
+    if (params.employee) queryParams.append("employee", params.employee);
+    if (params.departmentId)
+      queryParams.append("departmentId", params.departmentId);
+    if (params.status) queryParams.append("status", params.status);
+    if (params.type) queryParams.append("type", params.type);
+    if (params.startDate) queryParams.append("startDate", params.startDate);
+    if (params.endDate) queryParams.append("endDate", params.endDate);
+
+    const response = await axios.get(
+      `${BASE_URL}/allowances/requests?${queryParams.toString()}`
+    );
+
+    // Transform the response to match AllowancesListResponse
+    return {
+      success: true,
+      message: "Allowances fetched successfully",
+      data: response.data.data,
+    };
   },
 };

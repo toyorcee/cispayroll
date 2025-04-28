@@ -32,168 +32,19 @@ export const AllowancePriority = {
   INDIVIDUAL: 3, // Individual allowances
 };
 
-const AllowanceSchema = new Schema(
-  {
-    name: {
-      type: String,
-      required: [true, "Allowance name is required"],
-      trim: true,
-    },
-    type: {
-      type: String,
-      enum: ["TRANSPORT", "HOUSING", "MEAL", "MEDICAL", "OTHER"],
-      required: true,
-    },
-    amount: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-    description: {
-      type: String,
-      required: true,
-    },
-    status: {
-      type: String,
-      enum: ["PENDING", "APPROVED", "REJECTED"],
-      default: "PENDING",
-    },
-    approvedBy: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-    },
-    approvedAt: {
-      type: Date,
-    },
-    rejectedBy: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-    },
-    rejectedAt: {
-      type: Date,
-    },
-    rejectionReason: {
-      type: String,
-    },
-    documents: [
-      {
-        name: String,
-        url: String,
-        uploadedAt: {
-          type: Date,
-          default: Date.now,
-        },
-      },
-    ],
-    month: {
-      type: Number,
-      required: true,
-      min: 1,
-      max: 12,
-    },
-    year: {
-      type: Number,
-      required: true,
-    },
-    employee: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    calculationMethod: {
-      type: String,
-      enum: Object.values(CalculationMethod),
-      required: [true, "Calculation method is required"],
-      default: CalculationMethod.FIXED,
-    },
-    baseAmount: {
-      type: Number,
-      required: function () {
-        return this.calculationMethod === CalculationMethod.PERCENTAGE;
-      },
-      min: [0, "Base amount cannot be negative"],
-    },
-    frequency: {
-      type: String,
-      enum: Object.values(PayrollFrequency),
-      required: [true, "Frequency is required"],
-      default: PayrollFrequency.MONTHLY,
-    },
-    taxable: {
-      type: Boolean,
-      default: true,
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-    effectiveDate: {
-      type: Date,
-      required: [true, "Effective date is required"],
-    },
-    expiryDate: Date,
-    // Reference to salary grade
-    salaryGrade: {
-      type: Schema.Types.ObjectId,
-      ref: "SalaryGrade",
-      required: [true, "Salary grade is required"],
-    },
-    // Scope of the allowance
-    scope: {
-      type: String,
-      enum: ["department", "grade", "individual"],
-      required: [true, "Scope is required"],
-    },
-    // Department reference for department-wide allowances
-    department: {
-      type: Schema.Types.ObjectId,
-      ref: "Department",
-      required: function () {
-        return this.scope === "department";
-      },
-    },
-    // Priority level for calculation order
-    priority: {
-      type: Number,
-      enum: Object.values(AllowancePriority),
-      required: [true, "Priority is required"],
-      default: function () {
-        switch (this.scope) {
-          case "department":
-            return AllowancePriority.DEPARTMENT;
-          case "grade":
-            return AllowancePriority.GRADE;
-          case "individual":
-            return AllowancePriority.INDIVIDUAL;
-          default:
-            return AllowancePriority.DEPARTMENT;
-        }
-      },
-    },
-    // For performance-based allowances
-    performanceRating: {
-      type: Number,
-      min: [0, "Rating cannot be negative"],
-      max: [5, "Rating cannot exceed 5"],
-    },
-    createdBy: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Creator is required"],
-    },
-    updatedBy: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Updater is required"],
-    },
-    attachments: [
-      {
-        type: String,
-      },
-    ],
-  },
-  { timestamps: true }
-);
+const AllowanceSchema = new Schema({
+  employee: { type: Schema.Types.ObjectId, ref: "User", required: true },
+  type: { type: String, required: true },
+  amount: { type: Number, required: true },
+  reason: { type: String, required: true },
+  paymentDate: { type: Date, required: true },
+  department: { type: Schema.Types.ObjectId, ref: "Department" },
+  createdBy: { type: Schema.Types.ObjectId, ref: "User" },
+  updatedBy: { type: Schema.Types.ObjectId, ref: "User" },
+  approvalStatus: { type: String, default: "approved" },
+  approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
+  approvedAt: { type: Date },
+});
 
 // Methods
 AllowanceSchema.methods.calculateValue = function (baseSalary) {

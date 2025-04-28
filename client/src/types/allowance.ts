@@ -31,6 +31,20 @@ export enum AllowancePriority {
   INDIVIDUAL = 3,
 }
 
+export interface AllowanceEmployee {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  fullName: string;
+  id: string;
+}
+
+export interface AllowanceDepartment {
+  _id: string;
+  name: string;
+}
+
 export interface Allowance {
   _id: string;
   name: string;
@@ -50,7 +64,7 @@ export interface Allowance {
   }>;
   month: number;
   year: number;
-  employee: string;
+  employee: AllowanceEmployee;
   calculationMethod: CalculationMethod;
   baseAmount?: number;
   frequency: PayrollFrequency;
@@ -64,7 +78,7 @@ export interface Allowance {
     basicSalary: number;
   };
   scope: "department" | "grade" | "individual";
-  department: string;
+  department: AllowanceDepartment;
   priority: number;
   performanceRating?: number;
   createdBy: string;
@@ -72,6 +86,8 @@ export interface Allowance {
   attachments: string[];
   createdAt: string;
   updatedAt: string;
+  __v: number;
+  approvalStatus: string;
 }
 
 export interface CreateAllowanceRequest {
@@ -90,4 +106,18 @@ export interface CreateAllowanceRequest {
   department: string;
   performanceRating?: number;
   employee: string;
+}
+
+export interface AllowancesListResponse {
+  success: boolean;
+  message: string;
+  data: {
+    allowances: Allowance[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      pages: number;
+    };
+  };
 }
