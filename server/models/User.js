@@ -514,113 +514,110 @@ const UserSchema = new Schema(
       progress: { type: Number, default: 0 },
     },
     offboarding: {
+      status: {
+        type: String,
+        enum: Object.values(OffboardingStatus),
+        default: OffboardingStatus.NOT_STARTED,
+      },
       type: {
-        status: {
-          type: String,
-          enum: Object.values(OffboardingStatus),
-          default: OffboardingStatus.NOT_STARTED,
-        },
-        type: {
-          type: String,
-          enum: Object.values(OffboardingType),
-        },
-        reason: String,
-        initiatedAt: Date,
-        initiatedBy: {
-          type: Schema.Types.ObjectId,
-          ref: "User",
-        },
-        targetExitDate: Date,
-        actualExitDate: Date,
-        tasks: [
-          {
-            name: {
-              type: String,
-              required: true,
-              enum: Object.values(DefaultOffboardingTasks),
-            },
-            description: String,
-            category: {
-              type: String,
-              enum: Object.values(OffboardingTaskCategory),
-              required: true,
-            },
-            deadline: {
-              type: Date,
-              required: true,
-            },
-            completed: {
-              type: Boolean,
-              default: false,
-            },
-            completedAt: Date,
-            completedBy: {
-              type: Schema.Types.ObjectId,
-              ref: "User",
-            },
-            notes: String,
-            attachments: [
-              {
-                name: String,
-                url: String,
-                uploadedAt: Date,
-                uploadedBy: {
-                  type: Schema.Types.ObjectId,
-                  ref: "User",
-                },
-              },
-            ],
+        type: String,
+        enum: Object.values(OffboardingType),
+      },
+      reason: String,
+      initiatedAt: Date,
+      initiatedBy: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+      targetExitDate: Date,
+      actualExitDate: Date,
+      tasks: [
+        {
+          name: {
+            type: String,
+            required: true,
+            enum: Object.values(DefaultOffboardingTasks),
           },
-        ],
-        progress: {
-          type: Number,
-          default: 0,
-          min: 0,
-          max: 100,
-        },
-        exitInterview: {
+          description: String,
+          category: {
+            type: String,
+            enum: Object.values(OffboardingTaskCategory),
+            required: true,
+          },
+          deadline: {
+            type: Date,
+            required: true,
+          },
           completed: {
             type: Boolean,
             default: false,
           },
-          conductedBy: {
+          completedAt: Date,
+          completedBy: {
             type: Schema.Types.ObjectId,
             ref: "User",
           },
-          date: Date,
           notes: String,
-          feedback: {
-            rating: {
-              type: Number,
-              min: 1,
-              max: 5,
+          attachments: [
+            {
+              name: String,
+              url: String,
+              uploadedAt: Date,
+              uploadedBy: {
+                type: Schema.Types.ObjectId,
+                ref: "User",
+              },
             },
-            comments: String,
-            suggestions: String,
-          },
+          ],
         },
-        rehireEligible: {
-          status: Boolean,
-          notes: String,
-          decidedBy: {
-            type: Schema.Types.ObjectId,
-            ref: "User",
-          },
-          decidedAt: Date,
-        },
-        checklist: [
-          {
-            item: String,
-            completed: Boolean,
-            completedAt: Date,
-            completedBy: {
-              type: Schema.Types.ObjectId,
-              ref: "User",
-            },
-          },
-        ],
+      ],
+      progress: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 100,
       },
-      _id: false,
+      exitInterview: {
+        completed: {
+          type: Boolean,
+          default: false,
+        },
+        conductedBy: {
+          type: Schema.Types.ObjectId,
+          ref: "User",
+        },
+        date: Date,
+        notes: String,
+        feedback: {
+          rating: {
+            type: Number,
+            min: 1,
+            max: 5,
+          },
+          comments: String,
+          suggestions: String,
+        },
+      },
+      rehireEligible: {
+        status: Boolean,
+        notes: String,
+        decidedBy: {
+          type: Schema.Types.ObjectId,
+          ref: "User",
+        },
+        decidedAt: Date,
+      },
+      checklist: [
+        {
+          item: String,
+          completed: Boolean,
+          completedAt: Date,
+          completedBy: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+          },
+        },
+      ],
     },
     salaryGrade: {
       type: Schema.Types.ObjectId,
@@ -1396,19 +1393,17 @@ UserSchema.methods.initiateOffboarding = async function (offboardingData) {
     this._id,
     {
       $set: {
-        "offboarding.type": {
-          status: {
-            type: offboardingData.type,
-            reason: offboardingData.reason,
-            targetExitDate: offboardingData.targetExitDate,
-            initiatedBy: offboardingData.initiatedBy,
-            initiatedAt: new Date(),
-            status: OffboardingStatus.INITIATED,
-          },
-        },
+        "offboarding.status": OffboardingStatus.IN_PROGRESS, 
+        "offboarding.type": offboardingData.type,
+        "offboarding.reason": offboardingData.reason,
+        "offboarding.targetExitDate": offboardingData.targetExitDate,
+        "offboarding.initiatedBy": offboardingData.initiatedBy,
+        "offboarding.initiatedAt": new Date(),
+        "offboarding.tasks": this.getDefaultOffboardingTasks(offboardingData.type), 
+        "lifecycle.currentState": UserLifecycleState.OFFBOARDING, 
       },
     },
-    { new: true, runValidators: false } // This is the key change
+    { new: true, runValidators: false }
   );
 };
 

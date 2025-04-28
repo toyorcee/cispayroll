@@ -1,4 +1,7 @@
-import UserModel, { OnboardingStatus } from "../models/User.js";
+import UserModel, {
+  OnboardingStatus,
+  UserLifecycleState,
+} from "../models/User.js";
 import { ApiError } from "../utils/errorHandler.js";
 
 export class OnboardingController {
@@ -164,7 +167,7 @@ export class OnboardingController {
         );
 
         // Update lifecycle onboarding status
-        user.lifecycle.onboarding.status = "COMPLETED";
+        user.lifecycle.onboarding.status = OnboardingStatus.COMPLETED;
         user.lifecycle.onboarding.completedAt = new Date();
 
         // Set user status to active for payroll processing

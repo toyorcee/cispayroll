@@ -2,20 +2,8 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { OnboardingEmployee, Task } from "../../types/employee";
 import { toast } from "react-toastify";
-import { useNavigate } from "react-router-dom";
-import { offboardingService } from "../../services/offboardingService";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  TextField,
-  MenuItem,
-  DialogActions,
-  Button,
-} from "@mui/material";
-import { OffboardingType } from "../../types/offboarding";
 
-const BASE_URL = "https://payrollapi.digitalentshub.net/api";
+const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
 
 export interface OnboardingFilters {
   page?: number;
@@ -149,17 +137,6 @@ export const OnboardingDetailsModal: React.FC<OnboardingDetailsModalProps> = ({
   );
   const [localEmployee, setLocalEmployee] =
     useState<OnboardingEmployee>(employee);
-  const navigate = useNavigate();
-  const [showOffboardingForm, setShowOffboardingForm] = useState(false);
-  const [offboardingData, setOffboardingData] = useState<{
-    type: OffboardingType;
-    reason: string;
-    targetExitDate: Date;
-  }>({
-    type: "voluntary_resignation" as OffboardingType,
-    reason: "",
-    targetExitDate: new Date(),
-  });
 
   useEffect(() => {
     setLocalEmployee(employee);
@@ -223,26 +200,6 @@ export const OnboardingDetailsModal: React.FC<OnboardingDetailsModalProps> = ({
       toast.error("Failed to mark task as complete");
     } finally {
       setLoadingTasks((prev) => ({ ...prev, [taskName]: false }));
-    }
-  };
-
-  const handleInitiateOffboarding = () => {
-    setShowOffboardingForm(true);
-  };
-
-  const handleSubmitOffboarding = async () => {
-    try {
-      await offboardingService.initiateOffboarding(
-        employee._id,
-        offboardingData
-      );
-      toast.success("Offboarding initiated successfully");
-      setShowOffboardingForm(false);
-      onClose();
-      navigate("/pms/employees/offboarding");
-    } catch (error) {
-      toast.error("Failed to initiate offboarding");
-      console.error(error);
     }
   };
 
@@ -364,82 +321,7 @@ export const OnboardingDetailsModal: React.FC<OnboardingDetailsModalProps> = ({
             </div>
           ))}
         </div>
-
-        <div className="mt-6 pt-4 border-t border-gray-200">
-          <button
-            onClick={handleInitiateOffboarding}
-            className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2 px-4 rounded-lg"
-          >
-            Initiate Offboarding
-          </button>
-        </div>
       </div>
-
-      <Dialog
-        open={showOffboardingForm}
-        onClose={() => setShowOffboardingForm(false)}
-      >
-        <DialogTitle>Initiate Offboarding</DialogTitle>
-        <DialogContent>
-          <TextField
-            select
-            fullWidth
-            label="Offboarding Type"
-            value={offboardingData.type}
-            onChange={(e) =>
-              setOffboardingData({
-                ...offboardingData,
-                type: e.target.value as OffboardingType,
-              })
-            }
-            margin="normal"
-          >
-            <MenuItem value="voluntary_resignation">
-              Voluntary Resignation
-            </MenuItem>
-            <MenuItem value="involuntary_termination">
-              Involuntary Termination
-            </MenuItem>
-            <MenuItem value="retirement">Retirement</MenuItem>
-            <MenuItem value="contract_end">Contract End</MenuItem>
-          </TextField>
-          <TextField
-            fullWidth
-            label="Reason"
-            value={offboardingData.reason}
-            onChange={(e) =>
-              setOffboardingData({ ...offboardingData, reason: e.target.value })
-            }
-            margin="normal"
-            multiline
-            rows={3}
-          />
-          <TextField
-            fullWidth
-            label="Target Exit Date"
-            type="date"
-            value={offboardingData.targetExitDate.toISOString().split("T")[0]}
-            onChange={(e) =>
-              setOffboardingData({
-                ...offboardingData,
-                targetExitDate: new Date(e.target.value),
-              })
-            }
-            margin="normal"
-            InputLabelProps={{ shrink: true }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowOffboardingForm(false)}>Cancel</Button>
-          <Button
-            onClick={handleSubmitOffboarding}
-            variant="contained"
-            color="primary"
-          >
-            Submit
-          </Button>
-        </DialogActions>
-      </Dialog>
     </div>
   );
 };

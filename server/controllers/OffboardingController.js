@@ -9,21 +9,11 @@ import UserModel, {
 import { calculateFinalSettlement } from "../utils/payrollUtils.js";
 import { generateFinalSettlementReport } from "../utils/documentGenerators.js";
 import { EmailService } from "../services/EmailService.js";
-import { NotificationService } from "../services/NotificationService.js";
 import mongoose from "mongoose";
 
 export class OffboardingController {
   static async initiateOffboarding(req, res, next) {
     try {
-      console.log(
-        "[OFFBOARDING CONTROLLER] Initiating offboarding with data:",
-        {
-          userId: req.params.userId,
-          body: req.body,
-          user: req.user._id,
-        }
-      );
-
       if (!req.user.permissions.includes(Permission.MANAGE_OFFBOARDING)) {
         console.log(
           "[OFFBOARDING CONTROLLER] Permission denied for user:",
@@ -51,12 +41,6 @@ export class OffboardingController {
         );
       }
 
-      // Validate offboarding type
-      console.log("[OFFBOARDING CONTROLLER] Validating offboarding type:", {
-        providedType: type,
-        validTypes: Object.values(OffboardingType),
-      });
-
       if (!Object.values(OffboardingType).includes(type)) {
         console.log(
           "[OFFBOARDING CONTROLLER] Invalid offboarding type provided"
@@ -78,13 +62,14 @@ export class OffboardingController {
       console.log("[OFFBOARDING CONTROLLER] User found:", {
         userId: user._id,
         currentOffboardingStatus: user.offboarding?.status,
+        currentOffboardingObject: user.offboarding,
         currentLifecycleState: user.lifecycle?.currentState,
         currentOnboardingStatus: user.lifecycle?.onboarding?.status,
       });
 
       // Check if user is already in offboarding
       if (
-        user.offboarding?.status &&
+        user.offboarding &&
         user.offboarding.status !== OffboardingStatus.NOT_STARTED
       ) {
         console.log(
@@ -95,19 +80,11 @@ export class OffboardingController {
 
       // Call the model method to initiate offboarding
       const updatedUser = await user.initiateOffboarding({
-        type: {
-          status: OffboardingStatus.INITIATED,
-          type: type,
-          reason: reason,
-          targetExitDate: new Date(targetExitDate),
-          initiatedBy: req.user._id,
-          initiatedAt: new Date(),
-        },
+        type,
+        reason,
+        targetExitDate: new Date(targetExitDate),
+        initiatedBy: req.user._id,
       });
-
-      console.log(
-        "[OFFBOARDING CONTROLLER] Offboarding initiated successfully"
-      );
 
       res.status(200).json({
         success: true,
@@ -220,6 +197,10 @@ export class OffboardingController {
       const totalPages = Math.ceil(totalCount / limit);
       const hasNextPage = page < totalPages;
       const hasPrevPage = page > 1;
+
+      console.log(
+        employees.map((e) => ({ email: e.email, offboarding: e.offboarding }))
+      );
 
       res.status(200).json({
         success: true,

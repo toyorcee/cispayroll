@@ -246,24 +246,6 @@ export class LeaveController {
           }
         );
 
-        // Send notifications
-        await NotificationService.createNotification(
-          leave.user,
-          NOTIFICATION_TYPES.LEAVE_APPROVED,
-          approver,
-          leave,
-          notes
-        );
-
-        // Also send a notification to the super admin
-        await NotificationService.createNotification(
-          approver._id,
-          NOTIFICATION_TYPES.LEAVE_APPROVED,
-          approver,
-          leave,
-          notes
-        );
-
         return res.status(200).json({
           success: true,
           message: "Leave request approved successfully",
@@ -327,24 +309,6 @@ export class LeaveController {
           approverRole: "DEPARTMENT_HEAD",
           notes: notes,
         }
-      );
-
-      // Send notifications
-      await NotificationService.createNotification(
-        leave.user,
-        NOTIFICATION_TYPES.LEAVE_APPROVED,
-        approver,
-        leave,
-        notes
-      );
-
-      // Also send a notification to the admin
-      await NotificationService.createNotification(
-        approver._id,
-        NOTIFICATION_TYPES.LEAVE_APPROVED,
-        approver,
-        leave,
-        notes
       );
 
       return res.status(200).json({

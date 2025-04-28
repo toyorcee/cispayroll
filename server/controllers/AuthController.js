@@ -30,10 +30,7 @@ export class AuthController {
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 24 * 60 * 60 * 1000,
         path: "/",
-        domain:
-          process.env.NODE_ENV === "production"
-            ? "payroll.cistechlab.com"
-            : undefined,
+        domain: undefined,
       };
 
       res.cookie("token", token, cookieOptions);
@@ -65,17 +62,14 @@ export class AuthController {
 
       const { user, token } = await AuthService.createUser(userData);
 
-      res.cookie("token", token, {
+      const cookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 24 * 60 * 60 * 1000,
-        domain:
-          process.env.NODE_ENV === "production"
-            ? ".payroll.cistechlab.com"
-            : undefined,
-      });
-
+        path: "/",
+        domain: undefined,
+      };
       res.status(201).json({
         success: true,
         message: "Super Admin created successfully",
@@ -118,16 +112,14 @@ export class AuthController {
 
       const { user, token } = await AuthService.createUser(userData);
 
-      res.cookie("token", token, {
+      const cookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 24 * 60 * 60 * 1000,
-        domain:
-          process.env.NODE_ENV === "production"
-            ? ".payroll.cistechlab.com"
-            : undefined,
-      });
+        path: "/",
+        domain: undefined,
+      };
 
       res.status(201).json({
         success: true,
@@ -217,16 +209,10 @@ export class AuthController {
       const { refreshToken } = req.body;
 
       if (!refreshToken) {
-        console.log("❌ [AuthController] No refresh token provided");
         return res.status(400).json({ message: "Refresh token is required" });
       }
 
-      console.log("🔍 [AuthController] Verifying refresh token");
       const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-      console.log(
-        "✅ [AuthController] Refresh token verified for user:",
-        decoded.userId
-      );
 
       const user = await User.findById(decoded.userId);
       if (!user) {
@@ -249,15 +235,8 @@ export class AuthController {
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 24 * 60 * 60 * 1000,
         path: "/",
-        domain:
-          process.env.NODE_ENV === "production"
-            ? ".payroll.cistechlab.com"
-            : undefined,
+        domain: undefined,
       };
-      console.log(
-        "🍪 [AuthController] Setting cookie with options:",
-        cookieOptions
-      );
 
       res.cookie("token", accessToken, cookieOptions);
 
@@ -304,7 +283,13 @@ export class AuthController {
 
   static async logout(req, res) {
     try {
-      res.clearCookie("token");
+      res.clearCookie("token", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        path: "/",
+        domain: undefined,
+      });
       res.status(200).json({
         success: true,
         message: "Logged out successfully",

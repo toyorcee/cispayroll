@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { FaPlus, FaEdit, FaTrash, FaHistory } from "react-icons/fa";
 

@@ -4,7 +4,9 @@ import {
   OffboardingData,
 } from "../types/offboarding";
 
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
+const BASE_URL = `${
+  import.meta.env.VITE_API_URL || "https://payrollapi.digitalentshub.net"
+}/api`;
 
 // Helper function for consistent logging
 const logOffboardingAction = (action: string, data: any) => {

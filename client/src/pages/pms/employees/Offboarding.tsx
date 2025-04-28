@@ -39,7 +39,6 @@ import { toast } from "react-toastify";
 import { Employee, OffboardingStatus } from "../../../types/employee";
 import { OffboardingTask as ImportedOffboardingTask } from "../../../types/offboarding";
 
-// Use the imported OffboardingTask type
 type OffboardingTask = ImportedOffboardingTask;
 
 export default function Offboarding() {
@@ -75,29 +74,18 @@ export default function Offboarding() {
         limit
       );
       console.log("Fetched offboarding employees:", response);
-
-      if (!response.success && page === 1) {
-        toast.error("Failed to fetch offboarding employees");
-      }
-
       setEmployees(response.data || []);
       setTotalPages(response.pagination?.totalPages || 1);
       setTotalEmployees(response.pagination?.total || 0);
     } catch (error) {
       console.error("Failed to fetch offboarding employees:", error);
-      // Only show error toast on initial load
-      if (page === 1) {
-        toast.error("Failed to fetch offboarding employees");
-      }
+      toast.error("Failed to fetch offboarding employees");
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePageChange = (
-    _event: React.ChangeEvent<unknown>,
-    value: number
-  ) => {
+  const handlePageChange = (_: React.ChangeEvent<unknown>, value: number) => {
     setPage(value);
   };
 
@@ -168,22 +156,19 @@ export default function Offboarding() {
       );
 
       // Refresh employee list in the background without showing loading spinner
-      const refreshEmployees = async () => {
-        try {
-          const response = await offboardingService.getOffboardingUsers(
-            page,
-            limit
-          );
-          setEmployees(response.data || []);
-          setTotalPages(response.pagination?.totalPages || 1);
-          setTotalEmployees(response.pagination?.total || 0);
-        } catch (error) {
-          console.error("❌ Error refreshing employee list:", error);
-          // No toast here - this is a background refresh
-        }
-      };
-
-      refreshEmployees();
+      // const refreshEmployees = async () => {
+      //   try {
+      //     const response = await offboardingService.getOffboardingUsers(
+      //       page,
+      //       limit
+      //     );
+      //     setEmployees(response.data || []);
+      //     setTotalPages(response.pagination?.totalPages || 1);
+      //     setTotalEmployees(response.pagination?.total || 0);
+      //   } catch (error) {
+      //     console.error("❌ Error refreshing employee list:", error);
+      //   }
+      // };
     } catch (error) {
       console.error("❌ Error completing task:", {
         taskName,
