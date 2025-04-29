@@ -7,7 +7,7 @@ import LeaveModel from "../models/Leave.js";
 import { LEAVE_STATUS } from "../models/Leave.js";
 import { v4 as uuidv4 } from "uuid";
 import { UserRole } from "../models/User.js";
-import { EmailService } from "../services/EmailService.js";
+import { EmailService } from "../services/emailService.js";
 import DepartmentModel from "../models/Department.js";
 import path from "path";
 import fs from "fs";

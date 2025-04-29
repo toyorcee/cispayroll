@@ -31,7 +31,7 @@ import Audit from "../models/Audit.js";
 import { AuditAction, AuditEntity } from "../models/Audit.js";
 import { PaymentStatus } from "../models/Payment.js";
 import generatePayslipPDF from "../utils/pdfGenerator.js";
-import { EmailService } from "../services/EmailService.js";
+import { EmailService } from "../services/emailService.js";
 import BaseApprovalController, {
   APPROVAL_LEVELS,
 } from "./BaseApprovalController.js";

@@ -5,7 +5,7 @@ import {
   passwordAttemptLimiter,
   requirePasswordChange,
 } from "../middleware/authMiddleware.js";
-import { EmailService } from "../services/EmailService.js";
+import { EmailService } from "../services/emailService.js";
 
 const router = Router();
 

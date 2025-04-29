@@ -2,7 +2,7 @@ import UserModel from "../models/User.js";
 import { handleError, ApiError } from "../utils/errorHandler.js";
 import jwt from "jsonwebtoken";
 import { EmployeeService } from "../services/employeeService.js";
-import { EmailService } from "../services/EmailService.js";
+import { EmailService } from "../services/emailService.js";
 import bcrypt from "bcryptjs";
 import { OnboardingStatus } from "../models/User.js";
 

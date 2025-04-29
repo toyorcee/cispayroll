@@ -8,7 +8,7 @@ import UserModel, {
 } from "../models/User.js";
 import { calculateFinalSettlement } from "../utils/payrollUtils.js";
 import { generateFinalSettlementReport } from "../utils/documentGenerators.js";
-import { EmailService } from "../services/EmailService.js";
+import { EmailService } from "../services/emailService.js";
 import mongoose from "mongoose";
 
 export class OffboardingController {

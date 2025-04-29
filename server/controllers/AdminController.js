@@ -16,7 +16,7 @@ import { DeductionService } from "../services/DeductionService.js";
 import { DeductionType, DeductionScope } from "../models/Deduction.js";
 import DepartmentModel from "../models/Department.js";
 import { v4 as uuidv4 } from "uuid";
-import { EmailService } from "../services/EmailService.js";
+import { EmailService } from "../services/emailService.js";
 import { PayrollService } from "../services/PayrollService.js";
 import {
   NotificationService,
