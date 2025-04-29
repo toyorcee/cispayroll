@@ -30,7 +30,8 @@ export class AuthController {
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 24 * 60 * 60 * 1000,
         path: "/",
-        domain: undefined,
+        domain:
+          process.env.NODE_ENV === "production" ? ".cistechlab.com" : undefined,
       };
 
       res.cookie("token", token, cookieOptions);
@@ -68,8 +69,10 @@ export class AuthController {
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 24 * 60 * 60 * 1000,
         path: "/",
-        domain: undefined,
+        domain:
+          process.env.NODE_ENV === "production" ? ".cistechlab.com" : undefined,
       };
+
       res.status(201).json({
         success: true,
         message: "Super Admin created successfully",
@@ -118,7 +121,8 @@ export class AuthController {
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 24 * 60 * 60 * 1000,
         path: "/",
-        domain: undefined,
+        domain:
+          process.env.NODE_ENV === "production" ? ".cistechlab.com" : undefined,
       };
 
       res.status(201).json({
@@ -235,7 +239,8 @@ export class AuthController {
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 24 * 60 * 60 * 1000,
         path: "/",
-        domain: undefined,
+        domain:
+          process.env.NODE_ENV === "production" ? ".cistechlab.com" : undefined,
       };
 
       res.cookie("token", accessToken, cookieOptions);
