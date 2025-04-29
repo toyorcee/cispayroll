@@ -185,8 +185,8 @@ const MyAllowances: React.FC = () => {
 
       toast.success("Allowance request submitted successfully");
       handleCloseForm();
-      fetchAllowances(); // Refresh the list
-      fetchAllowanceHistory(); // Refresh history
+      fetchAllowances(); 
+      fetchAllowanceHistory(); 
     } catch (err: any) {
       console.error("Error requesting allowance:", err);
       toast.error(err.message || "Failed to submit allowance request");

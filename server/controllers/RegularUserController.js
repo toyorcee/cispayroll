@@ -357,6 +357,10 @@ export class RegularUserController {
       // Create the allowance request
       const allowanceRequest = {
         ...req.body,
+        amount: Number(req.body.amount),
+        effectiveDate: new Date(req.body.effectiveDate),
+        paymentDate: new Date(req.body.effectiveDate),
+        reason: req.body.description,
         employee: userId,
         department: user.department,
         salaryGrade: salaryGrade._id,
@@ -396,9 +400,7 @@ export class RegularUserController {
       const allowances = await Allowance.find({
         employee: req.user._id,
         scope: "individual",
-      })
-        .populate("salaryGrade", "level basicSalary")
-        .sort({ createdAt: -1 });
+      }).sort({ createdAt: -1 });
 
       res.status(200).json({
         success: true,

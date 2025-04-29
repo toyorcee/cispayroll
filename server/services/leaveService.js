@@ -656,13 +656,13 @@ export class LeaveService {
         null,
         null,
         {
-          leave: {
-            id: leave._id,
-            type: leave.type,
-            startDate: leave.startDate,
-            endDate: leave.endDate,
-            status: leave.status,
-          },
+        leave: {
+          id: leave._id,
+          type: leave.type,
+          startDate: leave.startDate,
+          endDate: leave.endDate,
+          status: leave.status,
+        },
         }
       );
       console.log(
@@ -1023,26 +1023,26 @@ export class LeaveService {
     // Notify the leave requester
     console.log(`[LeaveService] Notifying leave requester about rejection`);
     try {
-      await NotificationService.createNotification(
-        leave.user._id,
-        "LEAVE_REJECTED",
-        leave.user,
-        null,
-        reason,
-        {
-          leave: {
-            type: leave.type,
-            startDate: leave.startDate,
-            endDate: leave.endDate,
-            reason: leave.reason,
-            status: leave.status,
-          },
-          rejector: {
-            firstName: rejector.firstName,
-            lastName: rejector.lastName,
-            role: rejector.role,
-          },
-        }
+    await NotificationService.createNotification(
+      leave.user._id,
+      "LEAVE_REJECTED",
+      leave.user,
+      null,
+      reason,
+      {
+        leave: {
+          type: leave.type,
+          startDate: leave.startDate,
+          endDate: leave.endDate,
+          reason: leave.reason,
+          status: leave.status,
+        },
+        rejector: {
+          firstName: rejector.firstName,
+          lastName: rejector.lastName,
+          role: rejector.role,
+        },
+      }
       );
       console.log(`[LeaveService] Notification sent to leave requester`);
     } catch (notificationError) {
@@ -1065,28 +1065,28 @@ export class LeaveService {
       });
 
       try {
-        await NotificationService.createNotification(
-          employee._id,
-          "LEAVE_REJECTED",
-          employee,
-          null,
-          reason,
-          {
-            leave: {
-              type: leave.type,
-              startDate: leave.startDate,
-              endDate: leave.endDate,
-              reason: leave.reason,
-              status: leave.status,
-            },
-            rejector: {
-              firstName: rejector.firstName,
-              lastName: rejector.lastName,
-              role: rejector.role,
-            },
-          }
-        );
-        console.log(`[LeaveService] Notification sent to employee`);
+      await NotificationService.createNotification(
+        employee._id,
+        "LEAVE_REJECTED",
+        employee,
+        null,
+        reason,
+        {
+          leave: {
+            type: leave.type,
+            startDate: leave.startDate,
+            endDate: leave.endDate,
+            reason: leave.reason,
+            status: leave.status,
+          },
+          rejector: {
+            firstName: rejector.firstName,
+            lastName: rejector.lastName,
+            role: rejector.role,
+          },
+        }
+      );
+      console.log(`[LeaveService] Notification sent to employee`);
       } catch (notificationError) {
         console.error(
           `[LeaveService] Error notifying employee:`,
@@ -1140,28 +1140,28 @@ export class LeaveService {
         );
 
         try {
-          await NotificationService.createNotification(
-            departmentHead._id,
-            "LEAVE_REJECTED_INFO",
-            employee,
-            null,
-            reason,
-            {
-              leave: {
-                type: leave.type,
-                startDate: leave.startDate,
-                endDate: leave.endDate,
-                reason: leave.reason,
-                status: leave.status,
-              },
-              rejector: {
-                firstName: rejector.firstName,
-                lastName: rejector.lastName,
-                role: rejector.role,
-              },
-            }
-          );
-          console.log(`[LeaveService] Notification sent to department head`);
+        await NotificationService.createNotification(
+          departmentHead._id,
+          "LEAVE_REJECTED_INFO",
+          employee,
+          null,
+          reason,
+          {
+            leave: {
+              type: leave.type,
+              startDate: leave.startDate,
+              endDate: leave.endDate,
+              reason: leave.reason,
+              status: leave.status,
+            },
+            rejector: {
+              firstName: rejector.firstName,
+              lastName: rejector.lastName,
+              role: rejector.role,
+            },
+          }
+        );
+        console.log(`[LeaveService] Notification sent to department head`);
         } catch (notificationError) {
           console.error(
             `[LeaveService] Error notifying department head:`,
@@ -1213,28 +1213,28 @@ export class LeaveService {
           });
 
           try {
-            await NotificationService.createNotification(
-              hrManager._id,
-              "LEAVE_REJECTED_INFO",
-              employee,
-              null,
-              reason,
-              {
-                leave: {
-                  type: leave.type,
-                  startDate: leave.startDate,
-                  endDate: leave.endDate,
-                  reason: leave.reason,
-                  status: leave.status,
-                },
-                rejector: {
-                  firstName: rejector.firstName,
-                  lastName: rejector.lastName,
-                  role: rejector.role,
-                },
-              }
-            );
-            console.log(`[LeaveService] Notification sent to HR manager`);
+          await NotificationService.createNotification(
+            hrManager._id,
+            "LEAVE_REJECTED_INFO",
+            employee,
+            null,
+            reason,
+            {
+              leave: {
+                type: leave.type,
+                startDate: leave.startDate,
+                endDate: leave.endDate,
+                reason: leave.reason,
+                status: leave.status,
+              },
+              rejector: {
+                firstName: rejector.firstName,
+                lastName: rejector.lastName,
+                role: rejector.role,
+              },
+            }
+          );
+          console.log(`[LeaveService] Notification sent to HR manager`);
           } catch (notificationError) {
             console.error(
               `[LeaveService] Error notifying HR manager:`,
