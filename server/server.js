@@ -276,13 +276,14 @@ app.use((err, req, res, next) => {
   });
 });
 
+app.get("/", (req, res) => {
+  res.send("API is running...");
+});
+
 app.use((_req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-app.get("/", (req, res) => {
-  res.send("API is running...");
-});
 
 if (process.env.NODE_ENV === "development") {
   import("./routes/testRoutes.js").then((testRoutes) => {
