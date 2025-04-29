@@ -8,7 +8,6 @@ import {
 } from "../types/deduction";
 
 const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
-// Set default axios config
 axios.defaults.withCredentials = true;
 
 // Input types

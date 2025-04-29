@@ -86,6 +86,7 @@ export interface AdminPayrollResponse {
 const BASE_URL = `${import.meta.env.VITE_API_URL}/api/admin`;
 const SUPER_ADMIN_BASE_URL = `${import.meta.env.VITE_API_URL}/api/super-admin`;
 const APPROVAL_BASE_URL = `${import.meta.env.VITE_API_URL}/api/approvals`;
+axios.defaults.withCredentials = true;
 
 // Helper function to determine if user is Super Admin
 const isSuperAdmin = (userRole?: string): boolean => {

@@ -4,6 +4,7 @@ import axios from "axios";
 const BASE_URL = `${
   import.meta.env.VITE_API_URL 
 }/api/notifications`;
+axios.defaults.withCredentials = true;
 
 // Fetch unread notification count
 export const getUnreadNotificationCount = async () => {

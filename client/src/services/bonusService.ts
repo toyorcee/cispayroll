@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import type { IBonus, BonusType } from "../types/payroll";
 
 const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
+axios.defaults.withCredentials = true;
 
 interface CreateBonusData {
   employee: string;

@@ -1,20 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { FaUserPlus, FaBuildingColumns } from "react-icons/fa6";
-import { FaTimes, FaSpinner } from "react-icons/fa";
-import { toast } from "react-toastify";
-import { employeeService } from "../../../services/employeeService";
-import { salaryStructureService } from "../../../services/salaryStructureService";
-import { Dialog } from "@headlessui/react";
-import { DepartmentModal } from "../../../components/departments/DepartmentModal";
+import { FaSpinner } from "react-icons/fa";
 import { Department } from "../../../types/department";
 import { useAuth } from "../../../context/AuthContext";
-import { UserRole, User, Permission } from "../../../types/auth";
+import { User } from "../../../types/auth";
 import {
-  CreateEmployeeData,
   OnboardingEmployee,
   ExtendedOnboardingEmployee,
-  SalaryGrade,
 } from "../../../types/employee";
 import { Pagination } from "@mui/material";
 import { Grid } from "@mui/material";
@@ -24,23 +16,6 @@ import {
   OnboardingFilters,
 } from "../../../services/onboardingService";
 import { OnboardingDetailsModal } from "../../../components/modals/OnboardingDetailsModal";
-
-interface AdminUser {
-  _id: string;
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  role: UserRole;
-  status:
-    | "active"
-    | "inactive"
-    | "pending"
-    | "suspended"
-    | "terminated"
-    | "offboarding";
-  permissions: Permission[];
-}
 
 const useOnboardingData = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -185,39 +160,19 @@ type OnboardingStage =
   (typeof ONBOARDING_STAGES)[keyof typeof ONBOARDING_STAGES];
 
 export default function Onboarding() {
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showDepartmentModal, setShowDepartmentModal] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [salaryGrades, setSalaryGrades] = useState<SalaryGrade[]>([]);
-  const [isLoadingGrades, setIsLoadingGrades] = useState(false);
   const [filters, setFilters] = useState<OnboardingFilters>({
     status: "",
     department: "",
     search: "",
   });
 
-  const [formData, setFormData] = useState<CreateEmployeeData>({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    role: "USER",
-    position: "",
-    gradeLevel: "",
-    workLocation: "",
-    dateJoined: new Date().toISOString().split("T")[0],
-    department: "",
-  });
-
   const {
     departments,
-    setDepartments,
     onboardingEmployees,
     setOnboardingEmployees,
     isLoading,
     error,
     fetchData,
-    user,
     pagination,
     stats,
   } = useOnboardingData();
@@ -225,68 +180,10 @@ export default function Onboarding() {
   const [page] = useState(1);
   const [itemsPerPage] = useState(6);
 
-  // Add a state for admins
-  const [admins, setAdmins] = useState<AdminUser[]>([]);
-
   const [selectedEmployee, setSelectedEmployee] =
     useState<OnboardingEmployee | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Add role checks
-  const isAdmin = user?.role === "ADMIN";
-  const isSuperAdmin = user?.role === "SUPER_ADMIN";
-
-  // Update the fetchAdmins function to properly type the permissions
-  useEffect(() => {
-    const fetchAdmins = async () => {
-      try {
-        const response = await employeeService.getAdmins();
-        if (response && Array.isArray(response)) {
-          const transformedAdmins = response.map((admin) => ({
-            _id: admin._id,
-            id: admin._id,
-            firstName: admin.firstName,
-            lastName: admin.lastName,
-            email: admin.email,
-            role: admin.role || UserRole.ADMIN,
-            status: admin.status || "active",
-            permissions: (admin.permissions || []).map(
-              (perm) => perm as Permission
-            ),
-          }));
-          setAdmins(transformedAdmins as AdminUser[]);
-        } else {
-          setAdmins([]);
-        }
-      } catch (error) {
-        console.error("Failed to fetch admins:", error);
-        setAdmins([]);
-      }
-    };
-
-    fetchAdmins();
-  }, []);
-
-  // Fetch salary grades
-  const fetchSalaryGrades = useCallback(async () => {
-    try {
-      setIsLoadingGrades(true);
-      const grades = await salaryStructureService.getAllSalaryGrades();
-      setSalaryGrades(grades);
-    } catch (error) {
-      console.error("Error fetching salary grades:", error);
-      toast.error("Failed to load salary grades");
-    } finally {
-      setIsLoadingGrades(false);
-    }
-  }, []);
-
-  // Fetch salary grades when component mounts
-  useEffect(() => {
-    fetchSalaryGrades();
-  }, [fetchSalaryGrades]);
-
   // All useEffect hooks
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -305,52 +202,6 @@ export default function Onboarding() {
           );
 
     return filtered;
-  };
-
-  const handleCreateEmployee = async (formData: CreateEmployeeData) => {
-    try {
-      setIsCreating(true);
-      console.log("Creating employee with data:", formData);
-
-      // Ensure department is set for admin users
-      if (!formData.department && isAdmin) {
-        const userDepartment =
-          typeof user?.department === "object"
-            ? user.department._id
-            : user?.department;
-
-        if (!userDepartment) {
-          toast.error("No department assigned to admin user");
-          return;
-        }
-
-        formData.department = userDepartment;
-      }
-
-      if (isAdmin) {
-        formData.role = "USER";
-      }
-
-      let response;
-      if (isSuperAdmin) {
-        console.log("Using super admin service to create employee");
-        response = await employeeService.createEmployee(formData);
-      } else {
-        console.log("Using admin service to create employee");
-        response = await employeeService.adminService.createEmployee(formData);
-      }
-
-      console.log("Employee creation response:", response);
-
-      toast.success("Employee created successfully. Invitation sent.");
-      setShowCreateModal(false);
-      fetchData();
-    } catch (error) {
-      console.error("Error creating employee:", error);
-      toast.error("Failed to create employee. Please try again.");
-    } finally {
-      setIsCreating(false);
-    }
   };
 
   const handlePageChange = (
@@ -444,25 +295,6 @@ export default function Onboarding() {
       transition={{ duration: 0.5, ease: "easeOut" }}
       className="space-y-6 overflow-x-hidden"
     >
-      {/* Simplified top section with just the buttons */}
-      <div className="flex items-center space-x-4">
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="!bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors duration-200"
-        >
-          <FaUserPlus className="text-lg" />
-          <span>Create Employee</span>
-        </button>
-
-        <button
-          onClick={() => setShowDepartmentModal(true)}
-          className="!bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors duration-200"
-        >
-          <FaBuildingColumns className="text-lg" />
-          <span>Manage Departments</span>
-        </button>
-      </div>
-
       {/* Filter and Cards Section */}
       <div className="bg-white rounded-lg shadow-lg overflow-hidden">
         <div className="p-6">
@@ -610,271 +442,6 @@ export default function Onboarding() {
           </div>
         </div>
       </div>
-
-      {/* Modals */}
-      {showCreateModal && (
-        <Dialog
-          open={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          className="relative z-50"
-        >
-          <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
-          <div className="fixed inset-0 flex items-center justify-center p-4">
-            <Dialog.Panel className="mx-auto max-w-2xl w-full rounded-xl bg-white p-6 shadow-xl">
-              <div className="flex justify-between items-center mb-6">
-                <Dialog.Title className="text-xl font-semibold text-gray-900">
-                  Create New Employee
-                </Dialog.Title>
-                <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <FaTimes />
-                </button>
-              </div>
-
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleCreateEmployee(formData);
-                }}
-                className="space-y-4"
-              >
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      First Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      pattern="[A-Za-z\s]+"
-                      title="Please enter a valid name (letters and spaces only)"
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                      value={formData.firstName}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          firstName: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Last Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      pattern="[A-Za-z\s]+"
-                      title="Please enter a valid name (letters and spaces only)"
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                      value={formData.lastName}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          lastName: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Email *
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                      value={formData.email}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          email: e.target.value.toLowerCase(),
-                        }))
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Phone *
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      pattern="[\+]?[0-9\s\-]+"
-                      title="Please enter a valid phone number"
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                      value={formData.phone}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          phone: e.target.value,
-                        }))
-                      }
-                      placeholder="+234 XXX XXX XXXX"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Position *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                      value={formData.position}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          position: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Grade Level *
-                    </label>
-                    <div className="relative">
-                      <select
-                        required
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                        value={formData.gradeLevel}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            gradeLevel: e.target.value,
-                          }))
-                        }
-                      >
-                        <option value="">
-                          {isLoadingGrades
-                            ? "Loading grades..."
-                            : "Select Grade Level"}
-                        </option>
-                        {salaryGrades.map((grade) => (
-                          <option key={grade._id} value={grade.level}>
-                            {grade.level} - {grade.description}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Work Location *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                      value={formData.workLocation}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          workLocation: e.target.value.toUpperCase(),
-                        }))
-                      }
-                      placeholder="HQ-3F-IT"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Date Joined *
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                      value={formData.dateJoined}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          dateJoined: e.target.value,
-                        }))
-                      }
-                      max={new Date().toISOString().split("T")[0]}
-                    />
-                  </div>
-
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Department *
-                    </label>
-                    <div className="relative">
-                      <select
-                        required
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                        value={formData.department}
-                        onChange={(e) => {
-                          const selectedId = e.target.value;
-                          setFormData((prev) => ({
-                            ...prev,
-                            department: selectedId,
-                          }));
-                        }}
-                      >
-                        <option value="">Select Department</option>
-                        {departments?.map((dept) => (
-                          <option key={dept._id} value={dept._id}>
-                            {dept.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 flex justify-end space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateModal(false)}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                    disabled={isCreating}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isCreating}
-                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-white !bg-green-600 rounded-md hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed"
-                  >
-                    {isCreating ? (
-                      <>
-                        <FaSpinner className="animate-spin mr-2" />
-                        Creating...
-                      </>
-                    ) : (
-                      "Create Employee"
-                    )}
-                  </button>
-                </div>
-              </form>
-            </Dialog.Panel>
-          </div>
-        </Dialog>
-      )}
-
-      <DepartmentModal
-        isOpen={showDepartmentModal}
-        onClose={() => setShowDepartmentModal(false)}
-        departments={departments}
-        admins={admins}
-        isLoading={isLoading}
-        onSuccess={async () => {
-          const response = await departmentService.getAllDepartments();
-          setDepartments(response);
-        }}
-      />
 
       {/* Add this where you want to show the employee list */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -189,12 +189,16 @@ const CompleteRegistration = () => {
     const verifyToken = async () => {
       try {
         setIsLoading(true);
-        const response = await api.get(`/api/invitation/verify/${token}`);
+        const response = await api.get(`/api/invitation/verify/${token}`, {
+          withCredentials: true, 
+        });
 
         if (response.data.success) {
           setUserData(response.data.user);
           setIsTokenValid(true);
-          toast.success("Invitation verified successfully. Please complete your registration.");
+          toast.success(
+            "Invitation verified successfully. Please complete your registration."
+          );
         }
       } catch (error) {
         setIsTokenValid(false);

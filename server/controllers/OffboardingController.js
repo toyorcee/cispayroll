@@ -171,21 +171,24 @@ export class OffboardingController {
       const limit = parseInt(req.query.limit) || 10;
       const skip = (page - 1) * limit;
 
-      // Get total count for pagination - include both active and completed offboarding
-      const totalCount = await UserModel.countDocuments({
+      // Build base query
+      const baseQuery = {
         $or: [
           { "lifecycle.currentState": UserLifecycleState.OFFBOARDING },
           { "offboarding.status": { $in: ["in_progress", "completed"] } },
         ],
-      });
+      };
+
+      // If user is an admin, only show employees from their department
+      if (req.user.role === "ADMIN") {
+        baseQuery.department = req.user.department._id;
+      }
+
+      // Get total count for pagination - include both active and completed offboarding
+      const totalCount = await UserModel.countDocuments(baseQuery);
 
       // Get paginated employees - include both active and completed offboarding
-      const employees = await UserModel.find({
-        $or: [
-          { "lifecycle.currentState": UserLifecycleState.OFFBOARDING },
-          { "offboarding.status": { $in: ["in_progress", "completed"] } },
-        ],
-      })
+      const employees = await UserModel.find(baseQuery)
         .populate("department", "name code")
         .populate("offboarding.initiatedBy", "firstName lastName email")
         .select("-password")

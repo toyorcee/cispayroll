@@ -84,6 +84,16 @@ export const NOTIFICATION_TYPES = {
   ALLOWANCE_PENDING_ADMIN_APPROVAL: "ALLOWANCE_PENDING_ADMIN_APPROVAL",
   ALLOWANCE_ERROR: "ALLOWANCE_ERROR",
   ALLOWANCE_COMPLETED: "ALLOWANCE_COMPLETED",
+
+  // Leave specific notifications
+  LEAVE_REQUESTED: "LEAVE_REQUESTED",
+  LEAVE_REQUESTED_INFO: "LEAVE_REQUESTED_INFO",
+  LEAVE_APPROVED: "LEAVE_APPROVED",
+  LEAVE_REJECTED: "LEAVE_REJECTED",
+  LEAVE_HR_APPROVED: "LEAVE_HR_APPROVED",
+  LEAVE_HR_REJECTED: "LEAVE_HR_REJECTED",
+  LEAVE_PENDING_HR_APPROVAL: "LEAVE_PENDING_HR_APPROVAL",
+  LEAVE_CANCELLED: "LEAVE_CANCELLED",
 };
 
 // Message templates for different notification types
@@ -235,6 +245,7 @@ export class NotificationService {
         currentLevel: payrollData?.approvalFlow?.currentLevel,
         nextLevel: payrollData?.approvalFlow?.nextLevel,
         remarks,
+        options: options,
       });
 
       title = template.title;
@@ -636,47 +647,70 @@ export class NotificationService {
     }
   }
 
-  static getMessageTemplate(type, data = {}) {
-    const {
-      employee,
-      payroll,
-      currentLevel,
-      nextLevel,
-      remarks,
-      approvalLevel,
-    } = data;
+  static getMessageTemplate(type, data, currentLevel, approvalLevel) {
     console.log("🔍 getMessageTemplate called with:", {
       type,
       data,
       currentLevel,
       approvalLevel,
-      dataCurrentLevel: data.currentLevel,
-      dataApprovalLevel: data.approvalLevel,
-      dataDataApprovalLevel: data.data?.approvalLevel,
+      dataCurrentLevel: data?.currentLevel,
+      dataApprovalLevel: data?.approvalLevel,
+      dataDataApprovalLevel: data?.data?.approvalLevel,
     });
 
-    const employeeName = employee
-      ? `${employee.firstName} ${employee.lastName}`
-      : "";
-    const payrollPeriod = payroll ? `${payroll.month}/${payroll.year}` : "";
-    const netPay = payroll?.netPay ? `₦${payroll.netPay.toLocaleString()}` : "";
+    // Ensure data is an object
+    if (!data) data = {};
+
+    // Extract leave data if available - prioritize options.leave
+    const leave = data.options?.leave || data.leave || data.data?.leave || null;
+
+    console.log("🔍 Extracted leave data:", leave);
+
+    // Format dates for leave notifications
+    const formatDate = (dateString) => {
+      if (!dateString) return "Invalid Date";
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString("en-US", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        });
+      } catch (e) {
+        console.error("Error formatting date:", e);
+        return "Invalid Date";
+      }
+    };
+
+    // Get leave type display name
+    const getLeaveTypeDisplay = (type) => {
+      if (!type) return "undefined";
+      return type.charAt(0).toUpperCase() + type.slice(1);
+    };
+
+    // Get department name
+    const getDepartmentName = (departmentId) => {
+      if (!departmentId) return "Unknown Department";
+      // In a real implementation, you might want to fetch this from a cache or database
+      return "Department"; // Placeholder
+    };
 
     switch (type) {
       case NOTIFICATION_TYPES.PAYROLL_SUBMITTED:
         // Check if the employee is the one who submitted
         const isSubmitter =
-          employee._id.toString() ===
-          payroll.approvalFlow?.submittedBy?.toString();
+          data.employee._id.toString() ===
+          data.payroll.approvalFlow?.submittedBy?.toString();
 
         if (isSubmitter) {
           return {
             title: "Payroll Submitted",
-            message: `You have submitted payroll for ${payroll.employee.firstName} ${payroll.employee.lastName} (${payroll.month}/${payroll.year}) and it is waiting for your approval as HR Manager`,
+            message: `You have submitted payroll for ${data.payroll.employee.firstName} ${data.payroll.employee.lastName} (${data.payroll.month}/${data.payroll.year}) and it is waiting for your approval as HR Manager`,
           };
         } else {
           return {
             title: "Payroll Submitted",
-            message: `New payroll submission for ${employee.firstName} ${employee.lastName} for ${payroll.month}/${payroll.year} requires your approval as HR Manager`,
+            message: `New payroll submission for ${data.employee.firstName} ${data.employee.lastName} for ${data.payroll.month}/${data.payroll.year} requires your approval as HR Manager`,
           };
         }
 
@@ -694,13 +728,16 @@ export class NotificationService {
 
         return {
           title: "Payroll Pending Approval",
-          message: `New payroll for ${employeeName} (${payrollPeriod}) requires your approval as ${approverRole}`,
+          message: `New payroll for ${data.employee?.firstName || ""} ${
+            data.employee?.lastName || ""
+          } (${data.payroll?.month}/${
+            data.payroll?.year
+          }) requires your approval as ${approverRole}`,
         };
 
       case NOTIFICATION_TYPES.PAYROLL_APPROVED:
         // Get approvalLevel from data.approvalLevel or data.data.approvalLevel
-        const level =
-          data.approvalLevel || (data.data && data.data.approvalLevel);
+        const level = approvalLevel || (data.data && data.data.approvalLevel);
         console.log("🔍 PAYROLL_APPROVED level check:", {
           level,
           isHRManager: level === APPROVAL_LEVELS.HR_MANAGER,
@@ -710,97 +747,137 @@ export class NotificationService {
         if (level === APPROVAL_LEVELS.HR_MANAGER) {
           return {
             title: "Payroll Approved",
-            message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved by you as HR Manager${
-              remarks ? `: ${remarks}` : ""
+            message: `Payroll for ${data.employee?.firstName || ""} ${
+              data.employee?.lastName || ""
+            } (${data.payroll?.month}/${
+              data.payroll?.year
+            }) has been approved by you as HR Manager${
+              data.remarks ? `: ${data.remarks}` : ""
             } and is now waiting for Finance Director approval`,
           };
         } else if (level === APPROVAL_LEVELS.FINANCE_DIRECTOR) {
           return {
             title: "Payroll Approved",
-            message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved by you as Finance Director${
-              remarks ? `: ${remarks}` : ""
+            message: `Payroll for ${data.employee?.firstName || ""} ${
+              data.employee?.lastName || ""
+            } (${data.payroll?.month}/${
+              data.payroll?.year
+            }) has been approved by you as Finance Director${
+              data.remarks ? `: ${data.remarks}` : ""
             } and is now waiting for Super Admin approval`,
           };
         } else if (level === APPROVAL_LEVELS.DEPARTMENT_HEAD) {
           return {
             title: "Payroll Approved",
-            message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved by you as Department Head${
-              remarks ? `: ${remarks}` : ""
+            message: `Payroll for ${data.employee?.firstName || ""} ${
+              data.employee?.lastName || ""
+            } (${data.payroll?.month}/${
+              data.payroll?.year
+            }) has been approved by you as Department Head${
+              data.remarks ? `: ${data.remarks}` : ""
             } and is now waiting for HR Manager approval`,
           };
         }
 
         return {
           title: "Payroll Approved",
-          message: `Payroll for ${employeeName} (${payrollPeriod}) has been approved${
-            remarks ? `: ${remarks}` : ""
-          }${nextLevel ? ` and is waiting for ${nextLevel} approval` : ""}`,
+          message: `Payroll for ${data.employee?.firstName || ""} ${
+            data.employee?.lastName || ""
+          } (${data.payroll?.month}/${data.payroll?.year}) has been approved${
+            data.remarks ? `: ${data.remarks}` : ""
+          }${
+            data.nextLevel
+              ? ` and is waiting for ${data.nextLevel} approval`
+              : ""
+          }`,
         };
 
       case NOTIFICATION_TYPES.PAYROLL_CREATED:
         return {
           title: "Payroll Created",
-          message: `Payroll for ${employeeName} (${payrollPeriod}) has been created and is currently in ${
-            payroll?.status || "Unknown"
+          message: `Payroll for ${data.employee?.firstName || ""} ${
+            data.employee?.lastName || ""
+          } (${data.payroll?.month}/${
+            data.payroll?.year
+          }) has been created and is currently in ${
+            data.payroll?.status || "Unknown"
           } status.`,
         };
 
       case NOTIFICATION_TYPES.PAYROLL_DRAFT_CREATED:
         return {
           title: "Draft Payroll Created",
-          message: `A draft payroll for ${employeeName} (${payrollPeriod}) has been created for your review.`,
+          message: `A draft payroll for ${data.employee?.firstName || ""} ${
+            data.employee?.lastName || ""
+          } (${data.payroll?.month}/${
+            data.payroll?.year
+          }) has been created for your review.`,
         };
       case NOTIFICATION_TYPES.PAYROLL_REJECTED:
         return {
           title: "Payroll Rejected",
-          message: `Payroll for ${employeeName} (${payrollPeriod}) has been rejected. Reason: ${
-            remarks || "No reason provided"
+          message: `Payroll for ${data.employee?.firstName || ""} ${
+            data.employee?.lastName || ""
+          } (${data.payroll?.month}/${
+            data.payroll?.year
+          }) has been rejected. Reason: ${
+            data.remarks || "No reason provided"
           }`,
         };
       case NOTIFICATION_TYPES.PAYROLL_PAID:
         return {
           title: "Payroll Paid",
-          message: `Payroll for ${employeeName} (${payrollPeriod}) has been processed for payment.`,
+          message: `Payroll for ${data.employee?.firstName || ""} ${
+            data.employee?.lastName || ""
+          } (${data.payroll?.month}/${
+            data.payroll?.year
+          }) has been processed for payment.`,
         };
       case NOTIFICATION_TYPES.BANK_DETAILS_REQUIRED:
         return {
           title: "Bank Details Required",
-          message: `Bank details are required for ${employeeName}'s payroll approval. Please update your bank details in your profile.`,
+          message: `Bank details are required for ${
+            data.employee?.firstName || ""
+          } ${
+            data.employee?.lastName || ""
+          }'s payroll approval. Please update your bank details in your profile.`,
         };
       case NOTIFICATION_TYPES.DEPARTMENT_PAYROLL_APPROVED:
         return {
           title: "Department Payroll Approved",
-          message: `All department payrolls for ${payrollPeriod} have been approved${
-            remarks ? `: ${remarks}` : ""
-          }`,
+          message: `All department payrolls for ${data.payroll?.month}/${
+            data.payroll?.year
+          } have been approved${data.remarks ? `: ${data.remarks}` : ""}`,
         };
       case NOTIFICATION_TYPES.DEPARTMENT_PAYROLL_REJECTED:
         return {
           title: "Department Payroll Rejected",
-          message: `Department payrolls for ${payrollPeriod} have been rejected. Reason: ${
-            remarks || "No reason provided"
+          message: `Department payrolls for ${data.payroll?.month}/${
+            data.payroll?.year
+          } have been rejected. Reason: ${
+            data.remarks || "No reason provided"
           }`,
         };
       case NOTIFICATION_TYPES.DEPARTMENT_PAYROLL_REJECTION_STARTED:
         return {
           title: "Department Payroll Rejection Started",
-          message: `Started rejecting department payrolls for ${payrollPeriod}${
-            remarks ? `: ${remarks}` : ""
-          }`,
+          message: `Started rejecting department payrolls for ${
+            data.payroll?.month
+          }/${data.payroll?.year}${data.remarks ? `: ${data.remarks}` : ""}`,
         };
       case NOTIFICATION_TYPES.DEPARTMENT_PAYROLL_REJECTION_SUMMARY:
         return {
           title: "Department Payroll Rejection Summary",
-          message: `Department payroll rejection summary for ${payrollPeriod}: ${
-            remarks || "No summary provided"
-          }`,
+          message: `Department payroll rejection summary for ${
+            data.payroll?.month
+          }/${data.payroll?.year}: ${data.remarks || "No summary provided"}`,
         };
       case NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED:
         return {
           title: "Bulk Payroll Processed",
           message:
             data.metadata?.message ||
-            `Bulk payroll processing for ${payrollPeriod} has been completed.`,
+            `Bulk payroll processing for ${data.payroll?.month}/${data.payroll?.year} has been completed.`,
           data: {
             ...data.metadata,
             departmentBreakdown: data.metadata?.departmentBreakdown || [],
@@ -813,26 +890,40 @@ export class NotificationService {
       case NOTIFICATION_TYPES.PAYMENT_FAILED:
         return {
           title: "Payment Failed",
-          message: `Payment for ${employeeName}'s payroll (${payrollPeriod}) has failed.${
-            remarks ? ` Reason: ${remarks}` : ""
-          }`,
+          message: `Payment for ${data.employee?.firstName || ""} ${
+            data.employee?.lastName || ""
+          }'s payroll (${data.payroll?.month}/${
+            data.payroll?.year
+          }) has failed.${data.remarks ? ` Reason: ${data.remarks}` : ""}`,
         };
       case NOTIFICATION_TYPES.PAYMENT_CANCELLED:
         return {
           title: "Payment Cancelled",
-          message: `Payment for ${employeeName}'s payroll (${payrollPeriod}) has been cancelled.${
-            remarks ? ` Reason: ${remarks}` : ""
+          message: `Payment for ${data.employee?.firstName || ""} ${
+            data.employee?.lastName || ""
+          }'s payroll (${data.payroll?.month}/${
+            data.payroll?.year
+          }) has been cancelled.${
+            data.remarks ? ` Reason: ${data.remarks}` : ""
           }`,
         };
       case NOTIFICATION_TYPES.PAYMENT_ARCHIVED:
         return {
           title: "Payment Archived",
-          message: `Payment record for ${employeeName}'s payroll (${payrollPeriod}) has been archived.`,
+          message: `Payment record for ${data.employee?.firstName || ""} ${
+            data.employee?.lastName || ""
+          }'s payroll (${data.payroll?.month}/${
+            data.payroll?.year
+          }) has been archived.`,
         };
       case NOTIFICATION_TYPES.ALLOWANCE_REQUESTED:
         return {
           title: "New Allowance Request",
-          message: `${employee?.firstName} ${employee?.lastName} has requested a new ${data.allowance?.type} allowance of ${data.allowance?.amount}.`,
+          message: `${data.employee?.firstName || ""} ${
+            data.employee?.lastName || ""
+          } has requested a new ${data.allowance?.type} allowance of ${
+            data.allowance?.amount
+          }.`,
         };
       case NOTIFICATION_TYPES.ALLOWANCE_APPROVED:
         return {
@@ -844,7 +935,7 @@ export class NotificationService {
           title: "Allowance Rejected",
           message: `Your ${
             data.allowance?.type
-          } allowance request has been rejected. ${remarks || ""}`,
+          } allowance request has been rejected. ${data.remarks || ""}`,
         };
       case NOTIFICATION_TYPES.ALLOWANCE_UPDATED:
         return {
@@ -859,129 +950,137 @@ export class NotificationService {
       case NOTIFICATION_TYPES.ALLOWANCE_PENDING_HOD_APPROVAL:
         return {
           title: "Allowance Pending HOD Approval",
-          message: `${employee?.firstName} ${employee?.lastName}'s ${data.allowance?.type} allowance request is pending your approval.`,
+          message: `${data.employee?.firstName || ""} ${
+            data.employee?.lastName || ""
+          }'s ${
+            data.allowance?.type
+          } allowance request is pending your approval.`,
         };
       case NOTIFICATION_TYPES.ALLOWANCE_PENDING_HR_APPROVAL:
         return {
           title: "Allowance Pending HR Approval",
-          message: `${employee?.firstName} ${employee?.lastName}'s ${data.allowance?.type} allowance request is pending HR approval.`,
+          message: `${data.employee?.firstName || ""} ${
+            data.employee?.lastName || ""
+          }'s ${
+            data.allowance?.type
+          } allowance request is pending HR approval.`,
         };
       case NOTIFICATION_TYPES.ALLOWANCE_PENDING_ADMIN_APPROVAL:
         return {
           title: "Allowance Pending Admin Approval",
-          message: `${employee?.firstName} ${employee?.lastName}'s ${data.allowance?.type} allowance request is pending admin approval.`,
+          message: `${data.employee?.firstName || ""} ${
+            data.employee?.lastName || ""
+          }'s ${
+            data.allowance?.type
+          } allowance request is pending admin approval.`,
         };
       case NOTIFICATION_TYPES.ALLOWANCE_ERROR:
         return {
           title: "Allowance Error",
           message: `There was an error processing your ${
             data.allowance?.type
-          } allowance request. ${remarks || ""}`,
+          } allowance request. ${data.remarks || ""}`,
         };
       case NOTIFICATION_TYPES.ALLOWANCE_COMPLETED:
         return {
           title: "Allowance Completed",
           message: `Your ${data.allowance?.type} allowance request has been completed successfully.`,
         };
+      case NOTIFICATION_TYPES.LEAVE_REQUESTED_INFO:
+        return {
+          title: "Leave Request Submitted",
+          message: `Your ${getLeaveTypeDisplay(
+            leave?.type
+          )} leave request from ${formatDate(leave?.startDate)} to ${formatDate(
+            leave?.endDate
+          )} has been submitted for approval.`,
+        };
+      case NOTIFICATION_TYPES.LEAVE_REQUESTED:
+        return {
+          title: "Leave Request",
+          message: `${data.employee?.firstName || ""} ${
+            data.employee?.lastName || ""
+          } has requested ${getLeaveTypeDisplay(
+            leave?.type
+          )} leave from ${formatDate(leave?.startDate)} to ${formatDate(
+            leave?.endDate
+          )}.`,
+        };
+      case NOTIFICATION_TYPES.LEAVE_APPROVED:
+        return {
+          title: "Leave Request Approved",
+          message: `Your ${getLeaveTypeDisplay(
+            leave?.type
+          )} leave request from ${formatDate(leave?.startDate)} to ${formatDate(
+            leave?.endDate
+          )} has been approved.`,
+        };
+      case NOTIFICATION_TYPES.LEAVE_REJECTED:
+        return {
+          title: "Leave Request Rejected",
+          message: `Your ${getLeaveTypeDisplay(
+            leave?.type
+          )} leave request from ${formatDate(leave?.startDate)} to ${formatDate(
+            leave?.endDate
+          )} has been rejected.${
+            data.remarks ? ` Reason: ${data.remarks}` : ""
+          }`,
+        };
+      case NOTIFICATION_TYPES.LEAVE_HR_APPROVED:
+        return {
+          title: "Leave HR Approved",
+          message: `Your ${getLeaveTypeDisplay(
+            leave?.type
+          )} leave request from ${formatDate(leave?.startDate)} to ${formatDate(
+            leave?.endDate
+          )} has been approved by HR.${
+            data.remarks ? ` Notes: ${data.remarks}` : ""
+          }`,
+        };
+      case NOTIFICATION_TYPES.LEAVE_HR_REJECTED:
+        return {
+          title: "Leave HR Rejected",
+          message: `Your ${getLeaveTypeDisplay(
+            leave?.type
+          )} leave request from ${formatDate(leave?.startDate)} to ${formatDate(
+            leave?.endDate
+          )} has been rejected by HR.${
+            data.remarks ? ` Reason: ${data.remarks}` : ""
+          }`,
+        };
+      case NOTIFICATION_TYPES.LEAVE_PENDING_HR_APPROVAL:
+        return {
+          title: "Leave Pending HR Approval",
+          message: `Your ${getLeaveTypeDisplay(
+            leave?.type
+          )} leave request from ${formatDate(leave?.startDate)} to ${formatDate(
+            leave?.endDate
+          )} is pending HR approval.${
+            data.remarks ? ` Notes: ${data.remarks}` : ""
+          }`,
+        };
+      case NOTIFICATION_TYPES.LEAVE_CANCELLED:
+        return {
+          title: "Leave Cancelled",
+          message: `${data.employee?.firstName || ""} ${
+            data.employee?.lastName || ""
+          } has cancelled their ${getLeaveTypeDisplay(
+            leave?.type
+          )} leave request from ${formatDate(leave?.startDate)} to ${formatDate(
+            leave?.endDate
+          )}.`,
+        };
       default:
         return {
           title: "Payroll Notification",
-          message: `A notification of type ${type} for ${employeeName} (${payrollPeriod})`,
+          message: `A notification of type ${type} for ${
+            data.employee?.firstName || ""
+          } ${data.employee?.lastName || ""} (${data.payroll?.month}/${
+            data.payroll?.year
+          })`,
         };
     }
   }
-
-  // static async createAllowanceRequestNotification(employee, allowance) {
-  //   return this.createNotification(
-  //     employee._id,
-  //     NOTIFICATION_TYPES.ALLOWANCE_REQUESTED,
-  //     employee,
-  //     null,
-  //     null,
-  //     { allowance }
-  //   );
-  // }
-
-  // static async createAllowanceApprovalNotification(
-  //   employee,
-  //   allowance,
-  //   approver
-  // ) {
-  //   return this.createNotification(
-  //     employee._id,
-  //     NOTIFICATION_TYPES.ALLOWANCE_APPROVED,
-  //     employee,
-  //     null,
-  //     null,
-  //     { allowance, approver }
-  //   );
-  // }
-
-  // static async createAllowanceRejectionNotification(
-  //   employee,
-  //   allowance,
-  //   approver,
-  //   remarks
-  // ) {
-  //   return this.createNotification(
-  //     employee._id,
-  //     NOTIFICATION_TYPES.ALLOWANCE_REJECTED,
-  //     employee,
-  //     null,
-  //     remarks,
-  //     { allowance, approver }
-  //   );
-  // }
-
-  // static async createAllowanceUpdateNotification(employee, allowance) {
-  //   return this.createNotification(
-  //     employee._id,
-  //     NOTIFICATION_TYPES.ALLOWANCE_UPDATED,
-  //     employee,
-  //     null,
-  //     null,
-  //     { allowance }
-  //   );
-  // }
-
-  // static async createAllowancePendingNotification(
-  //   employee,
-  //   allowance,
-  //   approverRole,
-  //   approverId = null
-  // ) {
-  //   const type = this.getPendingApprovalType(approverRole);
-  //   return this.createNotification(
-  //     approverId || (approverRole === "employee" ? employee._id : null),
-  //     type,
-  //     employee,
-  //     null,
-  //     null,
-  //     { allowance }
-  //   );
-  // }
-
-  // static async createAllowanceErrorNotification(employee, allowance, error) {
-  //   return this.createNotification(
-  //     employee._id,
-  //     NOTIFICATION_TYPES.ALLOWANCE_ERROR,
-  //     employee,
-  //     null,
-  //     error.message,
-  //     { allowance }
-  //   );
-  // }
-
-  // static async createAllowanceCompletedNotification(employee, allowance) {
-  //   return this.createNotification(
-  //     employee._id,
-  //     NOTIFICATION_TYPES.ALLOWANCE_COMPLETED,
-  //     employee,
-  //     null,
-  //     null,
-  //     { allowance }
-  //   );
-  // }
 
   static getPendingApprovalType(approverRole) {
     switch (approverRole.toLowerCase()) {

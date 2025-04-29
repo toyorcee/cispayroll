@@ -102,6 +102,7 @@ export interface ProcessingStats {
 }
 
 const BASE_URL = `${import.meta.env.VITE_API_URL}/api/regular-user`;
+axios.defaults.withCredentials = true;
 
 const userService = {
   /**

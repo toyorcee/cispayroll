@@ -6,6 +6,8 @@ import { AdminResponse } from "./employeeService";
 import { toast } from "react-toastify";
 
 const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
+axios.defaults.withCredentials = true;
+
 export interface DepartmentResponse {
   _id: string;
   name: string;

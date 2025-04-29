@@ -19,8 +19,10 @@ import { DashboardStats } from "../data/dashboardData";
 import { salaryStructureService } from "./salaryStructureService";
 import { mapEmployeeToDetails } from "../utils/mappers";
 import { useAuth } from "../context/AuthContext";
+import { ISalaryGrade } from "../types/salary";
 
 const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
+const SUPER_ADMIN_BASE_URL = `${BASE_URL}/super-admin`;
 
 // Set default axios config to always include credentials
 axios.defaults.withCredentials = true;
@@ -471,9 +473,19 @@ export const employeeService = {
     return response.data;
   },
 
-  getAdmins: async (): Promise<AdminResponse[]> => {
-    const response = await axios.get(`${BASE_URL}/super-admin/admins`);
-    return response.data.data;
+  useGetAdmins: () => {
+    const { user } = useAuth();
+    return useQuery<AdminResponse[]>({
+      queryKey: ["admins"],
+      queryFn: async () => {
+        if (user?.role !== UserRole.SUPER_ADMIN) {
+          return []; // Return empty array for non-super admins
+        }
+        const response = await axios.get(`${SUPER_ADMIN_BASE_URL}/admins`);
+        return response.data.admins || [];
+      },
+      enabled: user?.role === UserRole.SUPER_ADMIN,
+    });
   },
 
   getDashboardStats: async (): Promise<DashboardStats> => {
@@ -538,17 +550,6 @@ export const employeeService = {
     }
   },
 
-  useGetAdmins: () => {
-    return useQuery<AdminResponse[]>({
-      queryKey: ["admins"],
-      queryFn: async () => {
-        const response = await axios.get(`${BASE_URL}/super-admin/admins`);
-        // Make sure we always return an array, even if empty
-        return response.data.admins || [];
-      },
-    });
-  },
-
   /**
    * Gets Heads of Departments by filtering admins
    * @returns Promise<HODResponse[]>
@@ -573,11 +574,19 @@ export const employeeService = {
   },
 
   useGetSalaryGrades: () => {
-    return useQuery({
+    return useQuery<ISalaryGrade[]>({
       queryKey: ["salaryGrades"],
-      queryFn: salaryStructureService.getAllSalaryGrades,
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 30 * 60 * 1000, // 30 minutes
+      queryFn: async () => {
+        try {
+          const result = await salaryStructureService.getAllSalaryGrades();
+          return result || []; 
+        } catch (error) {
+          console.error("Error fetching salary grades:", error);
+          return []; 
+        }
+      },
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
     });
   },
 

@@ -71,6 +71,7 @@ export const FAILED_PAYROLLS_QUERY_KEY = "failedPayrolls";
 
 // Use the same BASE_URL pattern as other services
 const baseURL = "/api";
+axios.defaults.withCredentials = true;
 
 class AuditService {
   private baseUrl: string;

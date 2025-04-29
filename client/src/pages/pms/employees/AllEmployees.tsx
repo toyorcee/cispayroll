@@ -202,7 +202,7 @@ export default function AllEmployees() {
   }, [departmentsData]);
 
   useEffect(() => {
-    if (adminsData) {
+    if (adminsData && isSuperAdmin) {
       const filteredAdmins = adminsData.filter(
         (admin): admin is AdminResponse => {
           if (!admin || typeof admin !== "object") return false;
@@ -211,7 +211,7 @@ export default function AllEmployees() {
       );
       setAdmins(filteredAdmins);
     }
-  }, [adminsData]);
+  }, [adminsData, isSuperAdmin]);
 
   const handleSearch = (query: string) => {
     setFilters((prev) => ({ ...prev, search: query, page: 1 }));

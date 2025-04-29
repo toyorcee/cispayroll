@@ -4766,4 +4766,19 @@ export class AdminController {
       next(error);
     }
   }
+
+  static async getSalaryGrades(req, res, next) {
+    try {
+      // Get all salary grades
+      const salaryGrades = await SalaryGrade.find().sort({ createdAt: -1 });
+
+      res.status(200).json({
+        success: true,
+        salaryGrades,
+        count: salaryGrades.length,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

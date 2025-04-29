@@ -6,6 +6,7 @@ import {
   ISalaryComponentInput,
   CreateSalaryGradeDTO,
 } from "../types/salary";
+import { UserRole } from "../types/auth"; 
 
 const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
 
@@ -21,11 +22,17 @@ interface UpdateSalaryGradeInput {
 }
 
 export const salaryStructureService = {
-  getAllSalaryGrades: async (): Promise<ISalaryGrade[]> => {
+  getAllSalaryGrades: async (
+    userRole: UserRole = UserRole.USER
+  ): Promise<ISalaryGrade[]> => {
     try {
-      const response = await axios.get<{ data: ISalaryGrade[] }>(
-        `${BASE_URL}/super-admin/salary-grades`
-      );
+      // Determine the endpoint based on user role
+      const endpoint =
+        userRole === UserRole.SUPER_ADMIN
+          ? `${BASE_URL}/super-admin/salary-grades`
+          : `${BASE_URL}/admin/salary-grades`;
+
+      const response = await axios.get<{ data: ISalaryGrade[] }>(endpoint);
 
       // Just return the data directly from backend
       return response.data.data;

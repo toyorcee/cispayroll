@@ -23,6 +23,11 @@ export class OnboardingController {
         status: "active",
       };
 
+      // If user is an admin, only show employees from their department
+      if (req.user.role === "ADMIN") {
+        query.department = req.user.department._id;
+      }
+
       // Add filters if provided
       if (status) {
         query["onboarding.status"] = status;

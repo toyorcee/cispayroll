@@ -4,6 +4,7 @@ import { UserRole } from "../types/auth";
 
 const BASE_URL = `${import.meta.env.VITE_API_URL}/api/admin`;
 const SUPER_ADMIN_BASE_URL = `${import.meta.env.VITE_API_URL}/api/super-admin`;
+axios.defaults.withCredentials = true;
 
 const isSuperAdmin = (userRole?: string): boolean => {
   return userRole === UserRole.SUPER_ADMIN;

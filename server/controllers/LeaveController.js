@@ -1,13 +1,11 @@
 import { LeaveService } from "../services/leaveService.js";
 import User from "../models/User.js";
 import { Types } from "mongoose";
-import { LEAVE_STATUS, APPROVAL_LEVEL } from "../models/Leave.js";
+import { LEAVE_STATUS } from "../models/Leave.js";
 import Leave from "../models/Leave.js";
 import Department from "../models/Department.js";
 import AuditService from "../services/AuditService.js";
 import { AuditAction, AuditEntity } from "../models/Audit.js";
-import { NotificationService } from "../services/NotificationService.js";
-import { NOTIFICATION_TYPES } from "../services/NotificationService.js";
 
 export class LeaveController {
   /**
@@ -19,20 +17,28 @@ export class LeaveController {
   static async requestLeave(req, res, next) {
     try {
       const userId = req.user.id;
+      console.log(`[LeaveController] ====== LEAVE REQUEST INITIATED ======`);
       console.log(`[LeaveController] User ${userId} is requesting a leave`);
+      console.log(
+        `[LeaveController] Request body:`,
+        JSON.stringify(req.body, null, 2)
+      );
 
       const user = await User.findById(userId);
 
       // Log the user requesting the leave
+      console.log(`[LeaveController] ====== USER DETAILS ======`);
       console.log("[LeaveController] Leave Request - User Details:", {
         userId: userId,
         userEmail: user?.email,
         userName: user ? `${user.firstName} ${user.lastName}` : "Unknown",
         userRole: user?.role,
         userDepartment: user?.department,
+        userPosition: user?.position,
       });
 
       // Log the leave request data
+      console.log(`[LeaveController] ====== LEAVE REQUEST DATA ======`);
       console.log("[LeaveController] Leave Request - Request Data:", {
         type: req.body.type,
         startDate: req.body.startDate,
@@ -46,6 +52,7 @@ export class LeaveController {
         return res.status(404).json({ message: "User not found" });
       }
 
+      console.log(`[LeaveController] ====== CALLING LEAVE SERVICE ======`);
       console.log(
         `[LeaveController] Calling LeaveService.createLeave for user ${user._id}`
       );
@@ -60,14 +67,23 @@ export class LeaveController {
       );
 
       // Log the created leave
+      console.log(`[LeaveController] ====== LEAVE REQUEST CREATED ======`);
       console.log("[LeaveController] Leave Request - Created Leave:", {
         leaveId: leave._id,
         status: leave.status,
         createdAt: leave.createdAt,
+        type: leave.type,
+        startDate: leave.startDate,
+        endDate: leave.endDate,
+        department: leave.department,
       });
 
+      console.log(
+        `[LeaveController] ====== LEAVE REQUEST PROCESS COMPLETED ======`
+      );
       res.status(201).json({ message: "Leave request created", leave });
     } catch (error) {
+      console.error("[LeaveController] ====== ERROR IN LEAVE REQUEST ======");
       console.error("[LeaveController] Leave Request - Error:", error);
       const message = error instanceof Error ? error.message : "Server error";
       res.status(400).json({ message });
@@ -208,114 +224,33 @@ export class LeaveController {
         });
       }
 
-      // For super admin, allow approval regardless of department
-      if (approver.role === "SUPER_ADMIN") {
-        leave.status = LEAVE_STATUS.APPROVED;
-        leave.approvedBy = approver._id;
-        leave.approvalDate = new Date();
-        leave.approvalNotes = notes;
-
-        // Add to approval history
-        const approvalEntry = {
-          level: 3,
-          approver: approver._id,
-          status: LEAVE_STATUS.APPROVED,
-          notes: notes,
-          date: new Date(),
-        };
-
-        if (!leave.approvalHistory) {
-          leave.approvalHistory = [];
-        }
-        leave.approvalHistory.push(approvalEntry);
-
-        await leave.save();
-
-        // Create audit log
-        await AuditService.logAction(
-          AuditAction.UPDATE,
-          AuditEntity.LEAVE,
-          leave._id,
+      // Use the LeaveService to handle the approval logic
+      try {
+        const updatedLeave = await LeaveService.approveLeave(
+          new Types.ObjectId(leaveId),
           approver._id,
-          {
-            action: "APPROVE",
-            previousStatus: LEAVE_STATUS.PENDING,
-            newStatus: LEAVE_STATUS.APPROVED,
-            approverRole: "SUPER_ADMIN",
-            notes: notes,
-          }
+          notes
         );
 
-        return res.status(200).json({
+        console.log(
+          `[LeaveController] Leave ${leaveId} approved by ${approver._id}`
+        );
+
+        res.json({
           success: true,
           message: "Leave request approved successfully",
-          data: leave,
+          data: updatedLeave,
         });
-      }
-
-      // For regular admin, check department
-      const department = await Department.findById(leave.user.department);
-      if (!department) {
-        return res.status(404).json({
+      } catch (serviceError) {
+        console.error(
+          `[LeaveController] Error in LeaveService.approveLeave:`,
+          serviceError
+        );
+        return res.status(400).json({
           success: false,
-          message: "Department not found",
+          message: serviceError.message || "Failed to approve leave request",
         });
       }
-
-      const isDepartmentHead =
-        department.headOfDepartment &&
-        department.headOfDepartment.toString() === approver._id.toString();
-
-      if (!isDepartmentHead) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "Only department head or super admin can approve leave requests",
-        });
-      }
-
-      // Update leave status
-      leave.status = LEAVE_STATUS.APPROVED;
-      leave.approvedBy = approver._id;
-      leave.approvalDate = new Date();
-      leave.approvalNotes = notes;
-
-      // Add to approval history
-      const approvalEntry = {
-        level: 1,
-        approver: approver._id,
-        status: LEAVE_STATUS.APPROVED,
-        notes: notes,
-        date: new Date(),
-      };
-
-      if (!leave.approvalHistory) {
-        leave.approvalHistory = [];
-      }
-      leave.approvalHistory.push(approvalEntry);
-
-      await leave.save();
-
-      // Create audit log
-      await AuditService.logAction(
-        AuditAction.UPDATE,
-        AuditEntity.LEAVE,
-        leave._id,
-        approver._id,
-        {
-          action: "APPROVE",
-          previousStatus: LEAVE_STATUS.PENDING,
-          newStatus: LEAVE_STATUS.APPROVED,
-          approverRole: "DEPARTMENT_HEAD",
-          notes: notes,
-        }
-      );
-
-      return res.status(200).json({
-        success: true,
-        message: "Leave request approved successfully",
-        data: leave,
-      });
     } catch (error) {
       next(error);
     }
@@ -356,19 +291,6 @@ export class LeaveController {
         );
         return res.status(400).json({
           message: `Leave request is already ${leave.status.toLowerCase()}`,
-        });
-      }
-
-      // For regular admins, only allow rejection of leaves from their department
-      if (
-        rejector.role === "ADMIN" &&
-        leave.department.toString() !== rejector.department.toString()
-      ) {
-        console.log(
-          `[LeaveController] Admin ${rejectorId} cannot reject leave from different department`
-        );
-        return res.status(403).json({
-          message: "You can only reject leaves from your department",
         });
       }
 
@@ -471,7 +393,7 @@ export class LeaveController {
       if (status === LEAVE_STATUS.APPROVED) {
         leave = await LeaveService.approveLeave(
           new Types.ObjectId(leaveId),
-          approver,
+          approver._id,
           notes
         );
       } else if (status === LEAVE_STATUS.REJECTED) {

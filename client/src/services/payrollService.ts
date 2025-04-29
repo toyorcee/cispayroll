@@ -13,6 +13,7 @@ import type {
 import { salaryStructureService } from "./salaryStructureService";
 
 const BASE_URL = `${import.meta.env.VITE_API_URL}/api/super-admin`;
+axios.defaults.withCredentials = true;
 
 interface PayrollFilters {
   dateRange?: string;

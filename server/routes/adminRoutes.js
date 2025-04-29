@@ -211,6 +211,12 @@ router.post(
 
 // ===== Salary Structure & Allowances Management Routes =====
 router.get(
+  "/salary-grades",
+  requirePermission([Permission.VIEW_SALARY_STRUCTURE]),
+  AdminController.getSalaryGrades
+);
+
+router.get(
   "/allowances",
   requirePermission([Permission.VIEW_ALLOWANCES]),
   AdminController.getDepartmentAllowances

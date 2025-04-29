@@ -7,6 +7,7 @@ import type {
 } from "../types/allowance";
 
 const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
+axios.defaults.withCredentials = true;
 
 export const allowanceService = {
   createAllowance: async (

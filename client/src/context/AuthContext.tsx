@@ -130,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
 
       const response = await axios.get(`/api/auth/me`, {
-        withCredentials: true, 
+        withCredentials: true,
       });
 
       if (response.data.success) {
@@ -141,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           "❌ [AuthContext] Failed to fetch user data:",
           response.data.message
         );
-        setUser(null); 
+        setUser(null);
       }
     } catch (error) {
       console.error("❌ [AuthContext] Error fetching user data:", error);
@@ -154,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             "/api/auth/refresh",
             {},
             {
-              withCredentials: true, 
+              withCredentials: true,
             }
           );
 
@@ -164,7 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             );
 
             const retryResponse = await axios.get(`/api/auth/me`, {
-              withCredentials: true, 
+              withCredentials: true,
             });
 
             if (retryResponse.data.success) {

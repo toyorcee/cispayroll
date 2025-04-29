@@ -5,6 +5,7 @@ import { LeaveStatus } from "../types/employee";
 import { useAuth } from "../context/AuthContext";
 
 const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
+axios.defaults.withCredentials = true;
 
 export interface LeaveRequest {
   _id: string;

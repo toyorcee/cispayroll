@@ -3,6 +3,7 @@ import { OnboardingEmployee, Task } from "../types/employee";
 import { toast } from "react-toastify";
 
 const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
+axios.defaults.withCredentials = true;
 
 export interface OnboardingFilters {
   page?: number;
@@ -31,7 +32,6 @@ export interface OnboardingResponse {
 }
 
 export const onboardingService = {
-  // Get all employees in onboarding with pagination and filtering
   getOnboardingEmployees: async (
     filters?: OnboardingFilters
   ): Promise<OnboardingResponse> => {
