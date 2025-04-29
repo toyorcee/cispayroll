@@ -85,26 +85,13 @@ class AuditController {
   static async getRecentActivities(req, res, next) {
     try {
       const { limit = 10 } = req.query;
+      const userId = req.user._id;
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000); 
 
-      // Get current user's role and department
-      const currentUser = await User.findById(req.user._id);
-      if (!currentUser) {
-        throw new ApiError(404, "User not found");
-      }
-
-      const filters = {};
-
-      // Apply role-based filtering
-      if (currentUser.role === "USER") {
-        filters.performedBy = currentUser._id;
-      } else if (currentUser.role === "ADMIN") {
-        filters.$or = [
-          { "details.departmentId": currentUser.department },
-          { "details.department": currentUser.department },
-        ];
-      }
-
-      const activities = await Audit.find(filters)
+      const activities = await Audit.find({
+        performedBy: userId,
+        createdAt: { $gte: since },
+      })
         .sort({ createdAt: -1 })
         .limit(parseInt(limit))
         .populate("performedBy", "firstName lastName email role department")

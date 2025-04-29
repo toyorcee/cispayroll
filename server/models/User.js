@@ -1393,14 +1393,16 @@ UserSchema.methods.initiateOffboarding = async function (offboardingData) {
     this._id,
     {
       $set: {
-        "offboarding.status": OffboardingStatus.IN_PROGRESS, 
+        "offboarding.status": OffboardingStatus.IN_PROGRESS,
         "offboarding.type": offboardingData.type,
         "offboarding.reason": offboardingData.reason,
         "offboarding.targetExitDate": offboardingData.targetExitDate,
         "offboarding.initiatedBy": offboardingData.initiatedBy,
         "offboarding.initiatedAt": new Date(),
-        "offboarding.tasks": this.getDefaultOffboardingTasks(offboardingData.type), 
-        "lifecycle.currentState": UserLifecycleState.OFFBOARDING, 
+        "offboarding.tasks": this.getDefaultOffboardingTasks(
+          offboardingData.type
+        ),
+        "lifecycle.currentState": UserLifecycleState.OFFBOARDING,
       },
     },
     { new: true, runValidators: false }

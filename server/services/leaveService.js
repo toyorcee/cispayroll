@@ -9,6 +9,7 @@ import {
 import Department from "../models/Department.js";
 import AuditService from "./AuditService.js";
 import { AuditAction, AuditEntity } from "../models/Audit.js";
+import { format } from "date-fns";
 
 export class LeaveService {
   /**
@@ -435,10 +436,28 @@ export class LeaveService {
       `[LeaveService] User role: ${user.role}, Department: ${user.department}`
     );
 
-    // If user is SUPER_ADMIN, they can see all leaves
-    if (user.role === "SUPER_ADMIN") {
-      console.log(`[LeaveService] User is SUPER_ADMIN, returning all leaves`);
-      return Leave.find()
+    // Check if user is SUPER_ADMIN or HR_MANAGER
+    const isSuperAdmin = user.role === "SUPER_ADMIN";
+    const isHRManager =
+      user.role === "HR_MANAGER" ||
+      (user.position &&
+        user.position.toLowerCase().includes("head of human resources"));
+
+    console.log(`[LeaveService] Role checks:`, {
+      isSuperAdmin,
+      isHRManager,
+      userRole: user.role,
+      userPosition: user.position,
+    });
+
+    // If user is SUPER_ADMIN or HR_MANAGER, they can see all leaves
+    if (isSuperAdmin || isHRManager) {
+      console.log(
+        `[LeaveService] User is ${
+          isSuperAdmin ? "SUPER_ADMIN" : "HR_MANAGER"
+        }, returning all leaves`
+      );
+      return Leave.find(query)
         .sort({ createdAt: -1 })
         .populate("user", "firstName lastName email department")
         .populate("approvedBy", "firstName lastName");
@@ -457,36 +476,50 @@ export class LeaveService {
         department.headOfDepartment &&
         department.headOfDepartment.toString() === user._id.toString();
 
+      // If not found by headOfDepartment field, check by position title
+      if (!isDepartmentHead) {
+        const departmentHeadByPosition = await User.findOne({
+          department: user.department,
+          position: {
+            $regex: "head of department|department head|head|director|manager",
+            $options: "i",
+          },
+          status: "active",
+        });
+
+        if (
+          departmentHeadByPosition &&
+          departmentHeadByPosition._id.toString() === user._id.toString()
+        ) {
+          isDepartmentHead = true;
+        }
+      }
+
       console.log(
         `[LeaveService] User is ADMIN, isDepartmentHead: ${isDepartmentHead}`
       );
 
       if (!isDepartmentHead) {
         console.log(
-          `[LeaveService] User is not the department head, cannot view team leaves`
+          `[LeaveService] User is not department head, returning empty list`
         );
         return [];
       }
 
-      // Find all users in the department
-      const usersInDepartment = await User.find({
-        department: user.department,
-      }).select("_id");
-      const userIds = usersInDepartment.map((user) => user._id);
+      // Add department filter to query
+      query.department = user.department;
+      console.log(`[LeaveService] Added department filter: ${user.department}`);
 
-      console.log(
-        `[LeaveService] Found ${userIds.length} users in department ${user.department}`
-      );
-
-      // Find leaves for these users
-      return Leave.find({ user: { $in: userIds } })
+      return Leave.find(query)
         .sort({ createdAt: -1 })
         .populate("user", "firstName lastName email department")
         .populate("approvedBy", "firstName lastName");
     }
 
-    // If regular user, return no leaves
-    console.log(`[LeaveService] User is regular user, cannot view team leaves`);
+    // For other roles, return empty list
+    console.log(
+      `[LeaveService] User role ${user.role} not authorized to view team leaves`
+    );
     return [];
   }
 
@@ -494,43 +527,89 @@ export class LeaveService {
    * Approve a leave request
    * @param {Types.ObjectId} leaveId - Leave ID
    * @param {Types.ObjectId} approverId - Approver user ID
-   * @param {string} remarks - Approval remarks
    * @returns {Promise<Object>} Updated leave request
    */
-  static async approveLeave(leaveId, approverId, remarks) {
-    try {
-      const leave = await Leave.findById(leaveId);
-      if (!leave) {
-        throw new Error("Leave request not found");
+  static async approveLeave(leaveId, approverId) {
+    console.log(
+      `[LeaveService] Approving leave ${leaveId} by approver ${approverId}`
+    );
+
+    // Get leave request with user details
+    const leave = await Leave.findById(leaveId).populate("user");
+    if (!leave) {
+      console.log(`[LeaveService] Leave request not found: ${leaveId}`);
+      throw new Error("Leave request not found");
+    }
+
+    // Get approver details
+    const approver = await User.findById(approverId);
+    if (!approver) {
+      console.log(`[LeaveService] Approver not found: ${approverId}`);
+      throw new Error("Approver not found");
+    }
+
+    console.log(`[LeaveService] Approver details:`, {
+      id: approver._id,
+      name: `${approver.firstName} ${approver.lastName}`,
+      role: approver.role,
+      position: approver.position,
+      department: approver.department,
+    });
+
+    // Check if leave is already approved
+    if (leave.status === LEAVE_STATUS.APPROVED) {
+      console.log(`[LeaveService] Leave is already approved`);
+      throw new Error("Leave request is already approved");
+    }
+
+    // Check if leave is in pending status
+    if (leave.status.toUpperCase() !== "PENDING") {
+      console.log(
+        `[LeaveService] Leave is not in pending status: ${leave.status}`
+      );
+      throw new Error("Leave request is not in pending status");
+    }
+
+    // Check if approver has permission to approve
+    const isSuperAdmin = approver.role === "SUPER_ADMIN";
+    const isHRManager =
+      approver.role === "HR_MANAGER" ||
+      (approver.position &&
+        approver.position.toLowerCase().includes("head of human resources"));
+
+    console.log(`[LeaveService] Role checks:`, {
+      isSuperAdmin,
+      isHRManager,
+      approverRole: approver.role,
+      approverPosition: approver.position,
+    });
+
+    // If not SUPER_ADMIN or HR_MANAGER, check if department head
+    if (!isSuperAdmin && !isHRManager) {
+      if (approver.role !== "ADMIN") {
+        console.log(
+          `[LeaveService] Approver is not SUPER_ADMIN, HR_MANAGER, or ADMIN`
+        );
+        throw new Error(
+          "You do not have permission to approve this leave request"
+        );
       }
 
-      const approver = await User.findById(approverId);
-      if (!approver) {
-        throw new Error("Approver not found");
+      // Check if approver is the head of the leave requester's department
+      const department = await Department.findById(leave.user.department);
+      if (!department) {
+        console.log(`[LeaveService] Department not found for leave requester`);
+        throw new Error("Department not found for leave requester");
       }
 
-      // Check if leave is already approved or rejected
-      if (leave.status !== LEAVE_STATUS.PENDING) {
-        throw new Error("Leave request is not pending approval");
-      }
-
-      // Check if approver has permission to approve this leave
-      const isSuperAdmin = approver.role === "SUPER_ADMIN";
-      const isHRManager = approver.role === "HR_MANAGER";
-
-      // Check if approver is the department head of the leave requester's department
-      const department = await Department.findById(leave.department);
-      let isDepartmentHead = false;
-
-      if (department && department.headOfDepartment) {
-        isDepartmentHead =
-          department.headOfDepartment.toString() === approver._id.toString();
-      }
+      const isDepartmentHead =
+        department.headOfDepartment &&
+        department.headOfDepartment.toString() === approver._id.toString();
 
       // If not found by headOfDepartment field, check by position title
       if (!isDepartmentHead) {
         const departmentHeadByPosition = await User.findOne({
-          department: leave.department,
+          department: leave.user.department,
           position: {
             $regex: "head of department|department head|head|director|manager",
             $options: "i",
@@ -546,69 +625,297 @@ export class LeaveService {
         }
       }
 
-      // Super Admin and HR Manager can approve any leave
-      // Department Head can only approve leaves from their department
-      if (!isSuperAdmin && !isHRManager && !isDepartmentHead) {
+      console.log(
+        `[LeaveService] Approver is ADMIN, isDepartmentHead: ${isDepartmentHead}`
+      );
+
+      if (!isDepartmentHead) {
+        console.log(
+          `[LeaveService] Approver is not the department head for leave requester's department`
+        );
         throw new Error(
           "You do not have permission to approve this leave request"
         );
       }
+    }
 
-      // For department heads, they can only approve leaves from their department
+    // Update leave status
+    leave.status = LEAVE_STATUS.APPROVED;
+    leave.approvedBy = approverId;
+    leave.approvedAt = new Date();
+    await leave.save();
+
+    console.log(`[LeaveService] Leave approved successfully`);
+
+    // Notify employee about approval
+    try {
+      await NotificationService.createNotification(
+        leave.user._id,
+        "LEAVE_APPROVED",
+        leave.user,
+        null,
+        null,
+        {
+          leave: {
+            id: leave._id,
+            type: leave.type,
+            startDate: leave.startDate,
+            endDate: leave.endDate,
+            status: leave.status,
+          },
+        }
+      );
+      console.log(
+        `[LeaveService] Notification sent to employee about approval`
+      );
+    } catch (notificationError) {
+      console.error(
+        `[LeaveService] Error notifying employee about approval:`,
+        notificationError
+      );
+      // Don't throw the error, just log it
+    }
+
+    // Notify department head (if not the approver)
+    if (department) {
+      console.log(
+        `[LeaveService] Finding department head to notify about approval`
+      );
+
+      let departmentHead = null;
+
+      // Check if department has a head assigned
+      if (department.headOfDepartment) {
+        departmentHead = await User.findById(department.headOfDepartment);
+
+        // Verify the user is still active
+        if (!departmentHead || departmentHead.status !== "active") {
+          departmentHead = null;
+        }
+      }
+
+      // If no department head found using the field, fall back to position title search
+      if (!departmentHead) {
+        departmentHead = await User.findOne({
+          department: leave.department,
+          position: {
+            $regex: "head of department|department head|head|director|manager",
+            $options: "i",
+          },
+          status: "active",
+        });
+      }
+
+      // Only notify if department head exists and is not the approver
       if (
-        isDepartmentHead &&
-        leave.department.toString() !== approver.department.toString()
+        departmentHead &&
+        departmentHead._id.toString() !== approver._id.toString()
       ) {
-        throw new Error("You can only approve leaves from your department");
-      }
-
-      // Update leave status and approval details
-      leave.status = LEAVE_STATUS.APPROVED;
-      leave.approvedBy = approverId;
-      leave.approvalDate = new Date();
-      leave.approvalNotes = remarks;
-
-      // Add to approval history
-      const approvalEntry = {
-        approver: approverId,
-        status: LEAVE_STATUS.APPROVED,
-        notes: remarks,
-        date: new Date(),
-      };
-
-      if (!leave.approvalHistory) {
-        leave.approvalHistory = [];
-      }
-      leave.approvalHistory.push(approvalEntry);
-
-      await leave.save();
-
-      // Notify the employee about the approval
-      const employee = await User.findById(leave.user);
-      if (employee) {
-        await NotificationService.createNotification(
-          employee._id,
-          "LEAVE_APPROVED",
-          employee,
-          null,
-          null,
+        console.log(
+          `[LeaveService] Notifying department head about approval:`,
           {
-            leave: {
-              type: leave.type,
-              startDate: leave.startDate,
-              endDate: leave.endDate,
-              reason: leave.reason,
-              status: leave.status,
-            },
+            id: departmentHead._id,
+            name: `${departmentHead.firstName} ${departmentHead.lastName}`,
           }
         );
-      }
 
-      return leave;
-    } catch (error) {
-      console.error("[LeaveService] Error approving leave:", error);
-      throw error;
+        try {
+          await NotificationService.createNotification(
+            departmentHead._id,
+            "LEAVE_APPROVED_INFO",
+            leave.user,
+            null,
+            null,
+            {
+              leave: {
+                id: leave._id,
+                type: leave.type,
+                startDate: leave.startDate,
+                endDate: leave.endDate,
+                status: leave.status,
+              },
+              approver: {
+                firstName: approver.firstName,
+                lastName: approver.lastName,
+                role: approver.role,
+              },
+            }
+          );
+          console.log(`[LeaveService] Notification sent to department head`);
+        } catch (notificationError) {
+          console.error(
+            `[LeaveService] Error notifying department head:`,
+            notificationError
+          );
+          // Don't throw the error, just log it
+        }
+      }
     }
+
+    // Notify HR manager (if approver is not HR)
+    if (!isHRManager) {
+      console.log(`[LeaveService] Finding HR manager to notify about approval`);
+
+      // Find HR department
+      const hrDepartment = await Department.findOne({
+        name: { $in: ["Human Resources", "HR"] },
+        status: "active",
+      });
+
+      if (hrDepartment) {
+        // Find HR manager
+        let hrManager = null;
+
+        // Check if HR department has a head assigned
+        if (hrDepartment.headOfDepartment) {
+          hrManager = await User.findById(hrDepartment.headOfDepartment);
+
+          // Verify the user is still active
+          if (!hrManager || hrManager.status !== "active") {
+            hrManager = null;
+          }
+        }
+
+        // If no HR manager found using the field, fall back to position title search
+        if (!hrManager) {
+          hrManager = await User.findOne({
+            department: hrDepartment._id,
+            position: {
+              $regex:
+                "hr manager|head of hr|hr head|head of human resources|human resources manager|hr director",
+              $options: "i",
+            },
+            status: "active",
+          });
+        }
+
+        // If still no HR manager found, consider any user in the HR department with an appropriate role
+        if (!hrManager) {
+          hrManager = await User.findOne({
+            department: hrDepartment._id,
+            role: { $in: ["ADMIN", "HR_MANAGER"] },
+            status: "active",
+          });
+        }
+
+        if (hrManager) {
+          console.log(`[LeaveService] Notifying HR manager about approval:`, {
+            id: hrManager._id,
+            name: `${hrManager.firstName} ${hrManager.lastName}`,
+          });
+
+          try {
+            await NotificationService.createNotification(
+              hrManager._id,
+              "LEAVE_APPROVED_INFO",
+              leave.user,
+              null,
+              null,
+              {
+                leave: {
+                  id: leave._id,
+                  type: leave.type,
+                  startDate: leave.startDate,
+                  endDate: leave.endDate,
+                  status: leave.status,
+                },
+                approver: {
+                  firstName: approver.firstName,
+                  lastName: approver.lastName,
+                  role: approver.role,
+                },
+              }
+            );
+            console.log(`[LeaveService] Notification sent to HR manager`);
+          } catch (notificationError) {
+            console.error(
+              `[LeaveService] Error notifying HR manager:`,
+              notificationError
+            );
+            // Don't throw the error, just log it
+          }
+        }
+      }
+    }
+
+    // If approver is HR, notify other HR managers
+    if (isHRManager) {
+      console.log(
+        `[LeaveService] Finding other HR managers to notify about approval`
+      );
+
+      // Find HR department
+      const hrDepartment = await Department.findOne({
+        name: { $in: ["Human Resources", "HR"] },
+        status: "active",
+      });
+
+      if (hrDepartment) {
+        // Find all HR managers in the department
+        const hrManagers = await User.find({
+          department: hrDepartment._id,
+          _id: { $ne: approver._id }, // Exclude the approver
+          $or: [
+            { role: "HR_MANAGER" },
+            {
+              position: {
+                $regex:
+                  "hr manager|head of hr|hr head|head of human resources|human resources manager|hr director",
+                $options: "i",
+              },
+            },
+          ],
+          status: "active",
+        });
+
+        console.log(
+          `[LeaveService] Found ${hrManagers.length} other HR managers to notify`
+        );
+
+        for (const hrManager of hrManagers) {
+          console.log(`[LeaveService] Notifying HR manager about approval:`, {
+            id: hrManager._id,
+            name: `${hrManager.firstName} ${hrManager.lastName}`,
+          });
+
+          try {
+            await NotificationService.createNotification(
+              hrManager._id,
+              "LEAVE_APPROVED_INFO",
+              leave.user,
+              null,
+              null,
+              {
+                leave: {
+                  id: leave._id,
+                  type: leave.type,
+                  startDate: leave.startDate,
+                  endDate: leave.endDate,
+                  status: leave.status,
+                },
+                approver: {
+                  firstName: approver.firstName,
+                  lastName: approver.lastName,
+                  role: approver.role,
+                },
+              }
+            );
+            console.log(`[LeaveService] Notification sent to HR manager`);
+          } catch (notificationError) {
+            console.error(
+              `[LeaveService] Error notifying HR manager:`,
+              notificationError
+            );
+            // Don't throw the error, just log it
+          }
+        }
+      }
+    }
+
+    console.log(
+      `[LeaveService] ====== LEAVE APPROVAL PROCESS COMPLETED ======`
+    );
+    return leave;
   }
 
   /**
@@ -715,35 +1022,233 @@ export class LeaveService {
 
     // Notify the leave requester
     console.log(`[LeaveService] Notifying leave requester about rejection`);
-    await NotificationService.createNotification(
-      leave.user._id,
-      "LEAVE_REJECTED",
-      leave.user,
-      null,
-      reason,
-      {
-        leave: {
-          type: leave.type,
-          startDate: leave.startDate,
-          endDate: leave.endDate,
-          reason: leave.reason,
-          status: leave.status,
-        },
-        rejector: {
-          firstName: rejector.firstName,
-          lastName: rejector.lastName,
-          role: rejector.role,
-        },
-      }
-    ).catch((error) => {
-      console.error(`[LeaveService] Error notifying leave requester:`, error);
-    });
+    try {
+      await NotificationService.createNotification(
+        leave.user._id,
+        "LEAVE_REJECTED",
+        leave.user,
+        null,
+        reason,
+        {
+          leave: {
+            type: leave.type,
+            startDate: leave.startDate,
+            endDate: leave.endDate,
+            reason: leave.reason,
+            status: leave.status,
+          },
+          rejector: {
+            firstName: rejector.firstName,
+            lastName: rejector.lastName,
+            role: rejector.role,
+          },
+        }
+      );
+      console.log(`[LeaveService] Notification sent to leave requester`);
+    } catch (notificationError) {
+      console.error(
+        `[LeaveService] Error notifying leave requester:`,
+        notificationError
+      );
+      // Don't throw the error, just log it
+    }
 
     await leave.save();
-    console.log(
-      `[LeaveService] Leave request rejected. New status: ${leave.status}`
-    );
+    console.log(`[LeaveService] Leave rejected successfully`);
 
+    // Notify the employee about the rejection
+    const employee = await User.findById(leave.user);
+    if (employee) {
+      console.log(`[LeaveService] Notifying employee about rejection:`, {
+        id: employee._id,
+        name: `${employee.firstName} ${employee.lastName}`,
+      });
+
+      try {
+        await NotificationService.createNotification(
+          employee._id,
+          "LEAVE_REJECTED",
+          employee,
+          null,
+          reason,
+          {
+            leave: {
+              type: leave.type,
+              startDate: leave.startDate,
+              endDate: leave.endDate,
+              reason: leave.reason,
+              status: leave.status,
+            },
+            rejector: {
+              firstName: rejector.firstName,
+              lastName: rejector.lastName,
+              role: rejector.role,
+            },
+          }
+        );
+        console.log(`[LeaveService] Notification sent to employee`);
+      } catch (notificationError) {
+        console.error(
+          `[LeaveService] Error notifying employee:`,
+          notificationError
+        );
+        // Don't throw the error, just log it
+      }
+    }
+
+    // Notify department head (if not the rejector)
+    if (department) {
+      console.log(
+        `[LeaveService] Finding department head to notify about rejection`
+      );
+
+      let departmentHead = null;
+
+      // Check if department has a head assigned
+      if (department.headOfDepartment) {
+        departmentHead = await User.findById(department.headOfDepartment);
+
+        // Verify the user is still active
+        if (!departmentHead || departmentHead.status !== "active") {
+          departmentHead = null;
+        }
+      }
+
+      // If no department head found using the field, fall back to position title search
+      if (!departmentHead) {
+        departmentHead = await User.findOne({
+          department: leave.department,
+          position: {
+            $regex: "head of department|department head|head|director|manager",
+            $options: "i",
+          },
+          status: "active",
+        });
+      }
+
+      // Only notify if department head exists and is not the rejector
+      if (
+        departmentHead &&
+        departmentHead._id.toString() !== rejector._id.toString()
+      ) {
+        console.log(
+          `[LeaveService] Notifying department head about rejection:`,
+          {
+            id: departmentHead._id,
+            name: `${departmentHead.firstName} ${departmentHead.lastName}`,
+          }
+        );
+
+        try {
+          await NotificationService.createNotification(
+            departmentHead._id,
+            "LEAVE_REJECTED_INFO",
+            employee,
+            null,
+            reason,
+            {
+              leave: {
+                type: leave.type,
+                startDate: leave.startDate,
+                endDate: leave.endDate,
+                reason: leave.reason,
+                status: leave.status,
+              },
+              rejector: {
+                firstName: rejector.firstName,
+                lastName: rejector.lastName,
+                role: rejector.role,
+              },
+            }
+          );
+          console.log(`[LeaveService] Notification sent to department head`);
+        } catch (notificationError) {
+          console.error(
+            `[LeaveService] Error notifying department head:`,
+            notificationError
+          );
+          // Don't throw the error, just log it
+        }
+      }
+    }
+
+    // Notify other HR managers (if rejector is HR)
+    if (isHRManager) {
+      console.log(
+        `[LeaveService] Finding other HR managers to notify about rejection`
+      );
+
+      // Find HR department
+      const hrDepartment = await Department.findOne({
+        name: { $in: ["Human Resources", "HR"] },
+        status: "active",
+      });
+
+      if (hrDepartment) {
+        // Find all HR managers in the department
+        const hrManagers = await User.find({
+          department: hrDepartment._id,
+          _id: { $ne: rejector._id }, // Exclude the rejector
+          $or: [
+            { role: "HR_MANAGER" },
+            {
+              position: {
+                $regex:
+                  "hr manager|head of hr|hr head|head of human resources|human resources manager|hr director",
+                $options: "i",
+              },
+            },
+          ],
+          status: "active",
+        });
+
+        console.log(
+          `[LeaveService] Found ${hrManagers.length} other HR managers to notify`
+        );
+
+        for (const hrManager of hrManagers) {
+          console.log(`[LeaveService] Notifying HR manager about rejection:`, {
+            id: hrManager._id,
+            name: `${hrManager.firstName} ${hrManager.lastName}`,
+          });
+
+          try {
+            await NotificationService.createNotification(
+              hrManager._id,
+              "LEAVE_REJECTED_INFO",
+              employee,
+              null,
+              reason,
+              {
+                leave: {
+                  type: leave.type,
+                  startDate: leave.startDate,
+                  endDate: leave.endDate,
+                  reason: leave.reason,
+                  status: leave.status,
+                },
+                rejector: {
+                  firstName: rejector.firstName,
+                  lastName: rejector.lastName,
+                  role: rejector.role,
+                },
+              }
+            );
+            console.log(`[LeaveService] Notification sent to HR manager`);
+          } catch (notificationError) {
+            console.error(
+              `[LeaveService] Error notifying HR manager:`,
+              notificationError
+            );
+            // Don't throw the error, just log it
+          }
+        }
+      }
+    }
+
+    console.log(
+      `[LeaveService] ====== LEAVE REJECTION PROCESS COMPLETED ======`
+    );
     return leave;
   }
 

@@ -12,7 +12,6 @@ import {
   FaExclamationTriangle,
   FaCheckCircle,
   FaUserTie,
-  FaChartPie,
   FaUserFriends,
 } from "react-icons/fa";
 import { IconType } from "react-icons";
@@ -138,6 +137,14 @@ export const getRoleStats = (
             href: "/employees",
             color: "blue",
           },
+          {
+            name: "Recent Activities",
+            value: stats.recentActivities?.toString() || "0",
+            subtext: "In the last 24 hours",
+            icon: FaClock,
+            color: "yellow",
+            href: "",
+          },
         ];
       }
       return [];
@@ -177,6 +184,14 @@ export const getRoleStats = (
             href: "/employees",
             color: "blue",
           },
+          {
+            name: "Recent Activities",
+            value: stats.recentActivities?.toString() || "0",
+            subtext: "In the last 24 hours",
+            icon: FaClock,
+            color: "yellow",
+            href: "",
+          },
         ];
       }
       return [];
@@ -185,36 +200,28 @@ export const getRoleStats = (
       if ("departmentName" in stats) {
         return [
           {
-            name: "Department Size",
-            value: stats.departmentSize?.toString() || "0",
-            subtext: stats.departmentName || "Department",
-            icon: FaBuilding,
-            href: "/departments",
-            color: "blue",
-          },
-          {
             name: "Active Colleagues",
             value: stats.activeColleagues?.toString() || "0",
             subtext: "Currently Working",
             icon: FaUsers,
-            href: "/employees",
             color: "green",
+            href: "",
           },
           {
-            name: "Department Overview",
-            value: stats.departmentName || "Department",
-            subtext: `${stats.teamMembers || 0} Team Members`,
-            icon: FaChartPie,
-            href: "/departments",
+            name: "Recent Activities",
+            value: stats.recentActivities?.toString() || "0",
+            subtext: "In the last 24 hours",
+            icon: FaClock,
             color: "yellow",
+            href: "",
           },
           {
             name: "Team Members",
             value: stats.teamMembers?.toString() || "0",
             subtext: "In Your Department",
             icon: FaUserFriends,
-            href: "/employees",
             color: "blue",
+            href: "",
           },
         ];
       }

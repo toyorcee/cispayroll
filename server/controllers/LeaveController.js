@@ -146,12 +146,6 @@ export class LeaveController {
 
       let query = {};
 
-      // For regular admins, only show leaves from their department
-      if (user.role === "ADMIN") {
-        query.department = user.department;
-      }
-      // For super admins, show all leaves (no department filter)
-
       // Add status filter if provided
       if (req.query.status) {
         query.status = req.query.status;
@@ -173,11 +167,8 @@ export class LeaveController {
 
       console.log(`[LeaveController] Query for team leaves:`, query);
 
-      const leaves = await Leave.find(query)
-        .sort({ createdAt: -1 })
-        .populate("user", "firstName lastName email department")
-        .populate("department", "name")
-        .populate("approvedBy", "firstName lastName email");
+      // Use the LeaveService to get team leaves with proper role-based access
+      const leaves = await LeaveService.getTeamLeaves(query, user);
 
       console.log(`[LeaveController] Found ${leaves.length} team leaves`);
 
@@ -285,7 +276,7 @@ export class LeaveController {
       }
 
       // Check if leave is already approved or rejected
-      if (leave.status !== "PENDING") {
+      if (leave.status !== LEAVE_STATUS.PENDING) {
         console.log(
           `[LeaveController] Leave ${leaveId} is already ${leave.status}`
         );

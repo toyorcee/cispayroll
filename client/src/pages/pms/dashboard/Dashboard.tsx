@@ -22,9 +22,8 @@ import {
   adminPayrollService,
   AdminPayrollProcessingStats,
 } from "../../../services/adminPayrollService";
-import userService, {
-  UserDashboardStats,
-} from "../../../services/userService";
+import userService, { UserDashboardStats } from "../../../services/userService";
+import { auditService } from "../../../services/auditService";
 
 // Lazy load chart components
 const LineChart = lazy(() => import("../../../components/charts/LineChart"));
@@ -125,6 +124,7 @@ export default function Dashboard() {
   const [processingStats, setProcessingStats] =
     useState<AdminPayrollProcessingStats | null>(null);
   const [userRecentActivities, setUserRecentActivities] = useState<number>(0);
+  const [recentActivitiesCount, setRecentActivitiesCount] = useState(0);
 
   // Only fetch the appropriate chart stats based on user role
   const { data: chartStatsData } =
@@ -354,6 +354,12 @@ export default function Dashboard() {
   useEffect(() => {
     fetchDashboardData();
   }, [user?.role]);
+
+  useEffect(() => {
+    auditService.getRecentActivities(1000).then((activities) => {
+      setRecentActivitiesCount(activities.length);
+    });
+  }, []);
 
   // Create admin-specific stat cards from admin chart stats
   const getAdminStatCards = () => {
@@ -633,8 +639,13 @@ export default function Dashboard() {
                 </motion.div>
               ))
             : // Other roles stats
-              getRoleStats(user?.role ?? UserRole.USER, dashboardStats).map(
-                (stat, index) => (
+              getRoleStats(user?.role ?? UserRole.USER, dashboardStats)
+                .map((stat) =>
+                  stat.name === "Recent Activities"
+                    ? { ...stat, value: recentActivitiesCount.toString() }
+                    : stat
+                )
+                .map((stat, index) => (
                   <motion.div
                     key={stat.name}
                     initial={{ opacity: 0, y: 20 }}
@@ -650,8 +661,7 @@ export default function Dashboard() {
                       color={stat.color}
                     />
                   </motion.div>
-                )
-              )}
+                ))}
         </div>
 
         {/* Charts Section */}
