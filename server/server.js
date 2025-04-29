@@ -280,6 +280,10 @@ app.use((_req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
+app.get("/", (req, res) => {
+  res.send("API is running...");
+});
+
 if (process.env.NODE_ENV === "development") {
   import("./routes/testRoutes.js").then((testRoutes) => {
     app.use("/api/test", testRoutes.default);
