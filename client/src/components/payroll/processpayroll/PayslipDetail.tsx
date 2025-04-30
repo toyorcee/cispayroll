@@ -228,86 +228,91 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
             </div>
 
             {/* Grade Allowances */}
-            {payslip.earnings?.allowances?.gradeAllowances?.map(
-              (
-                allowance: {
-                  name: string;
-                  type: string;
-                  value: number;
-                  amount: number;
-                  _id: string;
-                },
-                index: number
-              ) => (
-                <div
-                  key={allowance._id || index}
-                  className="flex justify-between text-gray-700 text-xs sm:text-sm"
-                >
-                  <span className="font-medium">
-                    {allowance.name}{" "}
-                    {allowance.type === "percentage"
-                      ? `(${allowance.value}%)`
-                      : ""}
-                  </span>
-                  <span className="font-semibold">
-                    {formatAmount(allowance.amount)}
-                  </span>
-                </div>
-              )
-            )}
+            <div className="pt-2">
+              <h4 className="text-xs font-semibold text-gray-500 mb-1">
+                Grade Allowances
+              </h4>
+              {payslip.earnings?.allowances?.gradeAllowances?.map(
+                (allowance, index) => (
+                  <div
+                    key={allowance._id || index}
+                    className="flex justify-between text-gray-700 text-xs sm:text-sm"
+                  >
+                    <span className="font-medium">
+                      {allowance.name}
+                      {allowance.type === "percentage"
+                        ? ` (${allowance.value}%)`
+                        : ""}
+                    </span>
+                    <span className="font-semibold">
+                      {formatAmount(allowance.amount)}
+                    </span>
+                  </div>
+                )
+              )}
+            </div>
 
-            {/* Additional Allowances */}
-            {payslip.earnings?.allowances?.additionalAllowances?.map(
-              (allowance: { name: string; amount: number }, index: number) => (
-                <div
-                  key={index}
-                  className="flex justify-between text-gray-700 text-xs sm:text-sm"
-                >
-                  <span className="font-medium">{allowance.name}</span>
-                  <span className="font-semibold">
-                    {formatAmount(allowance.amount)}
-                  </span>
-                </div>
-              )
-            )}
+            {/* Personal Allowances */}
+            <div className="pt-2 border-t border-gray-200 mt-2">
+              <h4 className="text-xs font-semibold text-gray-500 mb-1">
+                Personal Allowances
+              </h4>
+              {payslip.earnings?.allowances?.additionalAllowances?.map(
+                (allowance, index) => (
+                  <div
+                    key={allowance._id || index}
+                    className="flex justify-between text-gray-700 text-xs sm:text-sm"
+                  >
+                    <span className="font-medium">{allowance.name}</span>
+                    <span className="font-semibold">
+                      {formatAmount(allowance.amount)}
+                    </span>
+                  </div>
+                )
+              )}
+            </div>
 
+            {/* Personal Bonuses */}
+            <div className="pt-2 border-t border-gray-200 mt-2">
+              <h4 className="text-xs font-semibold text-gray-500 mb-1">
+                Personal Bonuses
+              </h4>
+              {(payslip.earnings as any)?.bonus &&
+              (payslip.earnings as any).bonus.length > 0 ? (
+                (payslip.earnings as any).bonus.map(
+                  (bonus: any, idx: number) => (
+                    <div
+                      key={bonus._id || idx}
+                      className="flex justify-between text-gray-700 text-xs sm:text-sm"
+                    >
+                      <span className="font-medium">
+                        {bonus.description || "Personal Bonus"}
+                      </span>
+                      <span className="font-semibold">
+                        {formatAmount(bonus.amount)}
+                      </span>
+                    </div>
+                  )
+                )
+              ) : (
+                <div className="flex justify-between text-gray-700 text-xs sm:text-sm">
+                  <span className="font-medium">No Personal Bonus</span>
+                  <span className="font-semibold">{formatAmount(0)}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Totals */}
             <div className="flex justify-between text-gray-700 text-xs sm:text-sm font-medium pt-2 border-t border-gray-100">
-              <span>Total Grade Allowances</span>
-              <span className="font-semibold">
-                {formatAmount(
-                  payslip.earnings?.allowances?.gradeAllowances?.reduce(
-                    (sum: number, a: { amount: number }) =>
-                      sum + (a.amount || 0),
-                    0
-                  )
-                )}
-              </span>
-            </div>
-
-            <div className="flex justify-between text-gray-700 text-xs sm:text-sm font-medium">
-              <span>Total Additional Allowances</span>
-              <span className="font-semibold">
-                {formatAmount(
-                  payslip.earnings?.allowances?.additionalAllowances?.reduce(
-                    (sum: number, a: { amount: number }) =>
-                      sum + (a.amount || 0),
-                    0
-                  )
-                )}
-              </span>
-            </div>
-
-            <div className="flex justify-between text-gray-700 text-xs sm:text-sm font-medium">
               <span>Total Allowances</span>
               <span className="font-semibold">
                 {formatAmount(payslip.earnings?.allowances?.totalAllowances)}
               </span>
             </div>
-
             <div className="flex justify-between text-gray-700 text-xs sm:text-sm font-medium">
               <span>Total Bonuses</span>
               <span className="font-semibold">
-                {formatAmount(payslip.earnings?.bonuses?.totalBonuses)}
+                {formatAmount(payslip.totals?.totalBonuses)}
               </span>
             </div>
           </div>

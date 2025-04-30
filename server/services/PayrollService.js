@@ -256,13 +256,33 @@ export class PayrollService {
     return totalTax;
   }
 
-  static async calculateBonuses(employeeId, startDate, endDate, basicSalary) {
+  static async calculateBonuses(
+    employeeId,
+    startDate,
+    endDate,
+    basicSalary,
+    month,
+    year
+  ) {
     try {
       console.log("🎯 Calculating bonuses for employee:", employeeId);
 
       const user = await UserModel.findById(employeeId).populate({
-        path: "personalBonuses.bonus",
-        select: "type description amount paymentDate calculationMethod value",
+        path: "personalBonuses.bonusId",
+        select: "type amount reason paymentDate approvalStatus taxable",
+      });
+
+      // Log the populated user data
+      console.log("👤 User's personal bonuses:", {
+        count: user.personalBonuses.length,
+        bonuses: user.personalBonuses.map((pb) => ({
+          id: pb.bonusId?._id,
+          type: pb.bonusId?.type,
+          amount: pb.bonusId?.amount,
+          reason: pb.bonusId?.reason,
+          status: pb.status,
+          usedInPayroll: pb.usedInPayroll,
+        })),
       });
 
       // Early return with zeros if no bonuses exist
@@ -274,47 +294,48 @@ export class PayrollService {
       }
 
       const approvedBonuses = user.personalBonuses.filter(
-        (item) =>
-          item.status === "APPROVED" &&
-          item.bonus &&
-          new Date(item.bonus.paymentDate) >= startDate &&
-          new Date(item.bonus.paymentDate) <= endDate
+        (pb) =>
+          pb.status === "APPROVED" &&
+          pb.bonusId &&
+          pb.bonusId.approvalStatus === "approved" &&
+          pb.bonusId.paymentDate >= startDate &&
+          pb.bonusId.paymentDate <= endDate &&
+          (!pb.usedInPayroll?.month || pb.usedInPayroll.month !== month) &&
+          (!pb.usedInPayroll?.year || pb.usedInPayroll.year !== year)
       );
 
-      const items = approvedBonuses.map((item) => {
-        let amount = 0;
+      console.log(
+        "✅ Approved bonuses for period:",
+        approvedBonuses.map((b) => ({
+          id: b.bonusId._id,
+          type: b.bonusId.type,
+          amount: b.bonusId.amount,
+          reason: b.bonusId.reason,
+        }))
+      );
 
-        // Calculate amount based on calculation method
-        switch (item.bonus.calculationMethod) {
-          case "fixed":
-            amount = item.bonus.value;
-            break;
-          case "percentage":
-            amount = (basicSalary * item.bonus.value) / 100;
-            break;
-          case "performance":
-            amount = BonusService.calculatePerformanceBonus(item.bonus);
-            break;
-          case "thirteenth_month":
-            amount = basicSalary;
-            break;
-          default:
-            console.warn(
-              `Unknown calculation method: ${item.bonus.calculationMethod}`
-            );
-            amount = 0;
-        }
-
+      const items = approvedBonuses.map((pb) => {
+        const bonus = pb.bonusId;
         return {
-          type: item.bonus.type,
-          description: item.bonus.description,
-          amount: amount,
-          calculationMethod: item.bonus.calculationMethod,
-          value: item.bonus.value,
+          bonusId: bonus._id,
+          type: bonus.type,
+          description: bonus.reason || bonus.type || "Personal Bonus",
+          amount: bonus.amount,
+          taxable: bonus.taxable,
+          paymentDate: bonus.paymentDate,
         };
       });
 
       const totalBonuses = items.reduce((sum, item) => sum + item.amount, 0);
+
+      console.log("🎯 Final bonus calculation:", {
+        items: items.map((i) => ({
+          type: i.type,
+          amount: i.amount,
+          description: i.description,
+        })),
+        totalBonuses,
+      });
 
       return {
         items,
@@ -734,7 +755,9 @@ export class PayrollService {
         employeeId,
         startDate,
         endDate,
-        basicSalary
+        basicSalary,
+        month,
+        year
       );
 
       // Calculate deductions

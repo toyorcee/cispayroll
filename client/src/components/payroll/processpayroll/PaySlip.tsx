@@ -116,6 +116,25 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
               </tr>
             )}
 
+            {/* Personal Bonuses */}
+            {(data.earnings as any)?.bonus &&
+              (data.earnings as any).bonus.length > 0 && (
+                <>
+                  {(data.earnings as any).bonus.map(
+                    (bonus: any, idx: number) => (
+                      <tr key={bonus._id || idx}>
+                        <td className="py-2">
+                          {bonus.description || "Personal Bonus"}
+                        </td>
+                        <td className="text-right">
+                          {formatAmount(bonus.amount)}
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </>
+              )}
+
             <tr className="border-t font-semibold">
               <td className="py-2">Total Earnings</td>
               <td className="text-right">

@@ -766,19 +766,24 @@ const UserSchema = new Schema(
     ],
     personalBonuses: [
       {
-        bonus: {
+        bonusId: {
           type: Schema.Types.ObjectId,
           ref: "Bonus",
-        },
-        assignedAt: Date,
-        assignedBy: {
-          type: Schema.Types.ObjectId,
-          ref: "User",
+          required: true,
         },
         status: {
           type: String,
           enum: ["PENDING", "APPROVED", "REJECTED"],
           default: "PENDING",
+        },
+        usedInPayroll: {
+          month: Number,
+          year: Number,
+          payrollId: {
+            type: Schema.Types.ObjectId,
+            ref: "Payroll",
+            default: null,
+          },
         },
       },
     ],

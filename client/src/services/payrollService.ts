@@ -363,6 +363,7 @@ export const payrollService = {
           response.data.message || "Failed to fetch payslip details"
         );
       }
+      console.log("[PayslipService] viewPayslip response:", response.data);
       return response.data.data;
     } catch (error) {
       console.error("❌ Error fetching payslip details:", error);

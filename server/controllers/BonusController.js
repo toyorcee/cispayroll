@@ -412,6 +412,25 @@ const createDepartmentEmployeeBonus = asyncHandler(async (req, res) => {
       approvedAt,
     });
 
+    // Remove any existing personalBonuses with this bonusId
+    await User.findByIdAndUpdate(employeeId, {
+      $pull: { personalBonuses: { bonusId: bonus._id } },
+    });
+
+    // Add to employee's personalBonuses array with correct structure
+    const personalBonus = {
+      bonusId: bonus._id,
+      status: "APPROVED",
+      usedInPayroll: {
+        month: null,
+        year: null,
+        payrollId: null,
+      },
+    };
+    await User.findByIdAndUpdate(employeeId, {
+      $push: { personalBonuses: personalBonus },
+    });
+
     // Log only after successful creation
     console.log(
       `[BONUS REQUEST SUCCESS] User ${userId} created a department employee bonus for employee ${employeeId} with amount ${amount}`
@@ -516,6 +535,25 @@ const createDepartmentWideBonus = asyncHandler(async (req, res) => {
     );
 
     const bonuses = await Promise.all(bonusPromises);
+
+    // For each employee, update their personalBonuses array
+    for (const bonus of bonuses) {
+      await User.findByIdAndUpdate(bonus.employee, {
+        $pull: { personalBonuses: { bonusId: bonus._id } },
+      });
+      const personalBonus = {
+        bonusId: bonus._id,
+        status: "APPROVED",
+        usedInPayroll: {
+          month: null,
+          year: null,
+          payrollId: null,
+        },
+      };
+      await User.findByIdAndUpdate(bonus.employee, {
+        $push: { personalBonuses: personalBonus },
+      });
+    }
 
     // Log only after successful creation
     console.log(

@@ -17,6 +17,15 @@ export const mapToPayslip = (payrollData: PayrollData): Payslip => {
       startDate: payrollData.periodStart,
       endDate: payrollData.periodEnd,
     },
+    allowances: {
+      gradeAllowances: payrollData.allowances.gradeAllowances,
+      additionalAllowances: payrollData.allowances.additionalAllowances,
+      totalAllowances: payrollData.allowances.totalAllowances,
+    },
+    bonuses: {
+      items: payrollData.bonuses.items,
+      totalBonuses: payrollData.bonuses.totalBonuses,
+    },
     earnings: {
       basicSalary: payrollData.basicSalary,
       allowances: {

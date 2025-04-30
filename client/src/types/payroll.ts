@@ -539,6 +539,13 @@ export interface PeriodPayrollResponse {
   };
 }
 
+export interface BonusItem {
+  type: string;
+  description: string;
+  amount: number;
+  _id?: string;
+}
+
 export interface Payslip {
   _id: string;
   payslipId: string;
@@ -555,6 +562,21 @@ export interface Payslip {
     startDate: string;
     endDate: string;
   };
+  allowances: {
+    gradeAllowances: Array<{
+      name: string;
+      type: string;
+      value: number;
+      amount: number;
+      _id?: string;
+    }>;
+    additionalAllowances: Array<{
+      name: string;
+      amount: number;
+      _id?: string;
+    }>;
+    totalAllowances: number;
+  };
   earnings: {
     basicSalary: number;
     allowances: {
@@ -569,10 +591,14 @@ export interface Payslip {
       totalAllowances: number;
     };
     bonuses: {
-      items: any[];
+      items: BonusItem[];
       totalBonuses: number;
     };
     totalEarnings: number;
+  };
+  bonuses: {
+    items: BonusItem[];
+    totalBonuses: number;
   };
   deductions: {
     tax: {
@@ -598,9 +624,11 @@ export interface Payslip {
     grossEarnings: number;
     totalDeductions: number;
     netPay: number;
+    totalAllowances?: number;
+    totalBonuses?: number;
   };
   status: string;
-  processedAt: string;
+  processedAt?: string;
 }
 
 export interface PayrollFilters {
