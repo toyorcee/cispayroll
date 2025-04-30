@@ -17,17 +17,28 @@ export class AllowanceService {
     const allowance = await Allowance.create({
       ...allowanceData,
       employee: employeeId,
-      status: AllowanceStatus.PENDING,
+      status: allowanceData.approvalStatus || AllowanceStatus.PENDING,
+      approvedBy:
+        allowanceData.approvalStatus === AllowanceStatus.APPROVED
+          ? allowanceData.createdBy
+          : undefined,
+      approvedAt:
+        allowanceData.approvalStatus === AllowanceStatus.APPROVED
+          ? new Date()
+          : undefined,
     });
 
-    // Notify department head and HR
-    await NotificationService.createNotification({
-      recipient: employee.departmentHead,
-      type: "ALLOWANCE_REQUEST",
-      title: "New Allowance Request",
-      message: `${employee.name} has requested an allowance of ${allowance.formattedAmount}`,
-      data: { allowanceId: allowance._id },
-    });
+    // Only send notification if the allowance is pending
+    if (allowance.status === AllowanceStatus.PENDING) {
+      // Notify department head and HR
+      await NotificationService.createNotification({
+        recipient: employee.departmentHead,
+        type: "ALLOWANCE_REQUEST",
+        title: "New Allowance Request",
+        message: `${employee.name} has requested an allowance of ${allowance.formattedAmount}`,
+        data: { allowanceId: allowance._id },
+      });
+    }
 
     return allowance;
   }
@@ -273,5 +284,24 @@ export class AllowanceService {
       .populate("employee", "name email department")
       .populate("approvedBy", "name")
       .populate("rejectedBy", "name");
+  }
+
+  async createDepartmentEmployeeAllowance(employeeId, allowanceData) {
+    const employee = await User.findById(employeeId);
+    if (!employee) {
+      throw new ApiError(404, "Employee not found");
+    }
+
+    const allowance = await Allowance.create({
+      ...allowanceData,
+      employee: employeeId,
+      department: employee.department,
+      status: AllowanceStatus.APPROVED,
+      approvedBy: allowanceData.createdBy,
+      approvedAt: new Date(),
+      isDepartmentWide: false,
+    });
+
+    return allowance;
   }
 }

@@ -49,19 +49,69 @@ const PayrollDetailsModal = ({
                     ₦{payroll.totals.basicSalary.toLocaleString()}
                   </span>
                 </p>
-                <p className="flex justify-between">
-                  <span className="text-gray-600">Total Allowances:</span>
-                  <span className="font-medium">
-                    ₦{payroll.totals.totalAllowances.toLocaleString()}
-                  </span>
-                </p>
-                <p className="flex justify-between">
-                  <span className="text-gray-600">Total Bonuses:</span>
-                  <span className="font-medium">
-                    ₦{payroll.totals.totalBonuses.toLocaleString()}
-                  </span>
-                </p>
-                <p className="flex justify-between text-green-600 font-semibold">
+
+                {/* Grade Allowances */}
+                <div className="border-t pt-2">
+                  <p className="text-sm font-medium text-gray-600 mb-1">
+                    Grade Allowances:
+                  </p>
+                  {payroll.allowances.gradeAllowances.map(
+                    (allowance, index) => (
+                      <p key={index} className="flex justify-between text-sm">
+                        <span className="text-gray-600 pl-2">
+                          {allowance.name}:
+                        </span>
+                        <span>₦{allowance.amount.toLocaleString()}</span>
+                      </p>
+                    )
+                  )}
+                  <p className="flex justify-between text-sm font-medium mt-1">
+                    <span className="text-gray-600">
+                      Total Grade Allowances:
+                    </span>
+                    <span>
+                      ₦{payroll.allowances.totalAllowances.toLocaleString()}
+                    </span>
+                  </p>
+                </div>
+
+                {/* Additional Allowances */}
+                <div className="border-t pt-2">
+                  <p className="text-sm font-medium text-gray-600 mb-1">
+                    Additional Allowances:
+                  </p>
+                  {payroll.allowances.additionalAllowances.map(
+                    (allowance, index) => (
+                      <p key={index} className="flex justify-between text-sm">
+                        <span className="text-gray-600 pl-2">
+                          {allowance.name}:
+                        </span>
+                        <span>₦{allowance.amount.toLocaleString()}</span>
+                      </p>
+                    )
+                  )}
+                </div>
+
+                {/* Bonuses */}
+                <div className="border-t pt-2">
+                  <p className="text-sm font-medium text-gray-600 mb-1">
+                    Bonuses:
+                  </p>
+                  {payroll.earnings.bonus.map((bonus, index) => (
+                    <p key={index} className="flex justify-between text-sm">
+                      <span className="text-gray-600 pl-2">
+                        {bonus.description}:
+                      </span>
+                      <span>₦{bonus.amount.toLocaleString()}</span>
+                    </p>
+                  ))}
+                  <p className="flex justify-between text-sm font-medium mt-1">
+                    <span className="text-gray-600">Total Bonuses:</span>
+                    <span>₦{payroll.totals.totalBonuses.toLocaleString()}</span>
+                  </p>
+                </div>
+
+                <p className="flex justify-between text-green-600 font-semibold border-t pt-2">
                   <span>Gross Earnings:</span>
                   <span>₦{payroll.totals.grossEarnings.toLocaleString()}</span>
                 </p>

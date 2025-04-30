@@ -84,13 +84,21 @@ export const PaySlip: React.FC<PaySlipProps> = ({ data, onPrint }) => {
 
             {/* Allowances */}
             {data.allowances?.gradeAllowances?.map((allowance, index) => (
-              <tr key={index}>
+              <tr key={allowance._id || index}>
                 <td className="py-2">
                   {allowance.name}
                   {allowance.type === "percentage"
                     ? ` (${allowance.value}%)`
                     : ""}
                 </td>
+                <td className="text-right">{formatAmount(allowance.amount)}</td>
+              </tr>
+            ))}
+
+            {/* Additional Allowances */}
+            {data.allowances?.additionalAllowances?.map((allowance, index) => (
+              <tr key={index}>
+                <td className="py-2">{allowance.name}</td>
                 <td className="text-right">{formatAmount(allowance.amount)}</td>
               </tr>
             ))}

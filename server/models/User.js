@@ -743,19 +743,24 @@ const UserSchema = new Schema(
     },
     personalAllowances: [
       {
-        allowance: {
+        allowanceId: {
           type: Schema.Types.ObjectId,
           ref: "Allowance",
-        },
-        assignedAt: Date,
-        assignedBy: {
-          type: Schema.Types.ObjectId,
-          ref: "User",
+          required: true,
         },
         status: {
           type: String,
           enum: ["PENDING", "APPROVED", "REJECTED"],
           default: "PENDING",
+        },
+        usedInPayroll: {
+          month: Number,
+          year: Number,
+          payrollId: {
+            type: Schema.Types.ObjectId,
+            ref: "Payroll",
+            default: null,
+          },
         },
       },
     ],

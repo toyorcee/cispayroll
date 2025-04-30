@@ -2,7 +2,33 @@ import Allowance from "../models/Allowance.js";
 import User from "../models/User.js";
 import Department from "../models/Department.js";
 import { asyncHandler, ApiError } from "../utils/errorHandler.js";
-import mongoose from "mongoose";
+import mongoose, { Types } from "mongoose";
+
+// Add this function at the top of the file, after imports
+const validatePaymentDate = (paymentDate) => {
+  const date = new Date(paymentDate);
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1; // JavaScript months are 0-based
+
+  // Calculate payroll period
+  const periodStart = new Date(year, month - 1, 1); // First day of the month
+  const periodEnd = new Date(year, month, 0); // Last day of the month
+
+  // Adjust for payroll processing period (last day of previous month to last day of current month)
+  const payrollStart = new Date(year, month - 1, 0); // Last day of previous month
+  const payrollEnd = new Date(year, month, 0); // Last day of current month
+
+  if (date < payrollStart || date > payrollEnd) {
+    throw new ApiError(
+      400,
+      `Payment date must be between ${
+        payrollStart.toISOString().split("T")[0]
+      } and ${payrollEnd.toISOString().split("T")[0]} for the selected month`
+    );
+  }
+
+  return true;
+};
 
 /**
  * Create a general allowance for all employees (Super Admin only)
@@ -70,6 +96,15 @@ const createDepartmentAllowance = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   const userRole = req.user.role;
 
+  console.log("📝 Creating department-wide allowance:", {
+    departmentId,
+    amount,
+    reason,
+    paymentDate,
+    type,
+    createdBy: userId,
+  });
+
   // Only Admin or Super Admin can create department allowance
   if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
     throw new ApiError(
@@ -85,58 +120,83 @@ const createDepartmentAllowance = asyncHandler(async (req, res) => {
     );
   }
 
-  let department;
+  // Validate payment date
+  validatePaymentDate(paymentDate);
 
+  // Find the department
+  const department = await Department.findById(departmentId);
+  if (!department) {
+    throw new ApiError(404, "Department not found");
+  }
+
+  // If Admin, check department match
   if (userRole === "ADMIN") {
-    department = await Department.findOne({ headOfDepartment: userId });
-    if (!department) {
-      throw new ApiError(403, "You are not a head of department");
-    }
-    if (department._id.toString() !== departmentId) {
+    const userDepartment = await Department.findOne({
+      headOfDepartment: userId,
+    });
+    if (!userDepartment || userDepartment._id.toString() !== departmentId) {
       throw new ApiError(
         403,
         "You can only create allowances for your own department"
       );
     }
-  } else if (userRole === "SUPER_ADMIN") {
-    department = await Department.findById(departmentId);
-    if (!department) {
-      throw new ApiError(404, "Department not found");
-    }
   }
 
+  // Find all active employees in the department
   const employees = await User.find({
-    department: department._id,
+    department: departmentId,
     status: "active",
   });
 
   if (!employees.length) {
-    throw new ApiError(404, "No active employees found in this department");
+    throw new ApiError(404, "No active employees found in the department");
   }
 
-  const allowancePromises = employees.map((employee) =>
-    Allowance.create({
+  console.log(`👥 Found ${employees.length} active employees in department`);
+
+  // Create allowances for each employee
+  const allowances = [];
+  for (const employee of employees) {
+    // Create allowance in the Allowance collection
+    const allowance = await Allowance.create({
       employee: employee._id,
       type,
-      amount,
+      amount: Number(amount),
       reason,
       paymentDate: new Date(paymentDate),
-      department: department._id,
+      department: departmentId,
       createdBy: userId,
       updatedBy: userId,
       approvalStatus: "approved",
       approvedBy: userId,
       approvedAt: new Date(),
-    })
+      isDepartmentWide: true,
+      calculationMethod: "fixed",
+      frequency: "monthly",
+    });
+
+    // Create simplified personalAllowance object
+    const personalAllowance = {
+      allowanceId: allowance._id,
+      status: "APPROVED",
+      usedInPayroll: {
+        month: null,
+        year: null,
+        payrollId: null,
+      },
+    };
+
+    // Update the user with the new allowance
+    await User.findByIdAndUpdate(employee._id, {
+      $push: { personalAllowances: personalAllowance },
+    });
+
+    allowances.push(allowance);
+  }
+
+  console.log(
+    `✅ Created ${allowances.length} allowances in collection and added to employees' personalAllowances arrays`
   );
-
-  let allowances = await Promise.all(allowancePromises);
-
-  // Populate employee name for each allowance
-  allowances = await Allowance.populate(allowances, {
-    path: "employee",
-    select: "firstName lastName email profileImageUrl",
-  });
 
   return res.status(201).json({
     success: true,
@@ -153,6 +213,15 @@ const createDepartmentEmployeeAllowance = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   const userRole = req.user.role;
 
+  console.log("📝 Creating allowance for employee:", {
+    employeeId,
+    amount,
+    reason,
+    paymentDate,
+    type,
+    createdBy: userId,
+  });
+
   // Only Admin or Super Admin can create department employee allowance
   if (userRole !== "ADMIN" && userRole !== "SUPER_ADMIN") {
     throw new ApiError(
@@ -168,11 +237,19 @@ const createDepartmentEmployeeAllowance = asyncHandler(async (req, res) => {
     );
   }
 
+  // Validate payment date
+  validatePaymentDate(paymentDate);
+
   // Find the employee
   const employee = await User.findById(employeeId);
   if (!employee || employee.status !== "active") {
     throw new ApiError(404, "Active employee not found");
   }
+
+  console.log("👤 Found employee:", {
+    name: employee.name,
+    department: employee.department,
+  });
 
   // If Admin, check department match
   if (userRole === "ADMIN") {
@@ -188,11 +265,11 @@ const createDepartmentEmployeeAllowance = asyncHandler(async (req, res) => {
     }
   }
 
-  // Create the allowance
-  let allowance = await Allowance.create({
-    employee: employee._id,
+  // Create the allowance in the Allowance collection
+  const allowance = await Allowance.create({
+    employee: employeeId,
     type,
-    amount,
+    amount: Number(amount),
     reason,
     paymentDate: new Date(paymentDate),
     department: employee.department,
@@ -201,18 +278,55 @@ const createDepartmentEmployeeAllowance = asyncHandler(async (req, res) => {
     approvalStatus: "approved",
     approvedBy: userId,
     approvedAt: new Date(),
+    calculationMethod: "fixed",
+    frequency: "monthly",
   });
 
-  // Populate employee name and email
-  allowance = await Allowance.populate(allowance, {
-    path: "employee",
-    select: "firstName lastName email profileImageUrl",
+  console.log("✅ Created allowance in collection:", allowance);
+
+  // Add to employee's personalAllowances array with correct structure
+  const personalAllowance = {
+    // Reference to main allowance
+    allowanceId: allowance._id,
+    // Assignment details
+    assignedAt: new Date(),
+    assignedBy: userId,
+    status: "APPROVED",
+    // Payroll calculation fields
+    type: allowance.type,
+    amount: allowance.amount,
+    paymentDate: allowance.paymentDate,
+    calculationMethod: allowance.calculationMethod,
+    frequency: allowance.frequency,
+    // Initialize usedInPayroll as null
+    usedInPayroll: {
+      month: null,
+      year: null,
+      payrollId: null,
+    },
+  };
+
+  // First remove any existing allowance with this ID
+  await User.findByIdAndUpdate(employeeId, {
+    $pull: { personalAllowances: { allowanceId: allowance._id } },
   });
+
+  // Then add the new allowance
+  await User.findByIdAndUpdate(employeeId, {
+    $push: { personalAllowances: personalAllowance },
+  });
+
+  console.log("✅ Added allowance to employee's personalAllowances array");
+
+  // Populate the allowance details for the response
+  const populatedAllowance = await Allowance.findById(allowance._id)
+    .populate("employee", "firstName lastName email")
+    .populate("department", "name");
 
   return res.status(201).json({
     success: true,
-    data: allowance,
-    message: `Allowance created for employee ${employee._id}`,
+    data: populatedAllowance,
+    message: `Allowance created for employee ${employee.firstName} ${employee.lastName}`,
   });
 });
 
@@ -287,23 +401,16 @@ const getAllowanceRequests = asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
   const skip = (page - 1) * limit;
 
+  // Get allowances from Allowance collection
   const allowances = await Allowance.find(query)
+    .populate("department", "name code")
+    .populate("createdBy", "firstName lastName")
     .populate("employee", "firstName lastName email profileImageUrl")
-    .populate("department", "name")
-    .populate("approvedBy", "fullName")
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit);
 
-  // Add fullName to each employee
-  allowances.forEach((allowance) => {
-    if (allowance.employee && typeof allowance.employee === "object") {
-      allowance.employee.fullName = `${allowance.employee.firstName || ""} ${
-        allowance.employee.lastName || ""
-      }`.trim();
-    }
-  });
-
+  // Get total count
   const total = await Allowance.countDocuments(query);
 
   return res.status(200).json({

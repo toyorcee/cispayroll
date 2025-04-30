@@ -12,6 +12,7 @@ import { BonusService } from "./BonusService.js";
 import { SalaryStructureService } from "./SalaryStructureService.js";
 import DepartmentModel from "../models/Department.js";
 import Audit from "../models/Audit.js";
+import Allowance from "../models/Allowance.js";
 
 const asObjectId = (id) => new Types.ObjectId(id);
 
@@ -467,83 +468,154 @@ export class PayrollService {
     employeeId,
     startDate,
     endDate,
-    basicSalary
+    basicSalary,
+    month,
+    year
   ) {
     try {
-      console.log("🧮 Calculating personal allowances for:", employeeId);
+      console.log(
+        "\n🔍 Starting allowance calculation for employee:",
+        employeeId
+      );
+      console.log("📅 Period:", { month, year, startDate, endDate });
+      console.log("💰 Basic Salary:", basicSalary);
 
+      // Get user with populated allowance details
       const user = await UserModel.findById(employeeId).populate({
-        path: "personalAllowances.allowance",
-        select: "name type value calculationMethod frequency",
+        path: "personalAllowances.allowanceId",
+        select: "type amount paymentDate calculationMethod frequency",
       });
 
-      // Early return with zeros if no allowances exist
-      if (!user?.personalAllowances?.length) {
-        return {
-          items: [],
-          totalPersonalAllowances: 0,
-        };
+      if (!user) {
+        console.log("❌ User not found");
+        throw new Error("User not found");
       }
 
-      const validAllowances = user.personalAllowances.filter((item) => {
-        return (
-          item.status === "APPROVED" &&
-          item.allowance &&
-          (!item.allowance.effectiveDate ||
-            item.allowance.effectiveDate <= endDate) &&
-          (!item.allowance.expiryDate || item.allowance.expiryDate >= startDate)
-        );
+      console.log("\n👤 User's personal allowances:", {
+        count: user.personalAllowances.length,
+        allowances: user.personalAllowances.map((pa) => ({
+          id: pa.allowanceId._id,
+          type: pa.allowanceId.type,
+          amount: pa.allowanceId.amount,
+          status: pa.status,
+          usedInPayroll: pa.usedInPayroll,
+        })),
       });
 
-      const items = validAllowances.map((item) => {
+      // Filter valid allowances
+      const validAllowances = user.personalAllowances.filter((pa) => {
+        const allowance = pa.allowanceId;
+        const isValid =
+          pa.status === "APPROVED" &&
+          allowance.paymentDate >= startDate &&
+          allowance.paymentDate <= endDate &&
+          (!pa.usedInPayroll.month || pa.usedInPayroll.month !== month) &&
+          (!pa.usedInPayroll.year || pa.usedInPayroll.year !== year);
+
+        console.log(`\n🔍 Validating allowance ${allowance._id}:`, {
+          type: allowance.type,
+          amount: allowance.amount,
+          paymentDate: allowance.paymentDate,
+          status: pa.status,
+          usedInPayroll: pa.usedInPayroll,
+          isValid,
+        });
+
+        return isValid;
+      });
+
+      console.log(
+        "\n✅ Valid allowances for period:",
+        validAllowances.map((pa) => ({
+          id: pa.allowanceId._id,
+          type: pa.allowanceId.type,
+          amount: pa.allowanceId.amount,
+          calculationMethod: pa.allowanceId.calculationMethod,
+        }))
+      );
+
+      // Calculate amounts
+      const calculatedItems = validAllowances.map((pa) => {
+        const allowance = pa.allowanceId;
         let amount = 0;
 
-        // Calculate amount based on calculation method
-        switch (item.allowance.calculationMethod) {
+        switch (allowance.calculationMethod) {
           case "fixed":
-            amount = item.allowance.value;
+            amount = allowance.amount;
+            console.log(`💰 Fixed amount for ${allowance.type}:`, amount);
             break;
           case "percentage":
-            amount = (basicSalary * item.allowance.value) / 100;
+            amount = (basicSalary * allowance.amount) / 100;
+            console.log(`📊 Percentage calculation for ${allowance.type}:`, {
+              basicSalary,
+              percentage: allowance.amount,
+              result: amount,
+            });
             break;
           case "performance":
-            amount = AllowanceService.calculatePerformanceAllowance(
-              item.allowance
-            );
+            amount = allowance.amount;
+            console.log(`🎯 Performance amount for ${allowance.type}:`, amount);
             break;
           default:
-            console.warn(
-              `Unknown calculation method: ${item.allowance.calculationMethod}`
+            amount = allowance.amount;
+            console.log(
+              `⚠️ Using default amount for ${allowance.type}:`,
+              amount
             );
-            amount = 0;
         }
 
         return {
-          name: item.allowance.name,
-          type: item.allowance.type,
-          value: item.allowance.value,
+          allowanceId: allowance._id,
+          name: allowance.type,
+          type: allowance.type,
+          value: amount,
           amount: amount,
-          calculationMethod: item.allowance.calculationMethod,
-          frequency: item.allowance.frequency || "monthly",
+          paymentDate: allowance.paymentDate,
+          calculationMethod: allowance.calculationMethod || "fixed",
+          frequency: allowance.frequency || "monthly",
         };
       });
 
-      const totalPersonalAllowances = items.reduce(
-        (sum, item) =>
-          sum + this.adjustAmountByFrequency(item.amount, item.frequency),
+      const totalAmount = calculatedItems.reduce(
+        (sum, item) => sum + item.amount,
         0
       );
 
+      console.log("\n🎯 Final allowance calculation:", {
+        items: calculatedItems.map((i) => ({
+          type: i.type,
+          amount: i.amount,
+          calculationMethod: i.calculationMethod,
+        })),
+        totalAmount,
+      });
+
       return {
-        items,
-        totalPersonalAllowances,
+        items: calculatedItems,
+        totalAmount,
       };
     } catch (error) {
       console.error("❌ Error calculating personal allowances:", error);
-      return {
-        items: [],
-        totalPersonalAllowances: 0,
-      };
+      throw error;
+    }
+  }
+
+  static async markAllowancesAsUsed(allowanceIds, payrollId, month, year) {
+    try {
+      await Allowance.updateMany(
+        { _id: { $in: allowanceIds } },
+        {
+          $set: {
+            usedInPayroll: {
+              month,
+              year,
+              payrollId,
+            },
+          },
+        }
+      );
+    } catch (error) {
+      console.error("❌ Error marking allowances as used:", error);
     }
   }
 
@@ -652,7 +724,9 @@ export class PayrollService {
         employeeId,
         startDate,
         endDate,
-        basicSalary
+        basicSalary,
+        month,
+        year
       );
 
       // Calculate bonuses
@@ -684,14 +758,28 @@ export class PayrollService {
       // Calculate total deductions
       const totalDeductions = this.roundToKobo(deductionDetails.total);
 
+      // Calculate grade allowances and their total
+      const gradeAllowances = salaryComponents.components.filter(
+        (c) => c.type === "allowance"
+      );
+      const totalGradeAllowances = gradeAllowances.reduce(
+        (sum, a) => sum + a.amount,
+        0
+      );
+      const totalAdditionalAllowances =
+        personalAllowances.items?.reduce((sum, a) => sum + a.amount, 0) || 0;
+      const totalAllowances = totalGradeAllowances + totalAdditionalAllowances;
+      const grossEarnings = basicSalary + totalAllowances;
+      const netPay = this.roundToKobo(grossEarnings - totalDeductions);
+
       console.log("\n✅ Payroll calculation completed:", {
-        basicSalary: salaryComponents.basicSalary,
-        totalAllowances: salaryComponents.totalAllowances,
-        totalBonuses: bonuses.totalBonuses || 0,
+        basicSalary,
+        totalGradeAllowances,
+        totalAdditionalAllowances,
+        totalAllowances,
+        grossEarnings,
         totalDeductions,
-        grossSalary: salaryComponents.grossSalary,
-        netSalary: salaryComponents.grossSalary - totalDeductions,
-        taxRate,
+        netPay,
       });
 
       return {
@@ -704,7 +792,7 @@ export class PayrollService {
           code: departmentData.code,
         },
         salaryGrade: salaryGradeId,
-        basicSalary: salaryComponents.basicSalary,
+        basicSalary,
         components: salaryComponents.components.map((c) => ({
           name: c.name,
           type: c.type,
@@ -716,21 +804,21 @@ export class PayrollService {
         earnings: {
           overtime: { hours: 0, rate: 0, amount: 0 },
           bonus: bonuses.items || [],
-          totalEarnings: salaryComponents.grossSalary,
+          totalEarnings: grossEarnings,
         },
         deductions: {
           tax: {
-            taxableAmount: salaryComponents.grossSalary,
+            taxableAmount: grossEarnings,
             taxRate: taxRate,
             amount: this.roundToKobo(deductionDetails.paye),
           },
           pension: {
-            pensionableAmount: salaryComponents.basicSalary,
+            pensionableAmount: basicSalary,
             rate: 8,
             amount: this.roundToKobo(deductionDetails.pension),
           },
           nhf: {
-            pensionableAmount: salaryComponents.basicSalary,
+            pensionableAmount: basicSalary,
             rate: 2.5,
             amount: this.roundToKobo(deductionDetails.nhf),
           },
@@ -739,23 +827,19 @@ export class PayrollService {
           totalDeductions,
         },
         totals: {
-          basicSalary: salaryComponents.basicSalary,
-          totalAllowances: salaryComponents.totalAllowances,
+          basicSalary,
+          totalAllowances,
           totalBonuses: bonuses.totalBonuses || 0,
-          grossEarnings: salaryComponents.grossSalary,
+          grossEarnings,
           totalDeductions,
-          netPay: this.roundToKobo(
-            salaryComponents.grossSalary - totalDeductions
-          ),
+          netPay,
         },
         allowances: {
-          gradeAllowances: salaryComponents.components.filter(
-            (c) => c.type === "allowance"
-          ),
+          gradeAllowances,
           additionalAllowances: personalAllowances.items || [],
-          totalAllowances:
-            salaryComponents.totalAllowances +
-            (personalAllowances.totalPersonalAllowances || 0),
+          totalGradeAllowances,
+          totalAdditionalAllowances,
+          totalAllowances,
         },
         bonuses: {
           items: bonuses.items || [],
@@ -1008,10 +1092,11 @@ export class PayrollService {
         year: payrollData.year,
       });
 
+      let payroll;
       if (existingPayroll) {
         // Update existing payroll
         console.log("📝 Updating existing payroll");
-        const updatedPayroll = await PayrollModel.findByIdAndUpdate(
+        payroll = await PayrollModel.findByIdAndUpdate(
           existingPayroll._id,
           {
             ...calculatedPayroll,
@@ -1020,17 +1105,33 @@ export class PayrollService {
           },
           { new: true }
         );
-        return updatedPayroll;
+      } else {
+        // Create new payroll
+        console.log("📝 Creating new payroll");
+        payroll = new PayrollModel({
+          ...calculatedPayroll,
+          status: PAYROLL_STATUS.DRAFT,
+        });
+        await payroll.save();
       }
 
-      // Create new payroll
-      console.log("📝 Creating new payroll");
-      const payroll = new PayrollModel({
-        ...calculatedPayroll,
-        status: PAYROLL_STATUS.DRAFT,
-      });
+      // Mark allowances as used in this payroll
+      if (calculatedPayroll.allowances?.items?.length) {
+        await Promise.all(
+          calculatedPayroll.allowances.items.map(async (item) => {
+            if (item.allowanceId) {
+              await Allowance.findByIdAndUpdate(item.allowanceId, {
+                usedInPayroll: {
+                  month: payrollData.month,
+                  year: payrollData.year,
+                  payrollId: payroll._id,
+                },
+              });
+            }
+          })
+        );
+      }
 
-      await payroll.save();
       return payroll;
     } catch (error) {
       console.error("❌ Error in createPayroll:", error);

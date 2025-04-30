@@ -229,7 +229,7 @@ export default function AllowanceManagement() {
             if (filters.status) {
               matches =
                 matches &&
-                (allowance.status === filters.status ||
+                (allowance.approvalStatus === filters.status ||
                   allowance.approvalStatus === filters.status);
             }
 
@@ -239,13 +239,13 @@ export default function AllowanceManagement() {
 
             if (filters.startDate) {
               const startDate = new Date(filters.startDate);
-              const allowanceDate = new Date(allowance.effectiveDate);
+              const allowanceDate = new Date(allowance.paymentDate);
               matches = matches && allowanceDate >= startDate;
             }
 
             if (filters.endDate) {
               const endDate = new Date(filters.endDate);
-              const allowanceDate = new Date(allowance.effectiveDate);
+              const allowanceDate = new Date(allowance.paymentDate);
               matches = matches && allowanceDate <= endDate;
             }
 
@@ -560,33 +560,36 @@ export default function AllowanceManagement() {
                   Department
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Name/Description
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                   Type
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                   Amount
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  Reason
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                   Status
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Date
+                  Payment Date
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  Approved By
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {isAllowancesLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-2 text-center">
+                  <td colSpan={8} className="px-4 py-2 text-center">
                     <div className="text-gray-500">Loading allowances...</div>
                   </td>
                 </tr>
               ) : (allowanceData as AllowancesListResponse)?.data?.allowances
                   ?.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-2 text-center">
+                  <td colSpan={8} className="px-4 py-2 text-center">
                     <div className="text-gray-500">
                       No allowances found. Click "Add Allowance" to create one.
                     </div>
@@ -600,7 +603,8 @@ export default function AllowanceManagement() {
                     <td className="px-4 py-2">
                       <div className="text-sm">
                         <div className="font-medium text-gray-900">
-                          {allowance.employee?.fullName}
+                          {allowance.employee?.firstName}{" "}
+                          {allowance.employee?.lastName}
                         </div>
                         <div className="text-xs text-gray-500">
                           {allowance.employee?.email}
@@ -608,18 +612,8 @@ export default function AllowanceManagement() {
                       </div>
                     </td>
                     <td className="px-4 py-2">
-                      <div className="text-sm text-gray-900 break-words">
+                      <div className="text-sm text-gray-900">
                         {allowance.department?.name}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="text-sm">
-                        <div className="font-medium text-gray-900 break-words">
-                          {allowance.name}
-                        </div>
-                        <div className="text-xs text-gray-500 break-words">
-                          {allowance.description}
-                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-2">
@@ -631,8 +625,10 @@ export default function AllowanceManagement() {
                       <div className="text-sm text-gray-900">
                         ₦{allowance.amount?.toLocaleString()}
                       </div>
-                      <div className="text-xs text-gray-500">
-                        {allowance.calculationMethod} / {allowance.frequency}
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="text-sm text-gray-900">
+                        {allowance.reason}
                       </div>
                     </td>
                     <td className="px-4 py-2">
@@ -641,20 +637,27 @@ export default function AllowanceManagement() {
                           ${
                             allowance.approvalStatus === "approved"
                               ? "bg-green-100 text-green-800"
-                              : allowance.status === "PENDING"
+                              : allowance.approvalStatus === "PENDING"
                               ? "bg-yellow-100 text-yellow-800"
                               : "bg-red-100 text-red-800"
                           }`}
                       >
-                        {allowance.status}
+                        {allowance.approvalStatus}
                       </span>
                     </td>
                     <td className="px-4 py-2">
                       <div className="text-sm text-gray-900">
-                        {new Date(allowance.effectiveDate).toLocaleDateString()}
+                        {new Date(allowance.paymentDate).toLocaleDateString()}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="text-sm text-gray-900">
+                        {allowance.approvedBy?.fullName}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {allowance.month}/{allowance.year}
+                        {allowance.approvedAt
+                          ? new Date(allowance.approvedAt).toLocaleDateString()
+                          : ""}
                       </div>
                     </td>
                   </tr>

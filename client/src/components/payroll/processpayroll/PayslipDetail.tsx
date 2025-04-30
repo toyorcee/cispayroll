@@ -1,9 +1,7 @@
 // import React from "react";
 import { Payslip } from "../../../types/payroll";
 import { FaDownload, FaPrint, FaEnvelope } from "react-icons/fa";
-// import { useAuth } from "../../../context/AuthContext";
 import { generatePayslipPDF } from "../../../utils/pdfGenerator";
-// import { PayrollBranding } from "../../shared/PayrollBranding";
 import { payrollService } from "../../../services/payrollService";
 import { useState } from "react";
 import { toast } from "react-toastify";
@@ -84,7 +82,14 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
   const netPay = payslip.totals?.netPay || 0;
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div
+      className="fixed inset-0 bg-white bg-opacity-80 overflow-y-auto h-full w-full z-50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="relative top-4 sm:top-8 md:top-20 mx-auto p-4 sm:p-6 border w-[95%] md:w-[600px] lg:w-[800px] shadow-xl rounded-lg bg-white mb-4 sm:mb-8 md:mb-20 ml-0 sm:ml-[280px] print:ml-0 print:w-full print:max-w-none print:shadow-none print:border-0 payslip-container">
         {/* Header with Branding and Payslip ID */}
         <div className="border-b border-gray-200 pb-4 sm:pb-6 mb-4 sm:mb-6">
@@ -222,10 +227,20 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
               <span className="font-semibold">{formatAmount(basicSalary)}</span>
             </div>
 
+            {/* Grade Allowances */}
             {payslip.earnings?.allowances?.gradeAllowances?.map(
-              (allowance, index) => (
+              (
+                allowance: {
+                  name: string;
+                  type: string;
+                  value: number;
+                  amount: number;
+                  _id: string;
+                },
+                index: number
+              ) => (
                 <div
-                  key={index}
+                  key={allowance._id || index}
                   className="flex justify-between text-gray-700 text-xs sm:text-sm"
                 >
                   <span className="font-medium">
@@ -241,7 +256,48 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
               )
             )}
 
+            {/* Additional Allowances */}
+            {payslip.earnings?.allowances?.additionalAllowances?.map(
+              (allowance: { name: string; amount: number }, index: number) => (
+                <div
+                  key={index}
+                  className="flex justify-between text-gray-700 text-xs sm:text-sm"
+                >
+                  <span className="font-medium">{allowance.name}</span>
+                  <span className="font-semibold">
+                    {formatAmount(allowance.amount)}
+                  </span>
+                </div>
+              )
+            )}
+
             <div className="flex justify-between text-gray-700 text-xs sm:text-sm font-medium pt-2 border-t border-gray-100">
+              <span>Total Grade Allowances</span>
+              <span className="font-semibold">
+                {formatAmount(
+                  payslip.earnings?.allowances?.gradeAllowances?.reduce(
+                    (sum: number, a: { amount: number }) =>
+                      sum + (a.amount || 0),
+                    0
+                  )
+                )}
+              </span>
+            </div>
+
+            <div className="flex justify-between text-gray-700 text-xs sm:text-sm font-medium">
+              <span>Total Additional Allowances</span>
+              <span className="font-semibold">
+                {formatAmount(
+                  payslip.earnings?.allowances?.additionalAllowances?.reduce(
+                    (sum: number, a: { amount: number }) =>
+                      sum + (a.amount || 0),
+                    0
+                  )
+                )}
+              </span>
+            </div>
+
+            <div className="flex justify-between text-gray-700 text-xs sm:text-sm font-medium">
               <span>Total Allowances</span>
               <span className="font-semibold">
                 {formatAmount(payslip.earnings?.allowances?.totalAllowances)}

@@ -885,6 +885,14 @@ export class NotificationService {
             totalEmployees: data.metadata?.totalEmployees || 0,
             skippedCount: data.metadata?.skippedCount || 0,
             failedCount: data.metadata?.failedCount || 0,
+            month: data.payroll?.month,
+            year: data.payroll?.year,
+            status: data.payroll?.status || "COMPLETED",
+            totals: data.payroll?.totals || {
+              processed: 0,
+              skipped: 0,
+              failed: 0,
+            },
           },
         };
       case NOTIFICATION_TYPES.PAYMENT_FAILED:

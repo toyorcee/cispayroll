@@ -47,47 +47,32 @@ export interface AllowanceDepartment {
 
 export interface Allowance {
   _id: string;
-  name: string;
-  type: AllowanceType;
-  amount: number;
-  description: string;
-  status: AllowanceStatus;
-  approvedBy?: string;
-  approvedAt?: Date;
-  rejectedBy?: string;
-  rejectedAt?: Date;
-  rejectionReason?: string;
-  documents?: Array<{
-    name: string;
-    url: string;
-    uploadedAt: Date;
-  }>;
-  month: number;
-  year: number;
-  employee: AllowanceEmployee;
-  calculationMethod: CalculationMethod;
-  baseAmount?: number;
-  frequency: PayrollFrequency;
-  taxable: boolean;
-  isActive: boolean;
-  effectiveDate: string;
-  expiryDate?: Date;
-  salaryGrade: {
+  employee: {
     _id: string;
-    level: string;
-    basicSalary: number;
+    firstName: string;
+    lastName: string;
+    email: string;
+    fullName: string;
   };
-  scope: "department" | "grade" | "individual";
-  department: AllowanceDepartment;
-  priority: number;
-  performanceRating?: number;
+  type: string;
+  amount: number;
+  reason: string;
+  paymentDate: string;
+  department: {
+    _id: string;
+    name: string;
+  };
   createdBy: string;
   updatedBy: string;
-  attachments: string[];
-  createdAt: string;
-  updatedAt: string;
-  __v: number;
   approvalStatus: string;
+  approvedBy?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    fullName: string;
+  };
+  approvedAt?: string;
+  __v: number;
 }
 
 export interface CreateAllowanceRequest {

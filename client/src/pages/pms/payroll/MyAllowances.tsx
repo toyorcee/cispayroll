@@ -30,7 +30,6 @@ import { Permission } from "../../../types/auth";
 import { allowanceService } from "../../../services/allowanceService";
 import {
   Allowance,
-  AllowanceStatus,
   AllowanceType,
   CalculationMethod,
   PayrollFrequency,
@@ -185,8 +184,8 @@ const MyAllowances: React.FC = () => {
 
       toast.success("Allowance request submitted successfully");
       handleCloseForm();
-      fetchAllowances(); 
-      fetchAllowanceHistory(); 
+      fetchAllowances();
+      fetchAllowanceHistory();
     } catch (err: any) {
       console.error("Error requesting allowance:", err);
       toast.error(err.message || "Failed to submit allowance request");
@@ -207,19 +206,6 @@ const MyAllowances: React.FC = () => {
       </Alert>
     );
   }
-
-  const getStatusColor = (status: AllowanceStatus) => {
-    switch (status) {
-      case AllowanceStatus.APPROVED:
-        return "success";
-      case AllowanceStatus.PENDING:
-        return "warning";
-      case AllowanceStatus.REJECTED:
-        return "error";
-      default:
-        return "default";
-    }
-  };
 
   const renderAllowanceTable = (
     allowances: Allowance[],
@@ -249,18 +235,24 @@ const MyAllowances: React.FC = () => {
           <TableBody>
             {allowances.map((allowance) => (
               <TableRow key={allowance._id}>
-                <TableCell>{allowance.name}</TableCell>
+                <TableCell>{allowance.reason}</TableCell>
                 <TableCell>{allowance.type}</TableCell>
                 <TableCell>{formatCurrency(allowance.amount)}</TableCell>
-                <TableCell>{allowance.frequency}</TableCell>
+                <TableCell>{allowance.paymentDate}</TableCell>
                 <TableCell>
                   <Chip
-                    label={allowance.status}
-                    color={getStatusColor(allowance.status) as any}
+                    label={allowance.approvalStatus}
+                    color={
+                      allowance.approvalStatus === "APPROVED"
+                        ? "success"
+                        : allowance.approvalStatus === "PENDING"
+                        ? "warning"
+                        : "error"
+                    }
                     size="small"
                   />
                 </TableCell>
-                <TableCell>{formatDate(allowance.effectiveDate)}</TableCell>
+                <TableCell>{formatDate(allowance.paymentDate)}</TableCell>
               </TableRow>
             ))}
           </TableBody>

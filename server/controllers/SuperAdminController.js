@@ -5019,6 +5019,13 @@ export class SuperAdminController {
           }
 
           // Calculate payroll
+          console.log(
+            `\n🔍 Checking allowances for employee ${employee.firstName} ${employee.lastName} (${employee.employeeId})`
+          );
+          console.log(
+            `📋 Department: ${employee.department.name} (${employee.department._id})`
+          );
+
           const payrollData = await PayrollService.calculatePayroll(
             employeeId,
             salaryGrade._id,
@@ -5035,6 +5042,24 @@ export class SuperAdminController {
             );
             continue;
           }
+
+          console.log(
+            `\n✅ Payroll calculation completed for ${employee.firstName} ${employee.lastName}:`,
+            {
+              basicSalary: payrollData.basicSalary,
+              totalAllowances: payrollData.totals.totalAllowances,
+              totalBonuses: payrollData.totals.totalBonuses,
+              grossEarnings: payrollData.totals.grossEarnings,
+              totalDeductions: payrollData.totals.totalDeductions,
+              netPay: payrollData.totals.netPay,
+              allowances: {
+                gradeAllowances: payrollData.allowances.gradeAllowances.length,
+                additionalAllowances:
+                  payrollData.allowances.additionalAllowances.length,
+                totalAllowances: payrollData.allowances.totalAllowances,
+              },
+            }
+          );
 
           // Create payroll record with COMPLETED status
           const payroll = await PayrollModel.create({
@@ -5198,12 +5223,25 @@ export class SuperAdminController {
         // Create the notification message with department breakdown
         const notificationMessage = `You have processed ${results.processed}/${results.total} payrolls for ${month}/${year}. ${results.skipped} skipped, ${results.failed} failed.\n\nDepartment Breakdown:\n${departmentBreakdown}`;
 
-        // Notify Super Admin with updated message
+        // Create a payroll object for the notification
+        const notificationPayroll = {
+          _id: new Types.ObjectId(),
+          month,
+          year,
+          status: "COMPLETED",
+          totals: {
+            processed: results.processed,
+            skipped: results.skipped,
+            failed: results.failed,
+          },
+        };
+
+        // Notify Super Admin
         await NotificationService.createNotification(
           superAdmin._id,
           NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED,
           null,
-          null,
+          notificationPayroll,
           notificationMessage,
           {
             approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
@@ -5243,7 +5281,7 @@ export class SuperAdminController {
               hrManager._id,
               NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED,
               null,
-              null,
+              notificationPayroll,
               `${results.processed} payrolls have been processed and completed by ${superAdmin.firstName} ${superAdmin.lastName} (Super Admin) for ${month}/${year}.`,
               {
                 approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
@@ -5274,7 +5312,7 @@ export class SuperAdminController {
               financeDirector._id,
               NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED,
               null,
-              null,
+              notificationPayroll,
               `${results.processed} payrolls have been processed and completed by ${superAdmin.firstName} ${superAdmin.lastName} (Super Admin) for ${month}/${year}.`,
               {
                 approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
@@ -5283,19 +5321,6 @@ export class SuperAdminController {
             );
           }
         }
-
-        // Notify Super Admin
-        await NotificationService.createNotification(
-          superAdmin._id,
-          NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED,
-          null,
-          null,
-          `You have processed ${results.processed} payrolls for ${month}/${year}. ${results.skipped} skipped, ${results.failed} failed.`,
-          {
-            approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-            metadata: notificationMetadata,
-          }
-        );
 
         console.log("Notifications sent to:", {
           hrManager: hrDepartment ? "Yes" : "No",
