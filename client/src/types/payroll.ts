@@ -641,6 +641,7 @@ export interface PayrollFilters {
   employee?: string;
   page: number;
   limit: number;
+  search?: string;
 }
 
 export interface LineChartDataset {

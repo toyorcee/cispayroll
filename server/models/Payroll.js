@@ -514,10 +514,14 @@ PayrollSchema.methods.approve = function (user, remarks) {
     // Move to next approval level
     this.approvalFlow.currentLevel = nextLevel;
   } else {
-    // Final approval
+    // Final approval - mark allowances and bonuses as used
     this.status = PAYROLL_STATUS.APPROVED;
     this.approvalFlow.approvedBy = user._id;
     this.approvalFlow.approvedAt = new Date();
+
+    // Mark allowances and bonuses as used
+    this.markAllowancesAsUsed();
+    this.markBonusesAsUsed();
   }
 
   return this;
@@ -567,6 +571,61 @@ PayrollSchema.methods.returnForRevision = function (user, remarks) {
   this.approvalFlow.currentLevel = null;
 
   return this;
+};
+
+// Add new methods to mark allowances and bonuses as used
+PayrollSchema.methods.markAllowancesAsUsed = async function () {
+  const User = mongoose.model("User");
+  const user = await User.findById(this.employee);
+
+  if (!user) return;
+
+  // Mark grade allowances as used
+  for (const allowance of this.allowances.gradeAllowances) {
+    const existingAllowance = user.allowances.find(
+      (a) => a.name === allowance.name
+    );
+    if (existingAllowance) {
+      existingAllowance.used = true;
+      existingAllowance.lastUsedInPayroll = this._id;
+      existingAllowance.lastUsedDate = new Date();
+    }
+  }
+
+  // Mark additional allowances as used
+  for (const allowance of this.allowances.additionalAllowances) {
+    const existingAllowance = user.allowances.find(
+      (a) => a.name === allowance.name
+    );
+    if (existingAllowance) {
+      existingAllowance.used = true;
+      existingAllowance.lastUsedInPayroll = this._id;
+      existingAllowance.lastUsedDate = new Date();
+    }
+  }
+
+  await user.save();
+};
+
+PayrollSchema.methods.markBonusesAsUsed = async function () {
+  const User = mongoose.model("User");
+  const user = await User.findById(this.employee);
+
+  if (!user) return;
+
+  // Mark bonuses as used
+  for (const bonus of this.earnings.bonus) {
+    const existingBonus = user.bonuses.find(
+      (b) => b.description === bonus.description
+    );
+    if (existingBonus) {
+      existingBonus.used = true;
+      existingBonus.lastUsedInPayroll = this._id;
+      existingBonus.lastUsedDate = new Date();
+    }
+  }
+
+  await user.save();
 };
 
 export default mongoose.model("Payroll", PayrollSchema);

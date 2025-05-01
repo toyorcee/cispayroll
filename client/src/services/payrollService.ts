@@ -398,7 +398,7 @@ export const payrollService = {
 
   initiatePayment: async (payrollId: string) => {
     try {
-      const response = await axios.patch(
+      const response = await axios.post(
         `${BASE_URL}/payroll/${payrollId}/initiate-payment`
       );
       if (!response.data.success) {
@@ -410,6 +410,28 @@ export const payrollService = {
       const errorMessage =
         (error as { response?: { data?: { message?: string } } })?.response
           ?.data?.message || "Failed to initiate payment";
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+  },
+
+  initiateBatchPayment: async (payrollIds: string[]) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/payroll/initiate-payment`,
+        { payrollIds }
+      );
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to initiate batch payment"
+        );
+      }
+      return response.data.data;
+    } catch (error) {
+      console.error("❌ Error initiating batch payment:", error);
+      const errorMessage =
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || "Failed to initiate batch payment";
       toast.error(errorMessage);
       throw new Error(errorMessage);
     }
@@ -520,9 +542,21 @@ export const payrollService = {
     }
   },
 
+  markPaymentsPaidBatch: async (payrollIds: string[]) => {
+    const response = await axios.post(`${BASE_URL}/payroll/mark-paid-batch`, {
+      payrollIds,
+    });
+    if (!response.data.success) {
+      throw new Error(
+        response.data.message || "Failed to mark payments as completed"
+      );
+    }
+    return response.data.data;
+  },
+
   markAsPaid: async (payrollId: string) => {
     try {
-      const response = await axios.patch(
+      const response = await axios.post(
         `${BASE_URL}/payroll/${payrollId}/mark-paid`
       );
       if (!response.data.success) {
@@ -538,9 +572,21 @@ export const payrollService = {
     }
   },
 
+  markPaymentsFailedBatch: async (payrollIds: string[]) => {
+    const response = await axios.post(`${BASE_URL}/payroll/mark-failed-batch`, {
+      payrollIds,
+    });
+    if (!response.data.success) {
+      throw new Error(
+        response.data.message || "Failed to mark payments as failed"
+      );
+    }
+    return response.data.data;
+  },
+
   markAsFailed: async (payrollId: string) => {
     try {
-      const response = await axios.patch(
+      const response = await axios.post(
         `${BASE_URL}/payroll/${payrollId}/mark-failed`
       );
       if (!response.data.success) {
@@ -554,13 +600,5 @@ export const payrollService = {
         error.response?.data?.message || "Failed to mark payment as failed"
       );
     }
-  },
-
-  markPaymentsPaidBatch: async (data: { payrollIds: string[] }) => {
-    const response = await axios.post(
-      `${BASE_URL}/payroll/mark-paid-batch`,
-      data
-    );
-    return response.data;
   },
 };

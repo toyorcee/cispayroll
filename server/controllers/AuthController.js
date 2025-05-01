@@ -4,13 +4,22 @@ import { UserRole } from "../models/User.js";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
+// const cookieOptions = {
+//   httpOnly: true,
+//   secure: true,
+//   sameSite: "None", 
+//   maxAge: 24 * 60 * 60 * 1000,
+//   path: "/",
+// };
+
 const cookieOptions = {
   httpOnly: true,
-  secure: true,
-  sameSite: "None", 
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   maxAge: 24 * 60 * 60 * 1000,
   path: "/",
 };
+
 
 export class AuthController {
   static async login(req, res) {

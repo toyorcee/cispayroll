@@ -12,7 +12,6 @@ import { BonusService } from "./BonusService.js";
 import { SalaryStructureService } from "./SalaryStructureService.js";
 import DepartmentModel from "../models/Department.js";
 import Audit from "../models/Audit.js";
-import Allowance from "../models/Allowance.js";
 
 const asObjectId = (id) => new Types.ObjectId(id);
 
@@ -621,22 +620,111 @@ export class PayrollService {
     }
   }
 
-  static async markAllowancesAsUsed(allowanceIds, payrollId, month, year) {
+  static async markAllowancesAsUsed(
+    userId,
+    allowanceIds,
+    payrollId,
+    month,
+    year
+  ) {
     try {
-      await Allowance.updateMany(
-        { _id: { $in: allowanceIds } },
-        {
-          $set: {
+      const user = await UserModel.findById(userId);
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // Verify the payroll exists and get its details
+      const payroll = await PayrollModel.findById(payrollId);
+      if (!payroll) {
+        throw new Error("Payroll not found");
+      }
+
+      // Update each allowance's usedInPayroll field
+      user.personalAllowances = user.personalAllowances.map((allowance) => {
+        if (allowanceIds.includes(allowance.allowanceId.toString())) {
+          // Verify this allowance is actually in the payroll
+          const isInPayroll =
+            payroll.allowances.gradeAllowances.some(
+              (pa) => pa._id.toString() === allowance.allowanceId.toString()
+            ) ||
+            payroll.allowances.additionalAllowances.some(
+              (pa) => pa._id.toString() === allowance.allowanceId.toString()
+            );
+
+          if (!isInPayroll) {
+            console.warn(
+              `Allowance ${allowance.allowanceId} not found in payroll ${payrollId}`
+            );
+            return allowance;
+          }
+
+          return {
+            ...allowance,
+            status: "APPROVED",
             usedInPayroll: {
-              month,
-              year,
-              payrollId,
+              month: payroll.month,
+              year: payroll.year,
+              payrollId: payroll._id,
             },
-          },
+          };
         }
-      );
+        return allowance;
+      });
+
+      await user.save();
+      return true;
     } catch (error) {
-      console.error("❌ Error marking allowances as used:", error);
+      console.error("Error marking allowances as used:", error);
+      throw error;
+    }
+  }
+
+  static async markBonusesAsUsed(userId, bonusIds, payrollId, month, year) {
+    try {
+      const user = await UserModel.findById(userId);
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      // Verify the payroll exists and get its details
+      const payroll = await PayrollModel.findById(payrollId);
+      if (!payroll) {
+        throw new Error("Payroll not found");
+      }
+
+      // Update each bonus's usedInPayroll field
+      user.personalBonuses = user.personalBonuses.map((bonus) => {
+        if (bonusIds.includes(bonus.bonusId.toString())) {
+          // Verify this bonus is actually in the payroll
+          const isInPayroll = payroll.bonuses.items.some(
+            (pb) => pb._id.toString() === bonus.bonusId.toString()
+          );
+
+          if (!isInPayroll) {
+            console.warn(
+              `Bonus ${bonus.bonusId} not found in payroll ${payrollId}`
+            );
+            return bonus;
+          }
+
+          return {
+            ...bonus,
+            status: "APPROVED",
+            usedInPayroll: {
+              month: payroll.month,
+              year: payroll.year,
+              payrollId: payroll._id,
+            },
+          };
+        }
+        return bonus;
+      });
+
+      await user.save();
+      return true;
+    } catch (error) {
+      console.error("Error marking bonuses as used:", error);
+      throw error;
     }
   }
 
@@ -740,6 +828,50 @@ export class PayrollService {
         employeeId
       );
 
+      // Get user's personal allowances that haven't been used this month/year
+      const unusedAllowances = employee.personalAllowances.filter(
+        (allowance) => {
+          return (
+            !allowance.usedInPayroll ||
+            !(
+              allowance.usedInPayroll.month === month &&
+              allowance.usedInPayroll.year === year
+            )
+          );
+        }
+      );
+
+      // Get user's personal bonuses that haven't been used this month/year
+      const unusedBonuses = employee.personalBonuses.filter((bonus) => {
+        return (
+          !bonus.usedInPayroll ||
+          !(
+            bonus.usedInPayroll.month === month &&
+            bonus.usedInPayroll.year === year
+          )
+        );
+      });
+
+      // Only include unused allowances and bonuses in calculations
+      const allowances = {
+        gradeAllowances: [
+          ...salaryComponents.components.filter((c) => c.type === "allowance"),
+        ],
+        additionalAllowances: unusedAllowances.map((allowance) => ({
+          ...allowance,
+          amount: this.calculateAllowanceAmount(allowance, basicSalary),
+        })),
+        totalAllowances: 0,
+      };
+
+      const bonuses = {
+        items: unusedBonuses.map((bonus) => ({
+          ...bonus,
+          amount: this.calculateAllowanceAmount(bonus, basicSalary),
+        })),
+        totalBonuses: 0,
+      };
+
       // Calculate personal allowances
       const personalAllowances = await this.calculatePersonalAllowances(
         employeeId,
@@ -751,7 +883,7 @@ export class PayrollService {
       );
 
       // Calculate bonuses
-      const bonuses = await this.calculateBonuses(
+      const calculatedBonuses = await this.calculateBonuses(
         employeeId,
         startDate,
         endDate,
@@ -826,7 +958,7 @@ export class PayrollService {
         })),
         earnings: {
           overtime: { hours: 0, rate: 0, amount: 0 },
-          bonus: bonuses.items || [],
+          bonus: calculatedBonuses.items || [],
           totalEarnings: grossEarnings,
         },
         deductions: {
@@ -852,7 +984,7 @@ export class PayrollService {
         totals: {
           basicSalary,
           totalAllowances,
-          totalBonuses: bonuses.totalBonuses || 0,
+          totalBonuses: calculatedBonuses.totalBonuses || 0,
           grossEarnings,
           totalDeductions,
           netPay,
@@ -865,8 +997,8 @@ export class PayrollService {
           totalAllowances,
         },
         bonuses: {
-          items: bonuses.items || [],
-          totalBonuses: bonuses.totalBonuses || 0,
+          items: calculatedBonuses.items || [],
+          totalBonuses: calculatedBonuses.totalBonuses || 0,
         },
         frequency,
         periodStart: startDate,
@@ -1139,20 +1271,37 @@ export class PayrollService {
       }
 
       // Mark allowances as used in this payroll
-      if (calculatedPayroll.allowances?.items?.length) {
-        await Promise.all(
-          calculatedPayroll.allowances.items.map(async (item) => {
-            if (item.allowanceId) {
-              await Allowance.findByIdAndUpdate(item.allowanceId, {
-                usedInPayroll: {
-                  month: payrollData.month,
-                  year: payrollData.year,
-                  payrollId: payroll._id,
-                },
-              });
-            }
-          })
-        );
+      if (calculatedPayroll.allowances?.additionalAllowances?.length) {
+        const allowanceIds = calculatedPayroll.allowances.additionalAllowances
+          .map((item) => item.allowanceId)
+          .filter((id) => id);
+
+        if (allowanceIds.length > 0) {
+          await this.markAllowancesAsUsed(
+            payrollData.employee,
+            allowanceIds,
+            payroll._id,
+            payrollData.month,
+            payrollData.year
+          );
+        }
+      }
+
+      // Mark bonuses as used in this payroll
+      if (calculatedPayroll.bonuses?.items?.length) {
+        const bonusIds = calculatedPayroll.bonuses.items
+          .map((item) => item.bonusId)
+          .filter((id) => id);
+
+        if (bonusIds.length > 0) {
+          await this.markBonusesAsUsed(
+            payrollData.employee,
+            bonusIds,
+            payroll._id,
+            payrollData.month,
+            payrollData.year
+          );
+        }
       }
 
       return payroll;

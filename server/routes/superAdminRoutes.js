@@ -197,12 +197,20 @@ router.patch(
   SuperAdminController.updatePayrollStatus
 );
 
-// Initiate payment for processing payrolls (PROCESSING -> PENDING_PAYMENT)
-router.patch(
-  "/payroll/:id/initiate-payment",
+// Single payment route
+router.post(
+  "/payroll/:id/mark-paid",
   requirePermission([Permission.APPROVE_PAYROLL]),
-  SuperAdminController.initiatePayment
+  SuperAdminController.markPaymentPaid
 );
+
+// Batch payment route
+router.post(
+  "/payroll/mark-paid-batch",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  SuperAdminController.markPaymentPaid
+);
+
 
 // Approve payroll (PROCESSING/PENDING -> APPROVED)
 router.patch(
@@ -212,25 +220,18 @@ router.patch(
   SuperAdminController.approvePayroll
 );
 
-// Mark payroll as paid (PENDING_PAYMENT -> PAID)
-router.patch(
-  "/payroll/:payrollId/mark-paid",
-  requirePermission([Permission.APPROVE_PAYROLL]),
-  SuperAdminController.markPaymentPaid
-);
-
-// Process payment for approved payroll
-router.post(
-  "/payroll/:id/process-payment",
-  requirePermission([Permission.APPROVE_PAYROLL]),
-  SuperAdminController.processPayment
-);
-
 // Mark payroll as failed (PAID -> FAILED)
-router.patch(
+router.post(
   "/payroll/:id/mark-failed",
   requirePermission([Permission.APPROVE_PAYROLL]),
-  SuperAdminController.updatePayrollStatus
+  SuperAdminController.markPaymentFailed
+);
+
+// Batch mark as failed
+router.post(
+  "/payroll/mark-failed-batch",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  SuperAdminController.markPaymentFailed
 );
 
 // Cancel payroll (Any status -> CANCELLED)
@@ -534,18 +535,6 @@ router.post(
   SuperAdminController.processPayment
 );
 
-router.patch(
-  "/payroll/:id/mark-paid",
-  requirePermission([Permission.PROCESS_PAYMENT]),
-  SuperAdminController.updatePayrollStatus
-);
-
-router.patch(
-  "/payroll/:id/mark-failed",
-  requirePermission([Permission.MARK_PAYMENT_FAILED]),
-  SuperAdminController.updatePayrollStatus
-);
-
 // Payment History
 router.get(
   "/payroll/:id/payment-history",
@@ -614,6 +603,20 @@ router.post(
   requirePermission([Permission.CREATE_PAYROLL]),
   validateBulkPayrollCreate,
   SuperAdminController.processAllEmployeesPayroll
+);
+
+// Single payment initiation route
+router.post(
+  "/payroll/:id/initiate-payment",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  SuperAdminController.initiatePayment
+);
+
+// Batch payment initiation route
+router.post(
+  "/payroll/initiate-payment",
+  requirePermission([Permission.APPROVE_PAYROLL]),
+  SuperAdminController.initiatePayment
 );
 
 export default router;

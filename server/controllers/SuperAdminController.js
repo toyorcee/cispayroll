@@ -3576,131 +3576,357 @@ export class SuperAdminController {
     }
   }
 
-  static async markPaymentFailed(req, res) {
+  static async markPaymentPaid(req, res, next) {
     try {
-      const { id } = req.params;
-      const { notes } = req.body;
+      const { payrollIds } = req.body;
+      const user = req.user;
 
-      console.log("🔍 Starting mark as failed for payroll ID:", id);
-      console.log("👤 Processor:", req.user.firstName, req.user.lastName);
+      // Handle both single and multiple payrolls
+      const isBatch = Array.isArray(payrollIds) && payrollIds.length > 1;
+      const ids = isBatch ? payrollIds : [req.params.id];
+      console.log(
+        `🔍 Starting ${
+          isBatch ? "batch" : "single"
+        } mark as paid for payroll ID(s):`,
+        ids
+      );
+      console.log("👤 Processor:", user.firstName, user.lastName);
 
-      const payroll = await PayrollModel.findById(id);
-      if (!payroll) {
-        throw new ApiError(404, "Payroll not found");
+      // Find all payrolls
+      const payrolls = await PayrollModel.find({
+        _id: { $in: ids },
+      }).populate([
+        { path: "employee", select: "firstName lastName employeeId email" },
+        { path: "department", select: "name code" },
+      ]);
+
+      if (payrolls.length !== ids.length) {
+        throw new ApiError(404, "Some payrolls not found");
       }
 
-      // Validate payroll status
-      if (payroll.status !== PAYROLL_STATUS.PENDING_PAYMENT) {
+      // Check if user has permission
+      if (!user.hasPermission(Permission.APPROVE_PAYROLL)) {
+        throw new ApiError(
+          403,
+          "You don't have permission to mark payments as paid"
+        );
+      }
+
+      // Validate all payrolls status
+      const invalidPayrolls = payrolls.filter(
+        (payroll) => payroll.status !== PAYROLL_STATUS.PENDING_PAYMENT
+      );
+
+      if (invalidPayrolls.length > 0) {
         throw new ApiError(
           400,
-          "Only pending payment payrolls can be marked as failed"
+          `Some payrolls are not in pending payment status: ${invalidPayrolls
+            .map((p) => p._id)
+            .join(", ")}`
         );
       }
 
-      // Update payroll status
-      const updatedPayroll = {
-        ...payroll.toObject(),
-        status: PAYROLL_STATUS.FAILED,
-        approvalFlow: {
-          ...payroll.approvalFlow,
-          currentLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-          history: [
-            ...(payroll.approvalFlow.history || []),
-            {
-              level: APPROVAL_LEVELS.SUPER_ADMIN,
-              status: "REJECTED",
-              user: req.user._id,
-              action: "REJECT",
-              updatedBy: req.user._id,
-              updatedAt: new Date(),
-              remarks: notes || "Payment failed",
+      const updatedPayrolls = [];
+      const errors = [];
+
+      // Process each payroll
+      for (const payroll of payrolls) {
+        try {
+          // Update payroll status to PAID
+          const updatedPayroll = {
+            ...payroll.toObject(),
+            status: PAYROLL_STATUS.PAID,
+            approvalFlow: {
+              ...payroll.approvalFlow,
+              currentLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+              history: [
+                ...(payroll.approvalFlow.history || []),
+                {
+                  level: APPROVAL_LEVELS.SUPER_ADMIN,
+                  status: "APPROVED",
+                  user: user._id,
+                  action: "APPROVE",
+                  updatedBy: user._id,
+                  updatedAt: new Date(),
+                  remarks: "Payment completed successfully",
+                },
+              ],
+              submittedBy: user._id,
+              submittedAt: new Date(),
+              remarks: "Payment marked as completed",
             },
-          ],
-          submittedBy: req.user._id,
-          submittedAt: new Date(),
-          status: PAYROLL_STATUS.FAILED,
-          remarks: notes || "Payment failed",
-        },
-      };
+          };
 
-      // Update the payroll with all required fields
-      const updated = await PayrollModel.findByIdAndUpdate(
-        id,
-        { $set: updatedPayroll },
-        { new: true, runValidators: true }
-      );
+          // Update the payroll
+          const updated = await PayrollModel.findByIdAndUpdate(
+            payroll._id,
+            { $set: updatedPayroll },
+            { new: true, runValidators: true }
+          );
 
-      if (!updated) {
-        throw new ApiError(500, "Failed to update payroll status");
+          // Create payment record
+          const payment = await Payment.create({
+            payrollId: payroll._id,
+            employeeId: payroll.employee._id,
+            amount: payroll.totals.netPay,
+            status: "COMPLETED",
+            processedBy: user._id,
+            processedAt: new Date(),
+            paymentMethod: req.body.paymentMethod || "BANK_TRANSFER",
+            reference: `PAY-${Date.now()}-${payroll._id}`,
+            bankDetails: payroll.payment,
+          });
+
+          updatedPayrolls.push({ payroll: updated, payment });
+        } catch (error) {
+          errors.push({
+            payrollId: payroll._id,
+            error: error.message,
+          });
+        }
       }
 
-      console.log("Updated payroll status:", updated.status);
+      // Create batch notification if processing multiple payrolls
+      if (isBatch) {
+        const batchMessage = `Batch payment completed for ${updatedPayrolls.length} payrolls`;
 
-      // Create payment record
-      await Payment.create({
-        payrollId: payroll._id,
-        employeeId: payroll.employee,
-        amount: payroll.totals.netPay,
-        status: PaymentStatus.FAILED,
-        processedBy: req.user._id,
-        processedAt: new Date(),
-        paymentMethod: "BANK_TRANSFER",
-        reference: `PAY-${Date.now()}`,
-        bankDetails: payroll.payment,
-        notes: notes || "Payment failed",
-      });
-
-      // Create audit log
-      await Audit.create({
-        user: req.user._id,
-        action: AuditAction.PROCESS,
-        entity: AuditEntity.PAYROLL,
-        entityId: payroll._id,
-        performedBy: req.user._id,
-        details: {
-          previousStatus: payroll.status,
-          newStatus: PAYROLL_STATUS.FAILED,
-          amount: payroll.totals.netPay,
-          notes: notes || "Payment failed",
-        },
-      });
-
-      // Create notification for employee
-      console.log(
-        "📬 Creating notification for employee:",
-        payroll.employee._id
-      );
-      await NotificationService.createPayrollNotification(
-        payroll.employee._id,
-        NOTIFICATION_TYPES.PAYROLL_FAILED,
-        payroll,
-        "Your payment has failed"
-      );
-
-      // Create notification for accountants
-      console.log("📬 Creating notifications for accountants");
-      const accountants = await UserModel.find({ role: "ACCOUNTANT" });
-      for (const accountant of accountants) {
-        console.log("📬 Sending notification to accountant:", accountant._id);
+        // Notify super admin
         await NotificationService.createPayrollNotification(
-          accountant._id,
-          NOTIFICATION_TYPES.PAYROLL_FAILED,
-          payroll,
-          "A payment has been marked as failed"
+          null,
+          NOTIFICATION_TYPES.PAYROLL_PAID,
+          user,
+          batchMessage
         );
+
+        // Notify accountants
+        const accountants = await UserModel.find({ role: "ACCOUNTANT" });
+        for (const accountant of accountants) {
+          await NotificationService.createPayrollNotification(
+            null,
+            NOTIFICATION_TYPES.PAYROLL_PAID,
+            accountant,
+            batchMessage
+          );
+        }
+      } else {
+        // Single payroll notifications
+        const payroll = updatedPayrolls[0].payroll;
+
+        // Notify super admin
+        await NotificationService.createPayrollNotification(
+          payroll,
+          NOTIFICATION_TYPES.PAYROLL_PAID,
+          user,
+          "Payment marked as completed successfully"
+        );
+
+        // Notify accountants
+        const accountants = await UserModel.find({ role: "ACCOUNTANT" });
+        for (const accountant of accountants) {
+          await NotificationService.createPayrollNotification(
+            payroll,
+            NOTIFICATION_TYPES.PAYROLL_PAID,
+            accountant,
+            "A payment has been marked as completed"
+          );
+        }
       }
 
       res.status(200).json({
         success: true,
-        message: "Payment marked as failed successfully",
+        message: isBatch
+          ? "Batch payments marked as completed successfully"
+          : "Payment marked as completed successfully",
         data: {
-          payrollId: updated._id,
-          amount: updated.totals.netPay,
-          status: updated.status,
-          paymentDate: updated.approvalFlow.submittedAt,
+          payrolls: updatedPayrolls.map(({ payroll, payment }) => ({
+            payrollId: payroll._id,
+            status: PAYROLL_STATUS.PAID,
+            payment: {
+              amount: payroll.totals.netPay,
+              method: req.body.paymentMethod || "BANK_TRANSFER",
+              reference: payment.reference,
+              bankDetails: payroll.payment,
+              notes: "Payment marked as completed",
+            },
+          })),
+          errors: errors.length > 0 ? errors : undefined,
         },
       });
     } catch (error) {
+      console.error("Batch mark as paid error:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async markPaymentFailed(req, res) {
+    try {
+      const { payrollIds } = req.body;
+      const user = req.user;
+
+      // Handle both single and multiple payrolls
+      const isBatch = Array.isArray(payrollIds) && payrollIds.length > 1;
+      const ids = isBatch ? payrollIds : [req.params.id];
+      console.log(
+        `🔍 Starting ${
+          isBatch ? "batch" : "single"
+        } mark as failed for payroll ID(s):`,
+        ids
+      );
+      console.log("👤 Processor:", user.firstName, user.lastName);
+
+      // Find all payrolls
+      const payrolls = await PayrollModel.find({
+        _id: { $in: ids },
+      }).populate([
+        { path: "employee", select: "firstName lastName employeeId email" },
+        { path: "department", select: "name code" },
+      ]);
+
+      if (payrolls.length !== ids.length) {
+        throw new ApiError(404, "Some payrolls not found");
+      }
+
+      // Validate all payrolls status
+      const invalidPayrolls = payrolls.filter(
+        (payroll) => payroll.status !== PAYROLL_STATUS.PENDING_PAYMENT
+      );
+
+      if (invalidPayrolls.length > 0) {
+        throw new ApiError(
+          400,
+          `Some payrolls are not in pending payment status: ${invalidPayrolls
+            .map((p) => p._id)
+            .join(", ")}`
+        );
+      }
+
+      const updatedPayrolls = [];
+      const errors = [];
+
+      // Process each payroll
+      for (const payroll of payrolls) {
+        try {
+          // Update payroll status to FAILED
+          const updatedPayroll = {
+            ...payroll.toObject(),
+            status: PAYROLL_STATUS.FAILED,
+            approvalFlow: {
+              ...payroll.approvalFlow,
+              currentLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+              history: [
+                ...(payroll.approvalFlow.history || []),
+                {
+                  level: APPROVAL_LEVELS.SUPER_ADMIN,
+                  status: "REJECTED",
+                  user: user._id,
+                  action: "REJECT",
+                  updatedBy: user._id,
+                  updatedAt: new Date(),
+                  remarks: "Payment marked as failed", // <--- Consistent remark
+                },
+              ],
+              submittedBy: user._id,
+              submittedAt: new Date(),
+              remarks: "Payment marked as failed", // <--- Consistent remark
+            },
+          };
+
+          // Update the payroll
+          const updated = await PayrollModel.findByIdAndUpdate(
+            payroll._id,
+            { $set: updatedPayroll },
+            { new: true, runValidators: true }
+          );
+
+          // Create payment record
+          await Payment.create({
+            payrollId: payroll._id,
+            employeeId: payroll.employee._id,
+            amount: payroll.totals.netPay,
+            status: PaymentStatus.FAILED,
+            processedBy: user._id,
+            processedAt: new Date(),
+            paymentMethod: "BANK_TRANSFER",
+            reference: `PAY-${Date.now()}-${payroll._id}`,
+            bankDetails: payroll.payment,
+            notes: "Payment marked as failed", // <--- Consistent remark
+          });
+
+          updatedPayrolls.push({ payroll: updated });
+        } catch (error) {
+          errors.push({
+            payrollId: payroll._id,
+            error: error.message,
+          });
+        }
+      }
+
+      // Create batch notification if processing multiple payrolls
+      if (isBatch) {
+        const batchMessage = `Batch payment failed for ${updatedPayrolls.length} payrolls`;
+
+        // Notify super admin
+        await NotificationService.createPayrollNotification(
+          null,
+          NOTIFICATION_TYPES.PAYROLL_FAILED,
+          user,
+          batchMessage
+        );
+
+        // Notify accountants
+        const accountants = await UserModel.find({ role: "ACCOUNTANT" });
+        for (const accountant of accountants) {
+          await NotificationService.createPayrollNotification(
+            null,
+            NOTIFICATION_TYPES.PAYROLL_FAILED,
+            accountant,
+            batchMessage
+          );
+        }
+      } else {
+        // Single payroll notifications
+        const payroll = updatedPayrolls[0].payroll;
+
+        // Notify super admin
+        await NotificationService.createPayrollNotification(
+          payroll,
+          NOTIFICATION_TYPES.PAYROLL_FAILED,
+          user,
+          "Payment marked as failed"
+        );
+
+        // Notify accountants
+        const accountants = await UserModel.find({ role: "ACCOUNTANT" });
+        for (const accountant of accountants) {
+          await NotificationService.createPayrollNotification(
+            payroll,
+            NOTIFICATION_TYPES.PAYROLL_FAILED,
+            accountant,
+            "A payment has been marked as failed"
+          );
+        }
+      }
+
+      res.status(200).json({
+        success: true,
+        message: isBatch
+          ? "Batch payments marked as failed successfully"
+          : "Payment marked as failed successfully",
+        data: {
+          payrolls: updatedPayrolls.map(({ payroll }) => ({
+            payrollId: payroll._id,
+            status: PAYROLL_STATUS.FAILED,
+            payment: {
+              amount: payroll.totals.netPay,
+              notes: "Payment marked as failed", 
+            },
+          })),
+          errors: errors.length > 0 ? errors : undefined,
+        },
+      });
+    } catch (error) {
+      console.error("Batch mark as failed error:", error);
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
     }
@@ -4643,125 +4869,145 @@ export class SuperAdminController {
 
   static async initiatePayment(req, res) {
     try {
-      const { id } = req.params;
+      // Handle both single and multiple payrolls
+      const { payrollIds } = req.body;
       const { method, bankDetails, notes } = req.body;
+      const isBatch = Array.isArray(payrollIds) && payrollIds.length > 1;
+      const ids = isBatch ? payrollIds : [req.params.id];
 
-      console.log("🔍 Starting payment initiation for payroll ID:", id);
+      console.log(
+        `🔍 Starting ${
+          isBatch ? "batch" : "single"
+        } payment initiation for payroll ID(s):`,
+        ids
+      );
       console.log("👤 Initiator:", req.user.firstName, req.user.lastName);
 
-      // Find and populate the payroll with employee data
-      const payroll = await PayrollModel.findById(id)
+      // Find all payrolls
+      const payrolls = await PayrollModel.find({
+        _id: { $in: ids },
+      })
         .populate("employee", "firstName lastName")
         .populate("department", "name code");
 
-      if (!payroll) {
-        throw new ApiError(404, "Payroll not found");
+      if (payrolls.length !== ids.length) {
+        throw new ApiError(404, "Some payrolls not found");
       }
 
-      // Validate payroll status
-      if (
-        payroll.status !== PAYROLL_STATUS.PROCESSING &&
-        payroll.status !== PAYROLL_STATUS.COMPLETED
-      ) {
+      // Validate all payrolls status
+      const invalidPayrolls = payrolls.filter(
+        (payroll) =>
+          payroll.status !== PAYROLL_STATUS.PROCESSING &&
+          payroll.status !== PAYROLL_STATUS.COMPLETED
+      );
+
+      if (invalidPayrolls.length > 0) {
         throw new ApiError(
           400,
-          "Only processing or completed payrolls can be initiated for payment"
+          `Some payrolls are not in valid status for payment: ${invalidPayrolls
+            .map((p) => p._id)
+            .join(", ")}`
         );
       }
 
-      // Generate payment reference
-      const paymentReference = `PAY-${Date.now()}`;
+      const updatedPayrolls = [];
+      const errors = [];
 
-      // Update payroll status and payment details
-      const updatedPayroll = await PayrollModel.findByIdAndUpdate(
-        id,
-        {
-          status: PAYROLL_STATUS.PENDING_PAYMENT,
-          payment: {
-            amount: payroll.totalAmount,
-            method: method || "BANK_TRANSFER",
-            reference: paymentReference,
-            bankDetails: bankDetails || {
-              bankName: "Pending",
-              accountNumber: "Pending",
-              accountName: "Pending",
-            },
-            notes: notes || "Payment initiated",
-          },
-          approvalFlow: {
-            ...payroll.approvalFlow,
-            currentLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-            history: [
-              ...(payroll.approvalFlow.history || []),
-              {
-                level: APPROVAL_LEVELS.SUPER_ADMIN,
-                status: "APPROVED",
-                user: req.user._id,
-                action: "APPROVE",
-                updatedBy: req.user._id,
-                updatedAt: new Date(),
-                remarks: notes || "Payment initiated",
+      // Process each payroll
+      for (const payroll of payrolls) {
+        try {
+          const paymentReference = `PAY-${Date.now()}-${payroll._id}`;
+
+          const updatedPayroll = await PayrollModel.findByIdAndUpdate(
+            payroll._id,
+            {
+              status: PAYROLL_STATUS.PENDING_PAYMENT,
+              payment: {
+                amount: payroll.totalAmount,
+                method: method || "BANK_TRANSFER",
+                reference: paymentReference,
+                bankDetails: bankDetails || {
+                  bankName: "Pending",
+                  accountNumber: "Pending",
+                  accountName: "Pending",
+                },
+                notes: notes || "Payment initiated",
               },
-            ],
-            submittedBy: req.user._id,
-            submittedAt: new Date(),
-            status: PAYROLL_STATUS.PENDING_PAYMENT,
-          },
-        },
-        { new: true }
-      ).populate("employee", "firstName lastName");
+              approvalFlow: {
+                ...payroll.approvalFlow,
+                currentLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+                history: [
+                  ...(payroll.approvalFlow.history || []),
+                  {
+                    level: APPROVAL_LEVELS.SUPER_ADMIN,
+                    status: "APPROVED",
+                    user: req.user._id,
+                    action: "APPROVE",
+                    updatedBy: req.user._id,
+                    updatedAt: new Date(),
+                    remarks: notes || "Payment initiated",
+                  },
+                ],
+                submittedBy: req.user._id,
+                submittedAt: new Date(),
+                status: PAYROLL_STATUS.PENDING_PAYMENT,
+              },
+            },
+            { new: true }
+          ).populate("employee", "firstName lastName");
 
-      if (!updatedPayroll) {
-        throw new ApiError(500, "Failed to update payroll status");
+          if (!updatedPayroll) {
+            throw new Error("Failed to update payroll status");
+          }
+
+          updatedPayrolls.push(updatedPayroll);
+        } catch (error) {
+          errors.push({
+            payrollId: payroll._id,
+            error: error.message,
+          });
+        }
       }
 
-      // Create notification for employee
-      console.log(
-        "📬 Creating notification for employee:",
-        updatedPayroll.employee._id
-      );
-      await NotificationService.createPayrollNotification(
-        updatedPayroll,
-        NOTIFICATION_TYPES.PAYROLL_PENDING_PAYMENT,
-        updatedPayroll.employee,
-        "Your payment is pending processing"
-      );
-
-      // Create notification for super admin
-      console.log("📬 Creating notification for super admin:", req.user._id);
-      await NotificationService.createPayrollNotification(
-        updatedPayroll,
-        NOTIFICATION_TYPES.PAYROLL_PENDING_PAYMENT,
-        req.user,
-        `Employee ${updatedPayroll.employee.firstName} ${updatedPayroll.employee.lastName}'s payroll is pending payment`
-      );
-
-      // Create notification for accountant
-      console.log("📬 Creating notification for accountant");
-      const accountants = await UserModel.find({ role: "ACCOUNTANT" });
-      for (const accountant of accountants) {
-        console.log("📬 Sending notification to accountant:", accountant._id);
+      // Create notifications for each successful update
+      for (const updatedPayroll of updatedPayrolls) {
+        // Notify super admin
         await NotificationService.createPayrollNotification(
           updatedPayroll,
           NOTIFICATION_TYPES.PAYROLL_PENDING_PAYMENT,
-          accountant,
+          req.user,
           `Employee ${updatedPayroll.employee.firstName} ${updatedPayroll.employee.lastName}'s payroll is pending payment`
         );
+
+        // Notify accountants
+        const accountants = await UserModel.find({ role: "ACCOUNTANT" });
+        for (const accountant of accountants) {
+          await NotificationService.createPayrollNotification(
+            updatedPayroll,
+            NOTIFICATION_TYPES.PAYROLL_PENDING_PAYMENT,
+            accountant,
+            `Employee ${updatedPayroll.employee.firstName} ${updatedPayroll.employee.lastName}'s payroll is pending payment`
+          );
+        }
       }
 
       // Return success response
       return res.status(200).json({
         success: true,
-        message: "Payment initiated successfully",
+        message: isBatch
+          ? "Batch payment initiation completed"
+          : "Payment initiated successfully",
         data: {
-          payrollId: updatedPayroll._id,
-          status: updatedPayroll.status,
-          payment: updatedPayroll.payment,
+          payrolls: updatedPayrolls.map((payroll) => ({
+            payrollId: payroll._id,
+            status: payroll.status,
+            payment: payroll.payment,
+          })),
+          errors: errors.length > 0 ? errors : undefined,
         },
       });
     } catch (error) {
       console.error("❌ Error in initiatePayment:", error);
-      console.error("Error details:", error);
       return res.status(error.statusCode || 500).json({
         success: false,
         message: error.message || "Failed to initiate payment",
@@ -4784,142 +5030,6 @@ export class SuperAdminController {
         message: "Failed to get processing statistics",
         error: error.message,
       });
-    }
-  }
-
-  static async markPaymentPaid(req, res, next) {
-    try {
-      const { payrollId } = req.params;
-      const user = req.user;
-
-      console.log("🔍 Starting mark as paid for payroll ID:", payrollId);
-      console.log("👤 Processor:", user.firstName, user.lastName);
-
-      // Find the payroll
-      const payroll = await PayrollModel.findById(payrollId).populate([
-        { path: "employee", select: "firstName lastName employeeId email" },
-        { path: "department", select: "name code" },
-      ]);
-
-      if (!payroll) {
-        throw new ApiError(404, "Payroll not found");
-      }
-
-      // Check if user has permission
-      if (!user.hasPermission(Permission.APPROVE_PAYROLL)) {
-        throw new ApiError(
-          403,
-          "You don't have permission to mark payments as paid"
-        );
-      }
-
-      // Validate payroll status
-      if (payroll.status !== PAYROLL_STATUS.PENDING_PAYMENT) {
-        throw new ApiError(
-          400,
-          "Only pending payment payrolls can be marked as paid"
-        );
-      }
-
-      // Update payroll status to PAID
-      const updatedPayroll = {
-        ...payroll.toObject(),
-        status: PAYROLL_STATUS.PAID,
-        approvalFlow: {
-          ...payroll.approvalFlow,
-          currentLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-          history: [
-            ...(payroll.approvalFlow.history || []),
-            {
-              level: APPROVAL_LEVELS.SUPER_ADMIN,
-              status: "APPROVED",
-              user: user._id,
-              action: "APPROVE",
-              updatedBy: user._id,
-              updatedAt: new Date(),
-              remarks: "Payment completed successfully",
-            },
-          ],
-          submittedBy: user._id,
-          submittedAt: new Date(),
-          remarks: "Payment marked as completed",
-        },
-      };
-
-      // Update the payroll with all required fields
-      const updated = await PayrollModel.findByIdAndUpdate(
-        payrollId,
-        { $set: updatedPayroll },
-        { new: true, runValidators: true }
-      );
-
-      // Create payment record
-      const payment = await Payment.create({
-        payrollId: payroll._id,
-        employeeId: payroll.employee._id,
-        amount: payroll.totals.netPay,
-        status: "COMPLETED",
-        processedBy: user._id,
-        processedAt: new Date(),
-        paymentMethod: req.body.paymentMethod || "BANK_TRANSFER",
-        reference: `PAY-${Date.now()}`,
-        bankDetails: payroll.payment,
-      });
-
-      // Create notification for the super admin
-      console.log("📬 Creating notification for super admin:", user._id);
-      await NotificationService.createPayrollNotification(
-        payroll,
-        NOTIFICATION_TYPES.PAYROLL_PAID,
-        user,
-        "Payment marked as completed successfully"
-      );
-
-      // Create notification for the employee
-      if (payroll.employee && payroll.employee.email) {
-        console.log(
-          "📬 Creating notification for employee:",
-          payroll.employee._id
-        );
-        await NotificationService.createPayrollNotification(
-          payroll,
-          NOTIFICATION_TYPES.PAYROLL_PAID,
-          payroll.employee,
-          "Your payment has been processed successfully"
-        );
-      }
-
-      // Create notification for accountants
-      console.log("📬 Creating notifications for accountants");
-      const accountants = await UserModel.find({ role: "ACCOUNTANT" });
-      for (const accountant of accountants) {
-        console.log("📬 Sending notification to accountant:", accountant._id);
-        await NotificationService.createPayrollNotification(
-          payroll,
-          NOTIFICATION_TYPES.PAYROLL_PAID,
-          accountant,
-          "A payment has been marked as completed"
-        );
-      }
-
-      res.status(200).json({
-        success: true,
-        message: "Payment marked as completed successfully",
-        data: {
-          payrollId: updated._id,
-          status: PAYROLL_STATUS.PAID,
-          payment: {
-            amount: updated.totals.netPay,
-            method: req.body.paymentMethod || "BANK_TRANSFER",
-            reference: payment.reference,
-            bankDetails: payroll.payment,
-            notes: "Payment marked as completed",
-          },
-        },
-      });
-    } catch (error) {
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
     }
   }
 
@@ -5722,6 +5832,155 @@ export class SuperAdminController {
     } catch (error) {
       console.error("❌ Error in processAllEmployeesPayroll:", error);
       next(error);
+    }
+  }
+
+  static async initiatePaymentsMultiple(req, res) {
+    try {
+      const { payrollIds } = req.body;
+      const { method, bankDetails, notes } = req.body;
+
+      if (!Array.isArray(payrollIds) || payrollIds.length < 2) {
+        throw new ApiError(
+          400,
+          "At least 2 payroll IDs are required for batch processing"
+        );
+      }
+
+      console.log(
+        "🔍 Starting batch payment initiation for payrolls:",
+        payrollIds
+      );
+      console.log("👤 Initiator:", req.user.firstName, req.user.lastName);
+
+      // Find all payrolls
+      const payrolls = await PayrollModel.find({
+        _id: { $in: payrollIds },
+      })
+        .populate("employee", "firstName lastName")
+        .populate("department", "name code");
+
+      if (payrolls.length !== payrollIds.length) {
+        throw new ApiError(404, "Some payrolls not found");
+      }
+
+      // Validate all payrolls status
+      const invalidPayrolls = payrolls.filter(
+        (payroll) =>
+          payroll.status !== PAYROLL_STATUS.PROCESSING &&
+          payroll.status !== PAYROLL_STATUS.COMPLETED
+      );
+
+      if (invalidPayrolls.length > 0) {
+        throw new ApiError(
+          400,
+          `Some payrolls are not in valid status for payment: ${invalidPayrolls
+            .map((p) => p._id)
+            .join(", ")}`
+        );
+      }
+
+      const updatedPayrolls = [];
+      const errors = [];
+
+      // Process each payroll
+      for (const payroll of payrolls) {
+        try {
+          const paymentReference = `PAY-${Date.now()}-${payroll._id}`;
+
+          const updatedPayroll = await PayrollModel.findByIdAndUpdate(
+            payroll._id,
+            {
+              status: PAYROLL_STATUS.PENDING_PAYMENT,
+              payment: {
+                amount: payroll.totalAmount,
+                method: method || "BANK_TRANSFER",
+                reference: paymentReference,
+                bankDetails: bankDetails || {
+                  bankName: "Pending",
+                  accountNumber: "Pending",
+                  accountName: "Pending",
+                },
+                notes: notes || "Payment initiated",
+              },
+              approvalFlow: {
+                ...payroll.approvalFlow,
+                currentLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+                history: [
+                  ...(payroll.approvalFlow.history || []),
+                  {
+                    level: APPROVAL_LEVELS.SUPER_ADMIN,
+                    status: "APPROVED",
+                    user: req.user._id,
+                    action: "APPROVE",
+                    updatedBy: req.user._id,
+                    updatedAt: new Date(),
+                    remarks: notes || "Payment initiated",
+                  },
+                ],
+                submittedBy: req.user._id,
+                submittedAt: new Date(),
+                status: PAYROLL_STATUS.PENDING_PAYMENT,
+              },
+            },
+            { new: true }
+          ).populate("employee", "firstName lastName");
+
+          if (!updatedPayroll) {
+            throw new Error("Failed to update payroll status");
+          }
+
+          updatedPayrolls.push(updatedPayroll);
+        } catch (error) {
+          errors.push({
+            payrollId: payroll._id,
+            error: error.message,
+          });
+        }
+      }
+
+      // Create notifications for each successful update
+      for (const updatedPayroll of updatedPayrolls) {
+        // Notify super admin
+        await NotificationService.createPayrollNotification(
+          updatedPayroll,
+          NOTIFICATION_TYPES.PAYROLL_PENDING_PAYMENT,
+          req.user,
+          `Employee ${updatedPayroll.employee.firstName} ${updatedPayroll.employee.lastName}'s payroll is pending payment`
+        );
+
+        // Notify accountants
+        const accountants = await UserModel.find({ role: "ACCOUNTANT" });
+        for (const accountant of accountants) {
+          await NotificationService.createPayrollNotification(
+            updatedPayroll,
+            NOTIFICATION_TYPES.PAYROLL_PENDING_PAYMENT,
+            accountant,
+            `Employee ${updatedPayroll.employee.firstName} ${updatedPayroll.employee.lastName}'s payroll is pending payment`
+          );
+        }
+      }
+
+      // Return success response
+      return res.status(200).json({
+        success: true,
+        message: "Batch payment initiation completed",
+        data: {
+          payrolls: updatedPayrolls.map((payroll) => ({
+            payrollId: payroll._id,
+            status: payroll.status,
+            payment: payroll.payment,
+          })),
+          errors: errors.length > 0 ? errors : undefined,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error in initiatePaymentsMultiple:", error);
+      return res.status(error.statusCode || 500).json({
+        success: false,
+        message: error.message || "Failed to initiate batch payments",
+        error: error.message,
+      });
     }
   }
 }
