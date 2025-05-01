@@ -653,11 +653,11 @@ export default function ProcessPayment() {
       selectedPayrolls.includes(p._id)
     );
     const statuses = new Set(selected.map((p) => p.status));
-    return { statuses, selected };
+    return { statuses };
   };
 
   const FiltersSection = () => {
-    const { statuses, selected } = getSelectedStatuses();
+    const { statuses } = getSelectedStatuses();
     const onlyCompleted =
       statuses.size === 1 && statuses.has(PayrollStatus.COMPLETED);
     const onlyPendingPayment =
@@ -771,12 +771,6 @@ export default function ProcessPayment() {
                   ? "Select All Pending Payment"
                   : "Deselect All Pending Payment"}
               </button>
-              {/* <button
-                onClick={handleSelectAll}
-                className="px-3 py-2 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200 text-sm w-full text-left"
-              >
-                {selectAll ? "Deselect All" : "Select All"}
-              </button> */}
             </div>
 
             {/* Selection Summary and Process Button */}
