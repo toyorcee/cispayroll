@@ -12,12 +12,10 @@ const isSuperAdmin = (userRole?: string): boolean => {
 
 export interface DepartmentEmployeeResponse {
   success: boolean;
-  data: Employee[];
-  pagination: {
-    total: number;
-    page: number;
-    pages: number;
-  };
+  employees: Employee[];
+  totalPages: number;
+  totalEmployees: number;
+  currentPage: number;
 }
 
 export const adminEmployeeService = {

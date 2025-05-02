@@ -672,7 +672,9 @@ export default function Offboarding() {
                           <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200">
                             {employee.profileImage ? (
                               <img
-                                src={`https://payrollapi.digitalentshub.net/${employee.profileImage}`}
+                                src={`${import.meta.env.VITE_API_URL}/${
+                                  employee.profileImage
+                                }`}
                                 alt={employee.fullName}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {

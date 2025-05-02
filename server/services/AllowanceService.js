@@ -304,4 +304,25 @@ export class AllowanceService {
 
     return allowance;
   }
+
+  static async markStandaloneAllowancesAsUsed(
+    allowanceIds,
+    payrollId,
+    month,
+    year
+  ) {
+    await Allowance.updateMany(
+      { _id: { $in: allowanceIds } },
+      {
+        $set: {
+          usedInPayroll: {
+            month,
+            year,
+            payrollId,
+          },
+        },
+      }
+    );
+    console.log("✅ Standalone allowances marked as used:", allowanceIds);
+  }
 }

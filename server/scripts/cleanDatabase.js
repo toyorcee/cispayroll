@@ -20,36 +20,29 @@ async function wipePayrolls() {
     const payrollResult = await Payroll.deleteMany({});
     console.log(`🗑️ Deleted ${payrollResult.deletedCount} payroll records`);
 
-    // Reset usedInPayroll for all bonuses
-    const bonusResult = await Bonus.updateMany(
-      { usedInPayroll: { $exists: true } },
-      { $unset: { usedInPayroll: "" } }
-    );
-    console.log(`🔄 Reset ${bonusResult.modifiedCount} bonus records`);
+    // Delete all bonuses
+    const bonusDeleteResult = await Bonus.deleteMany({});
+    console.log(`🗑️ Deleted ${bonusDeleteResult.deletedCount} bonus records`);
 
-    // Reset usedInPayroll for all allowances
-    const allowanceResult = await Allowance.updateMany(
-      { usedInPayroll: { $exists: true } },
-      { $unset: { usedInPayroll: "" } }
+    // Delete all allowances
+    const allowanceDeleteResult = await Allowance.deleteMany({});
+    console.log(
+      `🗑️ Deleted ${allowanceDeleteResult.deletedCount} allowance records`
     );
-    console.log(`🔄 Reset ${allowanceResult.modifiedCount} allowance records`);
 
-    // Reset usedInPayroll in user's personal allowances and bonuses
+    // Remove all personalAllowances and personalBonuses from all users
     const userResult = await User.updateMany(
-      {
-        $or: [
-          { "personalAllowances.usedInPayroll": { $exists: true } },
-          { "personalBonuses.usedInPayroll": { $exists: true } },
-        ],
-      },
+      {},
       {
         $set: {
-          "personalAllowances.$[].usedInPayroll": null,
-          "personalBonuses.$[].usedInPayroll": null,
+          personalAllowances: [],
+          personalBonuses: [],
         },
       }
     );
-    console.log(`🔄 Reset user personal records`);
+    console.log(
+      `🧹 Cleared personalAllowances and personalBonuses for all users`
+    );
 
     console.log("\n✨ Payroll wipe completed successfully!");
   } catch (error) {

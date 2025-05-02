@@ -110,7 +110,8 @@ export class InvitationController {
         return res.status(400).json({
           success: false,
           message: "Invalid or expired invitation token",
-        });
+        }
+      );
       }
 
       res.status(200).json({

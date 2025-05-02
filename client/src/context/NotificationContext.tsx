@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useCallback } from "react";
 import { useAuth } from "./AuthContext";
 import { toast } from "react-toastify";
+import axios from "axios";
 
 interface NotificationContextType {
   checkForNewNotifications: () => Promise<void>;
@@ -29,20 +30,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!user) return;
 
     try {
-      const response = await fetch(
-        `${
-          import.meta.env.VITE_API_URL || "https://payrollapi.digitalentshub.net"
-        }/api/notifications/unread`,
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_URL}/api/notifications/unread`,
         {
-          credentials: "include",
+          withCredentials: true,
         }
       );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch notifications");
-      }
-
-      const data = await response.json();
+      const data = response.data;
 
       // Show toast for new notifications
       data.notifications.forEach((notification: any) => {

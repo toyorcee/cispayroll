@@ -5,6 +5,8 @@ import { useAuth } from "../../../context/AuthContext";
 import { adminEmployeeService } from "../../../services/adminEmployeeService";
 import { bonusService } from "../../../services/bonusService";
 import { toast } from "react-toastify";
+import { DepartmentEmployeeResponse } from "../../../services/adminEmployeeService";
+import { Employee } from "../../../types/employee";
 
 // Constants from the model
 const BonusType = {
@@ -34,6 +36,23 @@ interface Bonus {
   taxable: boolean;
   createdBy?: string;
   updatedBy?: string;
+}
+
+interface DepartmentEmployee {
+  _id: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  employeeId: string;
+  email?: string;
+}
+
+export interface DepartmentEmployeeListResponse {
+  employees: DepartmentEmployee[];
+  totalPages: number;
+  totalEmployees: number;
+  currentPage: number;
+  success: boolean;
 }
 
 export default function BonusManagement() {
@@ -90,15 +109,17 @@ export default function BonusManagement() {
     queryFn: departmentService.getAllDepartments,
   });
 
-  const { data: employeeList, isLoading: employeesLoading } = useQuery({
-    queryKey: ["departmentEmployees", employeeBonusForm.departmentId],
-    queryFn: () =>
-      adminEmployeeService.getDepartmentEmployees({
-        departmentId: employeeBonusForm.departmentId,
-        userRole: isSuperAdmin() ? "SUPER_ADMIN" : "ADMIN",
-      }),
-    enabled: !!employeeBonusForm.departmentId,
-  });
+  const { data: employeeList, isLoading: employeesLoading } =
+    useQuery<DepartmentEmployeeResponse>({
+      queryKey: ["departmentEmployees", employeeBonusForm.departmentId],
+      queryFn: async () => {
+        return await adminEmployeeService.getDepartmentEmployees({
+          departmentId: employeeBonusForm.departmentId,
+          userRole: isSuperAdmin() ? "SUPER_ADMIN" : "ADMIN",
+        });
+      },
+      enabled: !!employeeBonusForm.departmentId,
+    });
 
   const { data: bonusRequests, isLoading: bonusesLoading } = useQuery({
     queryKey: ["bonusRequests", page, limit, filters],
@@ -395,8 +416,9 @@ export default function BonusManagement() {
       {/* Main Content */}
       <div className="bg-white shadow-sm rounded-lg">
         <div className="p-6">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+          {/* Responsive Table Wrapper */}
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[900px] divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -933,9 +955,12 @@ export default function BonusManagement() {
                         ? "Loading employees..."
                         : "Select Employee"}
                     </option>
-                    {employeeList?.data?.map((emp: any) => (
+                    {employeeList?.data?.map((emp: Employee) => (
                       <option key={emp._id} value={emp._id}>
-                        {emp.fullName} ({emp.employeeId})
+                        {emp.fullName
+                          ? emp.fullName
+                          : `${emp.firstName || ""} ${emp.lastName || ""}`}{" "}
+                        ({emp.employeeId})
                       </option>
                     ))}
                   </select>

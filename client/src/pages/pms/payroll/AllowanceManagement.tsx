@@ -205,66 +205,10 @@ export default function AllowanceManagement() {
           ...cleanFilters,
         });
 
-        // Filter the allowances based on the criteria
-        const filteredAllowances = response.data.allowances.filter(
-          (allowance) => {
-            let matches = true;
-
-            if (filters.employee) {
-              matches =
-                matches &&
-                (allowance.employee?.fullName
-                  ?.toLowerCase()
-                  .includes(filters.employee.toLowerCase()) ||
-                  allowance.employee?.email
-                    ?.toLowerCase()
-                    .includes(filters.employee.toLowerCase()));
-            }
-
-            if (filters.departmentId) {
-              matches =
-                matches && allowance.department?._id === filters.departmentId;
-            }
-
-            if (filters.status) {
-              matches =
-                matches &&
-                (allowance.approvalStatus === filters.status ||
-                  allowance.approvalStatus === filters.status);
-            }
-
-            if (filters.type) {
-              matches = matches && allowance.type === filters.type;
-            }
-
-            if (filters.startDate) {
-              const startDate = new Date(filters.startDate);
-              const allowanceDate = new Date(allowance.paymentDate);
-              matches = matches && allowanceDate >= startDate;
-            }
-
-            if (filters.endDate) {
-              const endDate = new Date(filters.endDate);
-              const allowanceDate = new Date(allowance.paymentDate);
-              matches = matches && allowanceDate <= endDate;
-            }
-
-            return matches;
-          }
-        );
-
         return {
           success: response.success,
           message: response.message,
-          data: {
-            ...response.data,
-            allowances: filteredAllowances,
-            pagination: {
-              ...response.data.pagination,
-              total: filteredAllowances.length,
-              pages: Math.ceil(filteredAllowances.length / limit),
-            },
-          },
+          data: response.data,
         };
       },
     });
@@ -550,121 +494,127 @@ export default function AllowanceManagement() {
               Reset
             </button>
           </div>
-          <table className="w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Employee
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Department
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Type
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Amount
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Reason
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Status
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Payment Date
-                </th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                  Approved By
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {isAllowancesLoading ? (
+          {/* Responsive Table Wrapper */}
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[900px] divide-y divide-gray-200">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td colSpan={8} className="px-4 py-2 text-center">
-                    <div className="text-gray-500">Loading allowances...</div>
-                  </td>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Employee
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Department
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Type
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Amount
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Reason
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Status
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Payment Date
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Approved By
+                  </th>
                 </tr>
-              ) : (allowanceData as AllowancesListResponse)?.data?.allowances
-                  ?.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-2 text-center">
-                    <div className="text-gray-500">
-                      No allowances found. Click "Add Allowance" to create one.
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                (
-                  allowanceData as AllowancesListResponse
-                )?.data?.allowances?.map((allowance: Allowance) => (
-                  <tr key={allowance._id}>
-                    <td className="px-4 py-2">
-                      <div className="text-sm">
-                        <div className="font-medium text-gray-900">
-                          {allowance.employee?.firstName}{" "}
-                          {allowance.employee?.lastName}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {allowance.employee?.email}
-                        </div>
-                      </div>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {isAllowancesLoading ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-2 text-center">
+                      <div className="text-gray-500">Loading allowances...</div>
                     </td>
-                    <td className="px-4 py-2">
-                      <div className="text-sm text-gray-900">
-                        {allowance.department?.name}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2">
-                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                        {allowance.type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="text-sm text-gray-900">
-                        ₦{allowance.amount?.toLocaleString()}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="text-sm text-gray-900">
-                        {allowance.reason}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={`px-2 py-1 text-xs font-semibold rounded-full
-                          ${
-                            allowance.approvalStatus === "approved"
-                              ? "bg-green-100 text-green-800"
-                              : allowance.approvalStatus === "PENDING"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
-                      >
-                        {allowance.approvalStatus}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="text-sm text-gray-900">
-                        {new Date(allowance.paymentDate).toLocaleDateString()}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="text-sm text-gray-900">
-                        {allowance.approvedBy?.fullName}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {allowance.approvedAt
-                          ? new Date(allowance.approvedAt).toLocaleDateString()
-                          : ""}
+                  </tr>
+                ) : (allowanceData as AllowancesListResponse)?.data?.allowances
+                    ?.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-2 text-center">
+                      <div className="text-gray-500">
+                        No allowances found. Click "Add Allowance" to create
+                        one.
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  (
+                    allowanceData as AllowancesListResponse
+                  )?.data?.allowances?.map((allowance: Allowance) => (
+                    <tr key={allowance._id}>
+                      <td className="px-4 py-2">
+                        <div className="text-sm">
+                          <div className="font-medium text-gray-900">
+                            {allowance.employee?.firstName}{" "}
+                            {allowance.employee?.lastName}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {allowance.employee?.email}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="text-sm text-gray-900">
+                          {allowance.department?.name}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                          {allowance.type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="text-sm text-gray-900">
+                          ₦{allowance.amount?.toLocaleString()}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="text-sm text-gray-900">
+                          {allowance.reason}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span
+                          className={`px-2 py-1 text-xs font-semibold rounded-full
+                            ${
+                              allowance.approvalStatus === "approved"
+                                ? "bg-green-100 text-green-800"
+                                : allowance.approvalStatus === "PENDING"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                        >
+                          {allowance.approvalStatus}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="text-sm text-gray-900">
+                          {new Date(allowance.paymentDate).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="text-sm text-gray-900">
+                          {allowance.approvedBy?.fullName}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {allowance.approvedAt
+                            ? new Date(
+                                allowance.approvedAt
+                              ).toLocaleDateString()
+                            : ""}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
           {allowanceData?.data?.pagination && (
             <div className="flex justify-between items-center mt-4">
               <div>

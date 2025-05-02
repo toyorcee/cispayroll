@@ -123,22 +123,36 @@ const createDepartmentAllowance = asyncHandler(async (req, res) => {
   // Validate payment date
   validatePaymentDate(paymentDate);
 
-  // Find the department
-  const department = await Department.findById(departmentId);
-  if (!department) {
-    throw new ApiError(404, "Department not found");
-  }
-
-  // If Admin, check department match
+  // If Admin, check department match (EXACTLY like bonus controller)
+  let department;
   if (userRole === "ADMIN") {
-    const userDepartment = await Department.findOne({
-      headOfDepartment: userId,
-    });
-    if (!userDepartment || userDepartment._id.toString() !== departmentId) {
+    // First try to find department by headOfDepartment field
+    department = await Department.findOne({ headOfDepartment: userId });
+
+    // If not found by headOfDepartment, check if user's position indicates they're a head of department
+    if (
+      !department &&
+      req.user.position &&
+      req.user.position.toLowerCase().includes("head of")
+    ) {
+      // Find department by user's department field
+      department = await Department.findById(req.user.department);
+    }
+
+    if (!department) {
+      throw new ApiError(403, "You are not a head of department");
+    }
+    if (department._id.toString() !== departmentId.toString()) {
       throw new ApiError(
         403,
         "You can only create allowances for your own department"
       );
+    }
+  } else {
+    // For super admin, fetch the department by ID
+    department = await Department.findById(departmentId);
+    if (!department) {
+      throw new ApiError(404, "Department not found");
     }
   }
 
@@ -251,9 +265,20 @@ const createDepartmentEmployeeAllowance = asyncHandler(async (req, res) => {
     department: employee.department,
   });
 
-  // If Admin, check department match
+  // If Admin, check department match (with fallback logic)
   if (userRole === "ADMIN") {
-    const department = await Department.findOne({ headOfDepartment: userId });
+    // First try to find department by headOfDepartment field
+    let department = await Department.findOne({ headOfDepartment: userId });
+
+    // Fallback: If not found, check if user's position indicates they're a head of department
+    if (
+      !department &&
+      req.user.position &&
+      req.user.position.toLowerCase().includes("head of")
+    ) {
+      department = await Department.findById(req.user.department);
+    }
+
     if (!department) {
       throw new ApiError(403, "You are not a head of department");
     }
@@ -282,7 +307,10 @@ const createDepartmentEmployeeAllowance = asyncHandler(async (req, res) => {
     frequency: "monthly",
   });
 
-  console.log("✅ Created allowance in collection:", allowance);
+  console.log(
+    "✅ Created allowance in collection:",
+    JSON.stringify(allowance, null, 2)
+  );
 
   // Add to employee's personalAllowances array with correct structure
   const personalAllowance = {
@@ -306,6 +334,11 @@ const createDepartmentEmployeeAllowance = asyncHandler(async (req, res) => {
     },
   };
 
+  console.log(
+    "📝 personalAllowance object to be added:",
+    JSON.stringify(personalAllowance, null, 2)
+  );
+
   // First remove any existing allowance with this ID
   await User.findByIdAndUpdate(employeeId, {
     $pull: { personalAllowances: { allowanceId: allowance._id } },
@@ -315,6 +348,13 @@ const createDepartmentEmployeeAllowance = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(employeeId, {
     $push: { personalAllowances: personalAllowance },
   });
+
+  // Fetch and log the updated user document
+  const updatedUser = await User.findById(employeeId).lean();
+  console.log(
+    "👤 Updated employee.personalAllowances:",
+    JSON.stringify(updatedUser.personalAllowances, null, 2)
+  );
 
   console.log("✅ Added allowance to employee's personalAllowances array");
 
@@ -361,7 +401,15 @@ const getAllowanceRequests = asyncHandler(async (req, res) => {
     query.department = userDepartment.department;
   }
   // Admins and HR managers can see all requests with filters
-  else {
+  else if (req.user.role === "ADMIN") {
+    // Restrict to admin's department by default
+    const adminDepartment = req.user.department;
+    query.department = adminDepartment;
+    // Allow further filtering if provided
+    if (employeeId) query.employee = employeeId;
+    if (departmentId) query.department = departmentId;
+  } else {
+    // For super admin and HR managers, allow all
     if (employeeId) query.employee = employeeId;
     if (departmentId) query.department = departmentId;
   }

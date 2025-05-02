@@ -22,7 +22,7 @@ import {
   Circle as CircleIcon,
 } from "@mui/icons-material";
 import { Permission } from "../../../types/auth.js";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "react-toastify";
 import { employeeService } from "../../../services/employeeService";
 import { getProfileImageUrl } from "../../../utils/imageUtils";
@@ -49,6 +49,14 @@ export default function UserProfile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { data: user, isLoading } = employeeService.useGetUserProfile();
   const { mutate: updateImage } = employeeService.useUpdateProfileImage();
+
+  // Add state for image URL
+  const [profileImageUrl, setProfileImageUrl] = useState<string>("");
+
+  // Update image URL when user changes
+  useEffect(() => {
+    setProfileImageUrl(getProfileImageUrl(user || {}));
+  }, [user]);
 
   const canEditProfile =
     !!authUser &&
@@ -272,7 +280,7 @@ export default function UserProfile() {
               <Box className="flex flex-col items-center mb-4 sm:mb-6">
                 <div className="relative">
                   <Avatar
-                    src={getProfileImageUrl(user || {})}
+                    src={profileImageUrl}
                     alt={`${user?.firstName} ${user?.lastName}`}
                     sx={{
                       width: { xs: 100, sm: 120 },

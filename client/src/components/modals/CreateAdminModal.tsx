@@ -52,7 +52,7 @@ const CreateAdminModal = ({
       setIsLoading(true);
 
       await axios.post(
-        "https://payrollapi.digitalentshub.net/api/employees/create",
+        `${import.meta.env.VITE_API_URL}/api/employees/create`,
         {
           ...data,
           role: UserRole.ADMIN,
@@ -60,8 +60,8 @@ const CreateAdminModal = ({
         {
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
+          withCredentials: true,
         }
       );
 

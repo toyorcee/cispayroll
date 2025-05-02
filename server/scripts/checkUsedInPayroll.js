@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
 import User from "../models/User.js";
+import "../models/Allowance.js";
+import "../models/Bonus.js";
 import dotenv from "dotenv";
-import Allowance from "../models/Allowance.js";
-import Bonus from "../models/Bonus.js";
 
 dotenv.config();
 
@@ -14,7 +14,7 @@ mongoose.connect(process.env.MONGO_URI, {
 
 async function getUserPersonalComponents() {
   try {
-    const userId = "67e9e81ebb907e1d9a25e806";
+    const userId = "67e9e73fbb907e1d9a25e7de";
 
     const userData = await User.findById(userId)
       .select("personalAllowances personalBonuses")
@@ -30,9 +30,15 @@ async function getUserPersonalComponents() {
       })
       .lean();
 
+    if (!userData) {
+      console.error("User not found!");
+      return;
+    }
+
     // Format the output
-    const formattedAllowances = userData.personalAllowances.map(
-      (allowance) => ({
+    const formattedAllowances = (userData.personalAllowances || [])
+      .filter((a) => a.allowanceId)
+      .map((allowance) => ({
         name: allowance.allowanceId.name,
         type: allowance.allowanceId.type,
         value: allowance.allowanceId.value,
@@ -40,16 +46,17 @@ async function getUserPersonalComponents() {
         frequency: allowance.allowanceId.frequency,
         status: allowance.status,
         usedInPayroll: allowance.usedInPayroll,
-      })
-    );
+      }));
 
-    const formattedBonuses = userData.personalBonuses.map((bonus) => ({
-      type: bonus.bonusId.type,
-      description: bonus.bonusId.description,
-      amount: bonus.bonusId.amount,
-      status: bonus.status,
-      usedInPayroll: bonus.usedInPayroll,
-    }));
+    const formattedBonuses = (userData.personalBonuses || [])
+      .filter((b) => b.bonusId)
+      .map((bonus) => ({
+        type: bonus.bonusId.type,
+        description: bonus.bonusId.description,
+        amount: bonus.bonusId.amount,
+        status: bonus.status,
+        usedInPayroll: bonus.usedInPayroll,
+      }));
 
     console.log(
       "Personal Allowances:",

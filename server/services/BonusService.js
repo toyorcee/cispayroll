@@ -369,4 +369,20 @@ export class BonusService {
       };
     }
   }
+
+  static async markStandaloneBonusesAsUsed(bonusIds, payrollId, month, year) {
+    await Bonus.updateMany(
+      { _id: { $in: bonusIds } },
+      {
+        $set: {
+          usedInPayroll: {
+            month,
+            year,
+            payrollId,
+          },
+        },
+      }
+    );
+    console.log("✅ Standalone bonuses marked as used:", bonusIds);
+  }
 }

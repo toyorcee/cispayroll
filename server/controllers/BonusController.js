@@ -76,7 +76,15 @@ const getBonusRequests = asyncHandler(async (req, res) => {
     query.department = userDepartment.department;
   }
   // Admins and HR managers can see all requests with filters
-  else {
+  else if (req.user.role === "ADMIN") {
+    // Restrict to admin's department by default
+    const adminDepartment = req.user.department;
+    query.department = adminDepartment;
+    // Allow further filtering if provided
+    if (employeeId) query.employee = employeeId;
+    if (departmentId) query.department = departmentId;
+  } else {
+    // For super admin and HR managers, allow all
     if (employeeId) query.employee = employeeId;
     if (departmentId) query.department = departmentId;
   }
@@ -430,6 +438,13 @@ const createDepartmentEmployeeBonus = asyncHandler(async (req, res) => {
     await User.findByIdAndUpdate(employeeId, {
       $push: { personalBonuses: personalBonus },
     });
+
+    // Fetch and log the updated user document
+    const updatedUser = await User.findById(employeeId).lean();
+    console.log(
+      "👤 Updated employee.personalBonuses:",
+      JSON.stringify(updatedUser.personalBonuses, null, 2)
+    );
 
     // Log only after successful creation
     console.log(

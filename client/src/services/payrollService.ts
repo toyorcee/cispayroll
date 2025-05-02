@@ -135,7 +135,7 @@ export const payrollService = {
     remarks?: string
   ): Promise<ApprovalResponse> => {
     const response = await axios.patch(
-      `https://payrollapi.digitalentshub.net/api/approvals/super-admin/${payrollId}/approve`,
+      `${BASE_URL}/approvals/${payrollId}/approve`,
       { remarks },
       { headers: { "Content-Type": "application/json" } }
     );
