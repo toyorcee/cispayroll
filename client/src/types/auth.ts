@@ -186,6 +186,27 @@ export interface PersonalDetails {
   }>;
 }
 
+interface UserProfile {
+  profileImage?: string;
+  profileImageUrl?: string;
+  _id: string;
+  email: string;
+  role: UserRole;
+}
+
+export interface ParsedUserProfile extends UserProfile {
+  profileImageUrl: string; 
+}
+
+export function parseUserProfile(data: UserProfile): ParsedUserProfile {
+  return {
+    ...data,
+    profileImageUrl: data.profileImage
+      ? `${import.meta.env.VITE_API_URL}/${data.profileImage}`
+      : "/default-profile.png",
+  };
+}
+
 export interface User {
   _id: string;
   employeeId: string;

@@ -25,6 +25,7 @@ import { Permission } from "../../../types/auth.js";
 import { useState, useRef } from "react";
 import { toast } from "react-toastify";
 import { employeeService } from "../../../services/employeeService";
+import { getProfileImageUrl } from "../../../utils/imageUtils";
 
 interface Qualification {
   _id: string;
@@ -271,15 +272,7 @@ export default function UserProfile() {
               <Box className="flex flex-col items-center mb-4 sm:mb-6">
                 <div className="relative">
                   <Avatar
-                    src={
-                      user?.profileImageUrl ||
-                      (user?.profileImage
-                        ? `${
-                            import.meta.env.VITE_API_URL
-                          }/${user.profileImage.replace(/\\/g, "/")}`
-                        : undefined) ||
-                      "/default-avatar.png"
-                    }
+                    src={getProfileImageUrl(user || {})}
                     alt={`${user?.firstName} ${user?.lastName}`}
                     sx={{
                       width: { xs: 100, sm: 120 },

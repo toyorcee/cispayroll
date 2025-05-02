@@ -1181,20 +1181,10 @@ UserSchema.pre("save", function (next) {
 UserSchema.set("toJSON", {
   virtuals: true,
   transform: function (_doc, ret) {
-    delete ret.password;
-    delete ret.__v;
-    return ret;
-  },
-});
-
-// JSON Transform
-UserSchema.set("toJSON", {
-  virtuals: true,
-  transform: function (_doc, ret) {
     if (ret.profileImage) {
-      ret.profileImageUrl = `${process.env.BASE_URL}/${ret.profileImage}`;
+      ret.profileImageUrl = ret.profileImage;
     } else {
-      ret.profileImageUrl = `${process.env.BASE_URL}/uploads/profiles/default-avatar.png`;
+      ret.profileImageUrl = "uploads/profiles/default-avatar.png";
     }
     delete ret.password;
     delete ret.__v;

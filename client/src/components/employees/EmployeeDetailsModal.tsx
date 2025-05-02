@@ -3,7 +3,8 @@ import { Dialog } from "@headlessui/react";
 import { EmployeeDetails, Department } from "../../types/employee";
 import { FaTimes, FaPhone, FaEnvelope } from "react-icons/fa";
 import { format } from "date-fns";
-import avatar from "../../assets/user-avatar.png";
+import { Avatar } from "@mui/material";
+import { getProfileImageUrl } from "../../utils/imageUtils";
 
 interface EmployeeDetailsModalProps {
   employee: EmployeeDetails | null;
@@ -67,10 +68,14 @@ export const EmployeeDetailsModal = ({
     );
   }
 
-  const DEFAULT_AVATAR = avatar;
-  const imageUrl = employee.profileImage
-    ? `https://payrollapi.digitalentshub.net/${employee.profileImage}`
-    : DEFAULT_AVATAR;
+  // Add logging to debug image data
+  console.log("EmployeeDetailsModal - Employee data:", {
+    id: employee._id,
+    name: `${employee.firstName} ${employee.lastName}`,
+    profileImage: employee.profileImage,
+    profileImageUrl: employee.profileImageUrl,
+    status: employee.status,
+  });
 
   const renderDepartmentName = (department: any) => {
     if (!department) return "No Department";
@@ -79,7 +84,6 @@ export const EmployeeDetailsModal = ({
       return department.name || "No Department";
     }
 
-    // If department is a string (ID), find it in the departments list
     const foundDepartment = departments?.find((d) => d._id === department);
     return foundDepartment?.name || "No Department";
   };
@@ -122,11 +126,21 @@ export const EmployeeDetailsModal = ({
                   <div className="relative">
                     <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto rounded-full p-1 bg-gradient-to-r from-green-400 to-blue-500">
                       <div className="w-full h-full rounded-full border-4 border-white overflow-hidden bg-gray-100">
-                        <img
-                          src={imageUrl}
+                        <Avatar
+                          src={getProfileImageUrl(employee)}
                           alt={`${employee.firstName} ${employee.lastName}`}
-                          className="w-full h-full object-cover"
-                        />
+                          sx={{
+                            width: "100%",
+                            height: "100%",
+                            border: "4px solid #fff",
+                            boxShadow: "0 0 20px rgba(0,0,0,0.1)",
+                            backgroundColor: "#e5e7eb",
+                          }}
+                        >
+                          {!employee.profileImage &&
+                            !employee.profileImageUrl &&
+                            `${employee.firstName?.[0]}${employee.lastName?.[0]}`}
+                        </Avatar>
                       </div>
                     </div>
                   </div>

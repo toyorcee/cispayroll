@@ -4,6 +4,8 @@ import { FaUserCircle, FaUserCog, FaSignOutAlt } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
 import { toast } from "react-toastify";
+import { getProfileImageUrl } from "../../utils/imageUtils";
+import { Avatar } from "@mui/material";
 
 interface ProfileMenuProps {
   variant?: "header" | "sidebar";
@@ -21,6 +23,13 @@ export function ProfileMenu({
   const { signOut, user } = useAuth();
   const [isLocalOpen, setIsLocalOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Add debug logs
+  console.log("ProfileMenu - User data:", {
+    profileImage: user?.profileImage,
+    profileImageUrl: user?.profileImageUrl,
+    fullUser: user,
+  });
 
   // Close menu on route change
   useEffect(() => {
@@ -120,32 +129,14 @@ export function ProfileMenu({
                    }`}
       >
         <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center overflow-hidden">
-          {user?.profileImageUrl ? (
-            <img
-              src={user.profileImageUrl.replace(/\\/g, "/")}
-              alt={getFullName()}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = "none";
-                const parent = target.parentElement;
-                if (parent) {
-                  const existingFallback = parent.querySelector("span");
-                  if (existingFallback) {
-                    parent.removeChild(existingFallback);
-                  }
-                  const fallback = document.createElement("span");
-                  fallback.className = "text-sm font-medium text-green-600";
-                  fallback.textContent = getInitials();
-                  parent.appendChild(fallback);
-                }
-              }}
-            />
-          ) : (
-            <span className="text-sm font-medium text-green-600">
-              {getInitials()}
-            </span>
-          )}
+          <Avatar
+            src={getProfileImageUrl(user || {})}
+            alt={getFullName()}
+            className="w-full h-full object-cover"
+            sx={{ width: "100%", height: "100%" }}
+          >
+            {!user?.profileImage && !user?.profileImageUrl && getInitials()}
+          </Avatar>
         </div>
         <div className={variant === "sidebar" ? "block" : "hidden sm:block"}>
           <p className="text-sm font-medium text-gray-700 text-left">

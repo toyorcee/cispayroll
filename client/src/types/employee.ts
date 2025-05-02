@@ -333,8 +333,53 @@ export interface EmployeeFilters {
   department?: string;
 }
 
-export interface EmployeeDetails extends Employee {
+export interface EmployeeDetails {
+  _id: string;
+  firstName: string;
+  lastName: string;
   fullName: string;
+  email: string;
+  phone: string;
+  position: string;
+  status: string;
+  profileImage?: string;
+  profileImageUrl?: string;
+  employeeId: string;
+  gradeLevel: string;
+  workLocation: string;
+  department: string | { name: string; _id: string };
+  createdAt: string | Date;
+  updatedAt: string | Date;
+  lastLogin?: string | Date;
+  personalDetails?: {
+    middleName: string;
+    dateOfBirth: string | Date;
+    maritalStatus: string;
+    nationality: string;
+    address?: {
+      street: string;
+      city: string;
+      state: string;
+      country: string;
+      zipCode: string;
+    };
+    qualifications?: Array<{
+      _id: string;
+      highestEducation: string;
+      institution: string;
+      yearGraduated: string;
+    }>;
+  };
+  bankDetails?: {
+    bankName: string;
+    accountNumber: string;
+    accountName: string;
+  };
+  emergencyContact?: {
+    name: string;
+    relationship: string;
+    phone: string;
+  };
 }
 
 export interface CreateEmployeeData {

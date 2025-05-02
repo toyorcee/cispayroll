@@ -163,14 +163,23 @@ export default function AllEmployees() {
     });
   }, [filters, queryClient]);
 
-  const { data: salaryGrades, isLoading: salaryGradesLoading } = useQuery<
-    ISalaryGrade[]
-  >({
-    queryKey: ["salaryGrades"],
-    queryFn: () => salaryStructureService.getAllSalaryGrades(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
+  const {
+    data: salaryGrades = [],
+    isLoading: salaryGradesLoading,
+    error: salaryGradesError,
+  } = useQuery<ISalaryGrade[]>({
+    queryKey: ["salaryGrades", user?.role],
+    queryFn: () => salaryStructureService.getAllSalaryGrades(user?.role),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
+
+  // Handle errors in useEffect
+  useEffect(() => {
+    if (salaryGradesError) {
+      console.error("Salary grades query error:", salaryGradesError);
+    }
+  }, [salaryGradesError]);
 
   const { data: adminsData } = employeeService.useGetAdmins();
 
@@ -218,8 +227,14 @@ export default function AllEmployees() {
   };
 
   const handleEmployeeClick = (employeeId: string) => {
-    setSelectedEmployeeId(employeeId);
-    setShowDetailsModal(true);
+    const employee = employees.find((e) => e._id === employeeId);
+
+    if (employee?.status?.toLowerCase() === "active") {
+      setSelectedEmployeeId(employeeId);
+      setShowDetailsModal(true);
+    } else {
+      toast.info("Detailed information is only available for active employees");
+    }
   };
 
   const handleEditClick = (e: React.MouseEvent, employee: Employee) => {
@@ -593,7 +608,11 @@ export default function AllEmployees() {
                     <tr
                       key={employee._id}
                       onClick={() => handleEmployeeClick(employee._id || "")}
-                      className="hover:bg-gray-50 cursor-pointer transition-colors"
+                      className={`hover:bg-gray-50 transition-colors ${
+                        employee.status.toLowerCase() === "active"
+                          ? "cursor-pointer"
+                          : "cursor-not-allowed"
+                      }`}
                     >
                       <td className="px-3 py-2">
                         <div className="flex items-center">
@@ -913,12 +932,13 @@ export default function AllEmployees() {
                           ? "Loading grades..."
                           : "Select Grade Level"}
                       </option>
-                      {salaryGrades?.map((grade: ISalaryGrade) => (
-                        <option key={grade._id} value={grade.level}>
-                          {grade.level} - {grade.description} (₦
-                          {(grade.basicSalary || 0).toLocaleString()})
-                        </option>
-                      ))}
+                      {Array.isArray(salaryGrades) &&
+                        salaryGrades.map((grade: ISalaryGrade) => (
+                          <option key={grade._id} value={grade.level}>
+                            {grade.level} - {grade.description} (₦
+                            {(grade.basicSalary || 0).toLocaleString()})
+                          </option>
+                        ))}
                     </select>
                     {salaryGradesLoading && (
                       <div className="absolute right-8 top-1/2 transform -translate-y-1/2">

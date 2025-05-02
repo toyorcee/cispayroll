@@ -105,13 +105,12 @@ const allowedOrigin = process.env.CLIENT_URL;
 
 app.use(
   cors({
-    origin: allowedOrigin, 
+    origin: allowedOrigin,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-
 
 app.use(cookieParser());
 app.use(express.json());
@@ -139,7 +138,9 @@ app.use((req, res, next) => {
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, "uploads", "profiles"));
+    const uploadPath = path.join(process.cwd(), "uploads", "profiles");
+    fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -278,7 +279,6 @@ app.get("/", (req, res) => {
 app.use((_req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
-
 
 if (process.env.NODE_ENV === "development") {
   import("./routes/testRoutes.js").then((testRoutes) => {
