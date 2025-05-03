@@ -44,11 +44,6 @@ const AllowanceSchema = new Schema({
   approvalStatus: { type: String, default: "approved" },
   approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
   approvedAt: { type: Date },
-  usedInPayroll: {
-    month: Number,
-    year: Number,
-    payrollId: { type: Schema.Types.ObjectId, ref: "Payroll" },
-  },
 });
 
 // Methods

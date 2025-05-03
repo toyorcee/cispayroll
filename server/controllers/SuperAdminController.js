@@ -3145,9 +3145,29 @@ export class SuperAdminController {
         });
       }
 
+      // Update user's personal allowances array
+      await UserModel.findByIdAndUpdate(allowance.employee, {
+        $pull: { personalAllowances: { allowanceId: allowance._id } }, 
+      });
+
+      const personalAllowance = {
+        allowanceId: allowance._id,
+        status: "APPROVED",
+        usedInPayroll: {
+          month: null,
+          year: null,
+          payrollId: null,
+        },
+      };
+
+      await UserModel.findByIdAndUpdate(allowance.employee, {
+        $push: { personalAllowances: personalAllowance },
+      });
+
       res.status(200).json({
         success: true,
         data: allowance,
+        message: "Allowance approved successfully",
       });
     } catch (error) {
       res.status(500).json({
@@ -3580,7 +3600,7 @@ export class SuperAdminController {
     try {
       const { payrollIds } = req.body;
       const user = req.user;
-  
+
       // Handle both single and multiple payrolls
       const isBatch = Array.isArray(payrollIds) && payrollIds.length > 1;
       const ids = isBatch ? payrollIds : [req.params.id];
@@ -3774,7 +3794,7 @@ export class SuperAdminController {
         ids
       );
       console.log("👤 Processor:", user.firstName, user.lastName);
-  
+
       // Find all payrolls
       const payrolls = await PayrollModel.find({
         _id: { $in: ids },
@@ -3782,16 +3802,16 @@ export class SuperAdminController {
         { path: "employee", select: "firstName lastName employeeId email" },
         { path: "department", select: "name code" },
       ]);
-  
+
       if (payrolls.length !== ids.length) {
         throw new ApiError(404, "Some payrolls not found");
       }
-  
+
       // Validate all payrolls status
       const invalidPayrolls = payrolls.filter(
         (payroll) => payroll.status !== PAYROLL_STATUS.PENDING_PAYMENT
       );
-  
+
       if (invalidPayrolls.length > 0) {
         throw new ApiError(
           400,
@@ -3800,10 +3820,10 @@ export class SuperAdminController {
             .join(", ")}`
         );
       }
-  
+
       const updatedPayrolls = [];
       const errors = [];
-  
+
       // Process each payroll
       for (const payroll of payrolls) {
         try {
@@ -3831,14 +3851,14 @@ export class SuperAdminController {
               remarks: "Payment marked as failed", // <--- Consistent remark
             },
           };
-  
+
           // Update the payroll
           const updated = await PayrollModel.findByIdAndUpdate(
             payroll._id,
             { $set: updatedPayroll },
             { new: true, runValidators: true }
           );
-  
+
           // Create payment record
           await Payment.create({
             payrollId: payroll._id,
@@ -3861,11 +3881,11 @@ export class SuperAdminController {
           });
         }
       }
-  
+
       // Create batch notification if processing multiple payrolls
       if (isBatch) {
         const batchMessage = `Batch payment failed for ${updatedPayrolls.length} payrolls`;
-  
+
         // Notify super admin
         await NotificationService.createPayrollNotification(
           null,
@@ -3873,7 +3893,7 @@ export class SuperAdminController {
           user,
           batchMessage
         );
-  
+
         // Notify accountants
         const accountants = await UserModel.find({ role: "ACCOUNTANT" });
         for (const accountant of accountants) {
@@ -3887,7 +3907,7 @@ export class SuperAdminController {
       } else {
         // Single payroll notifications
         const payroll = updatedPayrolls[0].payroll;
-  
+
         // Notify super admin
         await NotificationService.createPayrollNotification(
           payroll,
@@ -3895,7 +3915,7 @@ export class SuperAdminController {
           user,
           "Payment marked as failed"
         );
-  
+
         // Notify accountants
         const accountants = await UserModel.find({ role: "ACCOUNTANT" });
         for (const accountant of accountants) {
@@ -3907,7 +3927,7 @@ export class SuperAdminController {
           );
         }
       }
-  
+
       res.status(200).json({
         success: true,
         message: isBatch
@@ -3918,8 +3938,8 @@ export class SuperAdminController {
             payrollId: payroll._id,
             status: PAYROLL_STATUS.FAILED,
             payment: {
-            amount: payroll.totals.netPay,
-              notes: "Payment marked as failed", 
+              amount: payroll.totals.netPay,
+              notes: "Payment marked as failed",
             },
           })),
           errors: errors.length > 0 ? errors : undefined,

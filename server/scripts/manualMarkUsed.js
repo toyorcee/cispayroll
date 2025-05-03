@@ -13,10 +13,10 @@ if (!MONGO_URI) {
 }
 
 // === SET THESE VALUES ===
-const userId = "67e9e73fbb907e1d9a25e7de";
-const allowanceId = "6814ce2037b884abff1a35ae";
-const bonusId = "6814ce4a37b884abff1a35f2";
-const payrollId = "6814cf4437b884abff1a36ba"; // Use the correct payroll _id for the period you want
+const userId = "67f29dccbcda1d7c2667ba7c"; // Tope's ID
+const allowanceId = "6815d2acf11ccbf9af6e94dd"; // Tope's allowance ID
+const bonusId = "6815d287f11ccbf9af6e949c"; // Tope's bonus ID
+const payrollId = "6815dcf77c1a22133f815f8f"; // Current payroll ID
 const month = 5;
 const year = 2025;
 // ========================

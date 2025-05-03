@@ -70,11 +70,6 @@ const BonusSchema = new Schema(
       ref: "User",
       required: [true, "Updater is required"],
     },
-    usedInPayroll: {
-      month: Number,
-      year: Number,
-      payrollId: { type: Schema.Types.ObjectId, ref: "Payroll" },
-    },
   },
   { timestamps: true }
 );

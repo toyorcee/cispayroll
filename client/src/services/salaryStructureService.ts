@@ -31,8 +31,11 @@ export const salaryStructureService = {
           ? `${BASE_URL}/super-admin/salary-grades`
           : `${BASE_URL}/admin/salary-grades`;
 
-      const response = await axios.get<{ data: ISalaryGrade[] }>(endpoint);
-      return response.data.data;
+      const response = await axios.get<{ salaryGrades: ISalaryGrade[] }>(
+        endpoint
+      );
+      console.log("API response for salary grades:", response.data);
+      return response.data.salaryGrades;
     } catch (error: unknown) {
       console.error("Salary grades fetch error:", error);
       if (axios.isAxiosError(error) && error.response) {

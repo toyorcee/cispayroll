@@ -271,6 +271,25 @@ const approveBonusRequest = asyncHandler(async (req, res) => {
   bonus.updatedBy = userId;
   await bonus.save();
 
+  // Add to employee's personalBonuses array
+  await User.findByIdAndUpdate(bonus.employee, {
+    $pull: { personalBonuses: { bonusId: bonus._id } }, // Remove if exists
+  });
+
+  const personalBonus = {
+    bonusId: bonus._id,
+    status: "APPROVED",
+    usedInPayroll: {
+      month: null,
+      year: null,
+      payrollId: null,
+    },
+  };
+
+  await User.findByIdAndUpdate(bonus.employee, {
+    $push: { personalBonuses: personalBonus },
+  });
+
   return res.status(200).json({
     success: true,
     data: bonus,

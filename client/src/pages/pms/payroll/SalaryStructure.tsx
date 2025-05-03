@@ -30,6 +30,13 @@ export default function SalaryStructure() {
 
     try {
       const grades = await salaryStructureService.getAllSalaryGrades();
+      console.log("Fetched grades:", grades);
+
+      if (!grades || !Array.isArray(grades)) {
+        setSalaryGrades([]); // fallback to empty array
+        setError("No salary grades found.");
+        return;
+      }
 
       // Calculate totals silently without logs
       const gradesWithTotals = grades.map((grade) => {
@@ -59,6 +66,7 @@ export default function SalaryStructure() {
       setError(null);
     } catch (error) {
       console.error("Error fetching salary grades:", error);
+      setSalaryGrades([]); 
       setError("Failed to fetch salary grades");
     } finally {
       setIsLoading(false);

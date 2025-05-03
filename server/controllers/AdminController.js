@@ -1887,7 +1887,7 @@ export class AdminController {
       const allowance = await Allowance.findOneAndUpdate(
         {
           _id: req.params.id,
-          department: req.user.department,
+          department: req.user.department, // Admin can only approve allowances in their department
         },
         {
           status: AllowanceStatus.APPROVED,
@@ -1905,9 +1905,29 @@ export class AdminController {
         });
       }
 
+      // Update user's personal allowances array
+      await User.findByIdAndUpdate(allowance.employee, {
+        $pull: { personalAllowances: { allowanceId: allowance._id } }, // Remove if exists
+      });
+
+      const personalAllowance = {
+        allowanceId: allowance._id,
+        status: "APPROVED",
+        usedInPayroll: {
+          month: null,
+          year: null,
+          payrollId: null,
+        },
+      };
+
+      await User.findByIdAndUpdate(allowance.employee, {
+        $push: { personalAllowances: personalAllowance },
+      });
+
       res.status(200).json({
         success: true,
         data: allowance,
+        message: "Allowance approved successfully",
       });
     } catch (error) {
       const { statusCode, message } = handleError(error);

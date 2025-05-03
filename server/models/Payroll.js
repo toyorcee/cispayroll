@@ -514,14 +514,10 @@ PayrollSchema.methods.approve = function (user, remarks) {
     // Move to next approval level
     this.approvalFlow.currentLevel = nextLevel;
   } else {
-    // Final approval - mark allowances and bonuses as used
+    // Final approval
     this.status = PAYROLL_STATUS.APPROVED;
     this.approvalFlow.approvedBy = user._id;
     this.approvalFlow.approvedAt = new Date();
-
-    // Mark allowances and bonuses as used
-    this.markAllowancesAsUsed();
-    this.markBonusesAsUsed();
   }
 
   return this;
@@ -573,59 +569,98 @@ PayrollSchema.methods.returnForRevision = function (user, remarks) {
   return this;
 };
 
-// Add new methods to mark allowances and bonuses as used
-PayrollSchema.methods.markAllowancesAsUsed = async function () {
-  const User = mongoose.model("User");
-  const user = await User.findById(this.employee);
-
-  if (!user) return;
-
-  // Mark grade allowances as used
-  for (const allowance of this.allowances.gradeAllowances) {
-    const existingAllowance = user.allowances.find(
-      (a) => a.name === allowance.name
-    );
-    if (existingAllowance) {
-      existingAllowance.used = true;
-      existingAllowance.lastUsedInPayroll = this._id;
-      existingAllowance.lastUsedDate = new Date();
-    }
-  }
-
-  // Mark additional allowances as used
-  for (const allowance of this.allowances.additionalAllowances) {
-    const existingAllowance = user.allowances.find(
-      (a) => a.name === allowance.name
-    );
-    if (existingAllowance) {
-      existingAllowance.used = true;
-      existingAllowance.lastUsedInPayroll = this._id;
-      existingAllowance.lastUsedDate = new Date();
-    }
-  }
-
-  await user.save();
-};
-
-PayrollSchema.methods.markBonusesAsUsed = async function () {
-  const User = mongoose.model("User");
-  const user = await User.findById(this.employee);
-
-  if (!user) return;
-
-  // Mark bonuses as used
-  for (const bonus of this.earnings.bonus) {
-    const existingBonus = user.bonuses.find(
-      (b) => b.description === bonus.description
-    );
-    if (existingBonus) {
-      existingBonus.used = true;
-      existingBonus.lastUsedInPayroll = this._id;
-      existingBonus.lastUsedDate = new Date();
-    }
-  }
-
-  await user.save();
-};
-
 export default mongoose.model("Payroll", PayrollSchema);
+
+// New static methods
+PayrollSchema.statics.markAllowancesAsUsed = async function (
+  payrollId,
+  month,
+  year
+) {
+  try {
+    const payroll = await this.findById(payrollId);
+    if (!payroll) {
+      throw new Error("Payroll not found");
+    }
+
+    const employee = await UserModel.findById(payroll.employee);
+    if (!employee) {
+      throw new Error("Employee not found");
+    }
+
+    // Get all allowance IDs from the payroll
+    const allowanceIds = [
+      ...payroll.allowances.gradeAllowances.map((a) => a._id),
+      ...payroll.allowances.additionalAllowances.map((a) => a._id),
+    ];
+
+    // Update personalAllowances array
+    await UserModel.updateMany(
+      { _id: payroll.employee },
+      {
+        $set: {
+          "personalAllowances.$[elem].usedInPayroll": {
+            month,
+            year,
+            payrollId,
+          },
+        },
+      },
+      {
+        arrayFilters: [{ "elem.allowanceId": { $in: allowanceIds } }],
+      }
+    );
+
+    console.log(
+      `✅ Marked ${allowanceIds.length} allowances as used in payroll ${payrollId}`
+    );
+  } catch (error) {
+    console.error("❌ Error marking allowances as used:", error);
+    throw error;
+  }
+};
+
+PayrollSchema.statics.markBonusesAsUsed = async function (
+  payrollId,
+  month,
+  year
+) {
+  try {
+    const payroll = await this.findById(payrollId);
+    if (!payroll) {
+      throw new Error("Payroll not found");
+    }
+
+    const employee = await UserModel.findById(payroll.employee);
+    if (!employee) {
+      throw new Error("Employee not found");
+    }
+
+    // Get all bonus IDs from the payroll
+    const bonusIds = payroll.bonuses.items.map((b) => b._id);
+
+    // Update personalBonuses array
+    await UserModel.updateMany(
+      { _id: payroll.employee },
+      {
+        $set: {
+          "personalBonuses.$[elem].usedInPayroll": {
+            month,
+            year,
+            payrollId,
+          },
+        },
+      },
+      {
+        arrayFilters: [{ "elem.bonusId": { $in: bonusIds } }],
+      }
+    );
+
+    console.log(
+      `✅ Marked ${bonusIds.length} bonuses as used in payroll ${payrollId}`
+    );
+  } catch (error) {
+    console.error("❌ Error marking bonuses as used:", error);
+    throw error;
+  }
+};
