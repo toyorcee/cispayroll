@@ -34,10 +34,6 @@ export default function MyPayslipsPage() {
       setIsLoading(true);
       setError(null);
       const response = await employeeService.getOwnPayslips({ page, limit });
-      console.log("API Response:", response);
-      console.log("Response data:", response.data);
-      console.log("Payslips:", response.data.payslips);
-      console.log("Pagination:", response.data.pagination);
 
       setPayslips(response.data.payslips || []);
       setTotalPayslips(response.data.pagination?.total || 0);
@@ -121,7 +117,7 @@ export default function MyPayslipsPage() {
   }, [page, hasAttemptedFetch]);
 
   if (error && hasAttemptedFetch) {
-  return (
+    return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
           <h2 className="text-2xl font-bold text-red-600 mb-4">Error</h2>
@@ -323,21 +319,92 @@ export default function MyPayslipsPage() {
                             {selectedPayslip.earnings?.basicSalary?.toLocaleString()}
                           </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Allowances</span>
-                          <span className="font-medium">
-                            ₦
-                            {selectedPayslip.earnings?.allowances?.totalAllowances?.toLocaleString()}
-                          </span>
+
+                        {/* Grade Allowances */}
+                        <div className="pt-2">
+                          <h4 className="text-xs font-semibold text-gray-500 mb-1">
+                            Grade Allowances
+                          </h4>
+                          {selectedPayslip.earnings?.allowances?.gradeAllowances?.map(
+                            (allowance, index) => (
+                              <div
+                                key={allowance._id || index}
+                                className="flex justify-between text-gray-700 text-xs sm:text-sm"
+                              >
+                                <span className="font-medium">
+                                  {allowance.name}
+                                  {allowance.type === "percentage"
+                                    ? ` (${allowance.value}%)`
+                                    : ""}
+                                </span>
+                                <span className="font-semibold">
+                                  ₦{allowance.amount.toLocaleString()}
+                                </span>
+                              </div>
+                            )
+                          )}
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Bonuses</span>
-                          <span className="font-medium">
-                            ₦
-                            {selectedPayslip.earnings?.bonuses?.totalBonuses?.toLocaleString() ||
-                              "0"}
-                          </span>
+
+                        {/* Personal Allowances */}
+                        <div className="pt-2">
+                          <h4 className="text-xs font-semibold text-gray-500 mb-1">
+                            Personal Allowances
+                          </h4>
+                          {selectedPayslip.earnings?.allowances
+                            ?.additionalAllowances?.length > 0 ? (
+                            selectedPayslip.earnings.allowances.additionalAllowances.map(
+                              (allowance, index) => {
+                                return (
+                                  <div
+                                    key={allowance._id || index}
+                                    className="flex justify-between text-gray-700 text-xs sm:text-sm"
+                                  >
+                                    <span className="font-medium">
+                                      {allowance.type} - {allowance.name}
+                                    </span>
+                                    <span className="font-semibold">
+                                      ₦{allowance.amount.toLocaleString()}
+                                    </span>
+                                  </div>
+                                );
+                              }
+                            )
+                          ) : (
+                            <div className="text-gray-500 text-xs">
+                              No personal allowances
+                            </div>
+                          )}
                         </div>
+
+                        {/* Personal Bonuses */}
+                        <div className="pt-2">
+                          <h4 className="text-xs font-semibold text-gray-500 mb-1">
+                            Personal Bonuses
+                          </h4>
+                          {selectedPayslip.earnings?.bonuses?.items?.length >
+                          0 ? (
+                            selectedPayslip.earnings.bonuses.items.map(
+                              (bonus, index) => (
+                                <div
+                                  key={bonus._id || index}
+                                  className="flex justify-between text-gray-700 text-xs sm:text-sm"
+                                >
+                                  <span className="font-medium">
+                                    {bonus.description || "Personal Bonus"}
+                                  </span>
+                                  <span className="font-semibold">
+                                    ₦{bonus.amount.toLocaleString()}
+                                  </span>
+                                </div>
+                              )
+                            )
+                          ) : (
+                            <div className="text-gray-500 text-xs">
+                              No personal bonuses
+                            </div>
+                          )}
+                        </div>
+
                         <div className="border-t pt-1 flex justify-between font-medium">
                           <span>Total Earnings</span>
                           <span>

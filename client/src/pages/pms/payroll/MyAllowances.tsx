@@ -62,9 +62,7 @@ function TabPanel(props: TabPanelProps) {
 const MyAllowances: React.FC = () => {
   const { hasPermission, user } = useAuth();
   const [allowances, setAllowances] = useState<Allowance[]>([]);
-  const [allowanceHistory, setAllowanceHistory] = useState<Allowance[]>([]);
   const [loading, setLoading] = useState(true);
-  const [historyLoading, setHistoryLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openRequestForm, setOpenRequestForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -108,18 +106,18 @@ const MyAllowances: React.FC = () => {
     resetForm();
   };
 
-  useEffect(() => {
-    fetchAllowances();
-    fetchAllowanceHistory();
-  }, []);
-
   const fetchAllowances = async () => {
     try {
-      if (!user?.role) {
-        throw new Error("User role not found");
+      if (!user?._id) {
+        throw new Error("User ID not found");
       }
-      const response = await allowanceService.getAllAllowances(user.role);
-      setAllowances(response.data);
+      setLoading(true);
+      const response = await allowanceService.getAllowanceRequests({
+        employee: user._id,
+        includeInactive: tabValue === 1,
+      });
+      setAllowances(response.data.allowances || []);
+      setError(null);
     } catch (err) {
       setError("Failed to fetch allowances");
       console.error("Error fetching allowances:", err);
@@ -128,18 +126,12 @@ const MyAllowances: React.FC = () => {
     }
   };
 
-  const fetchAllowanceHistory = async () => {
-    try {
-      if (!user?.role) {
-        throw new Error("User role not found");
-      }
-      const response = await allowanceService.getAllowanceHistory(user.role);
-      setAllowanceHistory(response.data);
-    } catch (err) {
-      console.error("Error fetching allowance history:", err);
-    } finally {
-      setHistoryLoading(false);
-    }
+  useEffect(() => {
+    fetchAllowances();
+  }, [tabValue]);
+
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
   };
 
   const handleRequestSubmit = async (e: React.FormEvent) => {
@@ -185,17 +177,12 @@ const MyAllowances: React.FC = () => {
       toast.success("Allowance request submitted successfully");
       handleCloseForm();
       fetchAllowances();
-      fetchAllowanceHistory();
     } catch (err: any) {
       console.error("Error requesting allowance:", err);
       toast.error(err.message || "Failed to submit allowance request");
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
   };
 
   // Check if user has permission to view their own allowances
@@ -224,35 +211,35 @@ const MyAllowances: React.FC = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Name</TableCell>
               <TableCell>Type</TableCell>
+              <TableCell>Reason</TableCell>
               <TableCell>Amount</TableCell>
-              <TableCell>Frequency</TableCell>
+              <TableCell>Payment Date</TableCell>
               <TableCell>Status</TableCell>
-              <TableCell>Effective Date</TableCell>
+              <TableCell>Department</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {allowances.map((allowance) => (
               <TableRow key={allowance._id}>
-                <TableCell>{allowance.reason}</TableCell>
                 <TableCell>{allowance.type}</TableCell>
+                <TableCell>{allowance.reason}</TableCell>
                 <TableCell>{formatCurrency(allowance.amount)}</TableCell>
-                <TableCell>{allowance.paymentDate}</TableCell>
+                <TableCell>{formatDate(allowance.paymentDate)}</TableCell>
                 <TableCell>
                   <Chip
                     label={allowance.approvalStatus}
                     color={
-                      allowance.approvalStatus === "APPROVED"
+                      allowance.approvalStatus === "approved"
                         ? "success"
-                        : allowance.approvalStatus === "PENDING"
+                        : allowance.approvalStatus === "pending"
                         ? "warning"
                         : "error"
                     }
                     size="small"
                   />
                 </TableCell>
-                <TableCell>{formatDate(allowance.paymentDate)}</TableCell>
+                <TableCell>{allowance.department?.name}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -300,7 +287,7 @@ const MyAllowances: React.FC = () => {
             <Typography variant="h6" className="mb-4">
               Allowance History
             </Typography>
-            {renderAllowanceTable(allowanceHistory, historyLoading)}
+            {renderAllowanceTable(allowances, loading)}
           </TabPanel>
         </CardContent>
       </Card>

@@ -14,7 +14,7 @@ mongoose.connect(process.env.MONGO_URI, {
 
 async function getUserPersonalComponents() {
   try {
-    const userId = "67f29dccbcda1d7c2667ba7c";
+    const userId = "67ee91aa24f31a737df7c1ef";
 
     const userData = await User.findById(userId)
       .select("personalAllowances personalBonuses")

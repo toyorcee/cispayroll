@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import React, { useState, useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
 import {
   Card,
   CardContent,
@@ -17,11 +17,20 @@ import {
   Paper,
   IconButton,
   Tooltip,
+  TableContainer,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Chip,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
-import { bonusService } from "../../../services/bonusService";
+import { bonusService, BonusResponse } from "../../../services/bonusService";
 import { toast } from "react-toastify";
 import DeleteIcon from "@mui/icons-material/Delete";
 
@@ -49,34 +58,42 @@ const BONUS_TYPES = [
   },
 ];
 
-// Define the Bonus interface to match the API response
-interface Bonus {
-  _id: string;
-  amount: number;
-  reason: string;
-  type: string;
-  status: "PENDING" | "APPROVED" | "REJECTED";
-  createdAt: string;
-  paymentDate: string;
-  employee?: {
-    firstName: string;
-    lastName: string;
-    employeeId: string;
-  };
-}
-
 // Define the CreatePersonalBonusData interface to match the service
 interface CreatePersonalBonusData {
   amount: number;
   reason: string;
   paymentDate: Date;
-  type: string; // Add type to the interface
+  type: string;
+}
+
+// Add TabPanel interface and component
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`bonus-tabpanel-${index}`}
+      aria-labelledby={`bonus-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+    </div>
+  );
 }
 
 const MyBonus: React.FC = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [openTypeDialog, setOpenTypeDialog] = useState(false);
   const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [tabValue, setTabValue] = useState(0);
   const [formData, setFormData] = useState({
     amount: "",
     reason: "",
@@ -86,57 +103,33 @@ const MyBonus: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bonusToDelete, setBonusToDelete] = useState<string | null>(null);
+  const [bonuses, setBonuses] = useState<BonusResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Fix the type issue by explicitly typing the response
-  const {
-    data: bonuses,
-    isLoading,
-    refetch,
-  } = useQuery<Bonus[]>({
-    queryKey: ["my-bonuses"],
-    queryFn: async () => {
-      try {
-        const response = await bonusService.getMyBonuses();
-        // Check if response.data exists and has a bonuses property
-        if (
-          response &&
-          response.data &&
-          response.data.bonuses &&
-          Array.isArray(response.data.bonuses)
-        ) {
-          // Map the response to match our Bonus interface
-          const mappedBonuses = response.data.bonuses.map((bonus: any) => ({
-            _id: bonus._id,
-            amount: bonus.amount,
-            reason: bonus.reason,
-            type: bonus.type,
-            status: bonus.approvalStatus,
-            createdAt: bonus.createdAt,
-            paymentDate: bonus.paymentDate,
-            employee: bonus.employee,
-          }));
+  const fetchBonuses = async () => {
+    try {
+      setLoading(true);
+      const response = await bonusService.getMyBonuses({
+        includeInactive: tabValue === 1,
+      });
+      setBonuses(response.data.bonuses);
+      setError(null);
+    } catch (err) {
+      setError("Failed to fetch bonuses");
+      console.error("Error fetching bonuses:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-          // Filter out duplicates based on _id
-          const uniqueBonuses = mappedBonuses.filter(
-            (bonus, index, self) =>
-              index === self.findIndex((b) => b._id === bonus._id)
-          );
+  useEffect(() => {
+    fetchBonuses();
+  }, [tabValue]);
 
-          console.log(
-            `Found ${mappedBonuses.length} bonuses, ${uniqueBonuses.length} unique`
-          );
-          return uniqueBonuses;
-        } else {
-          console.error("Unexpected response format:", response);
-          return [];
-        }
-      } catch (error) {
-        console.error("Error fetching bonuses:", error);
-        toast.error("Failed to fetch your bonus requests");
-        return [];
-      }
-    },
-  });
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
 
   const createBonusMutation = useMutation({
     mutationFn: (data: CreatePersonalBonusData) =>
@@ -146,7 +139,7 @@ const MyBonus: React.FC = () => {
       setFormData({ amount: "", reason: "", paymentDate: null, type: "" });
       setSelectedType(null);
       setOpenDialog(false);
-      refetch();
+      fetchBonuses();
     },
     onError: (error: any) => {
       toast.error(
@@ -161,7 +154,7 @@ const MyBonus: React.FC = () => {
       toast.success("Bonus request deleted successfully!");
       setDeleteDialogOpen(false);
       setBonusToDelete(null);
-      refetch();
+      fetchBonuses();
     },
     onError: (error: any) => {
       toast.error(
@@ -249,7 +242,7 @@ const MyBonus: React.FC = () => {
     setBonusToDelete(null);
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <Box
         display="flex"
@@ -263,14 +256,12 @@ const MyBonus: React.FC = () => {
   }
 
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-4">
-        <Typography variant="h5" component="h1" className="text-gray-800">
-          My Bonuses
-        </Typography>
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <Typography variant="h4">My Bonuses</Typography>
         <Button
           variant="contained"
-          className="bg-green-600 hover:bg-green-700 text-white"
+          color="primary"
           onClick={handleOpenDialog}
           startIcon={<span>+</span>}
         >
@@ -278,86 +269,179 @@ const MyBonus: React.FC = () => {
         </Button>
       </div>
 
-      <div className="grid gap-4">
-        {bonuses &&
-          bonuses.map((bonus: Bonus) => (
-            <Card
-              key={bonus._id}
-              className="mb-4 hover:shadow-lg transition-shadow duration-200 border border-green-600 bg-white"
+      <Card>
+        <CardContent>
+          <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+            <Tabs
+              value={tabValue}
+              onChange={handleTabChange}
+              aria-label="bonus tabs"
             >
-              <CardContent>
-                <Box className="flex justify-between items-start mb-4">
-                  <Box className="flex items-center gap-3">
-                    <Typography
-                      className={`px-4 py-1.5 rounded-full text-sm font-medium ${
-                        bonus.status.toLowerCase() === "approved"
-                          ? "bg-green-500 text-white"
-                          : bonus.status.toLowerCase() === "pending"
-                          ? "bg-yellow-500 text-white"
-                          : "bg-red-500 text-white"
-                      }`}
-                    >
-                      {bonus.status}
-                    </Typography>
-                    {bonus.status.toLowerCase() === "pending" && (
-                      <Tooltip title="Delete request">
-                        <IconButton
-                          className="text-white hover:bg-green-500"
-                          size="small"
-                          onClick={() => handleDeleteClick(bonus._id)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </Box>
-                  <Typography variant="body2" className="text-white">
-                    {new Date(bonus.createdAt).toLocaleDateString()}
-                  </Typography>
-                </Box>
-                <Box className="grid grid-cols-2 gap-6 bg-green-500 p-4 rounded-lg">
-                  <Box>
-                    <Typography variant="body2" className="text-white mb-1">
-                      Amount
-                    </Typography>
-                    <Typography variant="h6" className="font-bold text-white">
-                      ₦{bonus.amount.toLocaleString()}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="body2" className="text-white mb-1">
-                      Payment Date
-                    </Typography>
-                    <Typography variant="h6" className="font-bold text-white">
-                      {new Date(bonus.paymentDate).toLocaleDateString()}
-                    </Typography>
-                  </Box>
-                </Box>
-                <Box className="mt-4">
-                  <Typography variant="body2" className="text-white mb-1">
-                    Reason
-                  </Typography>
-                  <Typography
-                    variant="body1"
-                    className="font-medium text-white bg-green-500 p-3 rounded-lg"
-                  >
-                    {bonus.reason}
-                  </Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          ))}
+              <Tab label="Active Bonuses" />
+              <Tab label="Bonus History" />
+            </Tabs>
+          </Box>
 
-        {(!bonuses || bonuses.length === 0) && (
-          <Card className="border border-gray-100">
-            <CardContent>
-              <Typography color="textSecondary" align="center">
-                No bonuses found
-              </Typography>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+          {loading ? (
+            <Box
+              display="flex"
+              justifyContent="center"
+              alignItems="center"
+              minHeight="200px"
+            >
+              <CircularProgress />
+            </Box>
+          ) : error ? (
+            <Alert severity="error">{error}</Alert>
+          ) : (
+            <>
+              <TabPanel value={tabValue} index={0}>
+                <Typography variant="h6" className="mb-4">
+                  Active Bonuses
+                </Typography>
+                <TableContainer component={Paper}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Type</TableCell>
+                        <TableCell>Reason</TableCell>
+                        <TableCell>Amount</TableCell>
+                        <TableCell>Payment Date</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {bonuses.length > 0 ? (
+                        bonuses.map((bonus) => (
+                          <TableRow key={bonus._id}>
+                            <TableCell>{bonus.type}</TableCell>
+                            <TableCell>{bonus.reason}</TableCell>
+                            <TableCell>
+                              ₦{bonus.amount.toLocaleString()}
+                            </TableCell>
+                            <TableCell>
+                              {new Date(bonus.paymentDate).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={bonus.approvalStatus}
+                                color={
+                                  bonus.approvalStatus.toLowerCase() ===
+                                  "approved"
+                                    ? "success"
+                                    : bonus.approvalStatus.toLowerCase() ===
+                                      "pending"
+                                    ? "warning"
+                                    : "error"
+                                }
+                                size="small"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              {bonus.approvalStatus.toLowerCase() ===
+                                "pending" && (
+                                <Tooltip title="Delete request">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleDeleteClick(bonus._id)}
+                                  >
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={6} align="center">
+                            <Typography color="textSecondary">
+                              No active bonuses found
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </TabPanel>
+
+              <TabPanel value={tabValue} index={1}>
+                <Typography variant="h6" className="mb-4">
+                  Bonus History
+                </Typography>
+                <TableContainer component={Paper}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Type</TableCell>
+                        <TableCell>Reason</TableCell>
+                        <TableCell>Amount</TableCell>
+                        <TableCell>Payment Date</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {bonuses.length > 0 ? (
+                        bonuses.map((bonus) => (
+                          <TableRow key={bonus._id}>
+                            <TableCell>{bonus.type}</TableCell>
+                            <TableCell>{bonus.reason}</TableCell>
+                            <TableCell>
+                              ₦{bonus.amount.toLocaleString()}
+                            </TableCell>
+                            <TableCell>
+                              {new Date(bonus.paymentDate).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={bonus.approvalStatus}
+                                color={
+                                  bonus.approvalStatus.toLowerCase() ===
+                                  "approved"
+                                    ? "success"
+                                    : bonus.approvalStatus.toLowerCase() ===
+                                      "pending"
+                                    ? "warning"
+                                    : "error"
+                                }
+                                size="small"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              {bonus.approvalStatus.toLowerCase() ===
+                                "pending" && (
+                                <Tooltip title="Delete request">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleDeleteClick(bonus._id)}
+                                  >
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={6} align="center">
+                            <Typography color="textSecondary">
+                              No bonus history found
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </TabPanel>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Bonus Type Selection Dialog */}
       <Dialog

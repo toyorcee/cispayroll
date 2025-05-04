@@ -375,104 +375,56 @@ const createDepartmentEmployeeAllowance = asyncHandler(async (req, res) => {
  */
 const getAllowanceRequests = asyncHandler(async (req, res) => {
   const {
-    status,
-    employeeId,
+    page = 1,
+    limit = 10,
+    employee,
     departmentId,
+    status,
+    type,
     startDate,
     endDate,
-    employee,
-    type,
+    includeInactive = false,
   } = req.query;
-  const userId = req.user._id;
-  const isAdmin = req.user.role === "SUPER_ADMIN" || req.user.role === "ADMIN";
-  const isHRManager = req.user.role === "HR_MANAGER";
-  const isDepartmentHead = req.user.role === "DEPARTMENT_HEAD";
 
-  // Build query based on user role and filters
-  const query = {};
-
-  // Regular users can only see their own requests
-  if (!isAdmin && !isHRManager && !isDepartmentHead) {
-    query.employee = userId;
-  }
-  // Department heads can see requests from their department
-  else if (isDepartmentHead) {
-    const userDepartment = await User.findById(userId).select("department");
-    query.department = userDepartment.department;
-  }
-  // Admins and HR managers can see all requests with filters
-  else if (req.user.role === "ADMIN") {
-    // Restrict to admin's department by default
-    const adminDepartment = req.user.department;
-    query.department = adminDepartment;
-    // Allow further filtering if provided
-    if (employeeId) query.employee = employeeId;
-    if (departmentId) query.department = departmentId;
-  } else {
-    // For super admin and HR managers, allow all
-    if (employeeId) query.employee = employeeId;
-    if (departmentId) query.department = departmentId;
-  }
-
-  // Apply additional filters
+  // Build the base query
+  let query = {};
+  if (employee) query.employee = employee;
+  if (departmentId) query.department = departmentId;
   if (status) query.approvalStatus = status;
   if (type) query.type = type;
-  if (startDate && endDate) {
-    query.createdAt = {
-      $gte: new Date(startDate),
-      $lte: new Date(endDate),
-    };
-  }
 
-  // If employee is provided and not a valid ObjectId, treat as name/email search
-  if (employee) {
-    const isObjectId = mongoose.Types.ObjectId.isValid(employee);
-    if (!isObjectId) {
-      // Find users by name or email (case-insensitive)
-      const users = await User.find({
+  // If includeInactive is false, we only want active allowances
+  if (!includeInactive) {
+    query.$and = [
+      { approvalStatus: "approved" },
+      {
         $or: [
-          { fullName: { $regex: employee, $options: "i" } },
-          { email: { $regex: employee, $options: "i" } },
-          { firstName: { $regex: employee, $options: "i" } },
-          { lastName: { $regex: employee, $options: "i" } },
+          { paymentDate: { $gt: new Date() } }, 
+          { usedInPayroll: { $exists: false } }, 
+          { usedInPayroll: null }, 
         ],
-      }).select("_id");
-      const userIds = users.map((u) => u._id);
-      query.employee = { $in: userIds };
-    } else {
-      query.employee = employee;
-    }
+      },
+    ];
   }
 
-  // Get allowance requests with pagination
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 10;
-  const skip = (page - 1) * limit;
+  // If includeInactive is true, we want all allowances
+  // (used ones will have paymentDate <= current date or usedInPayroll exists)
 
-  // Get allowances from Allowance collection
   const allowances = await Allowance.find(query)
-    .populate("department", "name code")
-    .populate("createdBy", "firstName lastName")
-    .populate("employee", "firstName lastName email profileImageUrl")
     .sort({ createdAt: -1 })
-    .skip(skip)
+    .skip((page - 1) * limit)
     .limit(limit);
 
-  // Get total count
-  const total = await Allowance.countDocuments(query);
-
-  return res.status(200).json({
+  res.json({
     success: true,
     data: {
       allowances,
       pagination: {
-        total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit),
+        total: await Allowance.countDocuments(query),
+        page: parseInt(page),
+        limit: parseInt(limit),
       },
     },
-    message: "Allowance requests retrieved successfully",
   });
 });
 

@@ -292,21 +292,8 @@ export class PayrollService {
           (!item.allowanceId.expiryDate ||
             new Date(item.allowanceId.expiryDate) >= startDate);
 
-        console.log(`Allowance ${item.allowanceId._id}:`, {
-          status: item.status,
-          isApproved,
-          isWithinDateRange,
-          effectiveDate: item.allowanceId.effectiveDate,
-          expiryDate: item.allowanceId.expiryDate,
-        });
-
         return isApproved && isWithinDateRange;
       });
-
-      console.log(
-        `✅ Found ${validAllowances.length} valid allowances for period`
-      );
-
       // Calculate amounts for each valid allowance
       const additionalAllowances = validAllowances.map((item) => {
         let amount = 0;
@@ -349,15 +336,13 @@ export class PayrollService {
           type: allowance.type || "additional",
           value: allowance.amount || 0,
           amount: amount,
-          frequency: "monthly",
-          description:
-            allowance.reason ||
-            allowance.description ||
-            `${allowance.name} - Personal Allowance`,
+          frequency: allowance.frequency || "monthly",
           reason:
+            item.reason ||
             allowance.reason ||
             allowance.description ||
-            `${allowance.name} - Personal Allowance`,
+            "No reason provided",
+          _id: allowance._id,
         };
       });
 

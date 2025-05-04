@@ -188,21 +188,8 @@ export default function ProcessPayment() {
   const processPaymentMutation = useMutation({
     mutationFn: (payrollId: string) =>
       payrollService.initiatePayment(payrollId),
-    onSuccess: (data) => {
-      queryClient.setQueryData(["payrolls", filters], (oldData: any) => {
-        if (!oldData?.data?.payrolls) return oldData;
-        return {
-          ...oldData,
-          data: {
-            ...oldData.data,
-            payrolls: oldData.data.payrolls.map((payroll: PayrollData) =>
-              payroll._id === data.payrollId
-                ? { ...payroll, status: "PENDING_PAYMENT" }
-                : payroll
-            ),
-          },
-        };
-      });
+    onSuccess: (_data) => {
+      queryClient.invalidateQueries({ queryKey: ["payrolls", filters] });
       queryClient.invalidateQueries({ queryKey: ["payrollStatistics"] });
       toast.success("Payment initiation completed");
       resetSelectionStates();
@@ -215,24 +202,7 @@ export default function ProcessPayment() {
   const batchProcessPaymentMutation = useMutation({
     mutationFn: (payrollIds: string[]) =>
       payrollService.initiateBatchPayment(payrollIds),
-    onSuccess: (data) => {
-      const updatedIds = Array.isArray(data.payrolls)
-        ? data.payrolls.map((p: { payrollId: string }) => p.payrollId)
-        : [];
-      queryClient.setQueryData(["payrolls", filters], (oldData: any) => {
-        if (!oldData?.data?.payrolls) return oldData;
-        return {
-          ...oldData,
-          data: {
-            ...oldData.data,
-            payrolls: oldData.data.payrolls.map((payroll: PayrollData) =>
-              updatedIds.includes(payroll._id)
-                ? { ...payroll, status: "PENDING_PAYMENT" }
-                : payroll
-            ),
-          },
-        };
-      });
+    onSuccess: (_data) => {
       queryClient.invalidateQueries({ queryKey: ["payrolls", filters] });
       queryClient.invalidateQueries({ queryKey: ["payrollStatistics"] });
       toast.success("Batch payment initiation completed");
@@ -665,103 +635,103 @@ export default function ProcessPayment() {
     const mixed = statuses.size > 1;
 
     return (
-    <div className="bg-white p-4 rounded-lg shadow mb-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Date Range
-          </label>
-          <select
-            className="mt-1 block w-full rounded-md border-gray-300"
-            value={filters.dateRange}
-            onChange={(e) =>
-              handleFilterChange({ ...filters, dateRange: e.target.value })
-            }
-          >
-            <option value="last3">Last 3 Months</option>
-            <option value="last6">Last 6 Months</option>
-            <option value="last12">Last 12 Months</option>
-            <option value="custom">Custom Range</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Department
-          </label>
-          <select
-            className="mt-1 block w-full rounded-md border-gray-300"
-            value={filters.department}
-            onChange={(e) =>
-              handleFilterChange({ ...filters, department: e.target.value })
-            }
-            disabled={isDepartmentsLoading}
-          >
-            <option value="all">All Departments</option>
-            {departments.map((dept: Department) => (
-              <option key={dept._id} value={dept._id}>
-                {dept.name}
-              </option>
-            ))}
-          </select>
-          {isDepartmentsLoading && (
-              <p className="text-sm text-gray-500 mt-1">
-                Loading departments...
-              </p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Frequency
-          </label>
-          <select
-            className="mt-1 block w-full rounded-md border-gray-300"
-            value={filters.frequency}
-            onChange={(e) =>
-              handleFilterChange({ ...filters, frequency: e.target.value })
-            }
-          >
-            <option value="all">All Frequencies</option>
-            <option value="weekly">Weekly</option>
-            <option value="bi-weekly">Bi-Weekly</option>
-            <option value="monthly">Monthly</option>
-          </select>
-        </div>
-
-        {/* Filter and Selection Controls */}
-        <div className="mb-4">
-          {/* Status Filter */}
-          <div className="mb-4">
-            <label className="text-sm font-medium text-gray-700 mr-2">
-              Filter by Status:
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Date Range
             </label>
             <select
+              className="mt-1 block w-full rounded-md border-gray-300"
+              value={filters.dateRange}
               onChange={(e) =>
-                handleFilterChange({ ...filters, status: e.target.value })
+                handleFilterChange({ ...filters, dateRange: e.target.value })
               }
-              className="border rounded-md px-3 py-2"
             >
-              <option value="">All Statuses</option>
-              {Object.values(PayrollStatus).map((status) => (
-                <option key={status} value={status}>
-                  {statusLabels[status]}
-                </option>
-              ))}
+              <option value="last3">Last 3 Months</option>
+              <option value="last6">Last 6 Months</option>
+              <option value="last12">Last 12 Months</option>
+              <option value="custom">Custom Range</option>
             </select>
           </div>
 
-          {/* Bulk Selection Buttons - Vertical Layout */}
-          <div className="flex flex-col space-y-2 mb-4">
-            <button
-              onClick={() => handleSelectByStatus(PayrollStatus.COMPLETED)}
-              className="px-3 py-2 bg-green-100 text-green-800 rounded-md hover:bg-green-200 text-sm w-full text-left"
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Department
+            </label>
+            <select
+              className="mt-1 block w-full rounded-md border-gray-300"
+              value={filters.department}
+              onChange={(e) =>
+                handleFilterChange({ ...filters, department: e.target.value })
+              }
+              disabled={isDepartmentsLoading}
             >
+              <option value="all">All Departments</option>
+              {departments.map((dept: Department) => (
+                <option key={dept._id} value={dept._id}>
+                  {dept.name}
+                </option>
+              ))}
+            </select>
+            {isDepartmentsLoading && (
+              <p className="text-sm text-gray-500 mt-1">
+                Loading departments...
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Frequency
+            </label>
+            <select
+              className="mt-1 block w-full rounded-md border-gray-300"
+              value={filters.frequency}
+              onChange={(e) =>
+                handleFilterChange({ ...filters, frequency: e.target.value })
+              }
+            >
+              <option value="all">All Frequencies</option>
+              <option value="weekly">Weekly</option>
+              <option value="bi-weekly">Bi-Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+
+          {/* Filter and Selection Controls */}
+          <div className="mb-4">
+            {/* Status Filter */}
+            <div className="mb-4">
+              <label className="text-sm font-medium text-gray-700 mr-2">
+                Filter by Status:
+              </label>
+              <select
+                onChange={(e) =>
+                  handleFilterChange({ ...filters, status: e.target.value })
+                }
+                className="border rounded-md px-3 py-2"
+              >
+                <option value="">All Statuses</option>
+                {Object.values(PayrollStatus).map((status) => (
+                  <option key={status} value={status}>
+                    {statusLabels[status]}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Bulk Selection Buttons - Vertical Layout */}
+            <div className="flex flex-col space-y-2 mb-4">
+              <button
+                onClick={() => handleSelectByStatus(PayrollStatus.COMPLETED)}
+                className="px-3 py-2 bg-green-100 text-green-800 rounded-md hover:bg-green-200 text-sm w-full text-left"
+              >
                 {isSelectingByStatus[PayrollStatus.COMPLETED] ?? true
                   ? "Select All Completed"
                   : "Deselect All Completed"}
-            </button>
-            <button
+              </button>
+              <button
                 onClick={() =>
                   handleSelectByStatus(PayrollStatus.PENDING_PAYMENT)
                 }
@@ -770,18 +740,18 @@ export default function ProcessPayment() {
                 {isSelectingByStatus[PayrollStatus.PENDING_PAYMENT] ?? true
                   ? "Select All Pending Payment"
                   : "Deselect All Pending Payment"}
-            </button>
-          </div>
+              </button>
+            </div>
 
-          {/* Selection Summary and Process Button */}
-          <div>
-            <span className="text-sm font-medium text-gray-700 mr-4">
+            {/* Selection Summary and Process Button */}
+            <div>
+              <span className="text-sm font-medium text-gray-700 mr-4">
                 Selected: {selectedPayrolls.length} of{" "}
                 {payrollsData?.data?.payrolls.length ?? 0}
-            </span>
+              </span>
               {selectedPayrolls.length > 0 && onlyCompleted && (
-              <button
-                onClick={handleBatchProcessPayment}
+                <button
+                  onClick={handleBatchProcessPayment}
                   className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm flex items-center"
                   disabled={
                     batchProcessPaymentMutation.status === "pending" ||
@@ -815,8 +785,8 @@ export default function ProcessPayment() {
                   ) : (
                     <>Process Selected ({selectedPayrolls.length})</>
                   )}
-              </button>
-            )}
+                </button>
+              )}
               {selectedPayrolls.length > 0 && onlyPendingPayment && (
                 <div className="flex flex-col md:flex-row items-center justify-center gap-y-2 md:gap-y-0 md:gap-x-4 mt-2">
                   <button
@@ -890,11 +860,11 @@ export default function ProcessPayment() {
                   Please select payrolls with the same status for batch actions.
                 </span>
               )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
   };
 
   const handleProcessPayment = async (payrollId: string) => {
@@ -930,8 +900,8 @@ export default function ProcessPayment() {
       console.log("🟢 Initiating batch payment for:", validIds);
       try {
         await batchProcessPaymentMutation.mutateAsync(validIds);
-    } catch (error) {
-      console.error("Failed to process batch payment:", error);
+      } catch (error) {
+        console.error("Failed to process batch payment:", error);
       }
     }
   };

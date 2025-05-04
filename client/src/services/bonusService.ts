@@ -31,6 +31,41 @@ interface BonusFilters {
   endDate?: string;
 }
 
+export interface BonusResponse {
+  _id: string;
+  employee: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    fullName: string;
+    id: string;
+    profileImageUrl: string;
+  };
+  type: string;
+  amount: number;
+  reason: string;
+  paymentDate: string;
+  approvalStatus: string;
+  approvedBy?: {
+    _id: string;
+    fullName: string;
+    id: string;
+    profileImageUrl: string;
+  };
+  approvedAt?: string;
+  department?: {
+    _id: string;
+    name: string;
+  };
+  taxable: boolean;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+}
+
 export const bonusService = {
   createBonus: async (data: Partial<IBonus>): Promise<{ data: IBonus }> => {
     try {
@@ -68,21 +103,19 @@ export const bonusService = {
     }
   },
 
-  getMyBonuses: async (): Promise<{
-    data: { bonuses: IBonus[]; pagination: any };
+  getMyBonuses: async (params?: {
+    includeInactive?: boolean;
+  }): Promise<{
+    data: { bonuses: BonusResponse[]; pagination: any };
   }> => {
     try {
-      const response = await axios.get(`${BASE_URL}/bonus/requests`);
+      const response = await axios.get(`${BASE_URL}/bonus/requests`, {
+        params: {
+          includeInactive: params?.includeInactive?.toString(),
+        },
+      });
       return response.data;
-    } catch (error: unknown) {
-      console.error("❌ Error fetching personal bonuses:", error);
-      if (axios.isAxiosError(error)) {
-        toast.error(
-          error.response?.data?.message || "Failed to fetch your bonus requests"
-        );
-      } else {
-        toast.error("An unexpected error occurred");
-      }
+    } catch (error) {
       throw error;
     }
   },

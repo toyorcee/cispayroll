@@ -579,10 +579,10 @@ export const employeeService = {
       queryFn: async () => {
         try {
           const result = await salaryStructureService.getAllSalaryGrades();
-          return result || []; 
+          return result || [];
         } catch (error) {
           console.error("Error fetching salary grades:", error);
-          return []; 
+          return [];
         }
       },
       staleTime: 5 * 60 * 1000,
@@ -881,7 +881,7 @@ export const employeeService = {
   // --- Payslip Management ---
   getOwnPayslips: async (params?: { page?: number; limit?: number }) => {
     try {
-      const response = await axios.get(`${BASE_URL}/employees/payslips`, {
+      const response = await axios.get(`${BASE_URL}/employee/payslips`, {
         params: {
           page: params?.page || 1,
           limit: params?.limit || 10,
@@ -903,7 +903,7 @@ export const employeeService = {
     try {
       console.log("🔍 Fetching payslip by ID:", payslipId);
       const response = await axios.get(
-        `${BASE_URL}/employees/payslips/${payslipId}`
+        `${BASE_URL}/employee/payslips/${payslipId}`
       );
       return response.data.data;
     } catch (error) {
@@ -916,7 +916,7 @@ export const employeeService = {
     try {
       console.log("🔍 Viewing payslip for payroll:", payrollId);
       const response = await axios.get(
-        `${BASE_URL}/employees/payslips/view/${payrollId}`
+        `${BASE_URL}/employee/payslips/view/${payrollId}`
       );
       return response.data.data;
     } catch (error) {

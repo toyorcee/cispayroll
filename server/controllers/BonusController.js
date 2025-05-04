@@ -57,6 +57,7 @@ const getBonusRequests = asyncHandler(async (req, res) => {
     endDate,
     employee,
     type,
+    includeInactive,
   } = req.query;
   const userId = req.user._id;
   const isAdmin = req.user.role === "SUPER_ADMIN" || req.user.role === "ADMIN";
@@ -97,6 +98,17 @@ const getBonusRequests = asyncHandler(async (req, res) => {
       $gte: new Date(startDate),
       $lte: new Date(endDate),
     };
+  }
+
+  // If includeInactive is false, only show active bonuses
+  if (includeInactive === "false") {
+    query.$or = [
+      { approvalStatus: "pending" },
+      {
+        approvalStatus: "approved",
+        paymentDate: { $gte: new Date() },
+      },
+    ];
   }
 
   // If employee is provided and not a valid ObjectId, treat as name/email search
@@ -236,6 +248,7 @@ const getBonusRequestById = asyncHandler(async (req, res) => {
     message: "Bonus request retrieved successfully",
   });
 });
+
 /**
  * Approve a bonus request
  */

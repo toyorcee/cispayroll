@@ -368,7 +368,7 @@ export const allowanceService = {
     }
   },
 
-  getAllowanceRequests: async (params: {
+  getAllowanceRequests: async (params?: {
     page?: number;
     limit?: number;
     employee?: string;
@@ -377,18 +377,21 @@ export const allowanceService = {
     type?: string;
     startDate?: string;
     endDate?: string;
+    includeInactive?: boolean;
   }): Promise<AllowancesListResponse> => {
     const queryParams = new URLSearchParams();
 
-    if (params.page) queryParams.append("page", params.page.toString());
-    if (params.limit) queryParams.append("limit", params.limit.toString());
-    if (params.employee) queryParams.append("employee", params.employee);
-    if (params.departmentId)
+    if (params?.page) queryParams.append("page", params.page.toString());
+    if (params?.limit) queryParams.append("limit", params.limit.toString());
+    if (params?.employee) queryParams.append("employee", params.employee);
+    if (params?.departmentId)
       queryParams.append("departmentId", params.departmentId);
-    if (params.status) queryParams.append("status", params.status);
-    if (params.type) queryParams.append("type", params.type);
-    if (params.startDate) queryParams.append("startDate", params.startDate);
-    if (params.endDate) queryParams.append("endDate", params.endDate);
+    if (params?.status) queryParams.append("status", params.status);
+    if (params?.type) queryParams.append("type", params.type);
+    if (params?.startDate) queryParams.append("startDate", params.startDate);
+    if (params?.endDate) queryParams.append("endDate", params.endDate);
+    if (params?.includeInactive)
+      queryParams.append("includeInactive", params.includeInactive.toString());
 
     const response = await axios.get(
       `${BASE_URL}/allowances/requests?${queryParams.toString()}`

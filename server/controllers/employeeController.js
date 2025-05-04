@@ -180,11 +180,11 @@ export class EmployeeController {
 
   static async getOwnPayslips(req, res, next) {
     try {
-      console.log("🔍 Employee getOwnPayslips called for user:", req.user.id);
-
       // Check if user has the required permission
       if (!req.user.permissions.includes("VIEW_OWN_PAYSLIP")) {
-        console.error("❌ User does not have VIEW_OWN_PAYSLIP permission");
+        console.error(
+          "❌ [getOwnPayslips] User does not have VIEW_OWN_PAYSLIP permission"
+        );
         throw new ApiError(403, "You do not have permission to view payslips");
       }
 
@@ -193,7 +193,9 @@ export class EmployeeController {
       const limit = parseInt(req.query.limit) || 10;
       const skip = (page - 1) * limit;
 
-      console.log(`📋 Pagination: page=${page}, limit=${limit}, skip=${skip}`);
+      console.log(
+        `📋 [getOwnPayslips] Pagination: page=${page}, limit=${limit}, skip=${skip}`
+      );
 
       // Fetch payslips with pagination - include both APPROVED and PAID statuses
       const payrolls = await PayrollModel.find({
@@ -218,10 +220,6 @@ export class EmployeeController {
         employee: req.user.id,
         status: { $in: ["APPROVED", "PAID"] },
       });
-
-      console.log(
-        `📋 Found ${payrolls.length} approved/paid payrolls for employee (total: ${total})`
-      );
 
       // Format each payslip with detailed information
       const formattedPayslips = payrolls.map((payroll) => ({
@@ -263,9 +261,8 @@ export class EmployeeController {
         processedAt: payroll.createdAt,
       }));
 
-      console.log("✅ Successfully formatted payslips");
 
-      res.status(200).json({
+      const response = {
         success: true,
         data: {
           payslips: formattedPayslips,
@@ -277,9 +274,12 @@ export class EmployeeController {
           },
         },
         count: formattedPayslips.length,
-      });
+      };
+
+      console.log("📤 [getOwnPayslips] Sending response:", response);
+      res.status(200).json(response);
     } catch (error) {
-      console.error("❌ Error fetching payslips:", error);
+      console.error("❌ [getOwnPayslips] Error:", error);
       next(error);
     }
   }
