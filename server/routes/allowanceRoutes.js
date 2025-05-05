@@ -5,6 +5,8 @@ import {
   createDepartmentAllowance,
   createDepartmentEmployeeAllowance,
   getAllowanceRequests,
+  createPersonalAllowance,
+  getPersonalAllowances,
 } from "../controllers/AllowancesController.js";
 
 const router = express.Router();
@@ -23,5 +25,11 @@ router.post("/department/all", createDepartmentAllowance);
 
 // Department employee-specific allowance
 router.post("/department/employee", createDepartmentEmployeeAllowance);
+
+// Personal allowance request (for all users)
+router.post("/personal", createPersonalAllowance);
+
+// Personal allowance requests (for all users)
+router.get("/personal-requests", getPersonalAllowances);
 
 export default router;

@@ -9,6 +9,7 @@ import {
   deleteBonusRequest,
   createDepartmentEmployeeBonus,
   createDepartmentWideBonus,
+  getMyBonuses,
 } from "../controllers/BonusController.js";
 
 const router = express.Router();
@@ -18,6 +19,7 @@ router.use(requireAuth);
 
 // Personal bonus request routes
 router.post("/personal", createPersonalBonus);
+router.get("/my", getMyBonuses);
 router.get("/requests", getBonusRequests);
 router.get("/requests/:id", getBonusRequestById);
 router.put("/requests/:id/approve", approveBonusRequest);

@@ -173,6 +173,8 @@ export default function ProcessPayment() {
   const [isSelectingByStatus, setIsSelectingByStatus] = useState<{
     [key in PayrollStatus]?: boolean;
   }>({});
+  const [isPayslipLoading, setIsPayslipLoading] = useState(false);
+  const [loadingPayslipId, setLoadingPayslipId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -334,6 +336,8 @@ export default function ProcessPayment() {
   };
 
   const handleViewPayslip = async (payrollId: string) => {
+    setIsPayslipLoading(true);
+    setLoadingPayslipId(payrollId);
     try {
       const payslipData = await payrollService.viewPayslip(payrollId);
       setSelectedPayslip(payslipData);
@@ -341,6 +345,9 @@ export default function ProcessPayment() {
     } catch (error) {
       console.error("Failed to fetch payslip:", error);
       toast.error("Failed to fetch payslip details");
+    } finally {
+      setIsPayslipLoading(false);
+      setLoadingPayslipId(null);
     }
   };
 
@@ -478,26 +485,109 @@ export default function ProcessPayment() {
                       {payroll.status === PayrollStatus.PAID && (
                         <button
                           onClick={() => handleViewPayslip(payroll._id)}
-                          className="text-green-600 hover:text-green-800"
+                          className="text-green-600 hover:text-green-800 relative flex items-center justify-center"
                           title="View Payslip"
+                          disabled={loadingPayslipId === payroll._id}
                         >
-                          <FaFileInvoiceDollar />
+                          {loadingPayslipId === payroll._id ? (
+                            <svg
+                              className="animate-spin h-5 w-5 text-green-600"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                                fill="none"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8v8z"
+                              />
+                            </svg>
+                          ) : (
+                            <FaFileInvoiceDollar />
+                          )}
                         </button>
                       )}
                       {payroll.status === PayrollStatus.COMPLETED && (
                         <button
                           onClick={() => handleProcessPayment(payroll._id)}
                           className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
+                          disabled={
+                            processPaymentMutation.isPending &&
+                            processPaymentMutation.variables === payroll._id
+                          }
                         >
-                          Initiate Payment
+                          {processPaymentMutation.isPending &&
+                          processPaymentMutation.variables === payroll._id ? (
+                            <span className="flex items-center">
+                              <svg
+                                className="animate-spin h-4 w-4 mr-2"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                  fill="none"
+                                />
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8v8z"
+                                />
+                              </svg>
+                              Processing...
+                            </span>
+                          ) : (
+                            "Initiate Payment"
+                          )}
                         </button>
                       )}
                       {payroll.status === PayrollStatus.PROCESSING && (
                         <button
                           onClick={() => handleProcessPayment(payroll._id)}
                           className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
+                          disabled={
+                            processPaymentMutation.isPending &&
+                            processPaymentMutation.variables === payroll._id
+                          }
                         >
-                          Initiate Payment
+                          {processPaymentMutation.isPending &&
+                          processPaymentMutation.variables === payroll._id ? (
+                            <span className="flex items-center">
+                              <svg
+                                className="animate-spin h-4 w-4 mr-2"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                  fill="none"
+                                />
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8v8z"
+                                />
+                              </svg>
+                              Processing...
+                            </span>
+                          ) : (
+                            "Initiate Payment"
+                          )}
                         </button>
                       )}
                       {payroll.status === PayrollStatus.PENDING_PAYMENT && (
@@ -1134,22 +1224,48 @@ export default function ProcessPayment() {
 
       {isPayrollsLoading ? <TableSkeleton /> : <PayrollTable />}
 
-      {showPayslipModal && selectedPayslip && (
-        <PayslipDetail
-          payslip={selectedPayslip}
-          onClose={() => {
-            setShowPayslipModal(false);
-            setSelectedPayslip(null);
-          }}
-          setPayslip={(value) => {
-            if (typeof value === "function") {
-              setSelectedPayslip(value);
-            } else {
-              setSelectedPayslip(value);
-            }
-          }}
-        />
-      )}
+      {showPayslipModal &&
+        (isPayslipLoading ? (
+          <div className="flex items-center justify-center min-h-[200px]">
+            <svg
+              className="animate-spin h-8 w-8 text-green-600 mr-2"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+                fill="none"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8v8z"
+              />
+            </svg>
+            <span className="text-lg text-gray-700">Loading payslip...</span>
+          </div>
+        ) : (
+          selectedPayslip && (
+            <PayslipDetail
+              payslip={selectedPayslip}
+              onClose={() => {
+                setShowPayslipModal(false);
+                setSelectedPayslip(null);
+              }}
+              setPayslip={(value) => {
+                if (typeof value === "function") {
+                  setSelectedPayslip(value);
+                } else {
+                  setSelectedPayslip(value);
+                }
+              }}
+            />
+          )
+        ))}
 
       {selectedEmployeeData && (
         <div className="relative bg-white rounded-lg shadow-lg p-6">

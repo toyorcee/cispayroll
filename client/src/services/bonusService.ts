@@ -66,6 +66,20 @@ export interface BonusResponse {
   __v: number;
 }
 
+interface MyBonusResponse {
+  success: boolean;
+  data: {
+    bonuses: BonusResponse[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      pages: number;
+    };
+  };
+  message: string;
+}
+
 export const bonusService = {
   createBonus: async (data: Partial<IBonus>): Promise<{ data: IBonus }> => {
     try {
@@ -103,19 +117,20 @@ export const bonusService = {
     }
   },
 
-  getMyBonuses: async (params?: {
-    includeInactive?: boolean;
-  }): Promise<{
-    data: { bonuses: BonusResponse[]; pagination: any };
-  }> => {
+  getMyBonuses: async (
+    page: number = 1,
+    limit: number = 10
+  ): Promise<MyBonusResponse> => {
     try {
-      const response = await axios.get(`${BASE_URL}/bonus/requests`, {
-        params: {
-          includeInactive: params?.includeInactive?.toString(),
-        },
+      const response = await axios.get(`${BASE_URL}/bonus/my`, {
+        params: { page, limit },
       });
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Error fetching personal bonuses:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch personal bonuses"
+      );
       throw error;
     }
   },
@@ -298,4 +313,21 @@ export const bonusService = {
       throw error;
     }
   },
+
+  approveBonusRequest: async (bonusId: string) => {
+    const response = await axios.put(
+      `${BASE_URL}/bonus/requests/${bonusId}/approve`
+    );
+    return response.data;
+  },
+
+  rejectBonusRequest: async (bonusId: string, comment: string) => {
+    const response = await axios.put(
+      `${BASE_URL}/bonus/requests/${bonusId}/reject`,
+      { comment }
+    );
+    return response.data;
+  },
 };
+
+export default bonusService;

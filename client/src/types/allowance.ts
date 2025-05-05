@@ -47,6 +47,7 @@ export interface AllowanceDepartment {
 
 export interface Allowance {
   _id: string;
+  name: string;
   employee: {
     _id: string;
     firstName: string;
@@ -57,7 +58,9 @@ export interface Allowance {
   type: string;
   amount: number;
   reason: string;
+  description: string;
   paymentDate: string;
+  effectiveDate: string;
   department: {
     _id: string;
     name: string;

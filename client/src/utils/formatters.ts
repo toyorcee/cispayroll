@@ -16,8 +16,10 @@ export const formatCurrency = (amount: number | undefined): string => {
  * @param date The date to format
  * @returns Formatted date string
  */
-export const formatDate = (date: Date | string): string => {
+export const formatDate = (date: Date | string | undefined | null): string => {
+  if (!date) return "N/A";
   const dateObj = typeof date === "string" ? new Date(date) : date;
+  if (isNaN(dateObj.getTime())) return "Invalid Date";
   return dateObj.toLocaleDateString("en-NG", {
     year: "numeric",
     month: "short",

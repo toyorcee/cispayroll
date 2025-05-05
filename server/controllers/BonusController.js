@@ -9,33 +9,80 @@ import mongoose from "mongoose";
  * Different handling for admin and regular user
  */
 const createPersonalBonus = asyncHandler(async (req, res) => {
-  const { amount, reason, paymentDate } = req.body;
+  const { amount, reason, paymentDate, type } = req.body;
   const userId = req.user._id;
+  const userRole = req.user.role;
+  const userPosition = req.user.position?.toLowerCase() || "";
 
   if (!amount || !reason || !paymentDate) {
     throw new ApiError(400, "Amount, reason, and payment date are required");
   }
 
   try {
+    // Check if user is HR Manager by department and position
+    const hrDepartment = await Department.findOne({
+      name: { $in: ["Human Resources", "HR"] },
+      status: "active",
+    });
+    const isHRManager =
+      hrDepartment &&
+      userRole === "ADMIN" &&
+      hrDepartment._id.toString() === req.user.department.toString() &&
+      [
+        "hr manager",
+        "head of hr",
+        "hr head",
+        "head of human resources",
+        "human resources manager",
+        "hr director",
+      ].some((pos) => userPosition.includes(pos));
+
+    // If user is HR or super admin, auto-approve the bonus
+    const isAutoApproved = userRole === "SUPER_ADMIN" || isHRManager;
+
     const bonus = await Bonus.create({
       employee: userId,
-      type: BonusType.PERSONAL,
+      type: type || BonusType.PERSONAL,
       amount,
       reason,
       paymentDate: new Date(paymentDate),
+      department: req.user.department,
+      approvalStatus: isAutoApproved
+        ? ApprovalStatus.APPROVED
+        : ApprovalStatus.PENDING,
+      approvedBy: isAutoApproved ? userId : null,
+      approvedAt: isAutoApproved ? new Date() : null,
       createdBy: userId,
       updatedBy: userId,
     });
 
+    // If auto-approved, add to employee's personalBonuses
+    if (isAutoApproved) {
+      const personalBonus = {
+        bonusId: bonus._id,
+        status: "APPROVED",
+        usedInPayroll: {
+          month: null,
+          year: null,
+          payrollId: null,
+        },
+      };
+      await User.findByIdAndUpdate(userId, {
+        $push: { personalBonuses: personalBonus },
+      });
+    }
+
     // Log only after successful creation
     console.log(
-      `[BONUS REQUEST SUCCESS] User ${userId} created a personal bonus request for amount ${amount}`
+      `[BONUS REQUEST SUCCESS] User ${userId} created a personal bonus request for amount ${amount} with status ${bonus.approvalStatus}`
     );
 
     return res.status(201).json({
       success: true,
       data: bonus,
-      message: "Personal bonus request created successfully",
+      message: isAutoApproved
+        ? "Personal bonus created and auto-approved successfully"
+        : "Personal bonus request created successfully and is pending approval",
     });
   } catch (error) {
     console.error(
@@ -61,8 +108,26 @@ const getBonusRequests = asyncHandler(async (req, res) => {
   } = req.query;
   const userId = req.user._id;
   const isAdmin = req.user.role === "SUPER_ADMIN" || req.user.role === "ADMIN";
-  const isHRManager = req.user.role === "HR_MANAGER";
-  const isDepartmentHead = req.user.role === "DEPARTMENT_HEAD";
+  const userPosition = req.user.position?.toLowerCase() || "";
+  const userDepartment = req.user.department;
+
+  // Check if user is HR Manager by department and position
+  const isHRManager =
+    userDepartment?.name?.toLowerCase() === "human resources" &&
+    req.user.role === "ADMIN" &&
+    [
+      "hr manager",
+      "head of hr",
+      "hr head",
+      "head of human resources",
+      "human resources manager",
+      "hr director",
+    ].some((pos) => userPosition.toLowerCase().includes(pos));
+
+  // Check if user is a Department Head
+  const isDepartmentHead = await Department.findOne({
+    headOfDepartment: userId,
+  });
 
   // Build query based on user role and filters
   const query = {};
@@ -73,19 +138,19 @@ const getBonusRequests = asyncHandler(async (req, res) => {
   }
   // Department heads can see requests from their department
   else if (isDepartmentHead) {
-    const userDepartment = await User.findById(userId).select("department");
-    query.department = userDepartment.department;
+    query.department = isDepartmentHead._id;
   }
-  // Admins and HR managers can see all requests with filters
-  else if (req.user.role === "ADMIN") {
-    // Restrict to admin's department by default
-    const adminDepartment = req.user.department;
-    query.department = adminDepartment;
-    // Allow further filtering if provided
+  // HR managers and super admins can see all requests
+  else if (isHRManager || req.user.role === "SUPER_ADMIN") {
+    // Allow all requests to be visible
     if (employeeId) query.employee = employeeId;
     if (departmentId) query.department = departmentId;
-  } else {
-    // For super admin and HR managers, allow all
+  }
+  // Regular admins can see requests from their department
+  else if (req.user.role === "ADMIN") {
+    // Restrict to admin's department by default
+    query.department = userDepartment._id;
+    // Allow further filtering if provided
     if (employeeId) query.employee = employeeId;
     if (departmentId) query.department = departmentId;
   }
@@ -138,7 +203,7 @@ const getBonusRequests = asyncHandler(async (req, res) => {
 
   const bonuses = await Bonus.find(query)
     .populate("employee", "firstName lastName email")
-    .populate("department", "name")
+    .populate("department", "name code")
     .populate("approvedBy", "fullName")
     .sort({ createdAt: -1 })
     .skip(skip)
@@ -169,9 +234,6 @@ const getBonusRequests = asyncHandler(async (req, res) => {
   });
 });
 
-/**
- * Get a single bonus request by ID
- */
 /**
  * Get a single bonus request by ID
  */
@@ -256,18 +318,33 @@ const approveBonusRequest = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { comment } = req.body;
   const userId = req.user._id;
-  const isAdmin = req.user.role === "SUPER_ADMIN" || req.user.role === "ADMIN";
-  const isHRManager = req.user.role === "HR_MANAGER";
+  const userRole = req.user.role;
+  const userPosition = req.user.position?.toLowerCase() || "";
+  const isSuperAdmin = userRole === "SUPER_ADMIN";
+  const isDepartmentHead = userRole === "ADMIN";
 
-  // Only admins and HR managers can approve bonus requests
-  if (!isAdmin && !isHRManager) {
-    throw new ApiError(
-      403,
-      "You don't have permission to approve bonus requests"
-    );
-  }
+  // Check if user is HR Manager by department and position
+  const hrDepartment = await Department.findOne({
+    name: { $in: ["Human Resources", "HR"] },
+    status: "active",
+  });
+  const isHRManager =
+    hrDepartment &&
+    userRole === "ADMIN" &&
+    hrDepartment._id.toString() === req.user.department.toString() &&
+    [
+      "hr manager",
+      "head of hr",
+      "hr head",
+      "head of human resources",
+      "human resources manager",
+      "hr director",
+    ].some((pos) => userPosition.includes(pos));
 
-  const bonus = await Bonus.findById(id);
+  const bonus = await Bonus.findById(id)
+    .populate("employee", "department")
+    .populate("department", "headOfDepartment");
+
   if (!bonus) {
     throw new ApiError(404, "Bonus request not found");
   }
@@ -277,6 +354,28 @@ const approveBonusRequest = asyncHandler(async (req, res) => {
     throw new ApiError(400, `Bonus request is already ${bonus.approvalStatus}`);
   }
 
+  // Check permissions
+  if (!isSuperAdmin && !isHRManager && !isDepartmentHead) {
+    throw new ApiError(
+      403,
+      "You don't have permission to approve bonus requests"
+    );
+  }
+
+  // If department head, check if the bonus is for an employee in their department
+  if (isDepartmentHead && !isHRManager) {
+    const department = await Department.findOne({ headOfDepartment: userId });
+    if (
+      !department ||
+      department._id.toString() !== bonus.employee.department.toString()
+    ) {
+      throw new ApiError(
+        403,
+        "You can only approve bonuses for employees in your department"
+      );
+    }
+  }
+
   // Update bonus status
   bonus.approvalStatus = ApprovalStatus.APPROVED;
   bonus.approvedBy = userId;
@@ -284,11 +383,7 @@ const approveBonusRequest = asyncHandler(async (req, res) => {
   bonus.updatedBy = userId;
   await bonus.save();
 
-  // Add to employee's personalBonuses array
-  await User.findByIdAndUpdate(bonus.employee, {
-    $pull: { personalBonuses: { bonusId: bonus._id } }, // Remove if exists
-  });
-
+  // Add to employee's personalBonuses array with correct structure
   const personalBonus = {
     bonusId: bonus._id,
     status: "APPROVED",
@@ -317,18 +412,33 @@ const rejectBonusRequest = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { comment } = req.body;
   const userId = req.user._id;
-  const isAdmin = req.user.role === "SUPER_ADMIN" || req.user.role === "ADMIN";
-  const isHRManager = req.user.role === "HR_MANAGER";
+  const userRole = req.user.role;
+  const userPosition = req.user.position?.toLowerCase() || "";
+  const isSuperAdmin = userRole === "SUPER_ADMIN";
+  const isDepartmentHead = userRole === "ADMIN";
 
-  // Only admins and HR managers can reject bonus requests
-  if (!isAdmin && !isHRManager) {
-    throw new ApiError(
-      403,
-      "You don't have permission to reject bonus requests"
-    );
-  }
+  // Check if user is HR Manager by department and position
+  const hrDepartment = await Department.findOne({
+    name: { $in: ["Human Resources", "HR"] },
+    status: "active",
+  });
+  const isHRManager =
+    hrDepartment &&
+    userRole === "ADMIN" &&
+    hrDepartment._id.toString() === req.user.department.toString() &&
+    [
+      "hr manager",
+      "head of hr",
+      "hr head",
+      "head of human resources",
+      "human resources manager",
+      "hr director",
+    ].some((pos) => userPosition.includes(pos));
 
-  const bonus = await Bonus.findById(id);
+  const bonus = await Bonus.findById(id)
+    .populate("employee", "department")
+    .populate("department", "headOfDepartment");
+
   if (!bonus) {
     throw new ApiError(404, "Bonus request not found");
   }
@@ -338,11 +448,34 @@ const rejectBonusRequest = asyncHandler(async (req, res) => {
     throw new ApiError(400, `Bonus request is already ${bonus.approvalStatus}`);
   }
 
+  // Check permissions
+  if (!isSuperAdmin && !isHRManager && !isDepartmentHead) {
+    throw new ApiError(
+      403,
+      "You don't have permission to reject bonus requests"
+    );
+  }
+
+  // If department head, check if the bonus is for an employee in their department
+  if (isDepartmentHead && !isHRManager) {
+    const department = await Department.findOne({ headOfDepartment: userId });
+    if (
+      !department ||
+      department._id.toString() !== bonus.employee.department.toString()
+    ) {
+      throw new ApiError(
+        403,
+        "You can only reject bonuses for employees in your department"
+      );
+    }
+  }
+
   // Update bonus status
   bonus.approvalStatus = ApprovalStatus.REJECTED;
   bonus.approvedBy = userId;
   bonus.approvedAt = new Date();
   bonus.updatedBy = userId;
+  bonus.rejectionComment = comment;
   await bonus.save();
 
   return res.status(200).json({
@@ -620,6 +753,47 @@ const createDepartmentWideBonus = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * Get personal bonuses for the logged-in user
+ * This function is specifically for the MyBonus page
+ * It only returns bonuses where the user is the employee
+ */
+const getMyBonuses = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  try {
+    const [bonuses, total] = await Promise.all([
+      Bonus.find({ employee: userId })
+        .sort({ createdAt: -1 })
+        .populate("employee", "firstName lastName")
+        .populate("department", "name")
+        .skip(skip)
+        .limit(limit),
+      Bonus.countDocuments({ employee: userId }),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        bonuses,
+        pagination: {
+          total,
+          page,
+          limit,
+          pages: Math.ceil(total / limit),
+        },
+      },
+      message: "Personal bonuses retrieved successfully",
+    });
+  } catch (error) {
+    console.error(`[GET MY BONUSES FAILED] User ${userId}: ${error.message}`);
+    throw new ApiError(500, "Failed to retrieve personal bonuses");
+  }
+});
+
 export {
   createPersonalBonus,
   getBonusRequests,
@@ -629,4 +803,5 @@ export {
   deleteBonusRequest,
   createDepartmentEmployeeBonus,
   createDepartmentWideBonus,
+  getMyBonuses,
 };

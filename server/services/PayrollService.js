@@ -12,6 +12,8 @@ import { BonusService } from "./BonusService.js";
 import { SalaryStructureService } from "./SalaryStructureService.js";
 import DepartmentModel from "../models/Department.js";
 import Audit from "../models/Audit.js";
+import Allowance from "../models/Allowance.js";
+import Bonus from "../models/Bonus.js";
 
 const asObjectId = (id) => new Types.ObjectId(id);
 
@@ -587,134 +589,71 @@ export class PayrollService {
     return { startDate, endDate };
   }
 
-  static async markAllowancesAsUsed(
-    userId,
-    allowanceIds,
-    payrollId,
-    month,
-    year
-  ) {
+  static async markAllowancesAndBonusesAsUsed(userId, payrollId, month, year) {
     try {
-      console.log("🔔 [markAllowancesAsUsed] STARTED with:", {
+      console.log("🔍 Starting to mark items as used for:", {
         userId,
-        allowanceIds,
-        payrollId,
         month,
         year,
       });
 
-      // BEFORE: Fetch and log current state
-      const userBefore = await UserModel.findById(userId).lean();
-      console.log("BEFORE update:");
-      allowanceIds.forEach((id) => {
-        console.log(
-          `Allowance ${id}:`,
-          userBefore.personalAllowances?.find(
-            (a) => a.allowanceId.toString() === id
-          )?.usedInPayroll
-        );
+      // Get all allowances and bonuses used in this payroll
+      const user = await UserModel.findById(userId)
+        .select("personalAllowances personalBonuses")
+        .lean();
+
+      const allowanceIds = user.personalAllowances
+        .filter((a) => a.status === "APPROVED")
+        .map((a) => a.allowanceId);
+
+      const bonusIds = user.personalBonuses
+        .filter((b) => b.status === "APPROVED")
+        .map((b) => b.bonusId);
+
+      console.log("📌 Items to mark as used:", {
+        allowanceCount: allowanceIds.length,
+        bonusCount: bonusIds.length,
       });
 
-      // Update only the specified allowances using arrayFilters
-      const update = {};
-      const arrayFilters = [];
-
-      allowanceIds.forEach((id, index) => {
-        update[`personalAllowances.$[a${index}].usedInPayroll`] = {
-          month,
-          year,
-          payrollId,
-        };
-        arrayFilters.push({
-          [`a${index}.allowanceId`]: new Types.ObjectId(id),
-        });
-      });
-
-      const result = await UserModel.updateOne(
-        { _id: userId },
-        { $set: update },
-        { arrayFilters, strict: false }
+      // Update main collections
+      await Allowance.updateMany(
+        { _id: { $in: allowanceIds } },
+        {
+          $set: {
+            usedInPayroll: { month, year, payrollId },
+          },
+        }
       );
-      console.log("Update result:", result);
 
-      // AFTER: Fetch and log new state
-      const userAfter = await UserModel.findById(userId).lean();
-      console.log("AFTER update:");
-      allowanceIds.forEach((id) => {
-        console.log(
-          `Allowance ${id}:`,
-          userAfter.personalAllowances?.find(
-            (a) => a.allowanceId.toString() === id
-          )?.usedInPayroll
-        );
-      });
+      await Bonus.updateMany(
+        { _id: { $in: bonusIds } },
+        {
+          $set: {
+            usedInPayroll: { month, year, payrollId },
+          },
+        }
+      );
 
-      console.log("✅ Allowances marked successfully");
+      console.log("✅ Successfully marked items as used in main collections");
+
+      // Update user's personal arrays
+      await UserModel.updateOne(
+        { _id: userId },
+        {
+          $set: {
+            "personalAllowances.$[].usedInPayroll": { month, year, payrollId },
+            "personalBonuses.$[].usedInPayroll": { month, year, payrollId },
+          },
+        }
+      );
+
+      console.log(
+        "✅ Successfully marked items as used in user's personal arrays"
+      );
+
       return true;
     } catch (error) {
-      console.error("❌ Error marking allowances as used:", error);
-      throw error;
-    }
-  }
-
-  static async markBonusesAsUsed(userId, bonusIds, payrollId, month, year) {
-    try {
-      console.log("🔔 [markBonusesAsUsed] STARTED with:", {
-        userId,
-        bonusIds,
-        payrollId,
-        month,
-        year,
-      });
-
-      // BEFORE: Fetch and log current state
-      const userBefore = await UserModel.findById(userId).lean();
-      console.log("BEFORE update:");
-      bonusIds.forEach((id) => {
-        console.log(
-          `Bonus ${id}:`,
-          userBefore.personalBonuses?.find((b) => b.bonusId.toString() === id)
-            ?.usedInPayroll
-        );
-      });
-
-      // Update only the specified bonuses using arrayFilters
-      const update = {};
-      const arrayFilters = [];
-
-      bonusIds.forEach((id, index) => {
-        update[`personalBonuses.$[b${index}].usedInPayroll`] = {
-          month,
-          year,
-          payrollId,
-        };
-        arrayFilters.push({
-          [`b${index}.bonusId`]: new Types.ObjectId(id),
-        });
-      });
-
-      const result = await UserModel.updateOne(
-        { _id: userId },
-        { $set: update },
-        { arrayFilters, strict: false }
-      );
-      console.log("Update result:", result);
-
-      // AFTER: Fetch and log new state
-      const userAfter = await UserModel.findById(userId).lean();
-      console.log("AFTER update:");
-      bonusIds.forEach((id) => {
-        console.log(
-          `Bonus ${id}:`,
-          userAfter.personalBonuses?.find((b) => b.bonusId.toString() === id)
-            ?.usedInPayroll
-        );
-      });
-
-      console.log("✅ Bonuses marked successfully");
-      return true;
-    } catch (error) {
-      console.error("❌ Error marking bonuses as used:", error);
+      console.error("❌ Error marking items as used:", error);
       throw error;
     }
   }
@@ -854,28 +793,26 @@ export class PayrollService {
       console.log("📌 Bonuses to mark:", bonusIds);
 
       if (allowanceIds?.length || bonusIds?.length) {
-        // Log BEFORE state
-        console.log("📋 BEFORE marking:");
-        allowanceIds?.forEach((id) => {
-          const allowance = user.personalAllowances.find(
-            (a) => a.allowanceId.toString() === id
-          );
-          console.log(`Allowance ${id}:`, {
-            status: allowance.status,
-            usedInPayroll: allowance.usedInPayroll,
-          });
-        });
-        bonusIds?.forEach((id) => {
-          const bonus = user.personalBonuses.find(
-            (b) => b.bonusId.toString() === id
-          );
-          console.log(`Bonus ${id}:`, {
-            status: bonus.status,
-            usedInPayroll: bonus.usedInPayroll,
-          });
-        });
+        // Update main collections
+        await Allowance.updateMany(
+          { _id: { $in: allowanceIds } },
+          {
+            $set: {
+              usedInPayroll: { month, year, payrollId: null },
+            },
+          }
+        );
 
-        // Prepare update query
+        await Bonus.updateMany(
+          { _id: { $in: bonusIds } },
+          {
+            $set: {
+              usedInPayroll: { month, year, payrollId: null },
+            },
+          }
+        );
+
+        // Update user's personal arrays
         const update = {};
         const arrayFilters = [];
 
@@ -883,7 +820,7 @@ export class PayrollService {
           update["personalAllowances.$[a].usedInPayroll"] = {
             month,
             year,
-            payrollId: null, // We don't need payrollId for marking
+            payrollId: null,
           };
           arrayFilters.push({
             "a.allowanceId": {
@@ -896,48 +833,18 @@ export class PayrollService {
           update["personalBonuses.$[b].usedInPayroll"] = {
             month,
             year,
-            payrollId: null, // We don't need payrollId for marking
+            payrollId: null,
           };
           arrayFilters.push({
             "b.bonusId": { $in: bonusIds.map((id) => new Types.ObjectId(id)) },
           });
         }
 
-        // Execute update
-        const result = await UserModel.updateOne(
+        await UserModel.updateOne(
           { _id: employeeId },
           { $set: update },
           { arrayFilters, strict: false }
         );
-        console.log("Update result:", result);
-
-        // Log AFTER state
-        const afterUser = await UserModel.findById(employeeId)
-          .select("personalAllowances personalBonuses")
-          .lean();
-        console.log("📋 AFTER marking:");
-        allowanceIds?.forEach((id) => {
-          const allowance = afterUser.personalAllowances.find(
-            (a) => a.allowanceId.toString() === id
-          );
-          console.log(`Allowance ${id}:`, {
-            status: allowance.status,
-            usedInPayroll: allowance.usedInPayroll,
-          });
-        });
-        bonusIds?.forEach((id) => {
-          const bonus = afterUser.personalBonuses.find(
-            (b) => b.bonusId.toString() === id
-          );
-          console.log(`Bonus ${id}:`, {
-            status: bonus.status,
-            usedInPayroll: bonus.usedInPayroll,
-          });
-        });
-
-        console.log("✅ Allowances and bonuses marked successfully");
-      } else {
-        console.log("ℹ️ No allowances or bonuses to mark");
       }
 
       // Calculate deductions
@@ -1367,127 +1274,6 @@ export class PayrollService {
         });
         await payroll.save();
         console.log("✅ Payroll created successfully");
-      }
-
-      // After payroll creation, mark allowances and bonuses as used
-      console.log("🔍 Marking allowances and bonuses as used...");
-
-      // Get the user's current state
-      const user = await UserModel.findById(payrollData.employee)
-        .select("personalAllowances personalBonuses")
-        .lean();
-
-      // Get IDs of allowances and bonuses to mark
-      const allowanceIds = user.personalAllowances
-        ?.filter((a) => {
-          const isApproved = a.status === "APPROVED";
-          const isNotUsed =
-            !a.usedInPayroll ||
-            a.usedInPayroll.month !== payrollData.month ||
-            a.usedInPayroll.year !== payrollData.year;
-          return isApproved && isNotUsed;
-        })
-        .map((a) => a.allowanceId._id.toString());
-
-      const bonusIds = user.personalBonuses
-        ?.filter((b) => {
-          const isApproved = b.status === "APPROVED";
-          const isNotUsed =
-            !b.usedInPayroll ||
-            b.usedInPayroll.month !== payrollData.month ||
-            b.usedInPayroll.year !== payrollData.year;
-          return isApproved && isNotUsed;
-        })
-        .map((b) => b.bonusId._id.toString());
-
-      console.log("📌 Allowances to mark:", allowanceIds);
-      console.log("📌 Bonuses to mark:", bonusIds);
-
-      if (allowanceIds?.length || bonusIds?.length) {
-        // Log BEFORE state
-        console.log("📋 BEFORE marking:");
-        allowanceIds?.forEach((id) => {
-          const allowance = user.personalAllowances.find(
-            (a) => a.allowanceId.toString() === id
-          );
-          console.log(`Allowance ${id}:`, {
-            status: allowance.status,
-            usedInPayroll: allowance.usedInPayroll,
-          });
-        });
-        bonusIds?.forEach((id) => {
-          const bonus = user.personalBonuses.find(
-            (b) => b.bonusId.toString() === id
-          );
-          console.log(`Bonus ${id}:`, {
-            status: bonus.status,
-            usedInPayroll: bonus.usedInPayroll,
-          });
-        });
-
-        // Prepare update query
-        const update = {};
-        const arrayFilters = [];
-
-        if (allowanceIds?.length) {
-          update["personalAllowances.$[a].usedInPayroll"] = {
-            month: payrollData.month,
-            year: payrollData.year,
-            payrollId: null, // We don't need payrollId for marking
-          };
-          arrayFilters.push({
-            "a.allowanceId": {
-              $in: allowanceIds.map((id) => new Types.ObjectId(id)),
-            },
-          });
-        }
-
-        if (bonusIds?.length) {
-          update["personalBonuses.$[b].usedInPayroll"] = {
-            month: payrollData.month,
-            year: payrollData.year,
-            payrollId: null, // We don't need payrollId for marking
-          };
-          arrayFilters.push({
-            "b.bonusId": { $in: bonusIds.map((id) => new Types.ObjectId(id)) },
-          });
-        }
-
-        // Execute update
-        const result = await UserModel.updateOne(
-          { _id: payrollData.employee },
-          { $set: update },
-          { arrayFilters, strict: false }
-        );
-        console.log("Update result:", result);
-
-        // Log AFTER state
-        const afterUser = await UserModel.findById(payrollData.employee)
-          .select("personalAllowances personalBonuses")
-          .lean();
-        console.log("📋 AFTER marking:");
-        allowanceIds?.forEach((id) => {
-          const allowance = afterUser.personalAllowances.find(
-            (a) => a.allowanceId.toString() === id
-          );
-          console.log(`Allowance ${id}:`, {
-            status: allowance.status,
-            usedInPayroll: allowance.usedInPayroll,
-          });
-        });
-        bonusIds?.forEach((id) => {
-          const bonus = afterUser.personalBonuses.find(
-            (b) => b.bonusId.toString() === id
-          );
-          console.log(`Bonus ${id}:`, {
-            status: bonus.status,
-            usedInPayroll: bonus.usedInPayroll,
-          });
-        });
-
-        console.log("✅ Allowances and bonuses marked successfully");
-      } else {
-        console.log("ℹ️ No allowances or bonuses to mark");
       }
 
       return payroll;

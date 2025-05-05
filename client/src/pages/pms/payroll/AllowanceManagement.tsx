@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { departmentService } from "../../../services/departmentService";
 import { employeeService } from "../../../services/employeeService";
 import { allowanceService } from "../../../services/allowanceService";
+import { useAuth } from "../../../context/AuthContext";
 import {
   Allowance,
   AllowanceType,
@@ -59,6 +60,7 @@ interface DepartmentEmployeeResponse {
 }
 
 export default function AllowanceManagement() {
+  const { isSuperAdmin, isAdmin } = useAuth();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingAllowance, setEditingAllowance] = useState<
     Allowance | undefined
@@ -218,6 +220,15 @@ export default function AllowanceManagement() {
     setPage(1);
   }, [filters]);
 
+  // Add effect to log data changes
+  useEffect(() => {
+    console.log("📊 [AllowanceManagement] Current allowance data:", {
+      total: allowanceData?.data?.pagination?.total,
+      allowances: allowanceData?.data?.allowances?.length,
+      isLoading: isAllowancesLoading,
+    });
+  }, [allowanceData, isAllowancesLoading]);
+
   const handleInputChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -282,21 +293,45 @@ export default function AllowanceManagement() {
     e.preventDefault();
     setDeptAllowanceLoading(true);
     try {
-      console.log("Submitting department allowance:", deptAllowanceForm);
+      console.log(
+        "🔵 [AllowanceManagement] Submitting department allowance:",
+        deptAllowanceForm
+      );
       const response = await allowanceService.createDepartmentAllowance(
         deptAllowanceForm
       );
-      console.log("Department allowance response:", response);
-      setShowDeptAllowanceModal(false);
-      queryClient.invalidateQueries({ queryKey: ["allowances"] });
-      toast.success("Department allowance created successfully");
-    } catch (error: any) {
-      console.error("Department allowance error:", error);
-      toast.error(
-        error.response?.data?.message ||
-          error.message ||
-          "Failed to create department allowance"
+      console.log(
+        "✅ [AllowanceManagement] Department allowance created:",
+        response
       );
+      toast.success("Department allowance created successfully!");
+      setShowDeptAllowanceModal(false);
+
+      // Invalidate and refetch allowances
+      console.log("🔄 [AllowanceManagement] Invalidating allowances query...");
+      await queryClient.invalidateQueries({ queryKey: ["allowances"] });
+      const newData = await queryClient.fetchQuery({
+        queryKey: ["allowances", page, limit, filters],
+        queryFn: async () => {
+          const response = await allowanceService.getAllowanceRequests({
+            page,
+            limit,
+            ...filters,
+          });
+          console.log(
+            "✅ [AllowanceManagement] Refetched allowances:",
+            response
+          );
+          return response;
+        },
+      });
+      console.log("✅ [AllowanceManagement] Updated data:", newData);
+    } catch (error) {
+      console.error(
+        "❌ [AllowanceManagement] Error creating department allowance:",
+        error
+      );
+      toast.error("Failed to create department allowance");
     } finally {
       setDeptAllowanceLoading(false);
     }
@@ -306,35 +341,48 @@ export default function AllowanceManagement() {
     e.preventDefault();
     setEmployeeAllowanceLoading(true);
     try {
-      console.log("Submitting employee allowance:", employeeAllowanceForm);
+      console.log(
+        "🔵 [AllowanceManagement] Submitting employee allowance:",
+        employeeAllowanceForm
+      );
       const response = await allowanceService.createDepartmentEmployeeAllowance(
         employeeAllowanceForm
       );
-      console.log("Employee allowance response:", response);
-      setShowEmployeeAllowanceModal(false);
-      queryClient.invalidateQueries({ queryKey: ["allowances"] });
-      toast.success("Employee allowance created successfully");
-    } catch (error: any) {
-      console.error("Employee allowance error:", error);
-      toast.error(
-        error.response?.data?.message ||
-          error.message ||
-          "Failed to create employee allowance"
+      console.log(
+        "✅ [AllowanceManagement] Employee allowance created:",
+        response
       );
+      toast.success("Employee allowance created successfully!");
+      setShowEmployeeAllowanceModal(false);
+
+      // Invalidate and refetch allowances
+      console.log("🔄 [AllowanceManagement] Invalidating allowances query...");
+      await queryClient.invalidateQueries({ queryKey: ["allowances"] });
+      const newData = await queryClient.fetchQuery({
+        queryKey: ["allowances", page, limit, filters],
+        queryFn: async () => {
+          const response = await allowanceService.getAllowanceRequests({
+            page,
+            limit,
+            ...filters,
+          });
+          console.log(
+            "✅ [AllowanceManagement] Refetched allowances:",
+            response
+          );
+          return response;
+        },
+      });
+      console.log("✅ [AllowanceManagement] Updated data:", newData);
+    } catch (error) {
+      console.error(
+        "❌ [AllowanceManagement] Error creating employee allowance:",
+        error
+      );
+      toast.error("Failed to create employee allowance");
     } finally {
       setEmployeeAllowanceLoading(false);
     }
-  };
-
-  // Add these helper functions
-  const isSuperAdmin = () => {
-    // Replace with your actual role check logic
-    return true; // Temporary return for testing
-  };
-
-  const isAdmin = () => {
-    // Replace with your actual role check logic
-    return true; // Temporary return for testing
   };
 
   return (
@@ -617,45 +665,54 @@ export default function AllowanceManagement() {
           </div>
           {allowanceData?.data?.pagination && (
             <div className="flex justify-between items-center mt-4">
-              <div>
-                Page {allowanceData.data.pagination.page} of{" "}
-                {allowanceData.data.pagination.pages}
+              <div className="text-sm text-gray-600">
+                Showing {(page - 1) * limit + 1} to{" "}
+                {Math.min(page * limit, allowanceData.data.pagination.total)} of{" "}
+                {allowanceData.data.pagination.total} allowances
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1 border rounded disabled:opacity-50"
+                  className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-50"
                 >
                   Previous
                 </button>
                 <button
                   onClick={() =>
                     setPage((p) =>
-                      Math.min(allowanceData.data.pagination.pages, p + 1)
+                      Math.min(
+                        Math.ceil(allowanceData.data.pagination.total / limit),
+                        p + 1
+                      )
                     )
                   }
-                  disabled={page === allowanceData.data.pagination.pages}
-                  className="px-3 py-1 border rounded disabled:opacity-50"
+                  disabled={
+                    page >=
+                    Math.ceil(allowanceData.data.pagination.total / limit)
+                  }
+                  className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-50"
                 >
                   Next
                 </button>
               </div>
-              <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Show</span>
                 <select
                   value={limit}
                   onChange={(e) => {
                     setLimit(Number(e.target.value));
                     setPage(1); // Reset to first page on limit change
                   }}
-                  className="border rounded px-2 py-1"
+                  className="border rounded px-2 py-1 text-sm"
                 >
                   {[10, 20, 50, 100].map((size) => (
                     <option key={size} value={size}>
-                      {size} per page
+                      {size}
                     </option>
                   ))}
                 </select>
+                <span className="text-sm text-gray-600">per page</span>
               </div>
             </div>
           )}

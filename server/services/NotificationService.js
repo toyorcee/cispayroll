@@ -1078,6 +1078,23 @@ export class NotificationService {
             leave?.endDate
           )}.`,
         };
+      case NOTIFICATION_TYPES.PAYROLL_COMPLETED: {
+        const recipientId = data.recipientId || data.options?.recipientId;
+        if (recipientId?.toString() === data.employee?._id?.toString()) {
+          return {
+            title: "Payslip Available",
+            message: `Your payslip for ${data.payroll?.month}/${data.payroll?.year} has been generated and sent to your email. You can also view it in your account.`,
+          };
+        }
+        return {
+          title: "Payslip Sent",
+          message: `You have sent a payslip to ${
+            data.employee?.firstName || ""
+          } ${data.employee?.lastName || ""} for ${data.payroll?.month}/${
+            data.payroll?.year
+          }.`,
+        };
+      }
       default:
         return {
           title: "Payroll Notification",

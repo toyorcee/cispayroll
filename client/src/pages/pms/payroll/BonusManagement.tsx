@@ -2,11 +2,13 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { departmentService } from "../../../services/departmentService";
 import { useAuth } from "../../../context/AuthContext";
-import { adminEmployeeService } from "../../../services/adminEmployeeService";
+import {
+  adminEmployeeService,
+  DepartmentEmployeeResponse,
+} from "../../../services/adminEmployeeService";
 import { bonusService } from "../../../services/bonusService";
 import { toast } from "react-toastify";
-import { DepartmentEmployeeResponse } from "../../../services/adminEmployeeService";
-import { Employee } from "../../../types/employee";
+import { IBonus } from "../../../types/payroll";
 
 // Constants from the model
 const BonusType = {
@@ -36,23 +38,6 @@ interface Bonus {
   taxable: boolean;
   createdBy?: string;
   updatedBy?: string;
-}
-
-interface DepartmentEmployee {
-  _id: string;
-  firstName?: string;
-  lastName?: string;
-  fullName?: string;
-  employeeId: string;
-  email?: string;
-}
-
-export interface DepartmentEmployeeListResponse {
-  employees: DepartmentEmployee[];
-  totalPages: number;
-  totalEmployees: number;
-  currentPage: number;
-  success: boolean;
 }
 
 export default function BonusManagement() {
@@ -103,6 +88,11 @@ export default function BonusManagement() {
     startDate: "",
     endDate: "",
   });
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [selectedBonus, setSelectedBonus] = useState<IBonus | null>(null);
+  const [approvalLoading, setApprovalLoading] = useState(false);
+  const [rejectionLoading, setRejectionLoading] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
 
   const { data: departments, isLoading: departmentsLoading } = useQuery({
     queryKey: ["departments"],
@@ -113,10 +103,12 @@ export default function BonusManagement() {
     useQuery<DepartmentEmployeeResponse>({
       queryKey: ["departmentEmployees", employeeBonusForm.departmentId],
       queryFn: async () => {
-        return await adminEmployeeService.getDepartmentEmployees({
+        const response = await adminEmployeeService.getDepartmentEmployees({
           departmentId: employeeBonusForm.departmentId,
           userRole: isSuperAdmin() ? "SUPER_ADMIN" : "ADMIN",
         });
+
+        return response;
       },
       enabled: !!employeeBonusForm.departmentId,
     });
@@ -216,21 +208,14 @@ export default function BonusManagement() {
     >
   ) => {
     const { name, value } = e.target;
-    if (name === "departmentId") {
-      console.log("[EmployeeBonusModal] Department selected:", value);
-    }
+
     setEmployeeBonusForm((prev) => {
       const updated = {
         ...prev,
         [name]: value,
         ...(name === "departmentId" ? { employeeId: "" } : {}),
       };
-      if (name === "departmentId") {
-        console.log(
-          "[EmployeeBonusModal] Updated form after department select:",
-          updated
-        );
-      }
+
       return updated;
     });
   };
@@ -266,6 +251,45 @@ export default function BonusManagement() {
     }
   };
 
+  const handleApproveBonus = async () => {
+    if (!selectedBonus) return;
+    setApprovalLoading(true);
+    try {
+      await bonusService.approveBonusRequest(selectedBonus._id);
+      toast.success("Bonus approved successfully!");
+      await queryClient.invalidateQueries({ queryKey: ["bonusRequests"] });
+      setShowApprovalModal(false);
+      setSelectedBonus(null);
+    } catch (err) {
+      console.error("[Approve Bonus] API error:", err);
+      toast.error("Failed to approve bonus");
+    } finally {
+      setApprovalLoading(false);
+    }
+  };
+
+  const handleRejectBonus = async () => {
+    if (!selectedBonus) return;
+    if (!rejectionReason.trim()) {
+      toast.error("Please provide a reason for rejection");
+      return;
+    }
+    setRejectionLoading(true);
+    try {
+      await bonusService.rejectBonusRequest(selectedBonus._id, rejectionReason);
+      toast.success("Bonus rejected successfully!");
+      await queryClient.invalidateQueries({ queryKey: ["bonusRequests"] });
+      setShowApprovalModal(false);
+      setSelectedBonus(null);
+      setRejectionReason("");
+    } catch (err) {
+      console.error("[Reject Bonus] API error:", err);
+      toast.error("Failed to reject bonus");
+    } finally {
+      setRejectionLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Section with Stats */}
@@ -282,7 +306,7 @@ export default function BonusManagement() {
           </h3>
           <p className="mt-2 text-3xl font-semibold text-yellow-600">
             {bonusRequests?.data?.bonuses?.filter(
-              (bonus) => bonus.approvalStatus === "pending"
+              (bonus: IBonus) => bonus.approvalStatus === "pending"
             ).length || 0}
           </p>
         </div>
@@ -292,7 +316,7 @@ export default function BonusManagement() {
           </h3>
           <p className="mt-2 text-3xl font-semibold text-green-600">
             {bonusRequests?.data?.bonuses?.filter(
-              (bonus) => bonus.approvalStatus === "approved"
+              (bonus: IBonus) => bonus.approvalStatus === "approved"
             ).length || 0}
           </p>
         </div>
@@ -301,7 +325,10 @@ export default function BonusManagement() {
           <p className="mt-2 text-3xl font-semibold text-purple-600">
             ₦
             {bonusRequests?.data?.bonuses
-              ?.reduce((sum, bonus) => sum + (bonus.amount || 0), 0)
+              ?.reduce(
+                (sum: number, bonus: IBonus) => sum + (bonus.amount || 0),
+                0
+              )
               .toLocaleString() || 0}
           </p>
         </div>
@@ -457,8 +484,15 @@ export default function BonusManagement() {
                     </td>
                   </tr>
                 ) : (
-                  bonusRequests.data.bonuses.map((bonus) => (
-                    <tr key={bonus._id}>
+                  bonusRequests.data.bonuses.map((bonus: IBonus) => (
+                    <tr
+                      key={bonus._id}
+                      onClick={() => {
+                        setSelectedBonus(bonus);
+                        setShowApprovalModal(true);
+                      }}
+                      className="cursor-pointer hover:bg-gray-50"
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
                           {typeof bonus.employee === "object" &&
@@ -955,11 +989,10 @@ export default function BonusManagement() {
                         ? "Loading employees..."
                         : "Select Employee"}
                     </option>
-                    {employeeList?.data?.map((emp: Employee) => (
+                    {employeeList?.data?.map((emp) => (
                       <option key={emp._id} value={emp._id}>
-                        {emp.fullName
-                          ? emp.fullName
-                          : `${emp.firstName || ""} ${emp.lastName || ""}`}{" "}
+                        {emp.fullName ||
+                          `${emp.firstName || ""} ${emp.lastName || ""}`}{" "}
                         ({emp.employeeId})
                       </option>
                     ))}
@@ -1067,6 +1100,167 @@ export default function BonusManagement() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showApprovalModal && selectedBonus && (
+        <div
+          className="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => {
+            setShowApprovalModal(false);
+            setSelectedBonus(null);
+            setRejectionReason("");
+          }}
+        >
+          <div
+            className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {selectedBonus.approvalStatus === "pending"
+                  ? "Approve/Reject Bonus"
+                  : "Bonus Details"}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowApprovalModal(false);
+                  setSelectedBonus(null);
+                  setRejectionReason("");
+                }}
+                className="text-gray-400 hover:text-gray-500 p-2 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-medium text-gray-700">Employee</h4>
+                <p className="mt-1 text-sm text-gray-900">
+                  {typeof selectedBonus.employee === "object" &&
+                  selectedBonus.employee !== null
+                    ? (selectedBonus.employee as any).fullName ||
+                      ((selectedBonus.employee as any).firstName &&
+                      (selectedBonus.employee as any).lastName
+                        ? `${(selectedBonus.employee as any).firstName} ${
+                            (selectedBonus.employee as any).lastName
+                          }`
+                        : (selectedBonus.employee as any).email || "-")
+                    : selectedBonus.employee || "-"}
+                </p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-medium text-gray-700">Amount</h4>
+                <p className="mt-1 text-sm text-gray-900">
+                  ₦{selectedBonus.amount?.toLocaleString()}
+                </p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-medium text-gray-700">Type</h4>
+                <p className="mt-1 text-sm text-gray-900">
+                  {selectedBonus.type}
+                </p>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-medium text-gray-700">
+                  Payment Date
+                </h4>
+                <p className="mt-1 text-sm text-gray-900">
+                  {selectedBonus.paymentDate
+                    ? new Date(selectedBonus.paymentDate).toLocaleDateString()
+                    : "-"}
+                </p>
+              </div>
+
+              {selectedBonus.approvalStatus === "pending" && (
+                <>
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700">
+                      Reason for Rejection
+                    </h4>
+                    <textarea
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
+                      rows={3}
+                      placeholder="Enter reason for rejection (required for rejection)"
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-3 mt-6">
+                    <button
+                      onClick={handleApproveBonus}
+                      disabled={approvalLoading || rejectionLoading}
+                      className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    >
+                      {approvalLoading ? (
+                        <span className="flex items-center">
+                          <svg
+                            className="animate-spin h-4 w-4 mr-2"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                              fill="none"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8v8z"
+                            />
+                          </svg>
+                          Approving...
+                        </span>
+                      ) : (
+                        "Approve"
+                      )}
+                    </button>
+                    <button
+                      onClick={handleRejectBonus}
+                      disabled={approvalLoading || rejectionLoading}
+                      className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      {rejectionLoading ? (
+                        <span className="flex items-center">
+                          <svg
+                            className="animate-spin h-4 w-4 mr-2"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                              fill="none"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8v8z"
+                            />
+                          </svg>
+                          Rejecting...
+                        </span>
+                      ) : (
+                        "Reject"
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}

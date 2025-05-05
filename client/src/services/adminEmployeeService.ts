@@ -10,15 +10,17 @@ const isSuperAdmin = (userRole?: string): boolean => {
   return userRole === UserRole.SUPER_ADMIN;
 };
 
+export interface DepartmentEmployee {
+  _id: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  employeeId: string;
+  email?: string;
+}
+
 export interface DepartmentEmployeeResponse {
-  success: boolean;
-  data: Employee[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    [key: string]: any;
-  };
+  data: DepartmentEmployee[];
 }
 
 export const adminEmployeeService = {
@@ -37,14 +39,9 @@ export const adminEmployeeService = {
         ? `${SUPER_ADMIN_BASE_URL}/departments/${data.departmentId}/employees`
         : `${BASE_URL}/departments/${data.departmentId}/employees`;
 
-      console.log("🚀 Making request to endpoint:", endpoint);
-      console.log("🔍 Request data:", data);
-
       const response = await axios.get(endpoint, {
         withCredentials: true,
       });
-
-      console.log("✅ Response received:", response.data);
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to fetch employees");

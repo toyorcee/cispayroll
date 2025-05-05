@@ -15,8 +15,6 @@ import {
   Alert,
   Grid,
   Paper,
-  IconButton,
-  Tooltip,
   TableContainer,
   Table,
   TableHead,
@@ -24,15 +22,13 @@ import {
   TableRow,
   TableCell,
   Chip,
-  Tabs,
-  Tab,
+  Pagination,
 } from "@mui/material";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { bonusService, BonusResponse } from "../../../services/bonusService";
 import { toast } from "react-toastify";
-import DeleteIcon from "@mui/icons-material/Delete";
 
 // Define bonus types
 const BONUS_TYPES = [
@@ -66,34 +62,10 @@ interface CreatePersonalBonusData {
   type: string;
 }
 
-// Add TabPanel interface and component
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`bonus-tabpanel-${index}`}
-      aria-labelledby={`bonus-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
-    </div>
-  );
-}
-
 const MyBonus: React.FC = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [openTypeDialog, setOpenTypeDialog] = useState(false);
   const [selectedType, setSelectedType] = useState<string | null>(null);
-  const [tabValue, setTabValue] = useState(0);
   const [formData, setFormData] = useState({
     amount: "",
     reason: "",
@@ -101,19 +73,22 @@ const MyBonus: React.FC = () => {
     type: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [bonusToDelete, setBonusToDelete] = useState<string | null>(null);
   const [bonuses, setBonuses] = useState<BonusResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0,
+  });
 
-  const fetchBonuses = async () => {
+  const fetchBonuses = async (page: number = 1) => {
     try {
       setLoading(true);
-      const response = await bonusService.getMyBonuses({
-        includeInactive: tabValue === 1,
-      });
+      const response = await bonusService.getMyBonuses(page, pagination.limit);
       setBonuses(response.data.bonuses);
+      setPagination(response.data.pagination);
       setError(null);
     } catch (err) {
       setError("Failed to fetch bonuses");
@@ -125,10 +100,13 @@ const MyBonus: React.FC = () => {
 
   useEffect(() => {
     fetchBonuses();
-  }, [tabValue]);
+  }, []);
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
+  const handlePageChange = (
+    _event: React.ChangeEvent<unknown>,
+    newPage: number
+  ) => {
+    fetchBonuses(newPage);
   };
 
   const createBonusMutation = useMutation({
@@ -144,21 +122,6 @@ const MyBonus: React.FC = () => {
     onError: (error: any) => {
       toast.error(
         error.response?.data?.message || "Failed to create bonus request"
-      );
-    },
-  });
-
-  const deleteBonusMutation = useMutation({
-    mutationFn: (id: string) => bonusService.deleteBonus(id),
-    onSuccess: () => {
-      toast.success("Bonus request deleted successfully!");
-      setDeleteDialogOpen(false);
-      setBonusToDelete(null);
-      fetchBonuses();
-    },
-    onError: (error: any) => {
-      toast.error(
-        error.response?.data?.message || "Failed to delete bonus request"
       );
     },
   });
@@ -226,22 +189,6 @@ const MyBonus: React.FC = () => {
     setOpenDialog(true);
   };
 
-  const handleDeleteClick = (id: string) => {
-    setBonusToDelete(id);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleConfirmDelete = () => {
-    if (bonusToDelete) {
-      deleteBonusMutation.mutate(bonusToDelete);
-    }
-  };
-
-  const handleCancelDelete = () => {
-    setDeleteDialogOpen(false);
-    setBonusToDelete(null);
-  };
-
   if (loading) {
     return (
       <Box
@@ -271,17 +218,6 @@ const MyBonus: React.FC = () => {
 
       <Card>
         <CardContent>
-          <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-            <Tabs
-              value={tabValue}
-              onChange={handleTabChange}
-              aria-label="bonus tabs"
-            >
-              <Tab label="Active Bonuses" />
-              <Tab label="Bonus History" />
-            </Tabs>
-          </Box>
-
           {loading ? (
             <Box
               display="flex"
@@ -295,149 +231,72 @@ const MyBonus: React.FC = () => {
             <Alert severity="error">{error}</Alert>
           ) : (
             <>
-              <TabPanel value={tabValue} index={0}>
-                <Typography variant="h6" className="mb-4">
-                  Active Bonuses
-                </Typography>
-                <TableContainer component={Paper}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Type</TableCell>
-                        <TableCell>Reason</TableCell>
-                        <TableCell>Amount</TableCell>
-                        <TableCell>Payment Date</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell>Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {bonuses.length > 0 ? (
-                        bonuses.map((bonus) => (
-                          <TableRow key={bonus._id}>
-                            <TableCell>{bonus.type}</TableCell>
-                            <TableCell>{bonus.reason}</TableCell>
-                            <TableCell>
-                              ₦{bonus.amount.toLocaleString()}
-                            </TableCell>
-                            <TableCell>
-                              {new Date(bonus.paymentDate).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell>
-                              <Chip
-                                label={bonus.approvalStatus}
-                                color={
-                                  bonus.approvalStatus.toLowerCase() ===
-                                  "approved"
-                                    ? "success"
-                                    : bonus.approvalStatus.toLowerCase() ===
-                                      "pending"
-                                    ? "warning"
-                                    : "error"
-                                }
-                                size="small"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {bonus.approvalStatus.toLowerCase() ===
-                                "pending" && (
-                                <Tooltip title="Delete request">
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => handleDeleteClick(bonus._id)}
-                                  >
-                                    <DeleteIcon />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={6} align="center">
-                            <Typography color="textSecondary">
-                              No active bonuses found
-                            </Typography>
+              <Typography variant="h6" className="mb-4">
+                My Bonuses
+              </Typography>
+              <TableContainer component={Paper}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Type</TableCell>
+                      <TableCell>Reason</TableCell>
+                      <TableCell>Amount</TableCell>
+                      <TableCell>Payment Date</TableCell>
+                      <TableCell>Status</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {bonuses.length > 0 ? (
+                      bonuses.map((bonus) => (
+                        <TableRow key={bonus._id}>
+                          <TableCell>{bonus.type}</TableCell>
+                          <TableCell>{bonus.reason}</TableCell>
+                          <TableCell>
+                            ₦{bonus.amount.toLocaleString()}
+                          </TableCell>
+                          <TableCell>
+                            {new Date(bonus.paymentDate).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={bonus.approvalStatus}
+                              color={
+                                bonus.approvalStatus.toLowerCase() ===
+                                "approved"
+                                  ? "success"
+                                  : bonus.approvalStatus.toLowerCase() ===
+                                    "pending"
+                                  ? "warning"
+                                  : "error"
+                              }
+                              size="small"
+                            />
                           </TableCell>
                         </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </TabPanel>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={5} align="center">
+                          <Typography color="textSecondary">
+                            No bonuses found
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
 
-              <TabPanel value={tabValue} index={1}>
-                <Typography variant="h6" className="mb-4">
-                  Bonus History
-                </Typography>
-                <TableContainer component={Paper}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Type</TableCell>
-                        <TableCell>Reason</TableCell>
-                        <TableCell>Amount</TableCell>
-                        <TableCell>Payment Date</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell>Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {bonuses.length > 0 ? (
-                        bonuses.map((bonus) => (
-                          <TableRow key={bonus._id}>
-                            <TableCell>{bonus.type}</TableCell>
-                            <TableCell>{bonus.reason}</TableCell>
-                            <TableCell>
-                              ₦{bonus.amount.toLocaleString()}
-                            </TableCell>
-                            <TableCell>
-                              {new Date(bonus.paymentDate).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell>
-                              <Chip
-                                label={bonus.approvalStatus}
-                                color={
-                                  bonus.approvalStatus.toLowerCase() ===
-                                  "approved"
-                                    ? "success"
-                                    : bonus.approvalStatus.toLowerCase() ===
-                                      "pending"
-                                    ? "warning"
-                                    : "error"
-                                }
-                                size="small"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {bonus.approvalStatus.toLowerCase() ===
-                                "pending" && (
-                                <Tooltip title="Delete request">
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => handleDeleteClick(bonus._id)}
-                                  >
-                                    <DeleteIcon />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={6} align="center">
-                            <Typography color="textSecondary">
-                              No bonus history found
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </TabPanel>
+              {pagination.pages > 1 && (
+                <Box display="flex" justifyContent="center" mt={2}>
+                  <Pagination
+                    count={pagination.pages}
+                    page={pagination.page}
+                    onChange={handlePageChange}
+                    color="primary"
+                  />
+                </Box>
+              )}
             </>
           )}
         </CardContent>
@@ -592,36 +451,6 @@ const MyBonus: React.FC = () => {
             disabled={createBonusMutation.isPending}
           >
             {createBonusMutation.isPending ? "Submitting..." : "Submit Request"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={handleCancelDelete}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle className="text-gray-800">
-          Delete Bonus Request
-        </DialogTitle>
-        <DialogContent>
-          <Typography className="text-gray-600">
-            Are you sure you want to delete this bonus request? This action
-            cannot be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCancelDelete} className="text-gray-600">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirmDelete}
-            className="bg-red-600 hover:bg-red-700 text-white"
-            disabled={deleteBonusMutation.isPending}
-          >
-            {deleteBonusMutation.isPending ? "Deleting..." : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>

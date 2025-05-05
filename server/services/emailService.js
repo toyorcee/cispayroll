@@ -665,6 +665,7 @@ export class EmailService {
     try {
       const {
         employee,
+        department,
         month,
         year,
         basicSalary,
@@ -674,6 +675,26 @@ export class EmailService {
       } = payslipData;
 
       const pdfContent = Buffer.from(pdfBuffer);
+
+      // Merge and deduplicate bonuses
+      const allBonuses = [
+        ...(earnings?.bonus || []),
+        ...(payslipData.personalBonuses || []),
+      ];
+      const uniqueBonuses = [];
+      const seenBonusDescriptions = new Set();
+      allBonuses.forEach((bonus) => {
+        if (!seenBonusDescriptions.has(bonus.description)) {
+          uniqueBonuses.push(bonus);
+          seenBonusDescriptions.add(bonus.description);
+        }
+      });
+
+      // Merge all allowances
+      const allAllowances = [
+        ...(payslipData.gradeAllowances || []),
+        ...(payslipData.additionalAllowances || []),
+      ];
 
       const html = `
         <!DOCTYPE html>
@@ -794,9 +815,7 @@ export class EmailService {
               
               <div class="payslip-details">
                 <p><strong>Employee ID:</strong> ${employee?.employeeId}</p>
-                <p><strong>Department:</strong> ${
-                  employee?.department?.name || "N/A"
-                }</p>
+                <p><strong>Department:</strong> ${department?.name || "N/A"}</p>
                 <p><strong>Position:</strong> ${employee?.position || "N/A"}</p>
                 <p><strong>Period:</strong> ${month} ${year}</p>
               </div>
@@ -825,12 +844,24 @@ export class EmailService {
                       : ""
                   }
                   ${
-                    earnings?.bonus
-                      ?.map(
+                    uniqueBonuses
+                      .map(
                         (bonus) => `
                   <tr>
                     <td>${bonus.description}</td>
                     <td class="earnings">₦${bonus.amount.toFixed(2)}</td>
+                  </tr>
+                `
+                      )
+                      .join("") || ""
+                  }
+                  ${
+                    allAllowances
+                      .map(
+                        (allowance) => `
+                  <tr>
+                    <td>${allowance.name}</td>
+                    <td class="earnings">₦${allowance.amount.toFixed(2)}</td>
                   </tr>
                 `
                       )

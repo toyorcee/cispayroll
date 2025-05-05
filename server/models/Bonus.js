@@ -52,6 +52,9 @@ const BonusSchema = new Schema(
       ref: "User",
     },
     approvedAt: Date,
+    rejectionComment: {
+      type: String,
+    },
     department: {
       type: Schema.Types.ObjectId,
       ref: "Department",

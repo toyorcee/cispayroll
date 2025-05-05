@@ -3147,7 +3147,7 @@ export class SuperAdminController {
 
       // Update user's personal allowances array
       await UserModel.findByIdAndUpdate(allowance.employee, {
-        $pull: { personalAllowances: { allowanceId: allowance._id } }, 
+        $pull: { personalAllowances: { allowanceId: allowance._id } },
       });
 
       const personalAllowance = {
@@ -4100,6 +4100,7 @@ export class SuperAdminController {
       // Prepare data for PDF generation
       const pdfData = {
         employee: payroll.employee,
+        department: payroll.department,
         month: payroll.month,
         year: payroll.year,
         basicSalary: payroll.basicSalary,
@@ -4126,6 +4127,9 @@ export class SuperAdminController {
           status: payroll.status,
           paymentDate: payroll.approvalFlow.paidAt || new Date(),
         },
+        gradeAllowances: payroll.allowances?.gradeAllowances || [],
+        additionalAllowances: payroll.allowances?.additionalAllowances || [],
+        personalBonuses: payroll.bonuses?.items || [],
       };
 
       // Generate PDF
@@ -4150,22 +4154,24 @@ export class SuperAdminController {
         },
       });
 
-      // Create notification for employee only
+      // Create notification for employee
       await NotificationService.createNotification(
         payroll.employee._id,
         NOTIFICATION_TYPES.PAYROLL_COMPLETED,
         payroll.employee,
         payroll,
-        "Your payslip has been sent to your email and is available in your account"
+        null,
+        { recipientId: payroll.employee._id }
       );
 
-      // Create notification for the sender only
+      // Create notification for sender (admin)
       await NotificationService.createNotification(
         user._id,
         NOTIFICATION_TYPES.PAYROLL_COMPLETED,
         payroll.employee,
         payroll,
-        `Payslip sent successfully to ${payroll.employee.firstName} ${payroll.employee.lastName}`
+        null,
+        { recipientId: user._id }
       );
 
       return res.status(200).json({

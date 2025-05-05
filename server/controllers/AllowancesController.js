@@ -371,6 +371,104 @@ const createDepartmentEmployeeAllowance = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Create a personal allowance request (for all users)
+ */
+const createPersonalAllowance = asyncHandler(async (req, res) => {
+  const { name, type, amount, description, effectiveDate } = req.body;
+  const userId = req.user._id;
+  const userRole = req.user.role;
+  const userPosition = req.user.position?.toLowerCase() || "";
+
+  if (!name || !type || !amount || !description || !effectiveDate) {
+    throw new ApiError(400, "All required fields must be provided");
+  }
+
+  try {
+    // Check if user is HR Manager by department and position
+    const hrDepartment = await Department.findOne({
+      name: { $in: ["Human Resources", "HR"] },
+      status: "active",
+    });
+    const isHRManager =
+      hrDepartment &&
+      userRole === "ADMIN" &&
+      hrDepartment._id.toString() === req.user.department.toString() &&
+      [
+        "hr manager",
+        "head of hr",
+        "hr head",
+        "head of human resources",
+        "human resources manager",
+        "hr director",
+      ].some((pos) => userPosition.includes(pos));
+
+    // If user is HR or super admin, auto-approve the allowance
+    const isAutoApproved = userRole === "SUPER_ADMIN" || isHRManager;
+
+    // Create the allowance request
+    const allowance = await Allowance.create({
+      name,
+      type,
+      amount: Number(amount),
+      description,
+      reason: description,
+      calculationMethod: "fixed",
+      frequency: "monthly",
+      effectiveDate: new Date(effectiveDate),
+      paymentDate: new Date(effectiveDate),
+      employee: userId,
+      department: req.user.department,
+      scope: "individual",
+      approvalStatus: isAutoApproved ? "approved" : "pending",
+      approvedBy: isAutoApproved ? userId : null,
+      approvedAt: isAutoApproved ? new Date() : null,
+      createdBy: userId,
+      updatedBy: userId,
+    });
+
+    // Log the created allowance
+    console.log(
+      "[PERSONAL ALLOWANCE CREATED]",
+      JSON.stringify(allowance, null, 2)
+    );
+
+    // If auto-approved, add to employee's personalAllowances
+    if (isAutoApproved) {
+      const personalAllowance = {
+        allowanceId: allowance._id,
+        status: "APPROVED",
+        usedInPayroll: {
+          month: null,
+          year: null,
+          payrollId: null,
+        },
+      };
+      await User.findByIdAndUpdate(userId, {
+        $push: { personalAllowances: personalAllowance },
+      });
+    }
+
+    // Log only after successful creation
+    console.log(
+      `[ALLOWANCE REQUEST SUCCESS] User ${userId} created an allowance request for amount ${amount} with status ${allowance.approvalStatus}`
+    );
+
+    return res.status(201).json({
+      success: true,
+      data: allowance,
+      message: isAutoApproved
+        ? "Allowance created and approved successfully"
+        : "Allowance request created successfully and is pending approval",
+    });
+  } catch (error) {
+    console.error(
+      `[ALLOWANCE REQUEST FAILED] User ${userId} failed to create allowance request: ${error.message}`
+    );
+    throw new ApiError(500, "Failed to create allowance request");
+  }
+});
+
+/**
  * Get all allowance requests with filtering options
  */
 const getAllowanceRequests = asyncHandler(async (req, res) => {
@@ -388,10 +486,29 @@ const getAllowanceRequests = asyncHandler(async (req, res) => {
 
   // Build the base query
   let query = {};
+
+  // If user is a regular admin (not super admin), filter by their department
+  if (
+    req.user.role === "ADMIN" &&
+    req.user.department &&
+    req.user.role !== "SUPER_ADMIN"
+  ) {
+    query.department = req.user.department;
+  }
+
+  // Add other filters if provided
   if (employee) query.employee = employee;
   if (departmentId) query.department = departmentId;
   if (status) query.approvalStatus = status;
   if (type) query.type = type;
+
+  // Date range filter
+  if (startDate && endDate) {
+    query.effectiveDate = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate),
+    };
+  }
 
   // If includeInactive is false, we only want active allowances
   if (!includeInactive) {
@@ -399,30 +516,67 @@ const getAllowanceRequests = asyncHandler(async (req, res) => {
       { approvalStatus: "approved" },
       {
         $or: [
-          { paymentDate: { $gt: new Date() } }, 
-          { usedInPayroll: { $exists: false } }, 
-          { usedInPayroll: null }, 
+          { effectiveDate: { $gt: new Date() } },
+          { usedInPayroll: { $exists: false } },
+          { usedInPayroll: null },
         ],
       },
     ];
   }
 
-  // If includeInactive is true, we want all allowances
-  // (used ones will have paymentDate <= current date or usedInPayroll exists)
-
   const allowances = await Allowance.find(query)
     .sort({ createdAt: -1 })
     .skip((page - 1) * limit)
-    .limit(limit);
+    .limit(limit)
+    .populate("employee", "firstName lastName email")
+    .populate("department", "name code");
+
+  const total = await Allowance.countDocuments(query);
 
   res.json({
     success: true,
     data: {
       allowances,
       pagination: {
-        total: await Allowance.countDocuments(query),
+        total,
         page: parseInt(page),
         limit: parseInt(limit),
+        pages: Math.ceil(total / limit),
+      },
+    },
+  });
+});
+
+const getPersonalAllowances = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
+  const userId = req.user._id;
+  const query = { employee: userId };
+
+  const allowances = await Allowance.find(query)
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(Number(limit))
+    .populate("department", "name code")
+    .lean();
+
+  const total = await Allowance.countDocuments(query);
+
+  // Patch name/description for frontend display
+  const allowancesWithNameDesc = allowances.map((a) => ({
+    ...a,
+    name: a.name || a.reason || "N/A",
+    description: a.description || a.reason || "N/A",
+  }));
+
+  res.json({
+    success: true,
+    data: {
+      allowances: allowancesWithNameDesc,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit),
       },
     },
   });
@@ -432,5 +586,7 @@ export {
   createAllowance,
   createDepartmentAllowance,
   createDepartmentEmployeeAllowance,
+  createPersonalAllowance,
   getAllowanceRequests,
+  getPersonalAllowances,
 };

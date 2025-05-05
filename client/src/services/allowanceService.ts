@@ -3,10 +3,10 @@ import { toast } from "react-toastify";
 import type {
   Allowance,
   CreateAllowanceRequest,
-  AllowancesListResponse,
+  AllowanceType,
 } from "../types/allowance";
 
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
+const BASE_URL = "/api/allowances";
 axios.defaults.withCredentials = true;
 
 export const allowanceService = {
@@ -17,8 +17,8 @@ export const allowanceService = {
     try {
       const endpoint =
         userRole === "ADMIN"
-          ? `${BASE_URL}/admin/allowances/request`
-          : `${BASE_URL}/regular-user/allowances/request`;
+          ? `/api/admin/allowances/request`
+          : `/api/regular-user/allowances/request`;
 
       console.log("🔵 Using endpoint:", endpoint);
       console.log("📝 Request data:", data);
@@ -42,8 +42,8 @@ export const allowanceService = {
     try {
       const endpoint =
         userRole === "ADMIN"
-          ? `${BASE_URL}/admin/allowances`
-          : `${BASE_URL}/regular-user/allowances`;
+          ? `/api/admin/allowances`
+          : `/api/regular-user/allowances`;
 
       const response = await axios.get(endpoint, {
         withCredentials: true,
@@ -65,8 +65,8 @@ export const allowanceService = {
     try {
       const endpoint =
         userRole === "ADMIN"
-          ? `${BASE_URL}/admin/allowances/${id}`
-          : `${BASE_URL}/regular-user/allowances/${id}`;
+          ? `/api/admin/allowances/${id}`
+          : `/api/regular-user/allowances/${id}`;
 
       const response = await axios.get(endpoint, {
         withCredentials: true,
@@ -87,8 +87,8 @@ export const allowanceService = {
     try {
       const endpoint =
         userRole === "ADMIN"
-          ? `${BASE_URL}/admin/allowances/${id}`
-          : `${BASE_URL}/regular-user/allowances/${id}`;
+          ? `/api/admin/allowances/${id}`
+          : `/api/regular-user/allowances/${id}`;
 
       const response = await axios.put(endpoint, data, {
         withCredentials: true,
@@ -111,8 +111,8 @@ export const allowanceService = {
     try {
       const endpoint =
         userRole === "ADMIN"
-          ? `${BASE_URL}/admin/allowances/${id}/approve`
-          : `${BASE_URL}/regular-user/allowances/${id}/approve`;
+          ? `/api/admin/allowances/${id}/approve`
+          : `/api/regular-user/allowances/${id}/approve`;
 
       const response = await axios.patch(
         endpoint,
@@ -138,8 +138,8 @@ export const allowanceService = {
     try {
       const endpoint =
         userRole === "ADMIN"
-          ? `${BASE_URL}/admin/allowances/${id}/reject`
-          : `${BASE_URL}/regular-user/allowances/${id}/reject`;
+          ? `/api/admin/allowances/${id}/reject`
+          : `/api/regular-user/allowances/${id}/reject`;
 
       const response = await axios.patch(
         endpoint,
@@ -163,8 +163,8 @@ export const allowanceService = {
     try {
       const endpoint =
         userRole === "ADMIN"
-          ? `${BASE_URL}/admin/allowances/history`
-          : `${BASE_URL}/regular-user/allowances/history`;
+          ? `/api/admin/allowances/history`
+          : `/api/regular-user/allowances/history`;
 
       const response = await axios.get(endpoint, {
         withCredentials: true,
@@ -181,7 +181,7 @@ export const allowanceService = {
 
   getDepartmentAllowances: async (): Promise<{ data: Allowance[] }> => {
     try {
-      const response = await axios.get(`${BASE_URL}/admin/allowances`, {
+      const response = await axios.get(`/api/admin/allowances`, {
         withCredentials: true,
       });
       return response.data;
@@ -201,10 +201,13 @@ export const allowanceService = {
     paymentDate: string;
     type: string;
   }): Promise<{ data: Allowance[]; message: string }> => {
+    console.log("🔵 [AllowanceService] Creating department allowance:", {
+      data,
+      timestamp: new Date().toISOString(),
+    });
     try {
-      console.log("Making API call to create department allowance:", data);
       const response = await axios.post(
-        `${BASE_URL}/allowances/department/all`,
+        `/api/allowances/department/all`,
         data,
         {
           withCredentials: true,
@@ -213,10 +216,20 @@ export const allowanceService = {
           },
         }
       );
-      console.log("Department allowance response:", response);
+      console.log("✅ [AllowanceService] Department allowance created:", {
+        response: response.data,
+        timestamp: new Date().toISOString(),
+      });
       return response.data;
     } catch (error: any) {
-      console.error("❌ Error creating department allowance:", error);
+      console.error(
+        "❌ [AllowanceService] Error creating department allowance:",
+        {
+          error,
+          data,
+          timestamp: new Date().toISOString(),
+        }
+      );
       console.error("Full error details:", {
         status: error.response?.status,
         data: error.response?.data,
@@ -234,13 +247,9 @@ export const allowanceService = {
     data: Partial<CreateAllowanceRequest>
   ): Promise<{ data: Allowance }> => {
     try {
-      const response = await axios.put(
-        `${BASE_URL}/admin/allowances/${id}`,
-        data,
-        {
-          withCredentials: true,
-        }
-      );
+      const response = await axios.put(`/api/admin/allowances/${id}`, data, {
+        withCredentials: true,
+      });
       toast.success("Department allowance updated successfully");
       return response.data;
     } catch (error: any) {
@@ -255,7 +264,7 @@ export const allowanceService = {
   toggleAllowanceStatus: async (id: string): Promise<{ data: Allowance }> => {
     try {
       const response = await axios.patch(
-        `${BASE_URL}/admin/allowances/${id}/toggle-status`,
+        `/api/admin/allowances/${id}/toggle-status`,
         {},
         { withCredentials: true }
       );
@@ -275,7 +284,7 @@ export const allowanceService = {
   ): Promise<{ data: Allowance }> => {
     try {
       const response = await axios.patch(
-        `${BASE_URL}/admin/allowances/${id}/approve`,
+        `/api/admin/allowances/${id}/approve`,
         {},
         { withCredentials: true }
       );
@@ -297,7 +306,7 @@ export const allowanceService = {
   ): Promise<{ data: Allowance }> => {
     try {
       const response = await axios.patch(
-        `${BASE_URL}/admin/allowances/${id}/reject`,
+        `/api/admin/allowances/${id}/reject`,
         { reason },
         { withCredentials: true }
       );
@@ -316,13 +325,9 @@ export const allowanceService = {
     data: CreateAllowanceRequest
   ): Promise<{ data: Allowance }> => {
     try {
-      const response = await axios.post(
-        `${BASE_URL}/admin/allowances/request`,
-        data,
-        {
-          withCredentials: true,
-        }
-      );
+      const response = await axios.post(`/api/admin/allowances/request`, data, {
+        withCredentials: true,
+      });
       return response.data;
     } catch (error: any) {
       console.error("❌ Error requesting admin allowance:", error);
@@ -340,10 +345,13 @@ export const allowanceService = {
     paymentDate: string;
     type: string;
   }): Promise<{ data: Allowance; message: string }> => {
+    console.log("🔵 [AllowanceService] Creating employee allowance:", {
+      data,
+      timestamp: new Date().toISOString(),
+    });
     try {
-      console.log("Making API call to create employee allowance:", data);
       const response = await axios.post(
-        `${BASE_URL}/allowances/department/employee`,
+        `/api/allowances/department/employee`,
         data,
         {
           withCredentials: true,
@@ -368,7 +376,7 @@ export const allowanceService = {
     }
   },
 
-  getAllowanceRequests: async (params?: {
+  getAllowanceRequests: async (params: {
     page?: number;
     limit?: number;
     employee?: string;
@@ -378,30 +386,24 @@ export const allowanceService = {
     startDate?: string;
     endDate?: string;
     includeInactive?: boolean;
-  }): Promise<AllowancesListResponse> => {
-    const queryParams = new URLSearchParams();
+  }) => {
+    const response = await axios.get(`${BASE_URL}/requests`, { params });
+    return response.data;
+  },
 
-    if (params?.page) queryParams.append("page", params.page.toString());
-    if (params?.limit) queryParams.append("limit", params.limit.toString());
-    if (params?.employee) queryParams.append("employee", params.employee);
-    if (params?.departmentId)
-      queryParams.append("departmentId", params.departmentId);
-    if (params?.status) queryParams.append("status", params.status);
-    if (params?.type) queryParams.append("type", params.type);
-    if (params?.startDate) queryParams.append("startDate", params.startDate);
-    if (params?.endDate) queryParams.append("endDate", params.endDate);
-    if (params?.includeInactive)
-      queryParams.append("includeInactive", params.includeInactive.toString());
+  createPersonalAllowance: async (data: {
+    type: AllowanceType;
+    amount: number;
+    description: string;
+  }) => {
+    const response = await axios.post(`${BASE_URL}/personal`, data);
+    return response.data;
+  },
 
-    const response = await axios.get(
-      `${BASE_URL}/allowances/requests?${queryParams.toString()}`
-    );
-
-    // Transform the response to match AllowancesListResponse
-    return {
-      success: true,
-      message: "Allowances fetched successfully",
-      data: response.data.data,
-    };
+  getPersonalAllowances: async (params: { page?: number; limit?: number }) => {
+    const response = await axios.get("/api/allowances/personal-requests", {
+      params,
+    });
+    return response.data;
   },
 };
