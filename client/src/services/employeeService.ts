@@ -21,6 +21,22 @@ import { mapEmployeeToDetails } from "../utils/mappers";
 import { useAuth } from "../context/AuthContext";
 import { ISalaryGrade } from "../types/salary";
 
+// Add ApiResponse type definition
+interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  employee?: T;
+  data?: T;
+  error?: {
+    message: string;
+    details?: string;
+  };
+  emailError?: {
+    message: string;
+    details: string;
+  };
+}
+
 const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
 const SUPER_ADMIN_BASE_URL = `${BASE_URL}/super-admin`;
 
@@ -117,22 +133,34 @@ export const employeeService = {
   // Create new employee
   async createEmployee(employeeData: CreateEmployeeData): Promise<Employee> {
     try {
-      const response = await axios.post(`${BASE_URL}/employee/create`, {
-        firstName: employeeData.firstName,
-        lastName: employeeData.lastName,
-        email: employeeData.email,
-        phone: employeeData.phone,
-        role: employeeData.role,
-        position: employeeData.position,
-        gradeLevel: employeeData.gradeLevel,
-        workLocation: employeeData.workLocation,
-        dateJoined: employeeData.dateJoined,
-        department: employeeData.department,
-      });
-      return response.data;
-    } catch (error) {
+      const response = await axios.post<ApiResponse<Employee>>(
+        `${BASE_URL}/employee/create`,
+        employeeData
+      );
+
+      if (!response.data.success || !response.data.employee) {
+        throw new Error(response.data.message || "Failed to create employee");
+      }
+
+      return response.data.employee;
+    } catch (error: any) {
       console.error("Error creating employee:", error);
-      throw error;
+
+      // Extract error message from response if available
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Failed to create employee";
+
+      // If there's an email error but employee was created
+      if (error.response?.data?.emailError) {
+        throw new Error(
+          `${errorMessage} (Email Error: ${error.response.data.emailError.details})`
+        );
+      }
+
+      throw new Error(errorMessage);
     }
   },
 

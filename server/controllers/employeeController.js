@@ -16,19 +16,10 @@ export class EmployeeController {
   static async createEmployee(req, res, next) {
     let employee = null;
     try {
-      console.log("==== [createEmployee] Incoming request ====");
-      console.log("Request user:", req.user);
-      console.log("Request body:", req.body);
-
       const { role = UserRole.USER, ...employeeData } = req.body;
-      console.log("Parsed role:", role);
-      console.log("Parsed employeeData:", employeeData);
 
       // Validate role creation permissions
       if (role === UserRole.ADMIN && req.user.role !== UserRole.SUPER_ADMIN) {
-        console.log(
-          "Permission denied: Only super admins can create admin accounts"
-        );
         throw new ApiError(403, "Only super admins can create admin accounts");
       }
 
@@ -39,15 +30,12 @@ export class EmployeeController {
           ? new mongoose.Types.ObjectId(req.user.department)
           : undefined,
       };
-      console.log("Creator object:", creator);
 
       // Add department population
       const department = await DepartmentModel.findById(
         employeeData.department
       );
-      console.log("Department lookup result:", department);
       if (!department) {
-        console.log("Invalid department selected:", employeeData.department);
         throw new ApiError(400, "Invalid department selected");
       }
 
@@ -68,31 +56,12 @@ export class EmployeeController {
 
       const prefix = role === UserRole.ADMIN ? "ADM" : "EMP";
       const employeeId = `${prefix}${day}${month}${sequentialNumber}`;
-      console.log("Generated employeeId:", employeeId);
 
       // Generate invitation token
       const invitationToken = uuidv4();
       const invitationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      console.log("Generated invitationToken:", invitationToken);
 
-      // Send the invitation email
-      try {
-        console.log("Sending invitation email to:", employeeData.email);
-        await EmailService.sendInvitationEmail(
-          employeeData.email,
-          invitationToken,
-          role
-        );
-        console.log("Invitation email sent successfully");
-      } catch (emailError) {
-        console.error("Failed to send invitation email:", emailError);
-        throw new ApiError(
-          500,
-          "Failed to send invitation email. Employee not created."
-        );
-      }
-
-      // Create the employee after successful email sending
+      // Create the employee first
       employee = new UserModel({
         ...employeeData,
         employeeId,
@@ -104,9 +73,39 @@ export class EmployeeController {
         department: department._id,
       });
 
-      console.log("Saving new employee:", employee);
       await employee.save();
-      console.log("Employee saved successfully");
+
+      // Send the invitation email
+      try {
+        await EmailService.sendInvitationEmail(
+          employeeData.email,
+          invitationToken,
+          role
+        );
+      } catch (emailError) {
+        // If email fails, update employee status and add a note
+        await UserModel.findByIdAndUpdate(employee._id, {
+          $set: {
+            status: "active",
+            "invitation.status": "failed",
+            "invitation.error": emailError.message,
+            "invitation.lastAttempt": new Date(),
+          },
+        });
+
+        // Return success but with email warning
+        return res.status(201).json({
+          success: true,
+          message: `${
+            role === UserRole.ADMIN ? "Admin" : "Employee"
+          } created successfully, but invitation email could not be sent. Please try sending the invitation email again later.`,
+          employee,
+          emailError: {
+            message: "Failed to send invitation email",
+            details: emailError.message,
+          },
+        });
+      }
 
       return res.status(201).json({
         success: true,
@@ -117,10 +116,15 @@ export class EmployeeController {
       });
     } catch (error) {
       if (employee && employee._id) {
-        console.log("Rolling back: deleting employee with _id:", employee._id);
         await UserModel.findByIdAndDelete(employee._id);
       }
-      console.error("Error in createEmployee:", error);
+
+      // Enhance error message for email-related errors
+      if (error.message.includes("email") || error.message.includes("SMTP")) {
+        error.message =
+          "Failed to send invitation email. Please check your email service configuration.";
+      }
+
       next(error);
     }
   }
@@ -260,7 +264,6 @@ export class EmployeeController {
         status: payroll.status,
         processedAt: payroll.createdAt,
       }));
-
 
       const response = {
         success: true,

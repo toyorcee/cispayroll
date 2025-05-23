@@ -5,7 +5,7 @@ import User, {
   UserLifecycleState,
   OnboardingStatus,
 } from "../models/User.js";
-import EmailService from "./EmailService.js";
+import { EmailService } from "./emailService.js";
 
 class UserService {
   constructor() {
