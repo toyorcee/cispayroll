@@ -31,11 +31,18 @@ export const salaryStructureService = {
           ? `${BASE_URL}/super-admin/salary-grades`
           : `${BASE_URL}/admin/salary-grades`;
 
-      const response = await axios.get<{ salaryGrades: ISalaryGrade[] }>(
-        endpoint
-      );
+      const response = await axios.get(endpoint);
       console.log("API response for salary grades:", response.data);
-      return response.data.salaryGrades;
+
+      // Handle both response structures
+      const salaryGrades = response.data.data || response.data.salaryGrades;
+
+      if (!Array.isArray(salaryGrades)) {
+        console.error("Invalid salary grades response:", response.data);
+        throw new Error("Invalid salary grades response format");
+      }
+
+      return salaryGrades;
     } catch (error: unknown) {
       console.error("Salary grades fetch error:", error);
       if (axios.isAxiosError(error) && error.response) {

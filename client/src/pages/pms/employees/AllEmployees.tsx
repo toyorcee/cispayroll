@@ -172,14 +172,23 @@ export default function AllEmployees() {
     queryFn: () => salaryStructureService.getAllSalaryGrades(user?.role),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+    enabled: !!user?.role,
   });
 
   // Handle errors in useEffect
   useEffect(() => {
     if (salaryGradesError) {
       console.error("Salary grades query error:", salaryGradesError);
+      toast.error("Failed to load salary grades. Please try again.");
     }
   }, [salaryGradesError]);
+
+  // Log when salary grades are loaded
+  useEffect(() => {
+    if (salaryGrades.length > 0) {
+      console.log("Salary grades loaded:", salaryGrades);
+    }
+  }, [salaryGrades]);
 
   const { data: adminsData } = employeeService.useGetAdmins();
 
