@@ -996,8 +996,19 @@ export default function ProcessPayment() {
     }
   };
 
-  const handleMarkAsPaid = (payrollId: string) => {
-    markAsPaidMutation.mutate(payrollId);
+  const handleMarkAsPaid = async (payrollId: string) => {
+    if (!payrollId) {
+      console.error("Invalid payroll ID:", payrollId);
+      toast.error("Invalid payroll ID");
+      return;
+    }
+
+    try {
+      await markAsPaidMutation.mutateAsync(payrollId);
+    } catch (error: any) {
+      console.error("Failed to mark as paid:", error);
+      toast.error(error.message || "Failed to mark payroll as paid");
+    }
   };
 
   const handleMarkAsFailed = (payrollId: string) => {
@@ -1046,13 +1057,53 @@ export default function ProcessPayment() {
     }));
   };
 
+  const handleBatchMarkAsPaid = async () => {
+    const allPayrolls = payrollsData?.data?.payrolls || [];
+
+    const validPayrolls = allPayrolls.filter(
+      (p) =>
+        selectedPayrolls.includes(p._id) &&
+        p.status === PayrollStatus.PENDING_PAYMENT
+    );
+
+    const validIds = validPayrolls.map((p) => p._id);
+
+    if (validIds.length === 0) {
+      toast.error("No selected payrolls are eligible to be marked as paid.");
+      return;
+    }
+
+    try {
+      await batchMarkAsPaidMutation.mutateAsync(validIds);
+    } catch (error: any) {
+      console.error("❌ Failed to mark batch as paid:", error);
+      console.error("❌ Error response:", error.response?.data);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to mark selected payrolls as paid";
+      toast.error(errorMessage);
+    }
+  };
+
   const batchMarkAsPaidMutation = useMutation({
-    mutationFn: (payrollIds: string[]) =>
-      payrollService.markPaymentsPaidBatch(payrollIds),
+    mutationFn: (payrollIds: string[]) => {
+      return payrollService.markPaymentsPaidBatch(payrollIds);
+    },
     onSuccess: (data) => {
-      const updatedIds = Array.isArray(data.payrolls)
-        ? data.payrolls.map((p: { payrollId: string }) => p.payrollId)
-        : [];
+      console.log("✅ Success response:", data);
+      if (!data || !data.payrolls) {
+        console.error("❌ Invalid response data:", data);
+        toast.error("Invalid response from server");
+        return;
+      }
+
+      const updatedIds = data.payrolls.map(
+        (p: { payrollId: string }) => p.payrollId
+      );
+      console.log("✅ Updated payroll IDs:", updatedIds);
+
+      // Update the local cache
       queryClient.setQueryData(["payrolls", filters], (oldData: any) => {
         if (!oldData?.data?.payrolls) return oldData;
         return {
@@ -1067,36 +1118,31 @@ export default function ProcessPayment() {
           },
         };
       });
+
+      // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ["payrolls", filters] });
       queryClient.invalidateQueries({ queryKey: ["payrollStatistics"] });
-      toast.success("Batch payments marked as completed successfully");
+
+      // Show success message
+      toast.success(
+        updatedIds.length === 1
+          ? "Payment marked as completed successfully"
+          : `Successfully marked ${updatedIds.length} payments as completed`
+      );
+
+      // Reset selection states
       resetSelectionStates();
     },
     onError: (error: any) => {
-      toast.error(error.message || "Failed to mark batch as paid");
+      console.error("❌ Batch mark as paid error:", error);
+      console.error("❌ Error response:", error.response?.data);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to mark batch as paid";
+      toast.error(errorMessage);
     },
   });
-
-  const handleBatchMarkAsPaid = async () => {
-    const allPayrolls = payrollsData?.data?.payrolls || [];
-    const validPayrolls = allPayrolls.filter(
-      (p) =>
-        selectedPayrolls.includes(p._id) &&
-        p.status === PayrollStatus.PENDING_PAYMENT
-    );
-    const validIds = validPayrolls.map((p) => p._id);
-
-    if (validIds.length === 0) {
-      toast.error("No selected payrolls are eligible to be marked as paid.");
-      return;
-    }
-
-    try {
-      await batchMarkAsPaidMutation.mutateAsync(validIds);
-    } catch (error) {
-      console.error("Failed to mark batch as paid:", error);
-    }
-  };
 
   const handleBatchMarkAsFailed = async () => {
     const allPayrolls = payrollsData?.data?.payrolls || [];

@@ -3602,15 +3602,14 @@ export class SuperAdminController {
       const user = req.user;
 
       // Handle both single and multiple payrolls
-      const isBatch = Array.isArray(payrollIds) && payrollIds.length > 1;
+      const isBatch = Array.isArray(payrollIds) && payrollIds.length > 0;
       const ids = isBatch ? payrollIds : [req.params.id];
-      console.log(
-        `🔍 Starting ${
-          isBatch ? "batch" : "single"
-        } mark as paid for payroll ID(s):`,
-        ids
-      );
-      console.log("👤 Processor:", user.firstName, user.lastName);
+
+      // Validate IDs
+      if (!ids || ids.length === 0) {
+        console.error("❌ No payroll IDs provided");
+        throw new ApiError(400, "No payroll IDs provided");
+      }
 
       // Find all payrolls
       const payrolls = await PayrollModel.find({
@@ -3621,11 +3620,18 @@ export class SuperAdminController {
       ]);
 
       if (payrolls.length !== ids.length) {
+        console.error(
+          "❌ Some payrolls not found. Expected:",
+          ids.length,
+          "Found:",
+          payrolls.length
+        );
         throw new ApiError(404, "Some payrolls not found");
       }
 
       // Check if user has permission
       if (!user.hasPermission(Permission.APPROVE_PAYROLL)) {
+        console.error("❌ User lacks permission:", user._id);
         throw new ApiError(
           403,
           "You don't have permission to mark payments as paid"
@@ -3638,6 +3644,10 @@ export class SuperAdminController {
       );
 
       if (invalidPayrolls.length > 0) {
+        console.error(
+          "❌ Invalid payroll statuses:",
+          invalidPayrolls.map((p) => ({ id: p._id, status: p.status }))
+        );
         throw new ApiError(
           400,
           `Some payrolls are not in pending payment status: ${invalidPayrolls
@@ -3645,6 +3655,7 @@ export class SuperAdminController {
             .join(", ")}`
         );
       }
+
 
       const updatedPayrolls = [];
       const errors = [];
@@ -3699,6 +3710,7 @@ export class SuperAdminController {
 
           updatedPayrolls.push({ payroll: updated, payment });
         } catch (error) {
+          console.error("❌ Error processing payroll:", payroll._id, error);
           errors.push({
             payrollId: payroll._id,
             error: error.message,
@@ -3706,9 +3718,10 @@ export class SuperAdminController {
         }
       }
 
-      // Create batch notification if processing multiple payrolls
+      // Create notifications
       if (isBatch) {
         const batchMessage = `Batch payment completed for ${updatedPayrolls.length} payrolls`;
+        console.log("📢 Sending batch notification:", batchMessage);
 
         // Notify super admin
         await NotificationService.createPayrollNotification(
@@ -3773,7 +3786,7 @@ export class SuperAdminController {
         },
       });
     } catch (error) {
-      console.error("Batch mark as paid error:", error);
+      console.error("❌ Batch mark as paid error:", error);
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
     }
@@ -6010,7 +6023,6 @@ export class SuperAdminController {
     }
   }
 }
-
 // Add this helper function
 function calculatePeriodEnd(startDate, frequency) {
   const endDate = new Date(startDate);
