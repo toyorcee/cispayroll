@@ -32,7 +32,6 @@ export const salaryStructureService = {
           : `${BASE_URL}/admin/salary-grades`;
 
       const response = await axios.get(endpoint);
-      console.log("API response for salary grades:", response.data);
 
       // Handle both response structures
       const salaryGrades = response.data.data || response.data.salaryGrades;
