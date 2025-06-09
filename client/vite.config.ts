@@ -6,16 +6,7 @@ export default defineConfig({
   base: "/",
   plugins: [react(), tailwindcss()],
   build: {
-    chunkSizeWarningLimit: 1600,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          react: ["react", "react-dom"],
-          mui: ["@mui/material", "@mui/icons-material"],
-          vendor: ["lodash", "axios", "date-fns"],
-        },
-      },
-    },
+    outDir: '../client/dist' 
   },
   server: {
     proxy: {

@@ -237,36 +237,24 @@ if (isDevelopment) {
   });
 }
 
-if (process.env.NODE_ENV === "production") {
-  const clientBuildPath = path.join(__dirname, "../client/dist");
-  console.log("➡️ Serving frontend from:", clientBuildPath);
+if (isProduction) {
+  const clientBuildPath = path.join(__dirname, "../../client/dist");
+  console.log("🔍 Final client path:", clientBuildPath);
 
   if (existsSync(clientBuildPath)) {
+    console.log("📂 Contents:", readdirSync(clientBuildPath));
+
     app.use(express.static(clientBuildPath));
+
+    app.get("/api/*", (req, res, next) => next()); 
 
     app.get("*", (req, res) => {
       res.sendFile(path.join(clientBuildPath, "index.html"));
     });
   } else {
-    console.warn("⚠️ Warning: client build not found at", clientBuildPath);
+    console.error("❌ Client build not found at:", clientBuildPath);
   }
 }
-
-// Serve React Client (Production Only)
-// if (isProduction) {
-//   const clientBuildPath = path.join(__dirname, "../client/dist");
-//   console.log("➡️ try to serve client folder:", clientBuildPath);
-
-//   if (existsSync(clientBuildPath)) {
-//     console.log("✅ Serving frontend from:", clientBuildPath);
-//     app.use(express.static(clientBuildPath));
-//     app.get("*", (req, res) => {
-//       res.sendFile(path.join(clientBuildPath, "index.html"));
-//     });
-//   } else {
-//     console.warn("⚠️ Warning: client build not found at", clientBuildPath);
-//   }
-// }
 
 // Connect to DB and start server
 connectDB().then(() => {
