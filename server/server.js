@@ -339,23 +339,24 @@ if (isProduction) {
     res.sendFile(path.join(clientBuildPath, "index.html"));
   });
 }
+
 if (isProduction) {
-  // Use absolute path based on Render's structure
-  const clientBuildPath = path.join(process.cwd(), "../client/dist");
+  // Try multiple possible paths
+  const possiblePaths = [
+    path.join(process.cwd(), "../client/dist"),
+    path.join(process.cwd(), "../../client/dist"),
+    "/opt/render/project/client/dist",
+  ];
 
-  // Debugging logs
-  console.log("🔍 Final client path:", clientBuildPath);
-  console.log("📂 Directory exists?", existsSync(clientBuildPath));
+  let clientBuildPath = possiblePaths.find((p) => existsSync(p));
 
-  if (!existsSync(clientBuildPath)) {
-    console.error("❌ Missing client files at:", clientBuildPath);
-    console.log(
-      "Current directory structure:",
-      readdirSync(path.join(process.cwd(), ".."))
-    );
+  if (!clientBuildPath) {
+    console.error("❌ Could not find client files in any location");
+    possiblePaths.forEach((p) => console.log(`- Checked: ${p}`));
     process.exit(1);
   }
 
+  console.log("✅ Found client files at:", clientBuildPath);
   app.use(express.static(clientBuildPath));
   app.get("*", (req, res) => {
     res.sendFile(path.join(clientBuildPath, "index.html"));
