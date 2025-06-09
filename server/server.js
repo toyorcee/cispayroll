@@ -7,17 +7,122 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { traceError, ApiError } from "./utils/errorHandler.js";
 import multer from "multer";
-import fs from "fs";
-import { readdirSync } from "fs";
+import fs, { readdirSync, existsSync } from "fs";
 
+// Environment
+dotenv.config();
+const isProduction = process.env.NODE_ENV === "production";
+const isDevelopment = process.env.NODE_ENV === "development";
+
+// Express app setup
+const app = express();
+const PORT = process.env.PORT || 5001;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Uploads Directory Setup
 const uploadsDir = path.join(process.cwd(), "uploads", "profiles");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-const isProduction = process.env.NODE_ENV === "production";
-const isDevelopment = process.env.NODE_ENV === "development";
+// MongoDB Connection
+const connectDB = async () => {
+  try {
+    const conn = await mongoose.connect(process.env.MONGO_URI);
+    console.log(`🟢 MongoDB Connected: ${conn.connection.host}`);
+    mongoose.connection.on("error", (error) =>
+      console.error("MongoDB Error:", error)
+    );
+    mongoose.connection.on("disconnected", () =>
+      console.warn("MongoDB Disconnected")
+    );
+  } catch (error) {
+    console.error("❌ MongoDB Connection Error:", error);
+    setTimeout(connectDB, 5000);
+  }
+};
 
+// Global Process Error Listeners
+process.on("unhandledRejection", (reason, promise) =>
+  console.error("Unhandled Promise Rejection:", reason)
+);
+process.on("uncaughtException", (error) =>
+  console.error("Uncaught Exception:", error)
+);
+
+// Middleware
+app.use((req, _res, next) => {
+  console.log(`📥 ${req.method} ${req.url}`);
+  next();
+});
+
+app.use((req, res, next) => {
+  const oldJson = res.json;
+  res.json = function (data) {
+    console.log(`📤 ${req.method} ${req.url} - Status: ${res.statusCode}`);
+    return oldJson.call(this, data);
+  };
+  next();
+});
+
+app.use(
+  cors({
+    origin: isDevelopment ? "http://localhost:5173" : process.env.CLIENT_URL,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Content-Length",
+      "X-Requested-With",
+    ],
+    exposedHeaders: ["Set-Cookie", "set-cookie"],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  })
+);
+
+app.use(cookieParser());
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    },
+    limit: "50mb",
+  })
+);
+
+// MIME Header Fix
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  if (req.url.endsWith(".ts")) {
+    res.setHeader("Content-Type", "application/typescript");
+  }
+  next();
+});
+
+// Multer Setup
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `profile-${uniqueSuffix}${path.extname(file.originalname)}`);
+  },
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
+    allowedTypes.includes(file.mimetype)
+      ? cb(null, true)
+      : cb(new Error("Invalid file type."));
+  },
+});
+
+// Routes Import
 import authRoutes from "./routes/authRoutes.js";
 import superAdminRoutes from "./routes/superAdminRoutes.js";
 import leaveRoutes from "./routes/leaveRoutes.js";
@@ -38,151 +143,17 @@ import auditRoutes from "./routes/auditRoutes.js";
 import bonusRoutes from "./routes/BonusRoutes.js";
 import allowanceRoutes from "./routes/allowanceRoutes.js";
 
-dotenv.config();
-
-const logServerError = (error, context) => {
-  console.error(`🔴 ${context}:`, {
-    message: error.message,
-    stack: error.stack,
-    time: new Date().toISOString(),
-  });
-};
-
-const requestLogger = (req, _res, next) => {
-  console.log(`📥 ${new Date().toISOString()} - ${req.method} ${req.url}`);
-  next();
-};
-
-const responseLogger = (req, res, next) => {
-  const oldJson = res.json;
-  res.json = function (data) {
-    console.log(
-      `📤 ${new Date().toISOString()} - ${req.method} ${req.url} - Status: ${
-        res.statusCode
-      }`
-    );
-    return oldJson.call(this, data);
-  };
-  next();
-};
-
-const connectDB = async () => {
+// Error Wrapper
+const routeErrorWrapper = (handler) => async (req, res, next) => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI);
-    console.log(`🟢 MongoDB Connected: ${conn.connection.host}`);
-
-    mongoose.connection.on("error", (error) => {
-      logServerError(error, "MongoDB Error");
-    });
-
-    mongoose.connection.on("disconnected", () => {
-      console.log("🔴 MongoDB Disconnected");
-    });
+    await handler(req, res, next);
   } catch (error) {
-    logServerError(error, "MongoDB Connection Error");
-    console.error("❌ Error details:", error);
-    setTimeout(connectDB, 5000);
+    console.error("🔴 Route Error:", error);
+    next(error);
   }
 };
 
-// Initialize Express with enhanced error handling
-const app = express();
-const PORT = process.env.PORT || 5001;
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-process.on("unhandledRejection", (reason, promise) => {
-  logServerError({ reason, promise }, "Unhandled Promise Rejection");
-  console.error("🔴 Promise details:", promise);
-});
-
-process.on("uncaughtException", (error) => {
-  logServerError(error, "Uncaught Exception");
-  console.error("🔴 Error details:", error);
-});
-
-app.use(requestLogger);
-app.use(responseLogger);
-const allowedOrigin = process.env.CLIENT_URL;
-
-app.use(
-  cors({
-    origin: isDevelopment ? "http://localhost:5173" : process.env.CLIENT_URL,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "Content-Length",
-      "X-Requested-With",
-    ],
-    exposedHeaders: ["Set-Cookie", "set-cookie"],
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
-  })
-);
-
-app.use(cookieParser());
-app.use(express.json());
-app.use(
-  express.json({
-    verify: (req, res, buf) => {
-      req.rawBody = buf;
-    },
-    limit: "50mb",
-  })
-);
-
-app.use((req, res, next) => {
-  res.setHeader("X-Content-Type-Options", "nosniff");
-
-  if (req.url.endsWith(".ts")) {
-    res.setHeader("Content-Type", "application/typescript");
-  }
-  next();
-});
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadPath = path.join(process.cwd(), "uploads", "profiles");
-    fs.mkdirSync(uploadPath, { recursive: true });
-    cb(null, uploadPath);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, "profile-" + uniqueSuffix + path.extname(file.originalname));
-  },
-});
-
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024,
-  },
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Invalid file type. Only JPEG, PNG and GIF are allowed."));
-    }
-  },
-});
-
-// Route error wrapper
-const routeErrorWrapper = (handler) => {
-  return async (req, res, next) => {
-    try {
-      await handler(req, res, next);
-    } catch (error) {
-      logServerError(error, `Route Error: ${req.method} ${req.url}`);
-      next(error);
-    }
-  };
-};
-
-// Register routes
+// Route Registrations
 app.use("/api/auth", routeErrorWrapper(authRoutes));
 app.use("/api/super-admin", routeErrorWrapper(superAdminRoutes));
 app.use("/api/admin", routeErrorWrapper(adminRoutes));
@@ -203,9 +174,9 @@ app.use("/api/audit", routeErrorWrapper(auditRoutes));
 app.use("/api/leaves", routeErrorWrapper(leaveRoutes));
 app.use("/api/allowances", routeErrorWrapper(allowanceRoutes));
 
-// Enhanced health check
-app.get("/api/health", (_req, res) => {
-  const health = {
+// Health Check
+app.get("/api/health", (_req, res) =>
+  res.json({
     status: "healthy",
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
@@ -213,165 +184,79 @@ app.get("/api/health", (_req, res) => {
       mongoose.connection.readyState === 1 ? "connected" : "disconnected",
     uptime: process.uptime(),
     memory: process.memoryUsage(),
-  };
-  res.json(health);
-});
+  })
+);
 
+// Static Files
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 app.get(
   "/uploads/profiles/:filename",
   (req, res, next) => {
-    console.log("📸 Profile image request:", {
-      filename: req.params.filename,
-      path: path.join(
-        process.cwd(),
-        "uploads",
-        "profiles",
-        req.params.filename
-      ),
-      exists: fs.existsSync(
-        path.join(process.cwd(), "uploads", "profiles", req.params.filename)
-      ),
-    });
     res.setHeader("Cache-Control", "public, max-age=31536000");
     next();
   },
   express.static(path.join(process.cwd(), "uploads", "profiles"))
 );
 
-// Enhanced error handler
+// Default Route
+app.get("/", (req, res) => {
+  res.send("API is running...");
+});
+
+// 404 Route
+app.use((_req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
+
+// Error Handler
 app.use((err, req, res, next) => {
   const error = traceError(
     err,
     `Global Error Handler: ${req.method} ${req.url}`
   );
-  console.error("❌ Full error details:", {
-    error,
-    path: req.path,
-    method: req.method,
-    body: req.body,
-    query: req.query,
-    params: req.params,
-    headers: req.headers,
-  });
-
   const statusCode = error.statusCode || 500;
-
-  let errorMessage = "Internal server error";
-
-  if (error instanceof ApiError) {
-    errorMessage = error.message;
-  } else if (error.message) {
-    errorMessage = error.message;
-  }
-
+  const message =
+    error instanceof ApiError
+      ? error.message
+      : error.message || "Internal server error";
   res.status(statusCode).json({
     success: false,
-    message: errorMessage,
+    message,
     error:
       process.env.NODE_ENV === "development"
-        ? {
-            message: error.message,
-            stack: error.stack,
-          }
+        ? { message: error.message, stack: error.stack }
         : undefined,
   });
 });
 
-app.get("/", (req, res) => {
-  res.send("API is running...");
-});
-
-app.use((_req, res) => {
-  res.status(404).json({ message: "Route not found" });
-});
-
-if (process.env.NODE_ENV === "development") {
+// Dev Routes
+if (isDevelopment) {
   import("./routes/testRoutes.js").then((testRoutes) => {
     app.use("/api/test", testRoutes.default);
   });
 }
 
+// Serve React Client (Production Only)
 if (isProduction) {
-  // Use absolute path based on Render's structure
   const clientBuildPath = path.join(process.cwd(), "../client/dist");
-
-  // Debugging logs
-  console.log("🔍 Final client path:", clientBuildPath);
-  console.log("📂 Directory exists?", existsSync(clientBuildPath));
-
   if (!existsSync(clientBuildPath)) {
     console.error("❌ Missing client files at:", clientBuildPath);
-    // List actual directory contents for debugging
     console.log(
       "Current directory structure:",
       readdirSync(path.join(process.cwd(), ".."))
     );
     process.exit(1);
   }
-
-  app.use(express.static(clientBuildPath));
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(clientBuildPath, "index.html"));
-  });
-}
-if (isProduction) {
-  // Use absolute path based on Render's structure
-  const clientBuildPath = path.join(process.cwd(), "../client/dist");
-
-  // Debugging logs
-  console.log("🔍 Final client path:", clientBuildPath);
-  console.log("📂 Directory exists?", existsSync(clientBuildPath));
-
-  if (!existsSync(clientBuildPath)) {
-    console.error("❌ Missing client files at:", clientBuildPath);
-    // List actual directory contents for debugging
-    console.log(
-      "Current directory structure:",
-      readdirSync(path.join(process.cwd(), ".."))
-    );
-    process.exit(1);
-  }
-
   app.use(express.static(clientBuildPath));
   app.get("*", (req, res) => {
     res.sendFile(path.join(clientBuildPath, "index.html"));
   });
 }
 
-if (isProduction) {
-  const clientBuildPath = path.join(process.cwd(), "../client/dist");
-
-  console.log("🔍 Final client path:", clientBuildPath);
-  console.log("📂 Directory exists?", fs.existsSync(clientBuildPath));
-
-  if (fs.existsSync(clientBuildPath)) {
-    app.use(express.static(clientBuildPath));
-
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(clientBuildPath, "index.html"));
-    });
-  } else {
-    console.error("❌ Client build directory not found:", clientBuildPath);
-  }
-}
-
-const startServer = async () => {
-  try {
-    await connectDB();
-    app.listen(PORT, () => {
-      console.log(`
-🚀 Server is running!
-📡 Port: ${PORT}
-🌍 Environment: ${process.env.NODE_ENV}
-🔗 Client URL: ${process.env.CLIENT_URL}
-      `);
-    });
-  } catch (error) {
-    logServerError(error, "Server Startup Error");
-    process.exit(1);
-  }
-};
-
-startServer();
+// Connect to DB and start server
+connectDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
+});
