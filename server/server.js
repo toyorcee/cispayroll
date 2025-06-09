@@ -293,22 +293,10 @@ if (process.env.NODE_ENV === "development") {
 }
 
 if (isProduction) {
-  const clientBuildPath = path.join(__dirname, "../client/dist");
+  const clientBuildPath = path.join(__dirname, "../../client/dist");
 
-  console.log("💡 App running from:", __dirname);
-  console.log("📍 FINAL CLIENT PATH:", clientBuildPath);
-  console.log("📂 Directory exists?", existsSync(clientBuildPath));
-
-  if (!existsSync(clientBuildPath)) {
-    console.error("❌ MISSING CLIENT FILES! Expected at:", clientBuildPath);
-    console.log('Running "ls -R /opt/render/project" for debugging:');
-    try {
-      console.log(execSync("ls -R /opt/render/project").toString());
-    } catch (e) {
-      console.log("Directory listing failed:", e.message);
-    }
-    process.exit(1);
-  }
+  console.log("🔍 Production path check:", clientBuildPath);
+  console.log("📁 Contents:", readdirSync(clientBuildPath));
 
   app.use(express.static(clientBuildPath));
   app.get("*", (req, res) => {
