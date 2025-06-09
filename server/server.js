@@ -239,19 +239,18 @@ if (isDevelopment) {
 
 // Serve React Client (Production Only)
 if (isProduction) {
-  const clientBuildPath = path.join(process.cwd(), "../client/dist");
-  if (!existsSync(clientBuildPath)) {
-    console.error("❌ Missing client files at:", clientBuildPath);
-    console.log(
-      "Current directory structure:",
-      readdirSync(path.join(process.cwd(), ".."))
-    );
-    process.exit(1);
+  const clientBuildPath = path.join(__dirname, "../client/dist");
+  console.log("➡️ try to serve client folder:", clientBuildPath);
+
+  if (existsSync(clientBuildPath)) {
+    console.log("✅ Serving frontend from:", clientBuildPath);
+    app.use(express.static(clientBuildPath));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(clientBuildPath, "index.html"));
+    });
+  } else {
+    console.warn("⚠️ Warning: client build not found at", clientBuildPath);
   }
-  app.use(express.static(clientBuildPath));
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(clientBuildPath, "index.html"));
-  });
 }
 
 // Connect to DB and start server
