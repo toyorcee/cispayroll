@@ -40,6 +40,13 @@ import allowanceRoutes from "./routes/allowanceRoutes.js";
 
 dotenv.config();
 
+const logServerError = (error, context) => {
+  console.error(`🔴 ${context}:`, {
+    message: error.message,
+    stack: error.stack,
+    time: new Date().toISOString(),
+  });
+};
 
 const requestLogger = (req, _res, next) => {
   console.log(`📥 ${new Date().toISOString()} - ${req.method} ${req.url}`);
