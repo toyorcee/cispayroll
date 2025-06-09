@@ -5,7 +5,7 @@
   "main": "server.js",
   "type": "module",
 "scripts": {
-  "build": "cd client && npm ci && npm run build",
+  "build": "cd ../client && npm ci && npm run build",
   "start": "node server.js"
 },
   "keywords": [],
