@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import { traceError, ApiError } from "./utils/errorHandler.js";
 import multer from "multer";
 import fs from "fs";
+import { readdirSync } from "fs";
 
 const uploadsDir = path.join(process.cwd(), "uploads", "profiles");
 if (!fs.existsSync(uploadsDir)) {
@@ -39,13 +40,6 @@ import allowanceRoutes from "./routes/allowanceRoutes.js";
 
 dotenv.config();
 
-const logServerError = (error, context) => {
-  console.error(`🔴 ${context}:`, {
-    message: error.message,
-    stack: error.stack,
-    time: new Date().toISOString(),
-  });
-};
 
 const requestLogger = (req, _res, next) => {
   console.log(`📥 ${new Date().toISOString()} - ${req.method} ${req.url}`);
@@ -86,7 +80,7 @@ const connectDB = async () => {
 
 // Initialize Express with enhanced error handling
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
