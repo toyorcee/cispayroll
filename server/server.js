@@ -341,26 +341,20 @@ if (isProduction) {
 }
 
 if (isProduction) {
-  // Try multiple possible paths
-  const possiblePaths = [
-    path.join(process.cwd(), "../client/dist"),
-    path.join(process.cwd(), "../../client/dist"),
-    "/opt/render/project/client/dist",
-  ];
+  const clientBuildPath = path.join(process.cwd(), "../client/dist");
 
-  let clientBuildPath = possiblePaths.find((p) => existsSync(p));
+  console.log("🔍 Final client path:", clientBuildPath);
+  console.log("📂 Directory exists?", fs.existsSync(clientBuildPath));
 
-  if (!clientBuildPath) {
-    console.error("❌ Could not find client files in any location");
-    possiblePaths.forEach((p) => console.log(`- Checked: ${p}`));
-    process.exit(1);
+  if (fs.existsSync(clientBuildPath)) {
+    app.use(express.static(clientBuildPath));
+
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(clientBuildPath, "index.html"));
+    });
+  } else {
+    console.error("❌ Client build directory not found:", clientBuildPath);
   }
-
-  console.log("✅ Found client files at:", clientBuildPath);
-  app.use(express.static(clientBuildPath));
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(clientBuildPath, "index.html"));
-  });
 }
 
 const startServer = async () => {
