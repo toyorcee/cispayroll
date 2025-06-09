@@ -294,10 +294,67 @@ if (process.env.NODE_ENV === "development") {
 }
 
 if (isProduction) {
-  const clientBuildPath = path.join(__dirname, "../../client/dist");
+  // Use absolute path based on Render's structure
+  const clientBuildPath = path.join(process.cwd(), "../client/dist");
 
-  console.log("🔍 Production path check:", clientBuildPath);
-  console.log("📁 Contents:", readdirSync(clientBuildPath));
+  // Debugging logs
+  console.log("🔍 Final client path:", clientBuildPath);
+  console.log("📂 Directory exists?", existsSync(clientBuildPath));
+
+  if (!existsSync(clientBuildPath)) {
+    console.error("❌ Missing client files at:", clientBuildPath);
+    // List actual directory contents for debugging
+    console.log(
+      "Current directory structure:",
+      readdirSync(path.join(process.cwd(), ".."))
+    );
+    process.exit(1);
+  }
+
+  app.use(express.static(clientBuildPath));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(clientBuildPath, "index.html"));
+  });
+}
+if (isProduction) {
+  // Use absolute path based on Render's structure
+  const clientBuildPath = path.join(process.cwd(), "../client/dist");
+
+  // Debugging logs
+  console.log("🔍 Final client path:", clientBuildPath);
+  console.log("📂 Directory exists?", existsSync(clientBuildPath));
+
+  if (!existsSync(clientBuildPath)) {
+    console.error("❌ Missing client files at:", clientBuildPath);
+    // List actual directory contents for debugging
+    console.log(
+      "Current directory structure:",
+      readdirSync(path.join(process.cwd(), ".."))
+    );
+    process.exit(1);
+  }
+
+  app.use(express.static(clientBuildPath));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(clientBuildPath, "index.html"));
+  });
+}
+if (isProduction) {
+  // Use absolute path based on Render's structure
+  const clientBuildPath = path.join(process.cwd(), "../client/dist");
+
+  // Debugging logs
+  console.log("🔍 Final client path:", clientBuildPath);
+  console.log("📂 Directory exists?", existsSync(clientBuildPath));
+
+  if (!existsSync(clientBuildPath)) {
+    console.error("❌ Missing client files at:", clientBuildPath);
+    console.log(
+      "Current directory structure:",
+      readdirSync(path.join(process.cwd(), ".."))
+    );
+    process.exit(1);
+  }
 
   app.use(express.static(clientBuildPath));
   app.get("*", (req, res) => {
