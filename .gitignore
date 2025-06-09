@@ -13,9 +13,7 @@ logs/
 **/*.log
 
 # Build files
-dist/
 build/
-**/dist/
 **/build/
 
 # Vite cache
@@ -36,7 +34,6 @@ Thumbs.db
 
 # Frontend-specific
 client/node_modules/
-client/dist/
 client/.env
 client/.cache/
 
