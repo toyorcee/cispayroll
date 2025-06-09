@@ -2,19 +2,27 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-// https://vite.dev/config/
 export default defineConfig({
+  base: "/",
   plugins: [react(), tailwindcss()],
-  server: {
-    headers: {
-      "Service-Worker-Allowed": "/",
+  build: {
+    chunkSizeWarningLimit: 1600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom"],
+          mui: ["@mui/material", "@mui/icons-material"],
+          vendor: ["lodash", "axios", "date-fns"],
+        },
+      },
     },
   },
-  build: {
-    rollupOptions: {
-      input: {
-        main: "./index.html",
-        sw: "./public/sw.js",
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        secure: false,
       },
     },
   },

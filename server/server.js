@@ -5,7 +5,6 @@ import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import { dirname } from "path";
 import { traceError, ApiError } from "./utils/errorHandler.js";
 import multer from "multer";
 import fs from "fs";
@@ -14,6 +13,9 @@ const uploadsDir = path.join(process.cwd(), "uploads", "profiles");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
+
+const isProduction = process.env.NODE_ENV === "production";
+const isDevelopment = process.env.NODE_ENV === "development";
 
 import authRoutes from "./routes/authRoutes.js";
 import superAdminRoutes from "./routes/superAdminRoutes.js";
@@ -87,7 +89,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = path.dirname(__filename);
 
 process.on("unhandledRejection", (reason, promise) => {
   logServerError({ reason, promise }, "Unhandled Promise Rejection");
@@ -105,27 +107,31 @@ const allowedOrigin = process.env.CLIENT_URL;
 
 app.use(
   cors({
-    origin: allowedOrigin,
+    origin: isDevelopment ? "http://localhost:5173" : process.env.CLIENT_URL,
     credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Content-Length",
+      "X-Requested-With",
+    ],
+    exposedHeaders: ["Set-Cookie", "set-cookie"],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   })
 );
 
 app.use(cookieParser());
 app.use(express.json());
-
-// app.use(
-//   session({
-//     secret: process.env.SESSION_SECRET || "your-secret-key",
-//     resave: false,
-//     saveUninitialized: true,
-//     cookie: {
-//       secure: process.env.NODE_ENV === "production",
-//       maxAge: 24 * 60 * 60 * 1000,
-//     },
-//   })
-// );
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    },
+    limit: "50mb",
+  })
+);
 
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -283,6 +289,30 @@ app.use((_req, res) => {
 if (process.env.NODE_ENV === "development") {
   import("./routes/testRoutes.js").then((testRoutes) => {
     app.use("/api/test", testRoutes.default);
+  });
+}
+
+if (isProduction) {
+  const clientBuildPath = path.join(__dirname, "../client/dist");
+
+  console.log("💡 App running from:", __dirname);
+  console.log("📍 FINAL CLIENT PATH:", clientBuildPath);
+  console.log("📂 Directory exists?", existsSync(clientBuildPath));
+
+  if (!existsSync(clientBuildPath)) {
+    console.error("❌ MISSING CLIENT FILES! Expected at:", clientBuildPath);
+    console.log('Running "ls -R /opt/render/project" for debugging:');
+    try {
+      console.log(execSync("ls -R /opt/render/project").toString());
+    } catch (e) {
+      console.log("Directory listing failed:", e.message);
+    }
+    process.exit(1);
+  }
+
+  app.use(express.static(clientBuildPath));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(clientBuildPath, "index.html"));
   });
 }
 
