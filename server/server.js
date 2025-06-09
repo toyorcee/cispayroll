@@ -69,7 +69,7 @@ app.use((req, res, next) => {
 
 app.use(
   cors({
-    origin: isDevelopment ? "http://localhost:5173" : process.env.CLIENT_URL,
+    origin: "https://payroll-management-system-qh4b.onrender.com",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: [
@@ -246,7 +246,7 @@ if (isDevelopment) {
 
 //     app.use(express.static(clientBuildPath));
 
-//     app.get("/api/*", (req, res, next) => next()); 
+//     app.get("/api/*", (req, res, next) => next());
 
 //     app.get("*", (req, res) => {
 //       res.sendFile(path.join(clientBuildPath, "index.html"));
