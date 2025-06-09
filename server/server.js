@@ -237,24 +237,24 @@ if (isDevelopment) {
   });
 }
 
-if (isProduction) {
-  const clientBuildPath = path.join(__dirname, "../../client/dist");
-  console.log("🔍 Final client path:", clientBuildPath);
+// if (isProduction) {
+//   const clientBuildPath = path.join(__dirname, "../../client/dist");
+//   console.log("🔍 Final client path:", clientBuildPath);
 
-  if (existsSync(clientBuildPath)) {
-    console.log("📂 Contents:", readdirSync(clientBuildPath));
+//   if (existsSync(clientBuildPath)) {
+//     console.log("📂 Contents:", readdirSync(clientBuildPath));
 
-    app.use(express.static(clientBuildPath));
+//     app.use(express.static(clientBuildPath));
 
-    app.get("/api/*", (req, res, next) => next()); 
+//     app.get("/api/*", (req, res, next) => next()); 
 
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(clientBuildPath, "index.html"));
-    });
-  } else {
-    console.error("❌ Client build not found at:", clientBuildPath);
-  }
-}
+//     app.get("*", (req, res) => {
+//       res.sendFile(path.join(clientBuildPath, "index.html"));
+//     });
+//   } else {
+//     console.error("❌ Client build not found at:", clientBuildPath);
+//   }
+// }
 
 // Connect to DB and start server
 connectDB().then(() => {
