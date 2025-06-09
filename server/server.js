@@ -237,21 +237,45 @@ if (isDevelopment) {
   });
 }
 
-// Serve React Client (Production Only)
 if (isProduction) {
   const clientBuildPath = path.join(__dirname, "../client/dist");
-  console.log("➡️ try to serve client folder:", clientBuildPath);
 
-  if (existsSync(clientBuildPath)) {
-    console.log("✅ Serving frontend from:", clientBuildPath);
-    app.use(express.static(clientBuildPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(clientBuildPath, "index.html"));
-    });
-  } else {
-    console.warn("⚠️ Warning: client build not found at", clientBuildPath);
+  console.log("💡 App running from:", __dirname);
+  console.log("📍 FINAL CLIENT PATH:", clientBuildPath);
+  console.log("📂 Directory exists?", existsSync(clientBuildPath));
+
+  if (!existsSync(clientBuildPath)) {
+    console.error("❌ MISSING CLIENT FILES! Expected at:", clientBuildPath);
+    console.log('Running "ls -R /opt/render/project" for debugging:');
+    try {
+      console.log(execSync("ls -R /opt/render/project").toString());
+    } catch (e) {
+      console.log("Directory listing failed:", e.message);
+    }
+    process.exit(1);
   }
+
+  app.use(express.static(clientBuildPath));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(clientBuildPath, "index.html"));
+  });
 }
+
+// Serve React Client (Production Only)
+// if (isProduction) {
+//   const clientBuildPath = path.join(__dirname, "../client/dist");
+//   console.log("➡️ try to serve client folder:", clientBuildPath);
+
+//   if (existsSync(clientBuildPath)) {
+//     console.log("✅ Serving frontend from:", clientBuildPath);
+//     app.use(express.static(clientBuildPath));
+//     app.get("*", (req, res) => {
+//       res.sendFile(path.join(clientBuildPath, "index.html"));
+//     });
+//   } else {
+//     console.warn("⚠️ Warning: client build not found at", clientBuildPath);
+//   }
+// }
 
 // Connect to DB and start server
 connectDB().then(() => {
