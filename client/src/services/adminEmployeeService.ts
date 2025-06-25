@@ -1,10 +1,9 @@
-import axios from "axios";
+import api from "./api";
 import { Employee } from "../types/employee";
 import { UserRole } from "../types/auth";
 
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api/admin`;
-const SUPER_ADMIN_BASE_URL = `${import.meta.env.VITE_API_URL}/api/super-admin`;
-axios.defaults.withCredentials = true;
+const BASE_URL = `/api/admin`;
+const SUPER_ADMIN_BASE_URL = `/api/super-admin`;
 
 const isSuperAdmin = (userRole?: string): boolean => {
   return userRole === UserRole.SUPER_ADMIN;
@@ -39,9 +38,7 @@ export const adminEmployeeService = {
         ? `${SUPER_ADMIN_BASE_URL}/departments/${data.departmentId}/employees`
         : `${BASE_URL}/departments/${data.departmentId}/employees`;
 
-      const response = await axios.get(endpoint, {
-        withCredentials: true,
-      });
+      const response = await api.get(endpoint);
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to fetch employees");
@@ -64,9 +61,7 @@ export const adminEmployeeService = {
   // Get single employee by ID
   getEmployeeById: async (employeeId: string): Promise<Employee> => {
     try {
-      const response = await axios.get(`${BASE_URL}/employees/${employeeId}`, {
-        withCredentials: true,
-      });
+      const response = await api.get(`${BASE_URL}/employees/${employeeId}`);
 
       if (!response.data.success) {
         throw new Error(
@@ -84,9 +79,7 @@ export const adminEmployeeService = {
   // Get active employees (for payroll processing)
   getActiveEmployees: async (): Promise<Employee[]> => {
     try {
-      const response = await axios.get(`${BASE_URL}/employees/active`, {
-        withCredentials: true,
-      });
+      const response = await api.get(`${BASE_URL}/employees/active`);
 
       if (!response.data.success) {
         throw new Error(
@@ -107,10 +100,9 @@ export const adminEmployeeService = {
     data: Partial<Employee>
   ): Promise<Employee> => {
     try {
-      const response = await axios.put(
+      const response = await api.put(
         `${BASE_URL}/employees/${employeeId}`,
-        data,
-        { withCredentials: true }
+        data
       );
 
       if (!response.data.success) {
@@ -127,9 +119,8 @@ export const adminEmployeeService = {
   // Get employee payroll history
   getEmployeePayrollHistory: async (employeeId: string) => {
     try {
-      const response = await axios.get(
-        `${BASE_URL}/employees/${employeeId}/payroll-history`,
-        { withCredentials: true }
+      const response = await api.get(
+        `${BASE_URL}/employees/${employeeId}/payroll-history`
       );
 
       if (!response.data.success) {

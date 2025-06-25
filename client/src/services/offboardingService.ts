@@ -1,194 +1,344 @@
-import axios from "axios";
-import { OffboardingType, OffboardingData } from "../types/offboarding";
+import api from "./api";
+import { toast } from "react-toastify";
+// import { OffboardingType, OffboardingData } from "../types/offboarding";
 
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
-axios.defaults.withCredentials = true;
+const BASE_URL = `/api`;
 
 // Helper function for consistent logging
-const logOffboardingAction = (action: string, data: any) => {
-  console.log(`[OFFBOARDING] ${action}:`, data);
-};
+// const logOffboardingAction = (action: string, data: any) => {
+//   console.log(`[OFFBOARDING] ${action}:`, data);
+// };
+
+export interface OffboardingTask {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  deadline: Date;
+  completed: boolean;
+  completedAt?: Date;
+  completedBy?: {
+    id: string;
+    name: string;
+  };
+  notes?: string;
+}
+
+export interface OffboardingEmployee {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  department: {
+    id: string;
+    name: string;
+  };
+  position: string;
+  exitDate: Date;
+  offboardingStatus: string;
+  progress: number;
+  tasks: OffboardingTask[];
+  supervisor: {
+    id: string;
+    name: string;
+  };
+  reason: string;
+  type: string;
+}
 
 export const offboardingService = {
+  // Get all offboarding employees
+  getOffboardingEmployees: async (): Promise<OffboardingEmployee[]> => {
+    try {
+      const response = await api.get(
+        `${BASE_URL}/super-admin/offboarding-employees`
+      );
+      return response.data.data || [];
+    } catch (error: any) {
+      console.error("Failed to fetch offboarding employees:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch offboarding employees"
+      );
+      throw error;
+    }
+  },
+
+  // Get offboarding employee by ID
+  getOffboardingEmployeeById: async (
+    employeeId: string
+  ): Promise<OffboardingEmployee> => {
+    try {
+      const response = await api.get(
+        `${BASE_URL}/super-admin/offboarding-employees/${employeeId}`
+      );
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Failed to fetch offboarding employee:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch offboarding employee"
+      );
+      throw error;
+    }
+  },
+
   // Initiate offboarding process
   initiateOffboarding: async (
-    userId: string,
+    employeeId: string,
     data: {
-      type: OffboardingType;
       reason: string;
-      targetExitDate: Date;
+      type: string;
+      exitDate: Date;
+      notes?: string;
     }
-  ): Promise<OffboardingData> => {
+  ): Promise<OffboardingEmployee> => {
     try {
-      logOffboardingAction("Initiating offboarding for user", {
-        userId,
-        ...data,
-      });
-
-      const payload = {
-        ...data,
-        type: data.type as OffboardingType,
-      };
-
-      const response = await axios.post(
-        `${BASE_URL}/offboarding/initiate/${userId}`,
-        payload,
-        { withCredentials: true }
+      const response = await api.post(
+        `${BASE_URL}/super-admin/offboarding-employees/${employeeId}/initiate`,
+        data
       );
-
-      // Log the response
-      logOffboardingAction("Offboarding initiation response", response.data);
-
-      if (!response.data.success) {
-        throw new Error(
-          response.data.message || "Failed to initiate offboarding"
-        );
-      }
-
+      toast.success("Offboarding process initiated successfully");
       return response.data.data;
     } catch (error: any) {
-      // Log the error
-      logOffboardingAction("Error initiating offboarding", {
-        userId,
-        error: error.message || error,
-        response: error.response?.data,
-      });
-
-      console.error("Error initiating offboarding:", error);
-      throw error.response?.data?.message || "Failed to initiate offboarding";
+      console.error("Failed to initiate offboarding:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to initiate offboarding"
+      );
+      throw error;
     }
   },
 
-  // Complete a specific offboarding task
-  completeTask: async (
-    userId: string,
-    taskName: string,
-    completed: boolean,
-    notes?: string,
-    attachments?: any[]
-  ): Promise<OffboardingData> => {
-    console.log(
-      `Completing task ${taskName} for user ${userId} with status: ${completed}`
-    );
-    const response = await axios.post(
-      `${BASE_URL}/offboarding/complete-task/${userId}/${taskName}`,
-      {
-        completed,
-        notes,
-        attachments,
-      },
-      { withCredentials: true }
-    );
-    console.log("Task completion response:", response.data);
-    return response.data.data;
-  },
-
-  // Get offboarding details
-  getOffboardingDetails: async (userId: string): Promise<OffboardingData> => {
+  // Update offboarding task
+  updateOffboardingTask: async (
+    employeeId: string,
+    taskId: string,
+    updates: Partial<OffboardingTask>
+  ): Promise<OffboardingTask> => {
     try {
-      // Log the request
-      logOffboardingAction("Fetching offboarding details for user", { userId });
-
-      const response = await axios.get(
-        `${BASE_URL}/offboarding/details/${userId}`,
-        { withCredentials: true }
+      const response = await api.patch(
+        `${BASE_URL}/super-admin/offboarding-employees/${employeeId}/tasks/${taskId}`,
+        updates
       );
-
-      // Log the response
-      logOffboardingAction("Offboarding details response", response.data);
-
-      if (!response.data.success) {
-        throw new Error(
-          response.data.message || "Failed to fetch offboarding details"
-        );
-      }
-
+      toast.success("Offboarding task updated successfully");
       return response.data.data;
     } catch (error: any) {
-      // Log the error
-      logOffboardingAction("Error fetching offboarding details", {
-        userId,
-        error: error.message || error,
-        response: error.response?.data,
-      });
-
-      console.error("Error fetching offboarding details:", error);
-      throw (
-        error.response?.data?.message || "Failed to fetch offboarding details"
+      console.error("Failed to update offboarding task:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to update offboarding task"
       );
+      throw error;
     }
   },
 
-  // Get all offboarding users
-  getOffboardingUsers: async (page: number = 1, limit: number = 10) => {
+  // Complete offboarding task
+  completeOffboardingTask: async (
+    employeeId: string,
+    taskId: string,
+    notes?: string
+  ): Promise<OffboardingTask> => {
     try {
-      logOffboardingAction("Fetching all offboarding users", { page, limit });
-
-      const response = await axios.get(`${BASE_URL}/offboarding/employees`, {
-        params: { page, limit },
-        withCredentials: true,
-      });
-
-      logOffboardingAction("Offboarding users response", response.data);
-
-      if (!response.data.success) {
-        throw new Error(
-          response.data.message || "Failed to fetch offboarding users"
-        );
-      }
-
-      return response.data;
+      const response = await api.post(
+        `${BASE_URL}/super-admin/offboarding-employees/${employeeId}/tasks/${taskId}/complete`,
+        { notes }
+      );
+      toast.success("Offboarding task completed successfully");
+      return response.data.data;
     } catch (error: any) {
-      logOffboardingAction("Error fetching offboarding users", {
-        error: error.message || error,
-        response: error.response?.data,
-      });
+      console.error("Failed to complete offboarding task:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to complete offboarding task"
+      );
+      throw error;
+    }
+  },
 
-      console.error("Failed to fetch offboarding users:", error);
+  // Add custom offboarding task
+  addOffboardingTask: async (
+    employeeId: string,
+    taskData: Omit<
+      OffboardingTask,
+      "id" | "completed" | "completedAt" | "completedBy"
+    >
+  ): Promise<OffboardingTask> => {
+    try {
+      const response = await api.post(
+        `${BASE_URL}/super-admin/offboarding-employees/${employeeId}/tasks`,
+        taskData
+      );
+      toast.success("Offboarding task added successfully");
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Failed to add offboarding task:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to add offboarding task"
+      );
+      throw error;
+    }
+  },
+
+  // Delete offboarding task
+  deleteOffboardingTask: async (
+    employeeId: string,
+    taskId: string
+  ): Promise<void> => {
+    try {
+      await api.delete(
+        `${BASE_URL}/super-admin/offboarding-employees/${employeeId}/tasks/${taskId}`
+      );
+      toast.success("Offboarding task deleted successfully");
+    } catch (error: any) {
+      console.error("Failed to delete offboarding task:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to delete offboarding task"
+      );
+      throw error;
+    }
+  },
+
+  // Complete offboarding process
+  completeOffboarding: async (
+    employeeId: string
+  ): Promise<OffboardingEmployee> => {
+    try {
+      const response = await api.post(
+        `${BASE_URL}/super-admin/offboarding-employees/${employeeId}/complete`
+      );
+      toast.success("Offboarding process completed successfully");
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Failed to complete offboarding process:", error);
+      toast.error(
+        error.response?.data?.message ||
+          "Failed to complete offboarding process"
+      );
       throw error;
     }
   },
 
   // Cancel offboarding process
   cancelOffboarding: async (
-    userId: string,
-    reason: string
-  ): Promise<OffboardingData> => {
+    employeeId: string
+  ): Promise<OffboardingEmployee> => {
     try {
-      // Log the request data
-      logOffboardingAction("Cancelling offboarding for user", {
-        userId,
-        reason,
-      });
-
-      const response = await axios.post(
-        `${BASE_URL}/offboarding/cancel/${userId}`,
-        { reason },
-        { withCredentials: true }
+      const response = await api.post(
+        `${BASE_URL}/super-admin/offboarding-employees/${employeeId}/cancel`
       );
-
-      // Log the response
-      logOffboardingAction("Offboarding cancellation response", response.data);
-
-      if (!response.data.success) {
-        throw new Error(
-          response.data.message || "Failed to cancel offboarding"
-        );
-      }
-
+      toast.success("Offboarding process cancelled successfully");
       return response.data.data;
     } catch (error: any) {
-      // Log the error
-      logOffboardingAction("Error cancelling offboarding", {
-        userId,
-        reason,
-        error: error.message || error,
-        response: error.response?.data,
-      });
-
-      console.error("Error cancelling offboarding:", error);
-      throw error.response?.data?.message || "Failed to cancel offboarding";
+      console.error("Failed to cancel offboarding process:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to cancel offboarding process"
+      );
+      throw error;
     }
+  },
+
+  // Get offboarding statistics
+  getOffboardingStats: async () => {
+    try {
+      const response = await api.get(
+        `${BASE_URL}/super-admin/offboarding-stats`
+      );
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Failed to fetch offboarding stats:", error);
+      toast.error(
+        error.response?.data?.message ||
+          "Failed to fetch offboarding statistics"
+      );
+      throw error;
+    }
+  },
+
+  // Admin-specific operations
+  adminService: {
+    getDepartmentOffboardingEmployees: async (): Promise<
+      OffboardingEmployee[]
+    > => {
+      try {
+        const response = await api.get(
+          `${BASE_URL}/admin/offboarding-employees`
+        );
+        return response.data.data || [];
+      } catch (error: any) {
+        console.error(
+          "Failed to fetch department offboarding employees:",
+          error
+        );
+        toast.error(
+          error.response?.data?.message ||
+            "Failed to fetch offboarding employees"
+        );
+        throw error;
+      }
+    },
+
+    initiateDepartmentOffboarding: async (
+      employeeId: string,
+      data: {
+        reason: string;
+        type: string;
+        exitDate: Date;
+        notes?: string;
+      }
+    ): Promise<OffboardingEmployee> => {
+      try {
+        const response = await api.post(
+          `${BASE_URL}/admin/offboarding-employees/${employeeId}/initiate`,
+          data
+        );
+        toast.success("Offboarding process initiated successfully");
+        return response.data.data;
+      } catch (error: any) {
+        console.error("Failed to initiate department offboarding:", error);
+        toast.error(
+          error.response?.data?.message || "Failed to initiate offboarding"
+        );
+        throw error;
+      }
+    },
+
+    updateDepartmentOffboardingTask: async (
+      employeeId: string,
+      taskId: string,
+      updates: Partial<OffboardingTask>
+    ): Promise<OffboardingTask> => {
+      try {
+        const response = await api.patch(
+          `${BASE_URL}/admin/offboarding-employees/${employeeId}/tasks/${taskId}`,
+          updates
+        );
+        toast.success("Offboarding task updated successfully");
+        return response.data.data;
+      } catch (error: any) {
+        console.error("Failed to update department offboarding task:", error);
+        toast.error(
+          error.response?.data?.message || "Failed to update offboarding task"
+        );
+        throw error;
+      }
+    },
+
+    completeDepartmentOffboardingTask: async (
+      employeeId: string,
+      taskId: string,
+      notes?: string
+    ): Promise<OffboardingTask> => {
+      try {
+        const response = await api.post(
+          `${BASE_URL}/admin/offboarding-employees/${employeeId}/tasks/${taskId}/complete`,
+          { notes }
+        );
+        toast.success("Offboarding task completed successfully");
+        return response.data.data;
+      } catch (error: any) {
+        console.error("Failed to complete department offboarding task:", error);
+        toast.error(
+          error.response?.data?.message || "Failed to complete offboarding task"
+        );
+        throw error;
+      }
+    },
   },
 
   getFinalSettlementReport: async (employeeId: string) => {
@@ -198,11 +348,10 @@ export const offboardingService = {
         employeeId
       );
 
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}/offboarding/final-settlement-report/${employeeId}`,
         {
           responseType: "blob",
-          withCredentials: true,
         }
       );
 
@@ -228,7 +377,7 @@ export const offboardingService = {
 
   emailFinalSettlementReport: async (employeeId: string) => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${BASE_URL}/offboarding/email-final-settlement-report/${employeeId}`,
         {},
         {

@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "./api";
 import { toast } from "react-toastify";
 
 // Define types for user dashboard data
@@ -101,8 +101,7 @@ export interface ProcessingStats {
   recentActivityCount?: number;
 }
 
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api/regular-user`;
-axios.defaults.withCredentials = true;
+const BASE_URL = `/api/regular-user`;
 
 const userService = {
   /**
@@ -110,9 +109,7 @@ const userService = {
    */
   getUserDashboardStats: async (): Promise<UserDashboardStats> => {
     try {
-      const response = await axios.get(`${BASE_URL}/dashboard/stats`, {
-        withCredentials: true,
-      });
+      const response = await api.get(`${BASE_URL}/dashboard/stats`);
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching user dashboard stats:", error);
@@ -125,9 +122,7 @@ const userService = {
    */
   getUserDepartmentStats: async () => {
     try {
-      const response = await axios.get(`${BASE_URL}/department/stats`, {
-        withCredentials: true,
-      });
+      const response = await api.get(`${BASE_URL}/department/stats`);
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching user department stats:", error);
@@ -140,9 +135,7 @@ const userService = {
    */
   getUserTeamStats: async () => {
     try {
-      const response = await axios.get(`${BASE_URL}/team/stats`, {
-        withCredentials: true,
-      });
+      const response = await api.get(`${BASE_URL}/team/stats`);
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching user team stats:", error);
@@ -155,9 +148,7 @@ const userService = {
    */
   getOwnProfile: async (): Promise<UserProfile> => {
     try {
-      const response = await axios.get(`${BASE_URL}/profile`, {
-        withCredentials: true,
-      });
+      const response = await api.get(`${BASE_URL}/profile`);
       return response.data.user;
     } catch (error: any) {
       console.error("Error fetching user profile:", error);
@@ -173,9 +164,7 @@ const userService = {
     profileData: Partial<UserProfile>
   ): Promise<UserProfile> => {
     try {
-      const response = await axios.put(`${BASE_URL}/profile`, profileData, {
-        withCredentials: true,
-      });
+      const response = await api.put(`${BASE_URL}/profile`, profileData);
       toast.success("Profile updated successfully");
       return response.data.user;
     } catch (error: any) {
@@ -193,9 +182,7 @@ const userService = {
     count: number;
   }> => {
     try {
-      const response = await axios.get(`${BASE_URL}/leave`, {
-        withCredentials: true,
-      });
+      const response = await api.get(`${BASE_URL}/leave`);
       return response.data;
     } catch (error: any) {
       console.error("Error fetching leave requests:", error);
@@ -213,9 +200,7 @@ const userService = {
     leaveData: Partial<LeaveRequest>
   ): Promise<LeaveRequest> => {
     try {
-      const response = await axios.post(`${BASE_URL}/leave`, leaveData, {
-        withCredentials: true,
-      });
+      const response = await api.post(`${BASE_URL}/leave`, leaveData);
       toast.success("Leave request created successfully");
       return response.data.leaveRequest;
     } catch (error: any) {
@@ -232,13 +217,7 @@ const userService = {
    */
   cancelLeaveRequest: async (leaveId: string): Promise<LeaveRequest> => {
     try {
-      const response = await axios.patch(
-        `${BASE_URL}/leave/${leaveId}/cancel`,
-        {},
-        {
-          withCredentials: true,
-        }
-      );
+      const response = await api.patch(`${BASE_URL}/leave/${leaveId}/cancel`);
       toast.success("Leave request cancelled successfully");
       return response.data.leaveRequest;
     } catch (error: any) {
@@ -255,9 +234,7 @@ const userService = {
    */
   getMyAllowances: async (): Promise<Allowance[]> => {
     try {
-      const response = await axios.get(`${BASE_URL}/allowances`, {
-        withCredentials: true,
-      });
+      const response = await api.get(`${BASE_URL}/allowances`);
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching allowances:", error);
@@ -275,12 +252,9 @@ const userService = {
     allowanceData: Partial<Allowance>
   ): Promise<Allowance> => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${BASE_URL}/allowances/request`,
-        allowanceData,
-        {
-          withCredentials: true,
-        }
+        allowanceData
       );
       toast.success("Allowance request submitted successfully");
       return response.data.data;
@@ -298,9 +272,7 @@ const userService = {
    */
   getAllowanceHistory: async (): Promise<Allowance[]> => {
     try {
-      const response = await axios.get(`${BASE_URL}/allowances/history`, {
-        withCredentials: true,
-      });
+      const response = await api.get(`${BASE_URL}/allowances/history`);
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching allowance history:", error);
@@ -316,9 +288,7 @@ const userService = {
    */
   getMyDeductions: async (): Promise<GroupedDeductions> => {
     try {
-      const response = await axios.get(`${BASE_URL}/deductions`, {
-        withCredentials: true,
-      });
+      const response = await api.get(`${BASE_URL}/deductions`);
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching deductions:", error);
@@ -334,12 +304,7 @@ const userService = {
    */
   getDeductionDetails: async (deductionId: string): Promise<Deduction> => {
     try {
-      const response = await axios.get(
-        `${BASE_URL}/deductions/${deductionId}`,
-        {
-          withCredentials: true,
-        }
-      );
+      const response = await api.get(`${BASE_URL}/deductions/${deductionId}`);
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching deduction details:", error);
@@ -355,9 +320,7 @@ const userService = {
    */
   getUserProcessingStats: async (): Promise<ProcessingStats> => {
     try {
-      const response = await axios.get(`${BASE_URL}/processing-statistics`, {
-        withCredentials: true,
-      });
+      const response = await api.get(`${BASE_URL}/processing-statistics`);
       return response.data.data;
     } catch (error: any) {
       console.error("Error fetching user processing stats:", error);

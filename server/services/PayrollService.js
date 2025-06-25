@@ -582,6 +582,65 @@ export class PayrollService {
     return parseFloat((Math.round(amount * 100) / 100).toFixed(2));
   }
 
+  static async validatePayPeriodSettings(systemPayPeriod, payrollFrequency) {
+    try {
+      console.log("🔍 Validating pay period settings:", {
+        systemPayPeriod,
+        payrollFrequency,
+      });
+
+      // Import SystemSettings model
+      const SystemSettings = (await import("../models/SystemSettings.js"))
+        .default;
+
+      // Get current system settings
+      const systemSettings = await SystemSettings.findOne();
+      const currentSystemPayPeriod =
+        systemSettings?.payrollSettings?.payPeriod || "monthly";
+
+      console.log(
+        "📋 Current system pay period setting:",
+        currentSystemPayPeriod
+      );
+
+      // Validate frequency against system settings
+      const isValidFrequency =
+        Object.values(PayrollFrequency).includes(payrollFrequency);
+      const isSystemConsistent = currentSystemPayPeriod === payrollFrequency;
+
+      const validationResult = {
+        systemPayPeriod: currentSystemPayPeriod,
+        payrollFrequency,
+        isValidFrequency,
+        isSystemConsistent,
+        recommendedAction: null,
+      };
+
+      if (!isValidFrequency) {
+        validationResult.recommendedAction = `Invalid frequency: ${payrollFrequency}. Valid options: ${Object.values(
+          PayrollFrequency
+        ).join(", ")}`;
+      } else if (!isSystemConsistent) {
+        validationResult.recommendedAction = `Frequency mismatch: System setting is "${currentSystemPayPeriod}" but payroll uses "${payrollFrequency}". Update system settings to use "${payrollFrequency}".`;
+      } else {
+        validationResult.recommendedAction =
+          "Pay period settings are consistent";
+      }
+
+      console.log("✅ Pay period validation result:", validationResult);
+      return validationResult;
+    } catch (error) {
+      console.error("❌ Error validating pay period settings:", error);
+      return {
+        systemPayPeriod: "unknown",
+        payrollFrequency,
+        isValidFrequency: false,
+        isSystemConsistent: false,
+        recommendedAction: `Error validating settings: ${error.message}`,
+      };
+    }
+  }
+
   static getMonthPeriod(month, year) {
     // Create dates in UTC to avoid timezone issues
     const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));

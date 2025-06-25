@@ -1,11 +1,10 @@
-import axios from "axios";
+import api from "./api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
 import { LeaveStatus } from "../types/employee";
 import { useAuth } from "../context/AuthContext";
 
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
-axios.defaults.withCredentials = true;
+const BASE_URL = `/api`;
 
 export interface LeaveRequest {
   _id: string;
@@ -50,7 +49,7 @@ export const leaveService = {
   // Get user's own leaves
   getMyLeaves: async () => {
     try {
-      const response = await axios.get(`${BASE_URL}/leaves/my-leaves`);
+      const response = await api.get(`${BASE_URL}/leaves/my-leaves`);
       return response.data.leaves;
     } catch (error) {
       console.error("Error fetching leaves:", error);
@@ -61,7 +60,7 @@ export const leaveService = {
   // Get team leaves (for admins and super admins)
   getTeamLeaves: async () => {
     try {
-      const response = await axios.get(`${BASE_URL}/leaves/team-leaves`);
+      const response = await api.get(`${BASE_URL}/leaves/team-leaves`);
       return response.data.leaves;
     } catch (error) {
       console.error("Error fetching team leaves:", error);
@@ -72,10 +71,7 @@ export const leaveService = {
   // Request a new leave
   requestLeave: async (leaveData: CreateLeaveRequest) => {
     try {
-      const response = await axios.post(
-        `${BASE_URL}/leaves/request`,
-        leaveData
-      );
+      const response = await api.post(`${BASE_URL}/leaves/request`, leaveData);
       return response.data.leave;
     } catch (error) {
       console.error("Error requesting leave:", error);
@@ -86,7 +82,7 @@ export const leaveService = {
   // Cancel a leave request
   cancelLeave: async (leaveId: string) => {
     try {
-      const response = await axios.delete(
+      const response = await api.delete(
         `${BASE_URL}/leaves/my-leaves/${leaveId}/cancel`
       );
       return response.data.leave;
@@ -99,7 +95,7 @@ export const leaveService = {
   // Delete a leave request
   deleteLeave: async (leaveId: string) => {
     try {
-      const response = await axios.delete(
+      const response = await api.delete(
         `${BASE_URL}/leaves/my-leaves/${leaveId}`
       );
       return response.data.leave;
@@ -112,7 +108,7 @@ export const leaveService = {
   // Approve a leave request (admin and super admin)
   approveLeave: async (params: { id: string; notes?: string }) => {
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/leaves/team-leaves/${params.id}/approve`,
         {
           notes: params.notes,
@@ -128,7 +124,7 @@ export const leaveService = {
   // Reject a leave request (admin and super admin)
   rejectLeave: async (params: { id: string; notes?: string }) => {
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/leaves/team-leaves/${params.id}/reject`,
         {
           comment: params.notes,
@@ -144,7 +140,7 @@ export const leaveService = {
   // Get leave statistics
   getLeaveStatistics: async () => {
     try {
-      const response = await axios.get(`${BASE_URL}/leaves/statistics`);
+      const response = await api.get(`${BASE_URL}/leaves/statistics`);
       return response.data.statistics;
     } catch (error) {
       console.error("Error fetching leave statistics:", error);

@@ -118,11 +118,11 @@ export class DepartmentService {
       });
 
       // Log for debugging
-      console.log(
-        "Department Counts:",
-        JSON.stringify(departmentCounts, null, 2)
-      );
-      console.log("Counts Map:", JSON.stringify(countsMap, null, 2));
+      // console.log(
+      //   "Department Counts:",
+      //   JSON.stringify(departmentCounts, null, 2)
+      // );
+      // console.log("Counts Map:", JSON.stringify(countsMap, null, 2));
 
       return {
         data: departmentsWithCounts,

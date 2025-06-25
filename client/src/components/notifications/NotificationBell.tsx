@@ -40,9 +40,6 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
       queryKey: ["notifications"],
       queryFn: async () => {
         const response = await getNotifications();
-        if (response.headers?.["x-refresh-notifications"] === "true") {
-          queryClient.invalidateQueries({ queryKey: ["notifications"] });
-        }
         return response.data;
       },
       refetchInterval: 30000,
@@ -55,9 +52,12 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
     }));
 
     useEffect(() => {
-      if (notificationsData?.data) {
-        setNotifications(notificationsData.data.notifications || []);
-        setUnreadCount(notificationsData.data.unreadCount || 0);
+      if (notificationsData && Array.isArray(notificationsData.notifications)) {
+        setNotifications(notificationsData.notifications);
+        setUnreadCount(notificationsData.unreadCount || 0);
+      } else {
+        setNotifications([]);
+        setUnreadCount(0);
       }
     }, [notificationsData]);
 
@@ -109,7 +109,9 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
     return (
       <div className="relative">
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={() => {
+            setIsOpen(!isOpen);
+          }}
           className={`p-2 hover:bg-green-50 rounded-full relative cursor-pointer ${
             unreadCount > 0 ? "animate-pulse" : ""
           }`}
@@ -148,90 +150,96 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
                   </p>
                 </div>
               ) : notifications.length === 0 ? (
-                <p className="text-center text-green-100 py-4">
-                  No notifications
-                </p>
+                <div className="p-4 text-center">
+                  <p className="text-center text-green-100 py-4">
+                    No notifications
+                  </p>
+                </div>
               ) : (
                 <div className="divide-y divide-green-700/60">
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification._id}
-                      className={`p-4 bg-green-700/80 rounded mb-2 cursor-pointer ${
-                        !notification.read ? "ring-2 ring-green-200" : ""
-                      }`}
-                      onClick={() => markAsRead(notification._id)}
-                    >
-                      <div className="flex justify-between items-start">
-                        <h4 className="font-medium text-white">
-                          {notification.title}
-                        </h4>
-                        <span className="text-xs text-green-100">
-                          {format(
-                            new Date(notification.createdAt),
-                            "MMM d, h:mm a"
-                          )}
-                        </span>
-                      </div>
-                      <p className="text-sm text-green-100 mt-1">
-                        {notification.message}
-                      </p>
+                  {notifications.map((notification, index) => {
+                    return (
+                      <div
+                        key={notification._id}
+                        className={`p-4 bg-green-700/80 rounded mb-2 cursor-pointer ${
+                          !notification.read ? "ring-2 ring-green-200" : ""
+                        }`}
+                        onClick={() => markAsRead(notification._id)}
+                      >
+                        <div className="flex justify-between items-start">
+                          <h4 className="font-medium text-white">
+                            {notification.title}
+                          </h4>
+                          <span className="text-xs text-green-100">
+                            {format(
+                              new Date(notification.createdAt),
+                              "MMM d, h:mm a"
+                            )}
+                          </span>
+                        </div>
+                        <p className="text-sm text-green-100 mt-1">
+                          {notification.message}
+                        </p>
 
-                      {notification.data && (
-                        <div className="mt-3 space-y-2">
-                          {/* Employee and Department Info */}
-                          {(notification.data.employeeName ||
-                            notification.data.departmentName) && (
-                            <div className="flex flex-wrap gap-2 text-xs">
-                              {notification.data.employeeName && (
-                                <div className="flex items-center bg-green-800/80 px-2 py-1 rounded">
-                                  <FaUser className="mr-1 text-green-200" />
-                                  <span>{notification.data.employeeName}</span>
-                                </div>
-                              )}
-                              {notification.data.departmentName && (
-                                <div className="flex items-center bg-green-800/80 px-2 py-1 rounded">
-                                  <FaBuilding className="mr-1 text-green-200" />
+                        {notification.data && (
+                          <div className="mt-3 space-y-2">
+                            {/* Employee and Department Info */}
+                            {(notification.data.employeeName ||
+                              notification.data.departmentName) && (
+                              <div className="flex flex-wrap gap-2 text-xs">
+                                {notification.data.employeeName && (
+                                  <div className="flex items-center bg-green-800/80 px-2 py-1 rounded">
+                                    <FaUser className="mr-1 text-green-200" />
+                                    <span>
+                                      {notification.data.employeeName}
+                                    </span>
+                                  </div>
+                                )}
+                                {notification.data.departmentName && (
+                                  <div className="flex items-center bg-green-800/80 px-2 py-1 rounded">
+                                    <FaBuilding className="mr-1 text-green-200" />
+                                    <span>
+                                      {notification.data.departmentName}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Payroll Period */}
+                            {notification.data.month &&
+                              notification.data.year && (
+                                <div className="flex items-center text-xs bg-green-800/80 px-2 py-1 rounded w-fit">
+                                  <FaCalendarAlt className="mr-1 text-green-200" />
                                   <span>
-                                    {notification.data.departmentName}
+                                    {getMonthName(notification.data.month)}{" "}
+                                    {notification.data.year}
                                   </span>
                                 </div>
                               )}
-                            </div>
-                          )}
 
-                          {/* Payroll Period */}
-                          {notification.data.month &&
-                            notification.data.year && (
-                              <div className="flex items-center text-xs bg-green-800/80 px-2 py-1 rounded w-fit">
-                                <FaCalendarAlt className="mr-1 text-green-200" />
-                                <span>
-                                  {getMonthName(notification.data.month)}{" "}
-                                  {notification.data.year}
+                            {/* Status Badge */}
+                            {notification.data.status && (
+                              <div className="flex items-center text-xs mt-1">
+                                <span
+                                  className={`px-2 py-1 rounded bg-green-900 text-green-100`}
+                                >
+                                  {notification.data.status}
                                 </span>
                               </div>
                             )}
 
-                          {/* Status Badge */}
-                          {notification.data.status && (
-                            <div className="flex items-center text-xs mt-1">
-                              <span
-                                className={`px-2 py-1 rounded bg-green-900 text-green-100`}
-                              >
-                                {notification.data.status}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Remarks if any */}
-                          {notification.data.remarks && (
-                            <div className="text-xs text-green-100 mt-1 italic">
-                              "{notification.data.remarks}"
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                            {/* Remarks if any */}
+                            {notification.data.remarks && (
+                              <div className="text-xs text-green-100 mt-1 italic">
+                                "{notification.data.remarks}"
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

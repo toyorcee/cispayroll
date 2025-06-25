@@ -24,14 +24,6 @@ export function ProfileMenu({
   const [isLocalOpen, setIsLocalOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Add state for image URL
-  const [profileImageUrl, setProfileImageUrl] = useState<string>("");
-
-  // Update image URL when user changes
-  useEffect(() => {
-    setProfileImageUrl(getProfileImageUrl(user || {}));
-  }, [user]);
-
   // Close menu on route change
   useEffect(() => {
     if (isLocalOpen) {
@@ -131,7 +123,7 @@ export function ProfileMenu({
       >
         <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center overflow-hidden">
           <Avatar
-            src={profileImageUrl}
+            src={getProfileImageUrl(user || {})}
             alt={getFullName()}
             className="w-full h-full object-cover"
             sx={{ width: "100%", height: "100%" }}

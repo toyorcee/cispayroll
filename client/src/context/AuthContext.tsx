@@ -412,11 +412,11 @@ export function useAuth() {
 
 // Helper function to map API response to User type
 const parseUserData = (data: Partial<User>): User => {
-  console.log("parseUserData - Raw profile image data:", {
-    profileImage: data.profileImage,
-    profileImageUrl: data.profileImageUrl,
-    fullData: data,
-  });
+  // console.log("parseUserData - Raw profile image data:", {
+  //   profileImage: data.profileImage,
+  //   profileImageUrl: data.profileImageUrl,
+  //   fullData: data,
+  // });
 
   // Construct profileImageUrl if not provided
   const profileImageUrl =

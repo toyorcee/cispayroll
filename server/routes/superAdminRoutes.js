@@ -16,6 +16,7 @@ import {
   validateSuperAdminSingleEmployeePayroll,
   validateSuperAdminMultipleEmployeesPayroll,
 } from "../middleware/payrollValidation.js";
+import { PayrollReportController } from "../controllers/PayrollReportController.js";
 
 const router = Router();
 
@@ -111,6 +112,11 @@ router.get(
 );
 
 // ===== Payroll Management Routes =====
+// Payroll Reports - Simple unified route (must come before /payroll to avoid conflicts)
+console.log("🔧 Registering payroll reports route: /payroll/reports");
+router.get("/payroll/reports", PayrollReportController.generateReport);
+console.log("✅ Payroll reports route registered successfully");
+
 // Get all payrolls with filters
 router.get(
   "/payroll",
@@ -174,6 +180,13 @@ router.post(
   SuperAdminController.sendPayslipEmail
 );
 
+// Send multiple payslips email (batch)
+router.post(
+  "/payroll/send-payslips-batch",
+  requirePermission([Permission.VIEW_DEPARTMENT_PAYSLIPS]),
+  SuperAdminController.sendMultiplePayslipsEmail
+);
+
 // Update payroll (only allowed for DRAFT status)
 router.patch(
   "/payroll/:id",
@@ -210,7 +223,6 @@ router.post(
   requirePermission([Permission.APPROVE_PAYROLL]),
   SuperAdminController.markPaymentPaid
 );
-
 
 // Approve payroll (PROCESSING/PENDING -> APPROVED)
 router.patch(

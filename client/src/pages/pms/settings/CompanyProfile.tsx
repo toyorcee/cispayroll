@@ -1,10 +1,103 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FaBuilding, FaMapMarkerAlt, FaPhone, FaIdCard } from "react-icons/fa";
-import { companyProfile } from "../../../data/settings";
-import { Link } from "react-router-dom";
+import { settingsService } from "../../../services/settingsService";
+import { Button } from "@mui/material";
+import CompanyProfileSkeleton from "../../../components/skeletons/CompanyProfileSkeleton";
+import { useAuth } from "../../../context/AuthContext";
+import { toast } from "react-toastify";
 
 export default function CompanyProfile() {
+  const [companyProfile, setCompanyProfile] = useState<any>(null);
+  const [editProfile, setEditProfile] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const { user, isSuperAdmin, isAdmin } = useAuth();
+
+  useEffect(() => {
+    // Log user information for debugging
+    console.log("🔍 [CompanyProfile] User info:", {
+      user: user
+        ? {
+            _id: user._id,
+            email: user.email,
+            role: user.role,
+            permissions: user.permissions,
+          }
+        : null,
+      isSuperAdmin: isSuperAdmin(),
+      isAdmin: isAdmin(),
+    });
+
+    settingsService
+      .getCompanyProfile()
+      .then((res) => {
+        console.log(
+          "✅ [CompanyProfile] Company profile loaded successfully:",
+          res.data
+        );
+        // Handle new response structure
+        const profileData = res.data.data || res.data;
+        setCompanyProfile(profileData);
+        setEditProfile(profileData);
+        setLoading(false);
+        setError(null);
+      })
+      .catch((err) => {
+        console.error(
+          "❌ [CompanyProfile] Error loading company profile:",
+          err
+        );
+        setLoading(false);
+        if (err.response?.status === 403) {
+          setError("Access denied. Super admin permissions required.");
+        } else {
+          setError("Failed to load company profile. Please try again.");
+        }
+      });
+  }, [user, isSuperAdmin, isAdmin]);
+
+  const handleChange = (section: string, field: string, value: string) => {
+    setEditProfile((prev: any) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const response = await settingsService.updateCompanyProfile(editProfile);
+      console.log("✅ [CompanyProfile] Save response:", response);
+
+      // Handle new response structure
+      const profileData = response.data.data || response.data;
+      setCompanyProfile(profileData);
+      setIsEditing(false);
+
+      // Show success toast
+      const message =
+        response.data.message || "Company profile updated successfully";
+      toast.success(message);
+    } catch (err: any) {
+      console.error("❌ [CompanyProfile] Error saving profile:", err);
+      const errorMessage =
+        err.response?.data?.message || "Failed to update company profile";
+      toast.error(errorMessage);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setEditProfile(companyProfile);
+    setIsEditing(false);
+  };
 
   const inputClasses =
     "mt-1 block w-full border border-gray-300 rounded-lg shadow-sm py-2 px-3 text-sm md:text-base " +
@@ -12,20 +105,86 @@ export default function CompanyProfile() {
     "transition-all duration-200 hover:border-green-400 " +
     "disabled:bg-gray-50 disabled:cursor-not-allowed";
 
+  if (loading) {
+    return <CompanyProfileSkeleton />;
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg
+                className="h-5 w-5 text-red-400"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">
+                Access Denied
+              </h3>
+              <div className="mt-2 text-sm text-red-700">
+                <p>{error}</p>
+                {user && (
+                  <p className="mt-1">
+                    Current role:{" "}
+                    <span className="font-medium">{user.role}</span>
+                    {user.permissions.length > 0 && (
+                      <span className="ml-2">
+                        Permissions: {user.permissions.join(", ")}
+                      </span>
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!editProfile) return null;
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <Link
-          to="/pms/settings/company/edit"
-          className="inline-flex items-center px-4 py-2 !bg-green-600 !text-white rounded-lg hover:bg-green-700 
-                   transition-all duration-300 transform hover:-translate-y-1 hover:shadow-lg
-                   animate-bounce-slow cursor-pointer focus:outline-none focus:ring-0"
-          onClick={() => setIsEditing(!isEditing)}
-        >
-          <span className="text-sm md:text-base">
-            {isEditing ? "Save Changes" : "Edit Profile"}
-          </span>
-        </Link>
+      <div className="flex justify-end gap-2">
+        {!isEditing ? (
+          <Button
+            variant="contained"
+            color="success"
+            onClick={() => setIsEditing(true)}
+          >
+            Edit
+          </Button>
+        ) : (
+          <>
+            <Button
+              variant="contained"
+              color="success"
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? "Saving..." : "Save"}
+            </Button>
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={handleCancel}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+          </>
+        )}
       </div>
 
       <div className="bg-white shadow rounded-lg transition-all duration-200 hover:shadow-md">
@@ -44,7 +203,8 @@ export default function CompanyProfile() {
               <input
                 type="text"
                 disabled={!isEditing}
-                defaultValue={companyProfile.basic.name}
+                value={editProfile.basic?.name || ""}
+                onChange={(e) => handleChange("basic", "name", e.target.value)}
                 className={inputClasses}
               />
             </div>
@@ -55,7 +215,10 @@ export default function CompanyProfile() {
               <input
                 type="text"
                 disabled={!isEditing}
-                defaultValue={companyProfile.basic.registrationNumber}
+                value={editProfile.basic?.registrationNumber || ""}
+                onChange={(e) =>
+                  handleChange("basic", "registrationNumber", e.target.value)
+                }
                 className={inputClasses}
               />
             </div>
@@ -66,7 +229,8 @@ export default function CompanyProfile() {
               <input
                 type="text"
                 disabled={!isEditing}
-                defaultValue={companyProfile.basic.taxId}
+                value={editProfile.basic?.taxId || ""}
+                onChange={(e) => handleChange("basic", "taxId", e.target.value)}
                 className={inputClasses}
               />
             </div>
@@ -77,7 +241,10 @@ export default function CompanyProfile() {
               <input
                 type="text"
                 disabled={!isEditing}
-                defaultValue={companyProfile.basic.industry}
+                value={editProfile.basic?.industry || ""}
+                onChange={(e) =>
+                  handleChange("basic", "industry", e.target.value)
+                }
                 className={inputClasses}
               />
             </div>
@@ -101,7 +268,10 @@ export default function CompanyProfile() {
               <input
                 type="email"
                 disabled={!isEditing}
-                defaultValue={companyProfile.contact.email}
+                value={editProfile.contact?.email || ""}
+                onChange={(e) =>
+                  handleChange("contact", "email", e.target.value)
+                }
                 className={inputClasses}
               />
             </div>
@@ -112,7 +282,10 @@ export default function CompanyProfile() {
               <input
                 type="tel"
                 disabled={!isEditing}
-                defaultValue={companyProfile.contact.phone}
+                value={editProfile.contact?.phone || ""}
+                onChange={(e) =>
+                  handleChange("contact", "phone", e.target.value)
+                }
                 className={inputClasses}
               />
             </div>
@@ -123,7 +296,10 @@ export default function CompanyProfile() {
               <input
                 type="url"
                 disabled={!isEditing}
-                defaultValue={companyProfile.contact.website}
+                value={editProfile.contact?.website || ""}
+                onChange={(e) =>
+                  handleChange("contact", "website", e.target.value)
+                }
                 className={inputClasses}
               />
             </div>
@@ -147,7 +323,10 @@ export default function CompanyProfile() {
               <input
                 type="text"
                 disabled={!isEditing}
-                defaultValue={companyProfile.address.street}
+                value={editProfile.address?.street || ""}
+                onChange={(e) =>
+                  handleChange("address", "street", e.target.value)
+                }
                 className={inputClasses}
               />
             </div>
@@ -158,7 +337,10 @@ export default function CompanyProfile() {
               <input
                 type="text"
                 disabled={!isEditing}
-                defaultValue={companyProfile.address.city}
+                value={editProfile.address?.city || ""}
+                onChange={(e) =>
+                  handleChange("address", "city", e.target.value)
+                }
                 className={inputClasses}
               />
             </div>
@@ -169,7 +351,10 @@ export default function CompanyProfile() {
               <input
                 type="text"
                 disabled={!isEditing}
-                defaultValue={companyProfile.address.state}
+                value={editProfile.address?.state || ""}
+                onChange={(e) =>
+                  handleChange("address", "state", e.target.value)
+                }
                 className={inputClasses}
               />
             </div>
@@ -180,7 +365,10 @@ export default function CompanyProfile() {
               <input
                 type="text"
                 disabled={!isEditing}
-                defaultValue={companyProfile.address.country}
+                value={editProfile.address?.country || ""}
+                onChange={(e) =>
+                  handleChange("address", "country", e.target.value)
+                }
                 className={inputClasses}
               />
             </div>
@@ -191,7 +379,10 @@ export default function CompanyProfile() {
               <input
                 type="text"
                 disabled={!isEditing}
-                defaultValue={companyProfile.address.postalCode}
+                value={editProfile.address?.postalCode || ""}
+                onChange={(e) =>
+                  handleChange("address", "postalCode", e.target.value)
+                }
                 className={inputClasses}
               />
             </div>
@@ -215,7 +406,10 @@ export default function CompanyProfile() {
               <input
                 type="date"
                 disabled={!isEditing}
-                defaultValue={companyProfile.legal.incorporationDate}
+                value={editProfile.legal?.incorporationDate || ""}
+                onChange={(e) =>
+                  handleChange("legal", "incorporationDate", e.target.value)
+                }
                 className={inputClasses}
               />
             </div>
@@ -226,7 +420,10 @@ export default function CompanyProfile() {
               <input
                 type="text"
                 disabled={!isEditing}
-                defaultValue={companyProfile.legal.businessType}
+                value={editProfile.legal?.businessType || ""}
+                onChange={(e) =>
+                  handleChange("legal", "businessType", e.target.value)
+                }
                 className={inputClasses}
               />
             </div>
@@ -237,7 +434,10 @@ export default function CompanyProfile() {
               <input
                 type="text"
                 disabled={!isEditing}
-                defaultValue={companyProfile.legal.fiscalYear}
+                value={editProfile.legal?.fiscalYear || ""}
+                onChange={(e) =>
+                  handleChange("legal", "fiscalYear", e.target.value)
+                }
                 className={inputClasses}
               />
             </div>

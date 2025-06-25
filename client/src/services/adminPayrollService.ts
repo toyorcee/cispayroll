@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "./api";
 import { toast } from "react-toastify";
 import { PayrollData } from "../types/payroll";
 import { UserRole } from "../types/auth";
@@ -13,12 +13,15 @@ export interface AdminPayrollPeriod {
 }
 
 export interface AdminPayrollStats {
-  PENDING: number;
-  APPROVED: number;
-  REJECTED: number;
-  total: number;
-  totalAmount: number;
-  PAID: number;
+  stats: Array<{
+    _id: string;
+    count: number;
+    totalNetPay: number;
+  }>;
+  summary: {
+    totalCount: number;
+    totalAmount: number;
+  };
 }
 
 export interface AdminPayrollProcessingStats {
@@ -83,10 +86,9 @@ export interface AdminPayrollResponse {
 }
 
 // Base URL for admin API
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api/admin`;
-const SUPER_ADMIN_BASE_URL = `${import.meta.env.VITE_API_URL}/api/super-admin`;
-const APPROVAL_BASE_URL = `${import.meta.env.VITE_API_URL}/api/approvals`;
-axios.defaults.withCredentials = true;
+const BASE_URL = `/api/admin`;
+const SUPER_ADMIN_BASE_URL = `/api/super-admin`;
+const APPROVAL_BASE_URL = `/api/approvals`;
 
 // Helper function to determine if user is Super Admin
 const isSuperAdmin = (userRole?: string): boolean => {
@@ -112,11 +114,9 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll`
         : `${BASE_URL}/payroll`;
 
-      const response = await axios.get(endpoint, {
+      const response = await api.get(endpoint, {
         params,
-        withCredentials: true,
       });
-
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to fetch payrolls");
@@ -130,14 +130,38 @@ export const adminPayrollService = {
   },
 
   // Get payroll statistics for admin's department
-  getPayrollStats: async (userRole?: string): Promise<AdminPayrollStats> => {
+  getPayrollStats: async (
+    userRole?: string,
+    filters?: {
+      status?: string;
+      department?: string;
+      startDate?: string;
+      endDate?: string;
+      month?: number;
+      year?: number;
+    }
+  ): Promise<AdminPayrollStats> => {
     try {
       // Use different endpoint for Super Admin
       const endpoint = isSuperAdmin(userRole)
         ? `${SUPER_ADMIN_BASE_URL}/payroll/stats`
         : `${BASE_URL}/payroll/stats`;
 
-      const response = await axios.get(endpoint, { withCredentials: true });
+      // Build query params
+      const params = new URLSearchParams();
+      if (filters?.status) params.append("status", filters.status);
+      if (filters?.department) params.append("department", filters.department);
+      if (filters?.startDate) params.append("startDate", filters.startDate);
+      if (filters?.endDate) params.append("endDate", filters.endDate);
+      if (filters?.month) params.append("month", filters.month.toString());
+      if (filters?.year) params.append("year", filters.year.toString());
+
+      const queryString = params.toString();
+      const url = queryString ? `${endpoint}?${queryString}` : endpoint;
+
+      console.log("🔍 Fetching payroll stats with filters:", { filters, url });
+
+      const response = await api.get(url);
 
       if (!response.data.success) {
         throw new Error(
@@ -145,12 +169,10 @@ export const adminPayrollService = {
         );
       }
 
+      console.log("📊 Received payroll stats:", response.data);
       return response.data.data;
-    } catch (error: any) {
-      console.error("Error fetching payroll statistics:", error);
-      // toast.error(
-      //   error.response?.data?.message || "Failed to fetch payroll statistics"
-      // );
+    } catch (error) {
+      console.error("❌ Error fetching payroll statistics:", error);
       throw error;
     }
   },
@@ -165,7 +187,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/periods`
         : `${BASE_URL}/payroll/periods`;
 
-      const response = await axios.get(endpoint, { withCredentials: true });
+      const response = await api.get(endpoint);
 
       if (!response.data.success) {
         throw new Error(
@@ -186,7 +208,7 @@ export const adminPayrollService = {
   // Get a single payroll by ID
   getPayrollById: async (payrollId: string): Promise<PayrollData> => {
     try {
-      const response = await axios.get(`${BASE_URL}/payroll/${payrollId}`);
+      const response = await api.get(`${BASE_URL}/payroll/${payrollId}`);
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to get payroll");
       }
@@ -209,11 +231,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/${payrollId}/submit`
         : `${BASE_URL}/payroll/${payrollId}/submit`;
 
-      const response = await axios.patch(
-        endpoint,
-        { remarks },
-        { withCredentials: true }
-      );
+      const response = await api.patch(endpoint, { remarks });
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to submit payroll");
@@ -239,11 +257,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/${payrollId}/approve`
         : `${BASE_URL}/payroll/${payrollId}/approve`;
 
-      const response = await axios.post(
-        endpoint,
-        {},
-        { withCredentials: true }
-      );
+      const response = await api.post(endpoint, {});
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to approve payroll");
@@ -274,11 +288,7 @@ export const adminPayrollService = {
         ? `${APPROVAL_BASE_URL}/super-admin/${payrollId}/reject`
         : `${BASE_URL}/payroll/${payrollId}/reject`;
 
-      const response = await axios.patch(
-        endpoint,
-        { reason },
-        { withCredentials: true }
-      );
+      const response = await api.patch(endpoint, { reason });
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to reject payroll");
@@ -295,7 +305,7 @@ export const adminPayrollService = {
   resubmitPayroll: async (payrollId: string, userRole?: string) => {
     try {
       // First get the payroll details to get the salary grade
-      const response = await axios.get(`${BASE_URL}/payroll/${payrollId}`);
+      const response = await api.get(`${BASE_URL}/payroll/${payrollId}`);
       const payroll = response.data.data;
 
       if (!payroll) {
@@ -306,7 +316,7 @@ export const adminPayrollService = {
         ? `${BASE_URL}/payroll/${payrollId}/resubmit`
         : `${BASE_URL}/payroll/${payrollId}/resubmit`;
 
-      const res = await axios.post(endpoint, {
+      const res = await api.post(endpoint, {
         salaryGrade: payroll.salaryGrade,
       });
 
@@ -328,11 +338,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/${payrollId}/process-payment`
         : `${BASE_URL}/payroll/${payrollId}/process-payment`;
 
-      const response = await axios.patch(
-        endpoint,
-        {},
-        { withCredentials: true }
-      );
+      const response = await api.patch(endpoint, {});
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to process payment");
@@ -343,6 +349,59 @@ export const adminPayrollService = {
     } catch (error: any) {
       console.error("Error processing payment:", error);
       // toast.error(error.response?.data?.message || "Failed to process payment");
+      throw error;
+    }
+  },
+
+  // Initiate payment
+  initiatePayment: async (
+    payrollId: string,
+    userRole?: string
+  ): Promise<AdminPayroll> => {
+    try {
+      // Use different endpoint for Super Admin
+      const endpoint = isSuperAdmin(userRole)
+        ? `${SUPER_ADMIN_BASE_URL}/payroll/${payrollId}/initiate-payment`
+        : `${BASE_URL}/payroll/${payrollId}/initiate-payment`;
+
+      const response = await api.post(endpoint, {});
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || "Failed to initiate payment");
+      }
+
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Error initiating payment:", error);
+      throw error;
+    }
+  },
+
+  // Initiate multiple payments for Super Admin
+  initiatePaymentsMultiple: async (
+    payrollIds: string[],
+    userRole?: string
+  ): Promise<{
+    payrolls: Array<{ payrollId: string; status: string; payment: any }>;
+    errors?: Array<{ payrollId: string; error: string }>;
+  }> => {
+    try {
+      // Use different endpoint for Super Admin
+      const endpoint = isSuperAdmin(userRole)
+        ? `${SUPER_ADMIN_BASE_URL}/payroll/initiate-payment`
+        : `${BASE_URL}/payroll/initiate-payment`;
+
+      const response = await api.post(endpoint, { payrollIds });
+
+      if (!response.data.success) {
+        throw new Error(
+          response.data.message || "Failed to initiate batch payments"
+        );
+      }
+
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Error initiating batch payments:", error);
       throw error;
     }
   },
@@ -358,7 +417,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/employee/${employeeId}/history`
         : `${BASE_URL}/payroll/employee/${employeeId}/history`;
 
-      const response = await axios.get(endpoint, { withCredentials: true });
+      const response = await api.get(endpoint);
 
       if (!response.data.success) {
         throw new Error(
@@ -392,39 +451,34 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/process-single-employee`
         : `${BASE_URL}/payroll/process-single`;
 
-      const response = await axios.post(
-        endpoint,
-        {
-          employeeId: data.employeeId,
-          departmentId: data.departmentId,
-          month: data.month,
-          year: data.year,
-          frequency: data.frequency,
-          salaryGrade: data.salaryGrade,
-        },
-        {
-          withCredentials: true,
-        }
-      );
+      const response = await api.post(endpoint, {
+        employeeId: data.employeeId,
+        departmentId: data.departmentId,
+        month: data.month,
+        year: data.year,
+        frequency: data.frequency,
+        salaryGrade: data.salaryGrade,
+      });
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to process payroll");
       }
 
-      // toast.success("Payroll processed successfully");
       return response.data.data;
     } catch (error: any) {
       console.error("Error in processSingleEmployeePayroll:", error);
-      // if (error.response?.data?.message?.includes("duplicate")) {
-      //   toast.error(
-      //     "A payroll for this employee already exists for this period"
-      //   );
-      // } else {
-      //   toast.error(
-      //     error.response?.data?.message || "Failed to process payroll"
-      //   );
-      // }
-      throw error;
+
+      // Extract the actual error message from the response
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to process payroll";
+
+      // Create a custom error with the proper message
+      const customError = new Error(errorMessage);
+      customError.name = "PayrollProcessingError";
+
+      throw customError;
     }
   },
 
@@ -444,9 +498,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/process-department`
         : `${BASE_URL}/payroll/process-department`;
 
-      const response = await axios.post(endpoint, data, {
-        withCredentials: true,
-      });
+      const response = await api.post(endpoint, data);
 
       if (!response.data.success) {
         throw new Error(
@@ -474,9 +526,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/submit-bulk`
         : `${BASE_URL}/payroll/submit-bulk`;
 
-      const response = await axios.post(endpoint, data, {
-        withCredentials: true,
-      });
+      const response = await api.post(endpoint, data);
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to submit payrolls");
@@ -508,9 +558,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/submit-department`
         : `${BASE_URL}/payroll/submit-department`;
 
-      const response = await axios.post(endpoint, data, {
-        withCredentials: true,
-      });
+      const response = await api.post(endpoint, data);
 
       if (!response.data.success) {
         throw new Error(
@@ -546,9 +594,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/approve-department`
         : `${BASE_URL}/payroll/approve-department`;
 
-      const response = await axios.post(endpoint, data, {
-        withCredentials: true,
-      });
+      const response = await api.post(endpoint, data);
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to approve payrolls");
@@ -579,9 +625,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/reject-department`
         : `${BASE_URL}/payroll/reject-department`;
 
-      const response = await axios.post(endpoint, data, {
-        withCredentials: true,
-      });
+      const response = await api.post(endpoint, data);
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to reject payrolls");
@@ -610,9 +654,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/process-multiple-employees`
         : `${BASE_URL}/payroll/process-multiple`;
 
-      const response = await axios.post(endpoint, data, {
-        withCredentials: true,
-      });
+      const response = await api.post(endpoint, data);
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to process payroll");
@@ -621,7 +663,18 @@ export const adminPayrollService = {
       return response.data.data;
     } catch (error: any) {
       console.error("Error processing multiple employees payroll:", error);
-      throw error;
+
+      // Extract the actual error message from the response
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to process payroll";
+
+      // Create a custom error with the proper message
+      const customError = new Error(errorMessage);
+      customError.name = "PayrollProcessingError";
+
+      throw customError;
     }
   },
 
@@ -640,9 +693,7 @@ export const adminPayrollService = {
 
       const endpoint = `${SUPER_ADMIN_BASE_URL}/payroll/process-all-employees`;
 
-      const response = await axios.post(endpoint, data, {
-        withCredentials: true,
-      });
+      const response = await api.post(endpoint, data);
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to process payroll");
@@ -665,11 +716,7 @@ export const adminPayrollService = {
         ? `${SUPER_ADMIN_BASE_URL}/payroll/${payrollId}/process`
         : `${BASE_URL}/payroll/${payrollId}/process`;
 
-      const response = await axios.post(
-        endpoint,
-        {},
-        { withCredentials: true }
-      );
+      const response = await api.post(endpoint, {});
 
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to process payroll");
@@ -697,7 +744,7 @@ export const adminPayrollService = {
       // Add timestamp to prevent caching
       const url = timestamp ? `${endpoint}?t=${timestamp}` : endpoint;
 
-      const response = await axios.get(url, { withCredentials: true });
+      const response = await api.get(url);
 
       if (!response.data.success) {
         throw new Error(

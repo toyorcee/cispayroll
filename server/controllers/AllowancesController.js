@@ -81,6 +81,37 @@ const createAllowance = asyncHandler(async (req, res) => {
     select: "firstName lastName email profileImageUrl",
   });
 
+  // Add audit logging
+  await PayrollStatisticsLogger.logAllowanceAction({
+    action: "CREATE",
+    allowanceIds: allowances.map((a) => a._id),
+    userId: userId,
+    details: {
+      type: type,
+      amount: amount,
+      reason: reason,
+      paymentDate: paymentDate,
+      employeeCount: employees.length,
+      createdBy: userId,
+      position: req.user.position,
+      role: req.user.role,
+      message: `Created general allowance for ${employees.length} employees`,
+    },
+    statisticsDetails: {
+      allowanceType: type,
+      amount: amount,
+      employeeCount: employees.length,
+    },
+    auditDetails: {
+      entity: "ALLOWANCE",
+      entityIds: allowances.map((a) => a._id),
+      action: "CREATE",
+      performedBy: userId,
+      status: "APPROVED",
+      remarks: `Created general allowance for ${employees.length} employees`,
+    },
+  });
+
   return res.status(201).json({
     success: true,
     data: allowances,
@@ -211,6 +242,40 @@ const createDepartmentAllowance = asyncHandler(async (req, res) => {
   console.log(
     `✅ Created ${allowances.length} allowances in collection and added to employees' personalAllowances arrays`
   );
+
+  // Add audit logging
+  await PayrollStatisticsLogger.logAllowanceAction({
+    action: "CREATE",
+    allowanceIds: allowances.map((a) => a._id),
+    userId: userId,
+    details: {
+      type: type,
+      amount: amount,
+      reason: reason,
+      paymentDate: paymentDate,
+      departmentId: departmentId,
+      departmentName: department.name,
+      employeeCount: employees.length,
+      createdBy: userId,
+      position: req.user.position,
+      role: req.user.role,
+      message: `Created department allowance for ${employees.length} employees in ${department.name}`,
+    },
+    statisticsDetails: {
+      allowanceType: type,
+      amount: amount,
+      departmentId: departmentId,
+      employeeCount: employees.length,
+    },
+    auditDetails: {
+      entity: "ALLOWANCE",
+      entityIds: allowances.map((a) => a._id),
+      action: "CREATE",
+      performedBy: userId,
+      status: "APPROVED",
+      remarks: `Created department allowance for ${employees.length} employees in ${department.name}`,
+    },
+  });
 
   return res.status(201).json({
     success: true,
@@ -363,6 +428,40 @@ const createDepartmentEmployeeAllowance = asyncHandler(async (req, res) => {
     .populate("employee", "firstName lastName email")
     .populate("department", "name");
 
+  // Add audit logging
+  await PayrollStatisticsLogger.logAllowanceAction({
+    action: "CREATE",
+    allowanceIds: [allowance._id],
+    userId: userId,
+    details: {
+      type: type,
+      amount: amount,
+      reason: reason,
+      paymentDate: paymentDate,
+      employeeId: employeeId,
+      employeeName: `${employee.firstName} ${employee.lastName}`,
+      departmentId: employee.department,
+      createdBy: userId,
+      position: req.user.position,
+      role: req.user.role,
+      message: `Created allowance for employee ${employee.firstName} ${employee.lastName}`,
+    },
+    statisticsDetails: {
+      allowanceType: type,
+      amount: amount,
+      employeeId: employeeId,
+      departmentId: employee.department,
+    },
+    auditDetails: {
+      entity: "ALLOWANCE",
+      entityIds: [allowance._id],
+      action: "CREATE",
+      performedBy: userId,
+      status: "APPROVED",
+      remarks: `Created allowance for employee ${employee.firstName} ${employee.lastName}`,
+    },
+  });
+
   return res.status(201).json({
     success: true,
     data: populatedAllowance,
@@ -447,6 +546,41 @@ const createPersonalAllowance = asyncHandler(async (req, res) => {
         $push: { personalAllowances: personalAllowance },
       });
     }
+
+    // Add audit logging
+    await PayrollStatisticsLogger.logAllowanceAction({
+      action: "CREATE",
+      allowanceIds: [allowance._id],
+      userId: userId,
+      details: {
+        name: name,
+        type: type,
+        amount: amount,
+        description: description,
+        effectiveDate: effectiveDate,
+        approvalStatus: allowance.approvalStatus,
+        employeeId: userId,
+        departmentId: req.user.department,
+        createdBy: userId,
+        position: req.user.position,
+        role: req.user.role,
+        message: `Created personal allowance request: ${name}`,
+      },
+      statisticsDetails: {
+        allowanceType: type,
+        amount: amount,
+        approvalStatus: allowance.approvalStatus,
+        scope: "individual",
+      },
+      auditDetails: {
+        entity: "ALLOWANCE",
+        entityIds: [allowance._id],
+        action: "CREATE",
+        performedBy: userId,
+        status: allowance.approvalStatus,
+        remarks: `Created personal allowance request: ${name}`,
+      },
+    });
 
     // Log only after successful creation
     console.log(

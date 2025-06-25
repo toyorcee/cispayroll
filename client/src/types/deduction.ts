@@ -10,26 +10,22 @@ export enum CalculationMethod {
 }
 
 export enum DeductionScope {
-  COMPANY = "company",
+  COMPANY_WIDE = "company_wide",
   DEPARTMENT = "department",
+  INDIVIDUAL = "individual",
 }
 
 export enum DeductionCategory {
   TAX = "tax",
   PENSION = "pension",
   HOUSING = "housing",
+  LOAN = "loan",
+  TRANSPORT = "transport",
+  COOPERATIVE = "cooperative",
+  INSURANCE = "insurance",
+  ASSOCIATION = "association",
+  SAVINGS = "savings",
   GENERAL = "general",
-}
-
-export enum DeductionApplicability {
-  GLOBAL = "global",
-  INDIVIDUAL = "individual",
-}
-
-export enum DeductionOptOutReason {
-  PERSONAL_CHOICE = "personal_choice",
-  ALTERNATIVE_PLAN = "alternative_plan",
-  TEMPORARY_SUSPENSION = "temporary_suspension",
   OTHER = "other",
 }
 
@@ -43,21 +39,20 @@ export interface Deduction {
   _id: string;
   name: string;
   type: DeductionType;
-  description: string;
+  description?: string;
   calculationMethod: CalculationMethod;
   value: number;
   taxBrackets?: TaxBracket[];
   isActive: boolean;
   scope: DeductionScope;
   department?: string;
+  assignedEmployees?: string[];
   createdBy: string;
   updatedBy: string;
   createdAt: string;
   updatedAt: string;
   effectiveDate?: string;
   category?: DeductionCategory;
-  applicability?: DeductionApplicability;
-  isCustom?: boolean;
 }
 
 export interface DeductionPreference {
@@ -70,7 +65,6 @@ export interface DeductionPreference {
   amount?: number;
   percentage?: number;
   notes?: string;
-  optOutReason?: DeductionOptOutReason;
 }
 
 export interface UserDeductionPreferences {
@@ -98,11 +92,11 @@ export type CreateDeductionInput = {
   taxBrackets?: TaxBracket[];
   isActive: boolean;
   effectiveDate: Date;
-  isCustom: boolean;
   category: DeductionCategory;
   scope: DeductionScope;
-  applicability: DeductionApplicability;
   type: "statutory" | "voluntary";
+  department?: string;
+  assignedEmployees?: string[];
 };
 
 export type UpdateDeductionInput = {
@@ -113,9 +107,9 @@ export type UpdateDeductionInput = {
   taxBrackets?: TaxBracket[];
   isActive?: boolean;
   effectiveDate?: Date;
-  isCustom?: boolean;
   category?: DeductionCategory;
   scope?: DeductionScope;
-  applicability?: DeductionApplicability;
   type: "statutory" | "voluntary";
+  department?: string;
+  assignedEmployees?: string[];
 };

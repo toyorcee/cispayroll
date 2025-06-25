@@ -75,6 +75,28 @@ export class EmployeeController {
 
       await employee.save();
 
+      // Add audit logging
+      await PayrollStatisticsLogger.logEmployeeAction({
+        action: "CREATE",
+        employeeId: employee._id,
+        userId: req.user.id,
+        details: {
+          employeeId: employee.employeeId,
+          firstName: employee.firstName,
+          lastName: employee.lastName,
+          email: employee.email,
+          role: employee.role,
+          department: department.name,
+          createdBy: req.user.id,
+          message: `Created ${
+            role === UserRole.ADMIN ? "admin" : "employee"
+          }: ${employee.firstName} ${employee.lastName}`,
+          remarks: `Created ${
+            role === UserRole.ADMIN ? "admin" : "employee"
+          }: ${employee.firstName} ${employee.lastName}`,
+        },
+      });
+
       // Send the invitation email
       try {
         await EmailService.sendInvitationEmail(
@@ -171,6 +193,21 @@ export class EmployeeController {
       if (!user) {
         throw new ApiError(404, "Employee not found");
       }
+
+      // Add audit logging
+      await PayrollStatisticsLogger.logEmployeeAction({
+        action: "UPDATE_PROFILE",
+        employeeId: user._id,
+        userId: req.user.id,
+        details: {
+          employeeId: user.employeeId,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          updatedFields: Object.keys(updates),
+          message: `Updated profile: ${user.firstName} ${user.lastName}`,
+          remarks: `Updated profile: ${user.firstName} ${user.lastName}`,
+        },
+      });
 
       res.status(200).json({
         success: true,
@@ -416,6 +453,23 @@ export class EmployeeController {
 
       await leaveRequest.populate("employee", "firstName lastName employeeId");
 
+      // Add audit logging
+      await PayrollStatisticsLogger.logLeaveAction({
+        action: "CREATE",
+        leaveId: leaveRequest._id,
+        userId: req.user.id,
+        details: {
+          employeeId: req.user.employeeId,
+          employeeName: `${req.user.firstName} ${req.user.lastName}`,
+          leaveType: leaveRequest.leaveType,
+          startDate: leaveRequest.startDate,
+          endDate: leaveRequest.endDate,
+          reason: leaveRequest.reason,
+          message: `Created leave request: ${leaveRequest.leaveType}`,
+          remarks: `Created leave request: ${leaveRequest.leaveType}`,
+        },
+      });
+
       res.status(201).json({
         success: true,
         message: "Leave request created successfully",
@@ -443,6 +497,23 @@ export class EmployeeController {
 
       leaveRequest.status = LEAVE_STATUS.CANCELLED;
       await leaveRequest.save();
+
+      // Add audit logging
+      await PayrollStatisticsLogger.logLeaveAction({
+        action: "CANCEL",
+        leaveId: leaveRequest._id,
+        userId: req.user.id,
+        details: {
+          employeeId: req.user.employeeId,
+          employeeName: `${req.user.firstName} ${req.user.lastName}`,
+          leaveType: leaveRequest.leaveType,
+          startDate: leaveRequest.startDate,
+          endDate: leaveRequest.endDate,
+          reason: leaveRequest.reason,
+          message: `Cancelled leave request: ${leaveRequest.leaveType}`,
+          remarks: `Cancelled leave request: ${leaveRequest.leaveType}`,
+        },
+      });
 
       res.status(200).json({
         success: true,
@@ -498,6 +569,22 @@ export class EmployeeController {
         throw new ApiError(404, "Employee not found");
       }
 
+      // Add audit logging
+      await PayrollStatisticsLogger.logEmployeeAction({
+        action: "UPDATE_PROFILE_IMAGE",
+        employeeId: user._id,
+        userId: req.user.id,
+        details: {
+          employeeId: user.employeeId,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          oldImagePath: currentUser.profileImage,
+          newImagePath: relativePath,
+          message: `Updated profile image: ${user.firstName} ${user.lastName}`,
+          remarks: `Updated profile image: ${user.firstName} ${user.lastName}`,
+        },
+      });
+
       // 5. Return success response
       res.status(200).json({
         success: true,
@@ -518,7 +605,36 @@ export class EmployeeController {
 
   static async deleteEmployee(req, res, next) {
     try {
-      const employee = await EmployeeService.deleteEmployee(req.params.id);
+      // Get employee data before deletion for audit
+      const employee = await UserModel.findById(req.params.id)
+        .select("firstName lastName employeeId role department")
+        .populate("department", "name");
+
+      if (!employee) {
+        throw new ApiError(404, "Employee not found");
+      }
+
+      const deletedEmployee = await EmployeeService.deleteEmployee(
+        req.params.id
+      );
+
+      // Add audit logging
+      await PayrollStatisticsLogger.logEmployeeAction({
+        action: "DELETE",
+        employeeId: employee._id,
+        userId: req.user.id,
+        details: {
+          employeeId: employee.employeeId,
+          firstName: employee.firstName,
+          lastName: employee.lastName,
+          role: employee.role,
+          department: employee.department?.name,
+          deletedBy: req.user.id,
+          message: `Deleted employee: ${employee.firstName} ${employee.lastName}`,
+          remarks: `Deleted employee: ${employee.firstName} ${employee.lastName}`,
+        },
+      });
+
       res.status(200).json({
         success: true,
         message: `Employee ${employee.employeeId} deleted successfully`,

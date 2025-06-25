@@ -1,9 +1,9 @@
-import axios from "axios";
+import api from "./api";
+import axios, { isAxiosError } from "axios";
 import { toast } from "react-toastify";
 import type { IBonus, BonusType } from "../types/payroll";
 
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
-axios.defaults.withCredentials = true;
+const BASE_URL = `/api`;
 
 interface CreateBonusData {
   employee: string;
@@ -83,11 +83,11 @@ interface MyBonusResponse {
 export const bonusService = {
   createBonus: async (data: Partial<IBonus>): Promise<{ data: IBonus }> => {
     try {
-      const response = await axios.post(`${BASE_URL}/bonus/personal`, data);
+      const response = await api.post(`${BASE_URL}/bonus/personal`, data);
       return response.data;
     } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        const errorMessage = axios.isAxiosError(error)
+      if (isAxiosError(error)) {
+        const errorMessage = isAxiosError(error)
           ? error.response?.data?.message || "Failed to create bonus"
           : "An unexpected error occurred";
         toast.error(errorMessage);
@@ -102,10 +102,10 @@ export const bonusService = {
     data: CreatePersonalBonusData
   ): Promise<{ data: IBonus }> => {
     try {
-      const response = await axios.post(`${BASE_URL}/bonus/personal`, data);
+      const response = await api.post(`${BASE_URL}/bonus/personal`, data);
       return response.data;
     } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
+      if (isAxiosError(error)) {
         const errorMessage =
           error.response?.data?.message ||
           "Failed to create personal bonus request";
@@ -122,7 +122,7 @@ export const bonusService = {
     limit: number = 10
   ): Promise<MyBonusResponse> => {
     try {
-      const response = await axios.get(`${BASE_URL}/bonus/my`, {
+      const response = await api.get(`${BASE_URL}/bonus/my`, {
         params: { page, limit },
       });
       return response.data;
@@ -137,11 +137,11 @@ export const bonusService = {
 
   getBonusById: async (id: string): Promise<{ data: IBonus }> => {
     try {
-      const response = await axios.get(`${BASE_URL}/bonus/requests/${id}`);
+      const response = await api.get(`${BASE_URL}/bonus/requests/${id}`);
       return response.data;
     } catch (error: unknown) {
       console.error("❌ Error fetching bonus:", error);
-      if (axios.isAxiosError(error)) {
+      if (isAxiosError(error)) {
         toast.error(error.response?.data?.message || "Failed to fetch bonus");
       } else {
         toast.error("An unexpected error occurred");
@@ -170,13 +170,13 @@ export const bonusService = {
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
     try {
-      const response = await axios.get(`${BASE_URL}/bonus/requests`, {
+      const response = await api.get(`${BASE_URL}/bonus/requests`, {
         params,
       });
       return response.data;
     } catch (error: unknown) {
       console.error("❌ Error fetching bonuses:", error);
-      if (axios.isAxiosError(error)) {
+      if (isAxiosError(error)) {
         toast.error(error.response?.data?.message || "Failed to fetch bonuses");
       } else {
         toast.error("An unexpected error occurred");
@@ -190,14 +190,14 @@ export const bonusService = {
     data: Partial<CreateBonusData>
   ): Promise<{ data: IBonus }> => {
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/bonus/requests/${id}`,
         data
       );
       return response.data;
     } catch (error: unknown) {
       console.error("❌ Error updating bonus:", error);
-      if (axios.isAxiosError(error)) {
+      if (isAxiosError(error)) {
         toast.error(error.response?.data?.message || "Failed to update bonus");
       } else {
         toast.error("An unexpected error occurred");
@@ -211,13 +211,13 @@ export const bonusService = {
     // approved: boolean
   ): Promise<{ data: IBonus }> => {
     try {
-      const response = await axios.put(
+      const response = await api.put(
         `${BASE_URL}/bonus/requests/${id}/approve`
       );
       return response.data;
     } catch (error: unknown) {
       console.error("❌ Error approving bonus:", error);
-      if (axios.isAxiosError(error)) {
+      if (isAxiosError(error)) {
         toast.error(error.response?.data?.message || "Failed to approve bonus");
       } else {
         toast.error("An unexpected error occurred");
@@ -231,14 +231,14 @@ export const bonusService = {
     rejectionReason: string
   ): Promise<{ data: IBonus }> => {
     try {
-      const response = await axios.put(
+      const response = await api.put(
         `${BASE_URL}/bonus/requests/${id}/reject`,
         { rejectionReason }
       );
       return response.data;
     } catch (error: unknown) {
       console.error("❌ Error rejecting bonus:", error);
-      if (axios.isAxiosError(error)) {
+      if (isAxiosError(error)) {
         toast.error(error.response?.data?.message || "Failed to reject bonus");
       } else {
         toast.error("An unexpected error occurred");
@@ -249,11 +249,11 @@ export const bonusService = {
 
   deleteBonus: async (id: string) => {
     try {
-      const response = await axios.delete(`${BASE_URL}/bonus/requests/${id}`);
+      const response = await api.delete(`${BASE_URL}/bonus/requests/${id}`);
       return response.data;
     } catch (error: unknown) {
       console.error("❌ Error deleting bonus:", error);
-      if (axios.isAxiosError(error)) {
+      if (isAxiosError(error)) {
         toast.error(error.response?.data?.message || "Failed to delete bonus");
       } else {
         toast.error("An unexpected error occurred");
@@ -270,13 +270,13 @@ export const bonusService = {
     type: string;
   }) => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${BASE_URL}/bonus/department/employee`,
         data
       );
       return response.data;
     } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
+      if (isAxiosError(error)) {
         toast.error(
           error.response?.data?.message ||
             "Failed to create department employee bonus"
@@ -296,13 +296,10 @@ export const bonusService = {
     departmentId: string;
   }) => {
     try {
-      const response = await axios.post(
-        `${BASE_URL}/bonus/department/all`,
-        data
-      );
+      const response = await api.post(`${BASE_URL}/bonus/department/all`, data);
       return response.data;
     } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
+      if (isAxiosError(error)) {
         toast.error(
           error.response?.data?.message ||
             "Failed to create department-wide bonus"
@@ -315,14 +312,14 @@ export const bonusService = {
   },
 
   approveBonusRequest: async (bonusId: string) => {
-    const response = await axios.put(
+    const response = await api.put(
       `${BASE_URL}/bonus/requests/${bonusId}/approve`
     );
     return response.data;
   },
 
   rejectBonusRequest: async (bonusId: string, comment: string) => {
-    const response = await axios.put(
+    const response = await api.put(
       `${BASE_URL}/bonus/requests/${bonusId}/reject`,
       { comment }
     );

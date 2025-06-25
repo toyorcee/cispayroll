@@ -213,16 +213,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         if (path === "/pms/settings" || path === "/pms/settings/") {
           return <>{children || element}</>;
         }
-
-        // Check specific permissions for each settings page
-        if (path.includes("/general")) {
-          if (!user.permissions?.includes(Permission.MANAGE_SYSTEM_SETTINGS)) {
-            toast.error("Access denied: No system settings permissions");
-            return <Navigate to="/pms/dashboard" replace />;
-          }
-          return <>{children || element}</>;
-        }
-
         // Block access to settings pages that are only for Super Admin
         if (path.includes("/company") || path.includes("/integrations")) {
           toast.error(
@@ -231,7 +221,23 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           return <Navigate to="/pms/dashboard" replace />;
         }
       } else if (user.role === UserRole.USER) {
-        toast.error("Access denied: Users cannot access settings");
+        // Allow access to main settings page and notification settings if user has the permission
+        if (
+          path === "/pms/settings" ||
+          path === "/pms/settings/" ||
+          path.includes("/notifications")
+        ) {
+          if (
+            !user.permissions?.includes(Permission.MANAGE_NOTIFICATION_SETTINGS)
+          ) {
+            toast.error("Access denied: No notification settings permissions");
+            return <Navigate to="/pms/dashboard" replace />;
+          }
+          return <>{children || element}</>;
+        }
+        toast.error(
+          "Access denied: Users can only access Notification Settings"
+        );
         return <Navigate to="/pms/dashboard" replace />;
       }
     }

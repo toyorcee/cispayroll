@@ -1,5 +1,7 @@
 import Notification from "../models/Notification.js";
 import UserModel from "../models/User.js";
+import * as NotificationPreferenceImport from "../models/NotificationPreference.js";
+const NotificationPreference = NotificationPreferenceImport.default;
 import { APPROVAL_LEVELS } from "../controllers/BaseApprovalController.js";
 import PayrollModel from "../models/Payroll.js";
 
@@ -204,6 +206,48 @@ const notificationMessages = {
 };
 
 export class NotificationService {
+  // Helper method to check if user should receive notification
+  static async shouldSendNotification(userId, type, channel = "inApp") {
+    try {
+      const preferences = await NotificationPreference.getOrCreatePreferences(
+        userId
+      );
+      if (!preferences.preferences[channel]?.enabled) {
+        return false;
+      }
+      if (preferences.isInQuietHours()) {
+        return false;
+      }
+      if (preferences.isDoNotDisturbActive()) {
+        return false;
+      }
+      let category = "general";
+      if (type.includes("PAYROLL")) {
+        category = "payroll";
+      } else if (type.includes("LEAVE")) {
+        category = "leave";
+      } else if (type.includes("ALLOWANCE")) {
+        category = "allowance";
+      } else if (type.includes("BONUS")) {
+        category = "bonus";
+      } else if (type.includes("ONBOARDING") || type.includes("OFFBOARDING")) {
+        category = type.toLowerCase().includes("onboarding")
+          ? "onboarding"
+          : "offboarding";
+      } else if (type.includes("SYSTEM") || type.includes("ERROR")) {
+        category = "system";
+      }
+      const isCategoryEnabled =
+        preferences.preferences[channel].types[category];
+      if (!isCategoryEnabled) {
+        return false;
+      }
+      return true;
+    } catch (error) {
+      return true;
+    }
+  }
+
   static async createNotification(
     recipientId,
     type,
@@ -213,32 +257,25 @@ export class NotificationService {
     options = {}
   ) {
     try {
-      console.log("Creating notification with data:", {
+      // Check if user should receive in-app notification
+      const shouldSendInApp = await this.shouldSendNotification(
         recipientId,
         type,
-        employeeId: employee?._id,
-        payrollId: payroll?._id,
-        remarks,
-        options,
-      });
-
-      // Get employee data if not provided
+        "inApp"
+      );
+      if (!shouldSendInApp) {
+        return null;
+      }
       let employeeData = employee;
       if (!employeeData && payroll?.employee) {
         employeeData = await UserModel.findById(payroll.employee);
       }
-
-      // Get payroll data if not provided
       let payrollData = payroll;
       if (!payrollData && employeeData?.payrolls?.length > 0) {
         payrollData = await PayrollModel.findById(employeeData.payrolls[0]);
       }
-
-      // Generate notification message
       let message = "";
       let title = "";
-
-      // Get message template based on notification type
       const template = this.getMessageTemplate(type, {
         employee: employeeData,
         payroll: payrollData,
@@ -247,11 +284,8 @@ export class NotificationService {
         remarks,
         options: options,
       });
-
       title = template.title;
       message = template.message;
-
-      // Create notification
       const notification = new Notification({
         recipient: recipientId,
         type,
@@ -275,25 +309,17 @@ export class NotificationService {
           totalAllowances: payrollData?.totalAllowances || 0,
           totalDeductions: payrollData?.totalDeductions || 0,
           netPay: payrollData?.netPay || 0,
-          // currentLevel: payrollData?.approvalFlow?.currentLevel,
-          // nextApprovalLevel: payrollData?.approvalFlow?.nextLevel,
           approvalHistory: payrollData?.approvalFlow?.history || [],
           actionButtons: this.getActionButtons(type, payrollData),
           statusColor: this.getStatusColor(payrollData?.status),
           statusIcon: this.getStatusIcon(payrollData?.status),
-          // Add forceRefresh flag for PAYROLL_PENDING_APPROVAL notifications
           forceRefresh: type === NOTIFICATION_TYPES.PAYROLL_PENDING_APPROVAL,
         },
         read: false,
       });
-
-      console.log("Creating notification with data:", notification);
       const savedNotification = await notification.save();
-      console.log("Created notification:", savedNotification._id);
-
       return savedNotification;
     } catch (error) {
-      console.error("Error creating notification:", error);
       throw error;
     }
   }
@@ -306,26 +332,12 @@ export class NotificationService {
     data = {}
   ) {
     try {
-      console.log("Creating payroll notification:", {
-        payrollId: payroll._id,
-        type,
-        adminId: admin._id,
-        remarks,
-      });
-
-      // Get the employee from the payroll
       const employee = await UserModel.findById(payroll.employee);
       if (!employee) {
-        console.error("Employee not found for payroll:", payroll._id);
         return null;
       }
-
-      // Create notifications array to store all notifications
       const notifications = [];
-      // Track notifications to prevent duplicates
       const notifiedUsers = new Set();
-
-      // 1. Notify the employee (skip for draft payrolls)
       if (type !== "PAYROLL_DRAFT_CREATED") {
         const employeeNotification = await this.createNotification(
           employee._id,
@@ -340,13 +352,10 @@ export class NotificationService {
           notifiedUsers.add(employee._id.toString());
         }
       }
-
-      // 2. Notify the HR Manager
       const hrManager = await UserModel.findOne({
         department: employee.department,
         position: { $in: ["HR Manager", "Human Resources Manager"] },
       });
-
       if (hrManager && !notifiedUsers.has(hrManager._id.toString())) {
         const hrManagerNotification = await this.createNotification(
           hrManager._id,
@@ -361,12 +370,9 @@ export class NotificationService {
           notifiedUsers.add(hrManager._id.toString());
         }
       }
-
-      // 3. Notify the Finance Director
       const financeDirector = await UserModel.findOne({
         position: { $in: ["Finance Director", "Chief Financial Officer"] },
       });
-
       if (
         financeDirector &&
         !notifiedUsers.has(financeDirector._id.toString())
@@ -384,12 +390,9 @@ export class NotificationService {
           notifiedUsers.add(financeDirector._id.toString());
         }
       }
-
-      // 4. Notify the Super Admin
       const superAdmin = await UserModel.findOne({
         position: "Super Admin",
       });
-
       if (superAdmin && !notifiedUsers.has(superAdmin._id.toString())) {
         const superAdminNotification = await this.createNotification(
           superAdmin._id,
@@ -404,9 +407,7 @@ export class NotificationService {
           notifiedUsers.add(superAdmin._id.toString());
         }
       }
-
-      // 5. Notify the creator/admin if they are different from the above
-      if (!notifiedUsers.has(admin._id.toString())) {
+      if (admin && !notifiedUsers.has(admin._id.toString())) {
         const adminNotification = await this.createNotification(
           admin._id,
           type === NOTIFICATION_TYPES.PAYROLL_PENDING_APPROVAL
@@ -422,10 +423,8 @@ export class NotificationService {
           notifiedUsers.add(admin._id.toString());
         }
       }
-
       return notifications;
     } catch (error) {
-      console.error("Error creating payroll notification:", error);
       return null;
     }
   }
@@ -436,43 +435,22 @@ export class NotificationService {
     payroll,
     remarks = ""
   ) {
-    console.log(
-      `🔔 Creating batch payroll notifications: ${type} for ${userIds.length} users`
-    );
-
-    // Get all employees with their departments in one query
     const employees = await UserModel.find({ _id: { $in: userIds } })
       .populate("department", "name code")
       .lean();
-
-    console.log(
-      `👥 Found ${employees.length} employees for batch notifications`
-    );
-
-    // Create a map for quick lookup
     const employeeMap = {};
     employees.forEach((emp) => {
       employeeMap[emp._id.toString()] = emp;
     });
-
     const notifications = userIds.map((userId) => {
       const employee = employeeMap[userId.toString()];
       if (!employee) {
-        console.warn(`⚠️ Employee not found for ID: ${userId}`);
         return this.createPayrollNotification(payroll, type, null, remarks);
       }
-
-      console.log(
-        `👤 Processing notification for: ${employee.firstName} ${employee.lastName} (${employee._id})`
-      );
-      console.log(
-        `🏢 Department: ${employee.department?.name || "Not assigned"}`
-      );
-
       return this.createPayrollNotification(payroll, type, null, remarks);
     });
-
-    return await Promise.all(notifications);
+    const results = await Promise.all(notifications);
+    return results;
   }
 
   // Helper function to get appropriate icon for notification type
@@ -648,24 +626,10 @@ export class NotificationService {
   }
 
   static getMessageTemplate(type, data, currentLevel, approvalLevel) {
-    console.log("🔍 getMessageTemplate called with:", {
-      type,
-      data,
-      currentLevel,
-      approvalLevel,
-      dataCurrentLevel: data?.currentLevel,
-      dataApprovalLevel: data?.approvalLevel,
-      dataDataApprovalLevel: data?.data?.approvalLevel,
-    });
-
     // Ensure data is an object
     if (!data) data = {};
-
     // Extract leave data if available - prioritize options.leave
     const leave = data.options?.leave || data.leave || data.data?.leave || null;
-
-    console.log("🔍 Extracted leave data:", leave);
-
     // Format dates for leave notifications
     const formatDate = (dateString) => {
       if (!dateString) return "Invalid Date";
@@ -677,24 +641,19 @@ export class NotificationService {
           year: "numeric",
         });
       } catch (e) {
-        console.error("Error formatting date:", e);
         return "Invalid Date";
       }
     };
-
     // Get leave type display name
     const getLeaveTypeDisplay = (type) => {
       if (!type) return "undefined";
       return type.charAt(0).toUpperCase() + type.slice(1);
     };
-
     // Get department name
     const getDepartmentName = (departmentId) => {
       if (!departmentId) return "Unknown Department";
-      // In a real implementation, you might want to fetch this from a cache or database
       return "Department"; // Placeholder
     };
-
     switch (type) {
       case NOTIFICATION_TYPES.PAYROLL_SUBMITTED:
         // Check if the employee is the one who submitted
@@ -738,12 +697,6 @@ export class NotificationService {
       case NOTIFICATION_TYPES.PAYROLL_APPROVED:
         // Get approvalLevel from data.approvalLevel or data.data.approvalLevel
         const level = approvalLevel || (data.data && data.data.approvalLevel);
-        console.log("🔍 PAYROLL_APPROVED level check:", {
-          level,
-          isHRManager: level === APPROVAL_LEVELS.HR_MANAGER,
-          isFinanceDirector: level === APPROVAL_LEVELS.FINANCE_DIRECTOR,
-        });
-
         if (level === APPROVAL_LEVELS.HR_MANAGER) {
           return {
             title: "Payroll Approved",

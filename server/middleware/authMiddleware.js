@@ -6,31 +6,53 @@ import { PermissionChecker } from "../utils/permissionUtils.js";
 
 // Update the requireAuth middleware to handle lifecycle states
 export const requireAuth = async (req, res, next) => {
+  // console.log("🔐 [AuthMiddleware] Processing authentication request");
+  // console.log("🔐 [AuthMiddleware] Request path:", req.path);
+  // console.log("🔐 [AuthMiddleware] Request method:", req.method);
+
   try {
     const token = req.cookies?.token;
     if (!token) {
+      // console.log("❌ [AuthMiddleware] No token provided in cookies");
       return res.status(401).json({ message: "No token provided" });
     }
+    // console.log("✅ [AuthMiddleware] Token found in cookies");
 
+    // console.log("🔍 [AuthMiddleware] Verifying JWT token...");
     const decoded = jwt.verify(
       token,
       process.env.JWT_SECRET || "your-secret-key"
     );
+    // console.log("✅ [AuthMiddleware] JWT token verified successfully");
+    // console.log("🔍 [AuthMiddleware] Decoded token user ID:", decoded.id);
 
     // Fetch full user to check lifecycle state
+    // console.log("👤 [AuthMiddleware] Fetching user from database...");
     const user = await UserModel.findById(decoded.id).select("-password");
     if (!user) {
+      console.error(
+        "❌ [AuthMiddleware] User not found in database:",
+        decoded.id
+      );
       return res.status(401).json({ message: "User not found" });
     }
+    // console.log("✅ [AuthMiddleware] User found:", {
+    //   id: user._id,
+    //   email: user.email,
+    //   role: user.role,
+    //   lifecycleState: user.lifecycle?.currentState,
+    // });
 
     // Check user lifecycle state
     if (user.lifecycle?.currentState === UserLifecycleState.TERMINATED) {
+      console.error("❌ [AuthMiddleware] User account terminated:", user._id);
       return res.status(403).json({
         message: "Account terminated. Please contact administrator.",
       });
     }
 
     if (user.lifecycle?.currentState === UserLifecycleState.OFFBOARDING) {
+      // console.log("⚠️ [AuthMiddleware] User in offboarding state:", user._id);
       // Allow only specific routes during offboarding
       const allowedOffboardingPaths = [
         "/api/password/update",
@@ -39,14 +61,23 @@ export const requireAuth = async (req, res, next) => {
       ];
 
       if (!allowedOffboardingPaths.includes(req.path)) {
+        // console.log(
+        //   "❌ [AuthMiddleware] Access denied during offboarding for path:",
+        //   req.path
+        // );
         return res.status(403).json({
           message: "Limited access during offboarding process",
         });
       }
+      // console.log(
+      //   "✅ [AuthMiddleware] Allowed access during offboarding for path:",
+      //   req.path
+      // );
     }
 
     // Set user info in request
     req.user = user;
+    // console.log("✅ [AuthMiddleware] User set in request object");
 
     // Add lifecycle state to response headers for client awareness
     res.set(
@@ -54,19 +85,30 @@ export const requireAuth = async (req, res, next) => {
       user.lifecycle?.currentState || "UNKNOWN"
     );
 
-    console.log("🔐 Auth middleware user:", {
-      id: user._id,
-      role: user.role,
-      lifecycleState: user.lifecycle?.currentState,
-    });
+    // console.log("🔐 [AuthMiddleware] Authentication successful:", {
+    //   id: user._id,
+    //   role: user.role,
+    //   lifecycleState: user.lifecycle?.currentState,
+    //   path: req.path,
+    // });
 
     next();
-  } catch (err) {
-    console.error("Auth middleware error:", err);
-    return res.status(401).json({
-      message: "Invalid or expired token",
-      error: process.env.NODE_ENV === "development" ? err.message : undefined,
+  } catch (error) {
+    console.error("❌ [AuthMiddleware] Authentication error:", error);
+    console.error("❌ [AuthMiddleware] Error details:", {
+      message: error.message,
+      name: error.name,
+      stack: error.stack,
     });
+
+    if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({ message: "Invalid token" });
+    }
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ message: "Token expired" });
+    }
+
+    return res.status(500).json({ message: "Authentication failed" });
   }
 };
 
@@ -94,10 +136,25 @@ export const requireRole = (roles) => {
 // Enhanced permission middleware with better error handling
 export const requirePermission = (requiredPermissions) => {
   return (req, res, next) => {
+    // console.log(
+    //   "🔐 [PermissionMiddleware] Checking permissions for path:",
+    //   req.path
+    // );
+    // console.log(
+    //   "🔐 [PermissionMiddleware] Required permissions:",
+    //   requiredPermissions
+    // );
+
     const user = req.user;
+    // console.log("👤 [PermissionMiddleware] User details:", {
+    //   id: user._id,
+    //   role: user.role,
+    //   permissions: user.permissions,
+    // });
 
     // Super Admin bypass remains
     if (user.role === UserRole.SUPER_ADMIN) {
+      // console.log("✅ [PermissionMiddleware] Super Admin access granted");
       next();
       return;
     }
@@ -107,6 +164,13 @@ export const requirePermission = (requiredPermissions) => {
         (permission) => !user.permissions.includes(permission)
       );
 
+      console.error("❌ [PermissionMiddleware] Permission denied:", {
+        required: requiredPermissions,
+        missing: missingPermissions,
+        current: user.permissions,
+        userRole: user.role,
+      });
+
       res.status(403).json({
         message: "Access denied. Insufficient permissions.",
         required: requiredPermissions,
@@ -115,6 +179,8 @@ export const requirePermission = (requiredPermissions) => {
       });
       return;
     }
+
+    // console.log("✅ [PermissionMiddleware] Permissions validated successfully");
     next();
   };
 };

@@ -26,6 +26,12 @@ router.delete(
   DeductionController.removeVoluntaryDeduction
 );
 
+// Toggle voluntary deduction opt-in/out
+router.patch(
+  "/preferences/voluntary/toggle/:userId?",
+  DeductionController.toggleVoluntaryDeduction
+);
+
 // Admin routes (keep these in superAdminRoutes.js)
 // These routes are for managing the deductions themselves, not user preferences
 // - Creating deductions

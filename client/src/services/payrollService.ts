@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "./api";
 import { toast } from "react-toastify";
 import type {
   IPayroll,
@@ -12,8 +12,7 @@ import type {
 } from "../types/payroll";
 import { salaryStructureService } from "./salaryStructureService";
 
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api/super-admin`;
-axios.defaults.withCredentials = true;
+const BASE_URL = `/api/super-admin`;
 
 interface PayrollFilters {
   dateRange?: string;
@@ -46,7 +45,7 @@ export const payrollService = {
   ): Promise<IPayrollCalculationResult> => {
     try {
       console.log("=== 🚀 Creating Payroll ===");
-      const response = await axios.post(`${BASE_URL}/payroll`, data);
+      const response = await api.post(`${BASE_URL}/payroll`, data);
 
       if (!response.data.success) {
         throw new Error("Failed to create payroll");
@@ -70,7 +69,7 @@ export const payrollService = {
   ): Promise<IPayroll> => {
     try {
       console.log("=== 🔄 Updating Payroll ===");
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/payroll/${payrollId}`,
         data
       );
@@ -92,7 +91,7 @@ export const payrollService = {
 
   deletePayroll: async (payrollId: string): Promise<void> => {
     try {
-      const response = await axios.delete(`${BASE_URL}/payroll/${payrollId}`);
+      const response = await api.delete(`${BASE_URL}/payroll/${payrollId}`);
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to delete payroll");
       }
@@ -110,7 +109,7 @@ export const payrollService = {
   // Payroll Status Management
   submitPayroll: async (payrollId: string): Promise<IPayroll> => {
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/payroll/${payrollId}/submit`
       );
 
@@ -134,7 +133,7 @@ export const payrollService = {
     payrollId: string,
     remarks?: string
   ): Promise<ApprovalResponse> => {
-    const response = await axios.patch(
+    const response = await api.patch(
       `${BASE_URL}/approvals/${payrollId}/approve`,
       { remarks },
       { headers: { "Content-Type": "application/json" } }
@@ -147,7 +146,7 @@ export const payrollService = {
     remarks: string
   ): Promise<ApprovalResponse> => {
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/payroll/${payrollId}/reject`,
         { remarks },
         { headers: { "Content-Type": "application/json" } }
@@ -175,7 +174,7 @@ export const payrollService = {
     remarks?: string
   ): Promise<IPayroll> => {
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/payroll/${payrollId}/status`,
         { status, remarks },
         { headers: { "Content-Type": "application/json" } }
@@ -213,7 +212,7 @@ export const payrollService = {
         });
       }
 
-      const response = await axios.get(`${BASE_URL}/payroll?${params}`);
+      const response = await api.get(`${BASE_URL}/payroll?${params}`);
       if (!response.data.success) {
         throw new Error(response.data.message || "Failed to fetch payrolls");
       }
@@ -231,7 +230,7 @@ export const payrollService = {
 
   getPayrollById: async (payrollId: string): Promise<PayrollData> => {
     try {
-      const response = await axios.get(`${BASE_URL}/payroll/${payrollId}`);
+      const response = await api.get(`${BASE_URL}/payroll/${payrollId}`);
       if (!response.data.success) {
         throw new Error(
           response.data.message || "Failed to fetch payroll details"
@@ -251,7 +250,7 @@ export const payrollService = {
   // Period Management
   getPayrollPeriods: async (): Promise<PayrollPeriod[]> => {
     try {
-      const response = await axios.get(`${BASE_URL}/payroll/periods`);
+      const response = await api.get(`${BASE_URL}/payroll/periods`);
       if (!response.data.success) {
         throw new Error("Failed to fetch payroll periods");
       }
@@ -271,7 +270,7 @@ export const payrollService = {
     year: number
   ): Promise<PeriodPayrollResponse> => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}/payroll/period/${month}/${year}`
       );
       if (!response.data.success) {
@@ -293,7 +292,7 @@ export const payrollService = {
   // Statistics and Counts
   getPayrollStats: async (): Promise<PayrollStats> => {
     try {
-      const response = await axios.get(`${BASE_URL}/payroll/stats`);
+      const response = await api.get(`${BASE_URL}/payroll/stats`);
       if (!response.data.success) {
         throw new Error("Failed to fetch payroll stats");
       }
@@ -315,7 +314,7 @@ export const payrollService = {
       const queryString = filters
         ? `?${new URLSearchParams(filters as Record<string, string>)}`
         : "";
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}/payroll/counts${queryString}`
       );
       if (!response.data.success) {
@@ -335,7 +334,7 @@ export const payrollService = {
   // Employee Payroll History
   getEmployeePayrollHistory: async (employeeId: string) => {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}/payroll/employee/${employeeId}/history`
       );
       if (!response.data.success) {
@@ -357,7 +356,7 @@ export const payrollService = {
   // Payslip Management
   viewPayslip: async (payrollId: string) => {
     try {
-      const response = await axios.get(`${BASE_URL}/payroll/${payrollId}/view`);
+      const response = await api.get(`${BASE_URL}/payroll/${payrollId}/view`);
       if (!response.data.success) {
         throw new Error(
           response.data.message || "Failed to fetch payslip details"
@@ -378,7 +377,7 @@ export const payrollService = {
   // Add new method for payment processing
   processPayment: async (payrollId: string) => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${BASE_URL}/payroll/${payrollId}/process-payment`
       );
       if (!response.data.success) {
@@ -398,7 +397,7 @@ export const payrollService = {
 
   initiatePayment: async (payrollId: string) => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${BASE_URL}/payroll/${payrollId}/initiate-payment`
       );
       if (!response.data.success) {
@@ -417,10 +416,9 @@ export const payrollService = {
 
   initiateBatchPayment: async (payrollIds: string[]) => {
     try {
-      const response = await axios.post(
-        `${BASE_URL}/payroll/initiate-payment`,
-        { payrollIds }
-      );
+      const response = await api.post(`${BASE_URL}/payroll/initiate-payment`, {
+        payrollIds,
+      });
       if (!response.data.success) {
         throw new Error(
           response.data.message || "Failed to initiate batch payment"
@@ -440,7 +438,7 @@ export const payrollService = {
   // Pending Payrolls
   getPendingPayrolls: async () => {
     try {
-      const response = await axios.get(`${BASE_URL}/payroll/pending`);
+      const response = await api.get(`${BASE_URL}/payroll/pending`);
       if (!response.data.success) {
         throw new Error(
           response.data.message || "Failed to fetch pending payrolls"
@@ -470,9 +468,7 @@ export const payrollService = {
         }
       });
 
-      const response = await axios.get(
-        `${BASE_URL}/payroll/filtered?${params}`
-      );
+      const response = await api.get(`${BASE_URL}/payroll/filtered?${params}`);
 
       if (!response.data.success) {
         throw new Error(
@@ -501,11 +497,10 @@ export const payrollService = {
   // Add new method for sending payslip email
   sendPayslipEmail: async (payslipId: string): Promise<boolean> => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${BASE_URL}/payroll/${payslipId}/email`,
         {},
         {
-          withCredentials: true,
           headers: {
             "Content-Type": "application/json",
           },
@@ -525,9 +520,38 @@ export const payrollService = {
     }
   },
 
+  // Add new method for sending multiple payslips email (batch)
+  sendMultiplePayslipsEmail: async (payrollIds: string[]): Promise<any> => {
+    try {
+      const response = await api.post(
+        `${BASE_URL}/payroll/send-payslips-batch`,
+        { payrollIds },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.data.success) {
+        toast.success(response.data.message || "Payslips sent successfully");
+        return response.data.data;
+      } else {
+        throw new Error(response.data.message || "Failed to send payslips");
+      }
+    } catch (error) {
+      console.error("❌ Error sending payslips in batch:", error);
+      const errorMessage =
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || "Failed to send payslips in batch";
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+  },
+
   async getProcessingStatistics() {
     try {
-      const response = await axios.get(
+      const response = await api.get(
         `${BASE_URL}/payroll/processing-statistics`
       );
       if (response.data.success) {
@@ -543,7 +567,7 @@ export const payrollService = {
   },
 
   markPaymentsPaidBatch: async (payrollIds: string[]) => {
-    const response = await axios.post(`${BASE_URL}/payroll/mark-paid-batch`, {
+    const response = await api.post(`${BASE_URL}/payroll/mark-paid-batch`, {
       payrollIds,
     });
     if (!response.data.success) {
@@ -556,7 +580,7 @@ export const payrollService = {
 
   markAsPaid: async (payrollId: string) => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${BASE_URL}/payroll/${payrollId}/mark-paid`
       );
       if (!response.data.success) {
@@ -573,7 +597,7 @@ export const payrollService = {
   },
 
   markPaymentsFailedBatch: async (payrollIds: string[]) => {
-    const response = await axios.post(`${BASE_URL}/payroll/mark-failed-batch`, {
+    const response = await api.post(`${BASE_URL}/payroll/mark-failed-batch`, {
       payrollIds,
     });
     if (!response.data.success) {
@@ -586,7 +610,7 @@ export const payrollService = {
 
   markAsFailed: async (payrollId: string) => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${BASE_URL}/payroll/${payrollId}/mark-failed`
       );
       if (!response.data.success) {

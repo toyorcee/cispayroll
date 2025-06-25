@@ -1,7 +1,6 @@
-import axios from "axios";
+import api from "./api";
 
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
-axios.defaults.withCredentials = true;
+const BASE_URL = `/api`;
 
 export interface ApprovalResponse {
   success: boolean;
@@ -28,7 +27,7 @@ const approvalService = {
     remarks?: string
   ): Promise<ApprovalResponse> => {
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/approvals/hr-manager/${payrollId}/approve`,
         { remarks }
       );
@@ -50,7 +49,7 @@ const approvalService = {
     reason: string
   ): Promise<ApprovalResponse> => {
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/approvals/hr-manager/${payrollId}/reject`,
         { reason }
       );
@@ -72,7 +71,7 @@ const approvalService = {
     remarks?: string
   ): Promise<ApprovalResponse> => {
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/approvals/department-head/${payrollId}/approve`,
         { remarks }
       );
@@ -94,7 +93,7 @@ const approvalService = {
     reason: string
   ): Promise<ApprovalResponse> => {
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/approvals/department-head/${payrollId}/reject`,
         { reason }
       );
@@ -116,7 +115,7 @@ const approvalService = {
     remarks?: string
   ): Promise<ApprovalResponse> => {
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/approvals/finance-director/${payrollId}/approve`,
         { remarks }
       );
@@ -138,7 +137,7 @@ const approvalService = {
     reason: string
   ): Promise<ApprovalResponse> => {
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/approvals/finance-director/${payrollId}/reject`,
         { reason }
       );
@@ -160,7 +159,7 @@ const approvalService = {
     remarks?: string
   ): Promise<ApprovalResponse> => {
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/approvals/super-admin/${payrollId}/approve`,
         { remarks }
       );
@@ -182,7 +181,7 @@ const approvalService = {
     reason: string
   ): Promise<ApprovalResponse> => {
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/approvals/super-admin/${payrollId}/reject`,
         { reason }
       );

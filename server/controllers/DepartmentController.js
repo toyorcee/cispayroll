@@ -80,6 +80,22 @@ export class DepartmentController {
         departmentData
       );
 
+      // Add audit logging
+      await PayrollStatisticsLogger.logDepartmentAction({
+        action: "CREATE",
+        departmentId: department._id,
+        userId: req.user.id,
+        details: {
+          name: department.name,
+          code: department.code,
+          description: department.description,
+          headOfDepartment: department.headOfDepartment,
+          createdBy: req.user.id,
+          message: `Created department: ${department.name}`,
+          remarks: `Created department: ${department.name}`,
+        },
+      });
+
       res.status(201).json({
         success: true,
         message: "Department created successfully",
@@ -119,6 +135,23 @@ export class DepartmentController {
         },
       ]);
 
+      // Add audit logging
+      await PayrollStatisticsLogger.logDepartmentAction({
+        action: "UPDATE",
+        departmentId: department._id,
+        userId: req.user.id,
+        details: {
+          name: department.name,
+          code: department.code,
+          description: department.description,
+          headOfDepartment: department.headOfDepartment,
+          updatedBy: req.user.id,
+          changes: req.body,
+          message: `Updated department: ${department.name}`,
+          remarks: `Updated department: ${department.name}`,
+        },
+      });
+
       // Now we should have the populated data
       res.status(200).json({
         success: true,
@@ -143,7 +176,27 @@ export class DepartmentController {
   static async deleteDepartment(req, res) {
     try {
       const { id } = req.params;
+
+      // Get department data before deletion for audit
+      const department = await DepartmentService.getDepartmentById(id);
+
       await DepartmentService.deleteDepartment(id);
+
+      // Add audit logging
+      await PayrollStatisticsLogger.logDepartmentAction({
+        action: "DELETE",
+        departmentId: department._id,
+        userId: req.user.id,
+        details: {
+          name: department.name,
+          code: department.code,
+          description: department.description,
+          headOfDepartment: department.headOfDepartment,
+          deletedBy: req.user.id,
+          message: `Deleted department: ${department.name}`,
+          remarks: `Deleted department: ${department.name}`,
+        },
+      });
 
       res.status(200).json({
         success: true,

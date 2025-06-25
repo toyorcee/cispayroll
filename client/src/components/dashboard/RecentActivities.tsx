@@ -113,6 +113,27 @@ const statusConfig: Record<
   },
 };
 
+// Add this mapping right after the actionIcons
+const actionDisplayNames: Record<string, string> = {
+  CREATE: "Created",
+  UPDATE: "Updated",
+  DELETE: "Deleted",
+  APPROVE: "Approved",
+  REJECT: "Rejected",
+  TOGGLE_STATUS: "Status Changed",
+  BATCH_PAYMENT_INITIATION: "Initiated Batch Payment",
+  PROCESS: "Processed",
+  SUBMIT: "Submitted",
+  ARCHIVE: "Archived",
+  LOCK: "Locked",
+  UNLOCK: "Unlocked",
+  ADD: "Added",
+  REMOVE: "Removed",
+  EDIT: "Edited",
+  UPLOAD: "Uploaded",
+  DOWNLOAD: "Downloaded",
+};
+
 const getActionIcon = (action: string) => {
   return actionIcons[action] || actionIcons.default;
 };
@@ -124,18 +145,21 @@ const getStatusConfig = (status: string | undefined) => {
 
 const formatActivityDescription = (activity: RecentActivity) => {
   const { action, entity, details } = activity;
+  const displayAction = actionDisplayNames[action] || action;
 
   switch (entity) {
     case "PAYROLL":
-      return `${action} payroll for ${details.employeeName || "employee"}`;
+      return `${displayAction} payroll for ${
+        details.employeeName || "employee"
+      }`;
     case "EMPLOYEE":
-      return `${action} employee ${details.employeeName || ""}`;
+      return `${displayAction} employee ${details.employeeName || ""}`;
     case "DEPARTMENT":
-      return `${action} department ${details.departmentName || ""}`;
+      return `${displayAction} department ${details.departmentName || ""}`;
     case "SETTINGS":
-      return `${action} system settings`;
+      return `${displayAction} system settings`;
     default:
-      return `${action} ${entity.toLowerCase()}`;
+      return `${displayAction} ${entity.toLowerCase()}`;
   }
 };
 

@@ -3,6 +3,9 @@ import { config } from "dotenv";
 import { UserLifecycleState } from "../models/User.js";
 import { ApiError } from "../utils/errorHandler.js";
 import { UserRole } from "../models/User.js";
+import UserModel from "../models/User.js";
+import * as NotificationPreferenceImport from "../models/NotificationPreference.js";
+const NotificationPreference = NotificationPreferenceImport.default;
 
 // Load environment variables
 config();
@@ -10,11 +13,11 @@ config();
 export class EmailService {
   static transporter = nodemailer.createTransport({
     host: process.env.MAIL_HOST,
-    port: process.env.MAIL_PORT,
-    secure: false,
+    port: parseInt(process.env.MAIL_PORT) || 587,
+    secure: process.env.MAIL_ENCRYPTION === "ssl",
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD,
+      user: process.env.MAIL_USERNAME || process.env.EMAIL_USER,
+      pass: process.env.MAIL_PASSWORD || process.env.EMAIL_PASSWORD,
     },
     tls: {
       rejectUnauthorized: false,
@@ -22,9 +25,136 @@ export class EmailService {
     debug: true,
   });
 
+  static async testEmailConfiguration() {
+    console.log("🧪 [EmailService] Testing email configuration...");
+
+    // Check environment variables (support both new and legacy names)
+    const config = {
+      host: process.env.MAIL_HOST,
+      port: process.env.MAIL_PORT || 587,
+      encryption: process.env.MAIL_ENCRYPTION,
+      username: process.env.MAIL_USERNAME || process.env.EMAIL_USER,
+      password:
+        process.env.MAIL_PASSWORD || process.env.EMAIL_PASSWORD
+          ? "***SET***"
+          : "NOT SET",
+      fromAddress: process.env.MAIL_FROM_ADDRESS || process.env.EMAIL_FROM,
+      fromName: process.env.MAIL_FROM_NAME || "Personnel Management System",
+      clientUrl: process.env.CLIENT_URL,
+    };
+
+    console.log("🔧 [EmailService] Current configuration:", config);
+
+    // Check for missing required variables
+    const missing = [];
+    if (!config.host) missing.push("MAIL_HOST");
+    if (!config.username) missing.push("MAIL_USERNAME or EMAIL_USER");
+    if (!config.password || config.password === "NOT SET")
+      missing.push("MAIL_PASSWORD or EMAIL_PASSWORD");
+    if (!config.fromAddress) missing.push("MAIL_FROM_ADDRESS or EMAIL_FROM");
+
+    if (missing.length > 0) {
+      console.error(
+        "❌ [EmailService] Missing required environment variables:",
+        missing
+      );
+      return {
+        success: false,
+        error: `Missing environment variables: ${missing.join(", ")}`,
+        config,
+      };
+    }
+
+    try {
+      // Test SMTP connection
+      console.log("🔍 [EmailService] Testing SMTP connection...");
+      await this.transporter.verify();
+      console.log("✅ [EmailService] SMTP connection successful");
+
+      return {
+        success: true,
+        message: "Email configuration is valid and connection successful",
+        config: {
+          ...config,
+          password: "***HIDDEN***",
+        },
+      };
+    } catch (error) {
+      console.error("❌ [EmailService] SMTP connection failed:", {
+        error: error.message,
+        code: error.code,
+        command: error.command,
+      });
+
+      return {
+        success: false,
+        error: error.message,
+        code: error.code,
+        command: error.command,
+        config: {
+          ...config,
+          password: "***HIDDEN***",
+        },
+      };
+    }
+  }
+
   static async sendInvitationEmail(email, token, role) {
+    console.log("📧 [EmailService] Starting invitation email sending process");
+    console.log("📧 [EmailService] Email details:", {
+      email,
+      role,
+      tokenPreview: token.substring(0, 8) + "...",
+    });
+
+    // Check if user should receive email notifications
+    const userId = await EmailService.getUserIdFromEmail(email);
+    if (userId) {
+      const shouldSend = await EmailService.shouldSendEmail(
+        userId,
+        "INVITATION"
+      );
+      if (!shouldSend) {
+        console.log(
+          `🔕 [EmailService] Skipping invitation email for user ${userId} (preferences disabled)`
+        );
+        return; // Exit early but don't throw error
+      }
+    }
+
+    // Diagnostic logging for email configuration
+    console.log("🔧 [EmailService] Email configuration check:", {
+      host: process.env.MAIL_HOST,
+      port: process.env.MAIL_PORT || 587,
+      encryption: process.env.MAIL_ENCRYPTION,
+      username:
+        process.env.MAIL_USERNAME || process.env.EMAIL_USER ? "SET" : "NOT SET",
+      password:
+        process.env.MAIL_PASSWORD || process.env.EMAIL_PASSWORD
+          ? "SET"
+          : "NOT SET",
+      fromAddress: process.env.MAIL_FROM_ADDRESS || process.env.EMAIL_FROM,
+      fromName: process.env.MAIL_FROM_NAME || "Personnel Management System",
+      clientUrl: process.env.CLIENT_URL,
+    });
+
+    // Check if required environment variables are set
+    const host = process.env.MAIL_HOST;
+    const username = process.env.MAIL_USERNAME || process.env.EMAIL_USER;
+    const password = process.env.MAIL_PASSWORD || process.env.EMAIL_PASSWORD;
+
+    if (!host || !username || !password) {
+      console.error("❌ [EmailService] Missing required email configuration:", {
+        MAIL_HOST: !!host,
+        MAIL_USERNAME: !!username,
+        MAIL_PASSWORD: !!password,
+      });
+      throw new ApiError(500, "Email service not properly configured");
+    }
+
     try {
       const setupLink = `${process.env.CLIENT_URL}/auth/complete-registration/${token}`;
+      console.log("🔗 [EmailService] Setup link generated:", setupLink);
 
       const html = `
         <!DOCTYPE html>
@@ -100,12 +230,190 @@ export class EmailService {
         </html>
       `;
 
+      console.log("📝 [EmailService] HTML template prepared");
+
+      const mailOptions = {
+        from: {
+          name: process.env.MAIL_FROM_NAME || "Personnel Management System",
+          address: process.env.MAIL_FROM_ADDRESS || process.env.EMAIL_FROM,
+        },
+        to: email,
+        subject:
+          "Welcome to Personnel Management System - Complete Your Account Setup",
+        html: html,
+        headers: {
+          "List-Unsubscribe": `<mailto:${
+            process.env.MAIL_USERNAME || process.env.EMAIL_USER
+          }>`,
+          Precedence: "bulk",
+          "X-Auto-Response-Suppress": "OOF, DR, RN, NRN, AutoReply",
+          "X-Mailer": "Personnel Management System",
+          "X-Priority": "1",
+          "X-MSMail-Priority": "High",
+          Importance: "high",
+          "Content-Type": "text/html; charset=UTF-8",
+        },
+      };
+
+      console.log("📤 [EmailService] Mail options prepared:", {
+        from: mailOptions.from,
+        to: mailOptions.to,
+        subject: mailOptions.subject,
+      });
+
+      // Retry mechanism for email sending
+      const maxRetries = 3;
+      let lastError = null;
+
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(
+            `📤 [EmailService] Attempting to send email (attempt ${attempt}/${maxRetries})...`
+          );
+
+          // Test connection first
+          console.log("🔍 [EmailService] Testing SMTP connection...");
+          await this.transporter.verify();
+          console.log(
+            "✅ [EmailService] SMTP connection verified successfully"
+          );
+
+          // Send email
+          await this.transporter.sendMail(mailOptions);
+          console.log(
+            `✅ [EmailService] Invitation email sent successfully on attempt ${attempt}`
+          );
+          return; // Success, exit retry loop
+        } catch (error) {
+          lastError = error;
+          console.error(`❌ [EmailService] Email attempt ${attempt} failed:`, {
+            error: error.message,
+            code: error.code,
+            command: error.command,
+            responseCode: error.responseCode,
+            response: error.response,
+          });
+
+          if (attempt < maxRetries) {
+            const delay = attempt * 2000; // 2s, 4s, 6s delays
+            console.log(`⏳ [EmailService] Waiting ${delay}ms before retry...`);
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
+        }
+      }
+
+      // All retries failed
+      console.error("❌ [EmailService] All email attempts failed:", {
+        maxRetries,
+        lastError: lastError.message,
+        code: lastError.code,
+        command: lastError.command,
+      });
+      throw new ApiError(
+        500,
+        "Failed to send invitation email after multiple attempts"
+      );
+    } catch (error) {
+      console.error("❌ [EmailService] Error sending invitation email:", error);
+      console.error("❌ [EmailService] Email error details:", {
+        email,
+        error: error.message,
+        stack: error.stack,
+        code: error.code,
+        command: error.command,
+        responseCode: error.responseCode,
+        response: error.response,
+      });
+      throw new ApiError(500, "Failed to send invitation email");
+    }
+  }
+
+  static async sendInvitation(user, token) {
+    try {
+      const setupLink = `${process.env.CLIENT_URL}/auth/complete-registration/${token}`;
+
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+          <title>Welcome to Personnel Management System</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              margin: 0;
+              padding: 0;
+            }
+            .container {
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .header {
+              background-color: #16a34a;
+              color: white;
+              padding: 20px;
+              text-align: center;
+            }
+            .content {
+              padding: 20px;
+              background-color: #f9f9f9;
+            }
+            .button {
+              display: inline-block;
+              padding: 12px 24px;
+              background-color: #16a34a;
+              color: white;
+              text-decoration: none;
+              border-radius: 4px;
+              margin: 20px 0;
+            }
+            .footer {
+              text-align: center;
+              padding: 20px;
+              font-size: 12px;
+              color: #666;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Welcome to Personnel Management System</h1>
+            </div>
+            <div class="content">
+              <p>Hello ${user.firstName},</p>
+              <p>You have been invited to join the Personnel Management System as a ${
+                user.role
+              }.</p>
+              <p>To complete your account setup, please click the button below:</p>
+              <p style="text-align: center;">
+                <a href="${setupLink}" class="button">Complete Account Setup</a>
+              </p>
+              <p>Or copy and paste this link into your browser:</p>
+              <p>${setupLink}</p>
+              <p>This invitation link will expire in 7 days.</p>
+              <p>If you did not request this invitation, please ignore this email.</p>
+            </div>
+            <div class="footer">
+              <p>This is an automated message, please do not reply to this email.</p>
+              <p>© ${new Date().getFullYear()} Personnel Management System. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
       const mailOptions = {
         from: {
           name: "Personnel Management System",
           address: process.env.EMAIL_FROM,
         },
-        to: email,
+        to: user.email,
         subject:
           "Welcome to Personnel Management System - Complete Your Account Setup",
         html: html,
@@ -129,75 +437,103 @@ export class EmailService {
   }
 
   static async sendLifecycleUpdateEmail(user, newState) {
-    let emailContent;
-
-    switch (newState) {
-      case UserLifecycleState.REGISTERED:
-        emailContent = {
-          to: user.email,
-          subject: "Registration Completed - Next Steps",
-          html: this.getRegistrationCompletedTemplate(user),
-        };
-        break;
-
-      case UserLifecycleState.ONBOARDING:
-        // Send to both user and supervisor
-        await this.sendEmail({
-          to: user.email,
-          subject: "Your Onboarding Process Has Started",
-          html: this.getOnboardingStartedTemplate(user),
-        });
-
-        if (user.onboarding.supervisor) {
-          const supervisor = await UserModel.findById(
-            user.onboarding.supervisor
-          );
-          if (supervisor) {
-            await this.sendEmail({
-              to: supervisor.email,
-              subject: `New Employee Onboarding: ${user.firstName} ${user.lastName}`,
-              html: this.getSupervisorOnboardingTemplate(user, supervisor),
-            });
-          }
-        }
-        break;
-
-      case UserLifecycleState.ACTIVE:
-        emailContent = {
-          to: user.email,
-          subject: "Welcome Aboard! Onboarding Completed",
-          html: this.getOnboardingCompletedTemplate(user),
-        };
-        break;
-
-      case UserLifecycleState.OFFBOARDING:
-        // Send to user, supervisor, and HR
-        const offboardingEmails = [
-          {
-            to: user.email,
-            subject: "Important: Your Offboarding Process Has Started",
-            html: this.getOffboardingStartedTemplate(user),
-          },
-        ];
-
-        // Add supervisor notification if exists
-        if (user.reportingTo) {
-          offboardingEmails.push({
-            to: user.reportingTo.email,
-            subject: `Offboarding Process Started: ${user.firstName} ${user.lastName}`,
-            html: this.getSupervisorOffboardingTemplate(user),
-          });
-        }
-
-        // Send all offboarding notifications
-        await Promise.all(
-          offboardingEmails.map((email) => this.sendEmail(email))
+    try {
+      // Check if user should receive email notifications
+      const shouldSend = await EmailService.shouldSendEmail(user._id, newState);
+      if (!shouldSend) {
+        console.log(
+          `🔕 [EmailService] Skipping lifecycle email for user ${user._id} (preferences disabled)`
         );
-        return;
-    }
+        return; // Exit early but don't throw error
+      }
 
-    if (emailContent) {
-      await this.sendEmail(emailContent);
+      switch (newState) {
+        case UserLifecycleState.REGISTERED:
+          await this.sendEmail({
+            to: user.email,
+            subject: "Registration Completed - Next Steps",
+            html: this.getRegistrationCompletedTemplate(user),
+          });
+          break;
+
+        case UserLifecycleState.ONBOARDING:
+          // Send to both user and supervisor
+          await this.sendEmail({
+            to: user.email,
+            subject: "Your Onboarding Process Has Started",
+            html: this.getOnboardingStartedTemplate(user),
+          });
+
+          if (user.onboarding && user.onboarding.supervisor) {
+            const supervisor = await UserModel.findById(
+              user.onboarding.supervisor
+            );
+            if (supervisor) {
+              // Check supervisor preferences too
+              const supervisorShouldSend = await EmailService.shouldSendEmail(
+                supervisor._id,
+                "ONBOARDING"
+              );
+              if (supervisorShouldSend) {
+                await this.sendEmail({
+                  to: supervisor.email,
+                  subject: `New Employee Onboarding: ${user.firstName} ${user.lastName}`,
+                  html: this.getSupervisorOnboardingTemplate(user, supervisor),
+                });
+              }
+            }
+          }
+          break;
+
+        case UserLifecycleState.ACTIVE:
+          await this.sendEmail({
+            to: user.email,
+            subject: "Welcome Aboard! Onboarding Completed",
+            html: this.getOnboardingCompletedTemplate(user),
+          });
+          break;
+
+        case UserLifecycleState.OFFBOARDING:
+          // Send to user, supervisor, and HR
+          const offboardingEmails = [
+            {
+              to: user.email,
+              subject: "Important: Your Offboarding Process Has Started",
+              html: this.getOffboardingStartedTemplate(user),
+            },
+          ];
+
+          // Add supervisor notification if exists
+          if (user.reportingTo) {
+            const supervisor = await UserModel.findById(user.reportingTo);
+            if (supervisor) {
+              // Check supervisor preferences
+              const supervisorShouldSend = await EmailService.shouldSendEmail(
+                supervisor._id,
+                "OFFBOARDING"
+              );
+              if (supervisorShouldSend) {
+                offboardingEmails.push({
+                  to: supervisor.email,
+                  subject: `Offboarding Process Started: ${user.firstName} ${user.lastName}`,
+                  html: this.getSupervisorOffboardingTemplate(user),
+                });
+              }
+            }
+          }
+
+          // Send all offboarding notifications
+          await Promise.all(
+            offboardingEmails.map((email) => this.sendEmail(email))
+          );
+          break;
+
+        default:
+          console.log(`No email template for lifecycle state: ${newState}`);
+      }
+    } catch (error) {
+      console.error("Error sending lifecycle update email:", error);
+      // Don't throw error to avoid breaking the main flow
     }
   }
 
@@ -547,6 +883,49 @@ export class EmailService {
 
   async sendEmail(config) {
     try {
+      // Check if user should receive email notifications
+      const userId = await EmailService.getUserIdFromEmail(config.to);
+      if (userId) {
+        // Try to determine email type from subject or content
+        let emailType = "general";
+        if (config.subject) {
+          const subject = config.subject.toLowerCase();
+          if (subject.includes("payslip") || subject.includes("payroll")) {
+            emailType = "PAYROLL";
+          } else if (subject.includes("leave")) {
+            emailType = "LEAVE";
+          } else if (subject.includes("allowance")) {
+            emailType = "ALLOWANCE";
+          } else if (subject.includes("bonus")) {
+            emailType = "BONUS";
+          } else if (
+            subject.includes("onboarding") ||
+            subject.includes("offboarding")
+          ) {
+            emailType = subject.includes("onboarding")
+              ? "ONBOARDING"
+              : "OFFBOARDING";
+          } else if (
+            subject.includes("password") ||
+            subject.includes("reset") ||
+            subject.includes("invitation")
+          ) {
+            emailType = "SYSTEM";
+          }
+        }
+
+        const shouldSend = await EmailService.shouldSendEmail(
+          userId,
+          emailType
+        );
+        if (!shouldSend) {
+          console.log(
+            `🔕 [EmailService] Skipping email for user ${userId} (preferences disabled) - Subject: ${config.subject}`
+          );
+          return; // Exit early but don't throw error
+        }
+      }
+
       await EmailService.transporter.sendMail({
         from: process.env.EMAIL_FROM,
         ...config,
@@ -565,6 +944,21 @@ export class EmailService {
   }
 
   async sendPasswordResetEmail(to, resetToken) {
+    // Check if user should receive email notifications
+    const userId = await EmailService.getUserIdFromEmail(to);
+    if (userId) {
+      const shouldSend = await EmailService.shouldSendEmail(
+        userId,
+        "PASSWORD_RESET"
+      );
+      if (!shouldSend) {
+        console.log(
+          `🔕 [EmailService] Skipping password reset email for user ${userId} (preferences disabled)`
+        );
+        return true;
+      }
+    }
+
     const resetUrl = `${process.env.CLIENT_URL}/auth/reset-password?token=${resetToken}`;
     const mailOptions = {
       from: process.env.EMAIL_USER,
@@ -583,6 +977,21 @@ export class EmailService {
   }
 
   async sendPasswordChangedEmail(to) {
+    // Check if user should receive email notifications
+    const userId = await EmailService.getUserIdFromEmail(to);
+    if (userId) {
+      const shouldSend = await EmailService.shouldSendEmail(
+        userId,
+        "PASSWORD_CHANGED"
+      );
+      if (!shouldSend) {
+        console.log(
+          `🔕 [EmailService] Skipping password changed email for user ${userId} (preferences disabled)`
+        );
+        return true; // Return success to avoid breaking the flow
+      }
+    }
+
     const content = `
       <div style="background: linear-gradient(to bottom right, #ffffff, #f8fafc);
                   padding: 32px;
@@ -673,6 +1082,21 @@ export class EmailService {
         deductions,
         totals,
       } = payslipData;
+
+      // Check if user should receive email notifications
+      const userId = await EmailService.getUserIdFromEmail(to);
+      if (userId) {
+        const shouldSend = await EmailService.shouldSendEmail(
+          userId,
+          "PAYSLIP"
+        );
+        if (!shouldSend) {
+          console.log(
+            `🔕 [EmailService] Skipping payslip email for user ${userId} (preferences disabled)`
+          );
+          return true; // Return success to avoid breaking the flow
+        }
+      }
 
       const pdfContent = Buffer.from(pdfBuffer);
 
@@ -947,6 +1371,110 @@ export class EmailService {
     } catch (error) {
       console.error("Error sending payslip email:", error);
       throw new ApiError(500, "Failed to send payslip email");
+    }
+  }
+
+  // Helper method to check if user should receive email notifications
+  static async shouldSendEmail(userId, type = "general") {
+    try {
+      // System-critical emails that should always be sent regardless of preferences
+      const criticalEmailTypes = [
+        "INVITATION",
+        "ACCOUNT_SETUP",
+        "REGISTRATION",
+        "FIRST_LOGIN",
+        "PASSWORD_RESET",
+        "PASSWORD_CHANGED",
+        "SECURITY_ALERT",
+      ];
+
+      if (criticalEmailTypes.includes(type.toUpperCase())) {
+        console.log(
+          `📧 [EmailService] Sending critical email of type ${type} to user ${userId} (bypassing preferences)`
+        );
+        return true;
+      }
+
+      // Get user's notification preferences
+      const preferences = await NotificationPreference.getOrCreatePreferences(
+        userId
+      );
+
+      // Check if email channel is enabled
+      if (!preferences.preferences.email?.enabled) {
+        console.log(
+          `🔕 [EmailService] Email notifications disabled for user ${userId}`
+        );
+        return false;
+      }
+
+      // Check if user is in quiet hours
+      if (preferences.isInQuietHours && preferences.isInQuietHours()) {
+        console.log(`🔕 [EmailService] User ${userId} is in quiet hours`);
+        return false;
+      }
+
+      // Check if do not disturb is active
+      if (
+        preferences.isDoNotDisturbActive &&
+        preferences.isDoNotDisturbActive()
+      ) {
+        console.log(
+          `🔕 [EmailService] Do not disturb active for user ${userId}`
+        );
+        return false;
+      }
+
+      // Determine notification category based on type
+      let category = "general";
+      if (type.includes("PAYROLL") || type.includes("PAYSLIP")) {
+        category = "payroll";
+      } else if (type.includes("LEAVE")) {
+        category = "leave";
+      } else if (type.includes("ALLOWANCE")) {
+        category = "allowance";
+      } else if (type.includes("BONUS")) {
+        category = "bonus";
+      } else if (type.includes("ONBOARDING") || type.includes("OFFBOARDING")) {
+        category = type.toLowerCase().includes("onboarding")
+          ? "onboarding"
+          : "offboarding";
+      } else if (type.includes("SYSTEM") || type.includes("ERROR")) {
+        category = "system";
+      }
+
+      // Check if specific category is enabled for email
+      const isCategoryEnabled = preferences.preferences.email.types[category];
+
+      if (!isCategoryEnabled) {
+        console.log(
+          `🔕 [EmailService] ${category} email notifications disabled for user ${userId}`
+        );
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        `❌ [EmailService] Error checking email preferences for user ${userId}:`,
+        error
+      );
+      // Default to true if there's an error checking preferences (reverse compatibility)
+      return true;
+    }
+  }
+
+  // Helper method to get user ID from email address
+  static async getUserIdFromEmail(email) {
+    try {
+      const user = await UserModel.findOne({ email });
+      return user?._id;
+    } catch (error) {
+      console.error(
+        `❌ [EmailService] Error finding user by email ${email}:`,
+        error
+      );
+      return null;
     }
   }
 }

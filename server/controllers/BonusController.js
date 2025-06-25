@@ -72,6 +72,40 @@ const createPersonalBonus = asyncHandler(async (req, res) => {
       });
     }
 
+    // Add audit logging
+    await PayrollStatisticsLogger.logBonusAction({
+      action: "CREATE",
+      bonusIds: [bonus._id],
+      userId: userId,
+      details: {
+        type: type || BonusType.PERSONAL,
+        amount: amount,
+        reason: reason,
+        paymentDate: paymentDate,
+        employeeId: userId,
+        departmentId: req.user.department,
+        approvalStatus: bonus.approvalStatus,
+        createdBy: userId,
+        position: req.user.position,
+        role: req.user.role,
+        message: `Created personal bonus request: ${reason}`,
+      },
+      statisticsDetails: {
+        bonusType: type || BonusType.PERSONAL,
+        amount: amount,
+        approvalStatus: bonus.approvalStatus,
+        scope: "individual",
+      },
+      auditDetails: {
+        entity: "BONUS",
+        entityIds: [bonus._id],
+        action: "CREATE",
+        performedBy: userId,
+        status: bonus.approvalStatus,
+        remarks: `Created personal bonus request: ${reason}`,
+      },
+    });
+
     // Log only after successful creation
     console.log(
       `[BONUS REQUEST SUCCESS] User ${userId} created a personal bonus request for amount ${amount} with status ${bonus.approvalStatus}`
@@ -316,92 +350,64 @@ const getBonusRequestById = asyncHandler(async (req, res) => {
  */
 const approveBonusRequest = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { comment } = req.body;
+  const { remarks } = req.body;
   const userId = req.user._id;
   const userRole = req.user.role;
-  const userPosition = req.user.position?.toLowerCase() || "";
-  const isSuperAdmin = userRole === "SUPER_ADMIN";
-  const isDepartmentHead = userRole === "ADMIN";
 
-  // Check if user is HR Manager by department and position
-  const hrDepartment = await Department.findOne({
-    name: { $in: ["Human Resources", "HR"] },
-    status: "active",
-  });
-  const isHRManager =
-    hrDepartment &&
-    userRole === "ADMIN" &&
-    hrDepartment._id.toString() === req.user.department.toString() &&
-    [
-      "hr manager",
-      "head of hr",
-      "hr head",
-      "head of human resources",
-      "human resources manager",
-      "hr director",
-    ].some((pos) => userPosition.includes(pos));
+  console.log("✍️ Processing bonus approval for:", id);
+  console.log("👤 Approver:", req.user.firstName, req.user.lastName);
 
-  const bonus = await Bonus.findById(id)
-    .populate("employee", "department")
-    .populate("department", "headOfDepartment");
+  // Check if user has permission to approve bonuses
+  if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    throw new ApiError(
+      403,
+      "Only department heads and super admins can approve bonuses"
+    );
+  }
 
+  const bonus = await Bonus.findById(id);
   if (!bonus) {
     throw new ApiError(404, "Bonus request not found");
   }
 
-  // Check if bonus is already approved or rejected
-  if (bonus.approvalStatus !== ApprovalStatus.PENDING) {
-    throw new ApiError(400, `Bonus request is already ${bonus.approvalStatus}`);
-  }
-
-  // Check permissions
-  if (!isSuperAdmin && !isHRManager && !isDepartmentHead) {
-    throw new ApiError(
-      403,
-      "You don't have permission to approve bonus requests"
-    );
-  }
-
-  // If department head, check if the bonus is for an employee in their department
-  if (isDepartmentHead && !isHRManager) {
-    const department = await Department.findOne({ headOfDepartment: userId });
-    if (
-      !department ||
-      department._id.toString() !== bonus.employee.department.toString()
-    ) {
-      throw new ApiError(
-        403,
-        "You can only approve bonuses for employees in your department"
-      );
-    }
+  if (bonus.status !== "pending") {
+    throw new ApiError(400, "Bonus request is not pending");
   }
 
   // Update bonus status
-  bonus.approvalStatus = ApprovalStatus.APPROVED;
+  bonus.status = "approved";
   bonus.approvedBy = userId;
   bonus.approvedAt = new Date();
+  bonus.approvalRemarks = remarks || "";
   bonus.updatedBy = userId;
+  bonus.updatedAt = new Date();
+
   await bonus.save();
 
-  // Add to employee's personalBonuses array with correct structure
-  const personalBonus = {
+  // Add audit logging
+  await PayrollStatisticsLogger.logBonusAction({
+    action: "APPROVE",
     bonusId: bonus._id,
-    status: "APPROVED",
-    usedInPayroll: {
-      month: null,
-      year: null,
-      payrollId: null,
+    userId: userId,
+    details: {
+      employeeId: bonus.employeeId,
+      amount: bonus.amount,
+      type: bonus.type,
+      reason: bonus.reason,
+      paymentDate: bonus.paymentDate,
+      approvedBy: userId,
+      approvalRemarks: remarks,
+      message: `Approved bonus request for ${bonus.amount}`,
+      remarks: `Approved bonus request for ${bonus.amount}`,
     },
-  };
-
-  await User.findByIdAndUpdate(bonus.employee, {
-    $push: { personalBonuses: personalBonus },
   });
 
-  return res.status(200).json({
+  console.log("✅ Bonus request approved successfully");
+
+  res.status(200).json({
     success: true,
-    data: bonus,
     message: "Bonus request approved successfully",
+    data: bonus,
   });
 });
 
@@ -410,78 +416,64 @@ const approveBonusRequest = asyncHandler(async (req, res) => {
  */
 const rejectBonusRequest = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { comment } = req.body;
+  const { remarks } = req.body;
   const userId = req.user._id;
   const userRole = req.user.role;
-  const userPosition = req.user.position?.toLowerCase() || "";
-  const isSuperAdmin = userRole === "SUPER_ADMIN";
-  const isDepartmentHead = userRole === "ADMIN";
 
-  // Check if user is HR Manager by department and position
-  const hrDepartment = await Department.findOne({
-    name: { $in: ["Human Resources", "HR"] },
-    status: "active",
-  });
-  const isHRManager =
-    hrDepartment &&
-    userRole === "ADMIN" &&
-    hrDepartment._id.toString() === req.user.department.toString() &&
-    [
-      "hr manager",
-      "head of hr",
-      "hr head",
-      "head of human resources",
-      "human resources manager",
-      "hr director",
-    ].some((pos) => userPosition.includes(pos));
+  console.log("✍️ Processing bonus rejection for:", id);
+  console.log("👤 Rejector:", req.user.firstName, req.user.lastName);
 
-  const bonus = await Bonus.findById(id)
-    .populate("employee", "department")
-    .populate("department", "headOfDepartment");
+  // Check if user has permission to reject bonuses
+  if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    throw new ApiError(
+      403,
+      "Only department heads and super admins can reject bonuses"
+    );
+  }
 
+  const bonus = await Bonus.findById(id);
   if (!bonus) {
     throw new ApiError(404, "Bonus request not found");
   }
 
-  // Check if bonus is already approved or rejected
-  if (bonus.approvalStatus !== ApprovalStatus.PENDING) {
-    throw new ApiError(400, `Bonus request is already ${bonus.approvalStatus}`);
-  }
-
-  // Check permissions
-  if (!isSuperAdmin && !isHRManager && !isDepartmentHead) {
-    throw new ApiError(
-      403,
-      "You don't have permission to reject bonus requests"
-    );
-  }
-
-  // If department head, check if the bonus is for an employee in their department
-  if (isDepartmentHead && !isHRManager) {
-    const department = await Department.findOne({ headOfDepartment: userId });
-    if (
-      !department ||
-      department._id.toString() !== bonus.employee.department.toString()
-    ) {
-      throw new ApiError(
-        403,
-        "You can only reject bonuses for employees in your department"
-      );
-    }
+  if (bonus.status !== "pending") {
+    throw new ApiError(400, "Bonus request is not pending");
   }
 
   // Update bonus status
-  bonus.approvalStatus = ApprovalStatus.REJECTED;
+  bonus.status = "rejected";
   bonus.approvedBy = userId;
   bonus.approvedAt = new Date();
+  bonus.approvalRemarks = remarks || "";
   bonus.updatedBy = userId;
-  bonus.rejectionComment = comment;
+  bonus.updatedAt = new Date();
+
   await bonus.save();
 
-  return res.status(200).json({
+  // Add audit logging
+  await PayrollStatisticsLogger.logBonusAction({
+    action: "REJECT",
+    bonusId: bonus._id,
+    userId: userId,
+    details: {
+      employeeId: bonus.employeeId,
+      amount: bonus.amount,
+      type: bonus.type,
+      reason: bonus.reason,
+      paymentDate: bonus.paymentDate,
+      rejectedBy: userId,
+      rejectionRemarks: remarks,
+      message: `Rejected bonus request for ${bonus.amount}`,
+      remarks: `Rejected bonus request for ${bonus.amount}`,
+    },
+  });
+
+  console.log("✅ Bonus request rejected successfully");
+
+  res.status(200).json({
     success: true,
-    data: bonus,
     message: "Bonus request rejected successfully",
+    data: bonus,
   });
 });
 
@@ -491,34 +483,53 @@ const rejectBonusRequest = asyncHandler(async (req, res) => {
 const deleteBonusRequest = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const userId = req.user._id;
-  const isAdmin = req.user.role === "SUPER_ADMIN" || req.user.role === "ADMIN";
+  const userRole = req.user.role;
+
+  console.log("🗑️ Deleting bonus request:", id);
+  console.log("👤 Deleter:", req.user.firstName, req.user.lastName);
+
+  // Check if user has permission to delete bonuses
+  if (userRole !== "SUPER_ADMIN" && userRole !== "ADMIN") {
+    throw new ApiError(
+      403,
+      "Only department heads and super admins can delete bonuses"
+    );
+  }
 
   const bonus = await Bonus.findById(id);
   if (!bonus) {
     throw new ApiError(404, "Bonus request not found");
   }
 
-  // Only creator or admin can delete the request
-  if (!isAdmin && bonus.createdBy.toString() !== userId.toString()) {
-    throw new ApiError(
-      403,
-      "You don't have permission to delete this bonus request"
-    );
-  }
-
-  // Can't delete if already approved or rejected
-  if (bonus.approvalStatus !== ApprovalStatus.PENDING) {
-    throw new ApiError(
-      400,
-      "Cannot delete a bonus request that has been approved or rejected"
-    );
-  }
+  // Store bonus data before deletion for audit
+  const deletedBonusData = {
+    employeeId: bonus.employeeId,
+    amount: bonus.amount,
+    type: bonus.type,
+    reason: bonus.reason,
+    paymentDate: bonus.paymentDate,
+    status: bonus.status,
+  };
 
   await Bonus.findByIdAndDelete(id);
 
-  return res.status(200).json({
+  // Add audit logging
+  await PayrollStatisticsLogger.logBonusAction({
+    action: "DELETE",
+    bonusId: bonus._id,
+    userId: userId,
+    details: {
+      ...deletedBonusData,
+      deletedBy: userId,
+      message: `Deleted bonus request for ${bonus.amount}`,
+      remarks: `Deleted bonus request for ${bonus.amount}`,
+    },
+  });
+
+  console.log("✅ Bonus request deleted successfully");
+
+  res.status(200).json({
     success: true,
-    data: null,
     message: "Bonus request deleted successfully",
   });
 });
@@ -610,6 +621,41 @@ const createDepartmentEmployeeBonus = asyncHandler(async (req, res) => {
       "👤 Updated employee.personalBonuses:",
       JSON.stringify(updatedUser.personalBonuses, null, 2)
     );
+
+    // Add audit logging
+    await PayrollStatisticsLogger.logBonusAction({
+      action: "CREATE",
+      bonusIds: [bonus._id],
+      userId: userId,
+      details: {
+        type: type || BonusType.SPECIAL,
+        amount: amount,
+        reason: reason,
+        paymentDate: paymentDate,
+        employeeId: employeeId,
+        employeeName: `${employee.firstName} ${employee.lastName}`,
+        departmentId: employee.department,
+        approvalStatus: approvalStatus,
+        createdBy: userId,
+        position: req.user.position,
+        role: req.user.role,
+        message: `Created department employee bonus for ${employee.firstName} ${employee.lastName}`,
+      },
+      statisticsDetails: {
+        bonusType: type || BonusType.SPECIAL,
+        amount: amount,
+        employeeId: employeeId,
+        departmentId: employee.department,
+      },
+      auditDetails: {
+        entity: "BONUS",
+        entityIds: [bonus._id],
+        action: "CREATE",
+        performedBy: userId,
+        status: approvalStatus,
+        remarks: `Created department employee bonus for ${employee.firstName} ${employee.lastName}`,
+      },
+    });
 
     // Log only after successful creation
     console.log(
@@ -734,6 +780,41 @@ const createDepartmentWideBonus = asyncHandler(async (req, res) => {
         $push: { personalBonuses: personalBonus },
       });
     }
+
+    // Add audit logging
+    await PayrollStatisticsLogger.logBonusAction({
+      action: "CREATE",
+      bonusIds: bonuses.map((b) => b._id),
+      userId: userId,
+      details: {
+        type: type || BonusType.SPECIAL,
+        amount: amount,
+        reason: reason,
+        paymentDate: paymentDate,
+        departmentId: department._id,
+        departmentName: department.name,
+        employeeCount: employees.length,
+        approvalStatus: approvalStatus,
+        createdBy: userId,
+        position: req.user.position,
+        role: req.user.role,
+        message: `Created department-wide bonus for ${employees.length} employees in ${department.name}`,
+      },
+      statisticsDetails: {
+        bonusType: type || BonusType.SPECIAL,
+        amount: amount,
+        departmentId: department._id,
+        employeeCount: employees.length,
+      },
+      auditDetails: {
+        entity: "BONUS",
+        entityIds: bonuses.map((b) => b._id),
+        action: "CREATE",
+        performedBy: userId,
+        status: approvalStatus,
+        remarks: `Created department-wide bonus for ${employees.length} employees in ${department.name}`,
+      },
+    });
 
     // Log only after successful creation
     console.log(

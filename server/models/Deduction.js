@@ -7,7 +7,7 @@ export const DeductionType = {
   VOLUNTARY: "VOLUNTARY",
 };
 
-// Add new enum for core statutory deductions
+// Core statutory deductions that are mandatory
 export const CoreStatutoryDeduction = {
   PAYE: "PAYE Tax",
   PENSION: "Pension",
@@ -15,14 +15,9 @@ export const CoreStatutoryDeduction = {
 };
 
 export const CalculationMethod = {
-  FIXED: "fixed",
-  PERCENTAGE: "percentage",
-  PROGRESSIVE: "progressive",
-};
-
-export const ApplicabilityType = {
-  GLOBAL: "global",
-  INDIVIDUAL: "individual",
+  FIXED: "FIXED",
+  PERCENTAGE: "PERCENTAGE",
+  PROGRESSIVE: "PROGRESSIVE",
 };
 
 export const DeductionCategory = {
@@ -36,10 +31,11 @@ export const DeductionCategory = {
   OTHER: "other",
 };
 
+// Simplified scope - this determines who the deduction applies to
 export const DeductionScope = {
-  COMPANY_WIDE: "company_wide",
-  DEPARTMENT: "department",
-  INDIVIDUAL: "individual",
+  COMPANY_WIDE: "company_wide", // Everyone in the company
+  DEPARTMENT: "department", // Specific department only
+  INDIVIDUAL: "individual", // Specific employees only
 };
 
 export const AssignmentAction = {
@@ -92,19 +88,22 @@ const DeductionSchema = new Schema(
       type: Date,
       default: Date.now,
     },
-    isCustom: {
-      type: Boolean,
-      default: false,
-    },
-    applicability: {
+    // Scope determines who this deduction applies to
+    scope: {
       type: String,
-      enum: Object.values(ApplicabilityType),
-      default: function () {
-        return this.type === DeductionType.STATUTORY
-          ? ApplicabilityType.GLOBAL
-          : ApplicabilityType.INDIVIDUAL;
+      enum: Object.values(DeductionScope),
+      default: DeductionScope.COMPANY_WIDE,
+      required: true,
+    },
+    // For department-specific deductions
+    department: {
+      type: Schema.Types.ObjectId,
+      ref: "Department",
+      required: function () {
+        return this.scope === DeductionScope.DEPARTMENT;
       },
     },
+    // For individual-specific deductions
     assignedEmployees: {
       type: [
         {
@@ -113,26 +112,13 @@ const DeductionSchema = new Schema(
         },
       ],
       default: function () {
-        return this.type === DeductionType.VOLUNTARY ? [] : undefined;
+        return this.scope === DeductionScope.INDIVIDUAL ? [] : undefined;
       },
     },
     category: {
       type: String,
       enum: Object.values(DeductionCategory),
       default: DeductionCategory.GENERAL,
-    },
-    department: {
-      type: Schema.Types.ObjectId,
-      ref: "Department",
-      required: function () {
-        return this.scope === DeductionScope.DEPARTMENT;
-      },
-    },
-    scope: {
-      type: String,
-      enum: Object.values(DeductionScope),
-      default: DeductionScope.COMPANY_WIDE,
-      required: true,
     },
     createdBy: {
       type: Schema.Types.ObjectId,
@@ -144,6 +130,7 @@ const DeductionSchema = new Schema(
       ref: "User",
       required: [true, "Updater is required"],
     },
+    // Track assignment history for audit
     assignmentHistory: [
       {
         employee: {
@@ -165,13 +152,13 @@ const DeductionSchema = new Schema(
           ref: "User",
           required: true,
         },
-        reason: String, // Optional reason for the change
+        reason: String,
       },
     ],
+    // Core statutory deductions are mandatory
     isMandatory: {
       type: Boolean,
       default: function () {
-        // PAYE, Pension, and NHF are mandatory by default
         return [
           CoreStatutoryDeduction.PAYE,
           CoreStatutoryDeduction.PENSION,
@@ -194,21 +181,27 @@ DeductionSchema.virtual("assignedEmployeesCount").get(function () {
 
 // Pre-save middleware to enforce business rules
 DeductionSchema.pre("save", function (next) {
-  // If statutory, ensure it's global
+  // Statutory deductions are always company-wide
   if (this.type === DeductionType.STATUTORY) {
-    this.applicability = ApplicabilityType.GLOBAL;
-  }
-
-  // If global, clear assignedEmployees
-  if (this.applicability === ApplicabilityType.GLOBAL) {
+    this.scope = DeductionScope.COMPANY_WIDE;
     this.assignedEmployees = undefined;
   }
 
   // Set appropriate category for default statutory deductions
-  if (this.type === DeductionType.STATUTORY && !this.isCustom) {
+  if (this.type === DeductionType.STATUTORY) {
     if (this.name === "PAYE Tax") this.category = DeductionCategory.TAX;
     else if (this.name === "Pension") this.category = DeductionCategory.PENSION;
     else if (this.name === "NHF") this.category = DeductionCategory.HOUSING;
+  }
+
+  // Clear assignedEmployees if not individual scope
+  if (this.scope !== DeductionScope.INDIVIDUAL) {
+    this.assignedEmployees = undefined;
+  }
+
+  // Clear department if not department scope
+  if (this.scope !== DeductionScope.DEPARTMENT) {
+    this.department = undefined;
   }
 
   next();

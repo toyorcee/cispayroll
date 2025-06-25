@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "./api";
 import { toast } from "react-toastify";
 import {
   Deduction,
@@ -7,8 +7,7 @@ import {
   CalculationMethod,
 } from "../types/deduction";
 
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
-axios.defaults.withCredentials = true;
+const BASE_URL = `/api`;
 
 // Input types
 interface CreateVoluntaryDeductionInput {
@@ -30,7 +29,7 @@ interface UpdateDeductionInput {
 export const deductionService = {
   getAllDeductions: async (): Promise<DeductionResponse> => {
     try {
-      const response = await axios.get<{ data: DeductionResponse }>(
+      const response = await api.get<{ data: DeductionResponse }>(
         `${BASE_URL}/super-admin/deductions`
       );
 
@@ -51,7 +50,7 @@ export const deductionService = {
 
   setupStatutoryDeductions: async (): Promise<void> => {
     try {
-      await axios.post(`${BASE_URL}/super-admin/deductions/statutory`);
+      await api.post(`${BASE_URL}/super-admin/deductions/statutory`);
       toast.success("Statutory deductions set up successfully");
     } catch (error: any) {
       console.error("Failed to setup statutory deductions:", error);
@@ -64,7 +63,7 @@ export const deductionService = {
 
   createCustomStatutoryDeduction: async (data: any) => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${BASE_URL}/super-admin/deductions/statutory/custom`,
         data
       );
@@ -81,7 +80,7 @@ export const deductionService = {
 
   createVoluntaryDeduction: async (data: CreateVoluntaryDeductionInput) => {
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${BASE_URL}/super-admin/deductions/voluntary`,
         data
       );
@@ -98,7 +97,7 @@ export const deductionService = {
 
   updateDeduction: async (id: string, data: UpdateDeductionInput) => {
     try {
-      const response = await axios.put(
+      const response = await api.put(
         `${BASE_URL}/super-admin/deductions/${id}`,
         data
       );
@@ -117,7 +116,7 @@ export const deductionService = {
     id: string
   ): Promise<{ deduction: Deduction }> => {
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/super-admin/deductions/${id}/toggle`
       );
       toast.success(response.data.message);
@@ -131,7 +130,7 @@ export const deductionService = {
 
   deleteDeduction: async (id: string) => {
     try {
-      await axios.delete(`${BASE_URL}/super-admin/deductions/${id}`);
+      await api.delete(`${BASE_URL}/super-admin/deductions/${id}`);
       toast.success("Deduction deleted successfully");
     } catch (error: any) {
       console.error("Failed to delete deduction:", error);
@@ -157,7 +156,7 @@ export const deductionService = {
     // Get all deductions for admin's department
     getAllDeductions: async (): Promise<DeductionResponse> => {
       try {
-        const response = await axios.get<{
+        const response = await api.get<{
           success: boolean;
           data: DeductionResponse;
         }>(`${BASE_URL}/admin/deductions`);
@@ -180,7 +179,7 @@ export const deductionService = {
     // Create department-specific deduction
     createDepartmentDeduction: async (data: CreateVoluntaryDeductionInput) => {
       try {
-        const response = await axios.post(
+        const response = await api.post(
           `${BASE_URL}/admin/deductions/department`,
           data
         );
@@ -198,11 +197,16 @@ export const deductionService = {
     // Assign deduction to employee
     assignDeductionToEmployee: async (
       deductionId: string,
-      employeeId: string
+      employeeId: string,
+      preferences: UserDeductionPreferences
     ) => {
       try {
-        const response = await axios.post(
-          `${BASE_URL}/admin/deductions/${deductionId}/assign/${employeeId}`
+        const response = await api.post(
+          `${BASE_URL}/admin/deductions/${deductionId}/assign`,
+          {
+            employeeId,
+            preferences,
+          }
         );
         toast.success("Deduction assigned to employee successfully");
         return response.data;
@@ -221,8 +225,8 @@ export const deductionService = {
       employeeId: string
     ) => {
       try {
-        const response = await axios.delete(
-          `${BASE_URL}/admin/deductions/${deductionId}/employees/${employeeId}`
+        const response = await api.delete(
+          `${BASE_URL}/admin/deductions/${deductionId}/assign/${employeeId}`
         );
         toast.success("Deduction removed from employee successfully");
         return response.data;
@@ -235,13 +239,38 @@ export const deductionService = {
       }
     },
 
-    // Get employee's deductions
+    // Update employee deduction preferences
+    updateEmployeeDeductionPreferences: async (
+      deductionId: string,
+      employeeId: string,
+      preferences: UserDeductionPreferences
+    ) => {
+      try {
+        const response = await api.put(
+          `${BASE_URL}/admin/deductions/${deductionId}/assign/${employeeId}`,
+          { preferences }
+        );
+        toast.success("Employee deduction preferences updated successfully");
+        return response.data;
+      } catch (error: any) {
+        console.error(
+          "Failed to update employee deduction preferences:",
+          error
+        );
+        toast.error(
+          error.response?.data?.message || "Failed to update preferences"
+        );
+        throw error;
+      }
+    },
+
+    // Get employee deductions
     getEmployeeDeductions: async (employeeId: string) => {
       try {
-        const response = await axios.get(
+        const response = await api.get(
           `${BASE_URL}/admin/employees/${employeeId}/deductions`
         );
-        return response.data;
+        return response.data.data;
       } catch (error: any) {
         console.error("Failed to fetch employee deductions:", error);
         toast.error(
@@ -251,187 +280,91 @@ export const deductionService = {
       }
     },
 
-    // Assign deduction to multiple employees
-    assignDeductionToMultipleEmployees: async (
+    // Get department deduction statistics
+    getDepartmentDeductionStats: async () => {
+      try {
+        const response = await api.get(`${BASE_URL}/admin/deductions/stats`);
+        return response.data.data;
+      } catch (error: any) {
+        console.error("Failed to fetch department deduction stats:", error);
+        toast.error(
+          error.response?.data?.message ||
+            "Failed to fetch deduction statistics"
+        );
+        throw error;
+      }
+    },
+  },
+
+  // ===== User-specific Operations =====
+  userService: {
+    // Get user's own deductions
+    getMyDeductions: async () => {
+      try {
+        const response = await api.get(`${BASE_URL}/regular-user/deductions`);
+        return response.data.data;
+      } catch (error: any) {
+        console.error("Failed to fetch user deductions:", error);
+        toast.error(
+          error.response?.data?.message || "Failed to fetch deductions"
+        );
+        throw error;
+      }
+    },
+
+    // Update user's deduction preferences
+    updateDeductionPreferences: async (
       deductionId: string,
-      employeeIds: string[]
+      preferences: UserDeductionPreferences
     ) => {
       try {
-        const response = await axios.post(
-          `${BASE_URL}/admin/deductions/${deductionId}/assign-batch`,
-          { employeeIds }
+        const response = await api.put(
+          `${BASE_URL}/regular-user/deductions/${deductionId}/preferences`,
+          { preferences }
         );
-        toast.success("Deduction assigned to employees successfully");
+        toast.success("Deduction preferences updated successfully");
         return response.data;
       } catch (error: any) {
-        console.error("Failed to assign deduction to employees:", error);
+        console.error("Failed to update deduction preferences:", error);
         toast.error(
-          error.response?.data?.message || "Failed to assign deduction"
+          error.response?.data?.message || "Failed to update preferences"
         );
         throw error;
       }
     },
 
-    // Remove deduction from multiple employees
-    removeDeductionFromMultipleEmployees: async (
-      deductionId: string,
-      employeeIds: string[]
-    ) => {
+    // Opt out of deduction
+    optOutOfDeduction: async (deductionId: string, reason: string) => {
       try {
-        const response = await axios.delete(
-          `${BASE_URL}/admin/deductions/${deductionId}/remove-batch`,
-          { data: { employeeIds } }
+        const response = await api.post(
+          `${BASE_URL}/regular-user/deductions/${deductionId}/opt-out`,
+          { reason }
         );
-        toast.success("Deduction removed from employees successfully");
+        toast.success("Successfully opted out of deduction");
         return response.data;
       } catch (error: any) {
-        console.error("Failed to remove deduction from employees:", error);
+        console.error("Failed to opt out of deduction:", error);
         toast.error(
-          error.response?.data?.message || "Failed to remove deduction"
+          error.response?.data?.message || "Failed to opt out of deduction"
         );
         throw error;
       }
     },
 
-    // Create statutory deduction
-    createStatutoryDeduction: async (
-      data: Partial<Deduction>
-    ): Promise<Deduction> => {
+    // Get deduction details
+    getDeductionDetails: async (deductionId: string) => {
       try {
-        const response = await axios.post(`${BASE_URL}/admin/statutory`, data);
-        toast.success("Successfully created statutory deduction");
-        return response.data;
-      } catch (error) {
-        console.error("Error creating statutory deduction:", error);
-        toast.error("Failed to create statutory deduction");
+        const response = await api.get(
+          `${BASE_URL}/regular-user/deductions/${deductionId}`
+        );
+        return response.data.data;
+      } catch (error: any) {
+        console.error("Failed to fetch deduction details:", error);
+        toast.error(
+          error.response?.data?.message || "Failed to fetch deduction details"
+        );
         throw error;
       }
     },
-
-    // Create voluntary deduction
-    createVoluntaryDeduction: async (
-      data: Partial<Deduction>
-    ): Promise<Deduction> => {
-      try {
-        const response = await axios.post(`${BASE_URL}/admin/voluntary`, data);
-        toast.success("Successfully created voluntary deduction");
-        return response.data;
-      } catch (error) {
-        console.error("Error creating voluntary deduction:", error);
-        toast.error("Failed to create voluntary deduction");
-        throw error;
-      }
-    },
-
-    // Update deduction
-    updateDeduction: async (
-      id: string,
-      data: Partial<Deduction>
-    ): Promise<Deduction> => {
-      try {
-        const response = await axios.put(`${BASE_URL}/admin/${id}`, data);
-        toast.success("Successfully updated deduction");
-        return response.data;
-      } catch (error) {
-        console.error("Error updating deduction:", error);
-        toast.error("Failed to update deduction");
-        throw error;
-      }
-    },
-
-    // Toggle deduction status
-    toggleDeductionStatus: async (id: string): Promise<Deduction> => {
-      try {
-        const response = await axios.patch(`${BASE_URL}/admin/${id}/toggle`);
-        toast.success("Successfully toggled deduction status");
-        return response.data;
-      } catch (error) {
-        console.error("Error toggling deduction status:", error);
-        toast.error("Failed to toggle deduction status");
-        throw error;
-      }
-    },
-
-    // Delete deduction
-    deleteDeduction: async (id: string): Promise<void> => {
-      try {
-        await axios.delete(`${BASE_URL}/admin/${id}`);
-        toast.success("Successfully deleted deduction");
-      } catch (error) {
-        console.error("Error deleting deduction:", error);
-        toast.error("Failed to delete deduction");
-        throw error;
-      }
-    },
-  },
-
-  // ===== User Deduction Preferences =====
-  getUserDeductionPreferences: async (
-    userId?: string
-  ): Promise<UserDeductionPreferences> => {
-    try {
-      const url = userId
-        ? `${BASE_URL}/preferences/${userId}`
-        : `${BASE_URL}/preferences`;
-
-      const response = await axios.get(url);
-      return response.data;
-    } catch (error: any) {
-      console.error("Error fetching user deduction preferences:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to fetch deduction preferences"
-      );
-      throw error;
-    }
-  },
-
-  addVoluntaryDeduction: async (
-    deductionId: string,
-    data: {
-      startDate: Date;
-      endDate?: Date;
-      amount?: number;
-      percentage?: number;
-      notes?: string;
-    },
-    userId?: string
-  ): Promise<UserDeductionPreferences> => {
-    try {
-      const url = userId
-        ? `${BASE_URL}/preferences/voluntary/${userId}`
-        : `${BASE_URL}/preferences/voluntary`;
-
-      const response = await axios.post(url, {
-        deduction: deductionId,
-        ...data,
-      });
-
-      toast.success("Successfully opted in to deduction");
-      return response.data;
-    } catch (error: any) {
-      console.error("Error adding voluntary deduction:", error);
-      toast.error("Failed to opt in to deduction");
-      throw error;
-    }
-  },
-
-  removeVoluntaryDeduction: async (
-    deductionId: string,
-    userId?: string
-  ): Promise<UserDeductionPreferences> => {
-    try {
-      const url = userId
-        ? `${BASE_URL}/preferences/voluntary/${userId}/${deductionId}`
-        : `${BASE_URL}/preferences/voluntary/${deductionId}`;
-
-      const response = await axios.delete(url);
-
-      toast.success("Successfully opted out of deduction");
-      return response.data;
-    } catch (error: any) {
-      console.error("Error removing voluntary deduction:", error);
-      toast.error("Failed to opt out of deduction");
-      throw error;
-    }
   },
 };

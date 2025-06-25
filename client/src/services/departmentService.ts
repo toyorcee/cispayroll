@@ -1,12 +1,11 @@
-import axios from "axios";
+import api from "./api";
 import { QueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { Department, DepartmentFormData } from "../types/department";
 import { AdminResponse } from "./employeeService";
 import { toast } from "react-toastify";
 
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
-axios.defaults.withCredentials = true;
+const BASE_URL = `/api`;
 
 export interface DepartmentResponse {
   _id: string;
@@ -156,23 +155,27 @@ export const prefetchDepartments = async (queryClient: QueryClient) => {
  */
 export const departmentService = {
   getAllDepartments: async (): Promise<Department[]> => {
-    const response = await axios.get(`${BASE_URL}/departments`);
-    return response.data.data;
+    try {
+      const response = await api.get(`${BASE_URL}/super-admin/departments`);
+      return response.data.data || [];
+    } catch (error) {
+      console.error("Error fetching departments:", error);
+      toast.error("Failed to fetch departments");
+      throw error;
+    }
   },
 
   createDepartment: async (data: DepartmentFormData): Promise<Department> => {
     try {
-      const response = await axios.post(`${BASE_URL}/departments`, data, {
-        withCredentials: true,
-      });
-      toast.success("Department created successfully!");
+      const response = await api.post(
+        `${BASE_URL}/super-admin/departments`,
+        data
+      );
+      toast.success("Department created successfully");
       return response.data.data;
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        toast.error(
-          error.response?.data?.message || "Failed to create department"
-        );
-      }
+      console.error("Error creating department:", error);
+      toast.error("Failed to create department");
       throw error;
     }
   },
@@ -183,8 +186,16 @@ export const departmentService = {
    * @returns Promise<Department>
    */
   getDepartmentById: async (id: string): Promise<Department> => {
-    const response = await axios.get(`${BASE_URL}/departments/${id}`);
-    return response.data.data;
+    try {
+      const response = await api.get(
+        `${BASE_URL}/super-admin/departments/${id}`
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Error fetching department:", error);
+      toast.error("Failed to fetch department");
+      throw error;
+    }
   },
 
   /**
@@ -198,31 +209,26 @@ export const departmentService = {
     data: DepartmentFormData
   ): Promise<Department> => {
     try {
-      const response = await axios.put(`${BASE_URL}/departments/${id}`, data, {
-        withCredentials: true,
-      });
-      toast.success("Department updated successfully!");
+      const response = await api.put(
+        `${BASE_URL}/super-admin/departments/${id}`,
+        data
+      );
+      toast.success("Department updated successfully");
       return response.data.data;
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        toast.error(
-          error.response?.data?.message || "Failed to update department"
-        );
-      }
+      console.error("Error updating department:", error);
+      toast.error("Failed to update department");
       throw error;
     }
   },
 
   deleteDepartment: async (id: string): Promise<void> => {
     try {
-      await axios.delete(`${BASE_URL}/departments/${id}`);
-      toast.success("Department deleted successfully!");
+      await api.delete(`${BASE_URL}/super-admin/departments/${id}`);
+      toast.success("Department deleted successfully");
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        toast.error(
-          error.response?.data?.message || "Failed to delete department"
-        );
-      }
+      console.error("Error deleting department:", error);
+      toast.error("Failed to delete department");
       throw error;
     }
   },
@@ -236,9 +242,7 @@ export const departmentService = {
 
   getDepartmentChartStats: async () => {
     try {
-      const response = await axios.get(`${BASE_URL}/departments/stats/charts`, {
-        withCredentials: true,
-      });
+      const response = await api.get(`${BASE_URL}/departments/stats/charts`);
       return response.data.data;
     } catch (error) {
       console.error("Error fetching department chart stats:", error);
@@ -255,11 +259,8 @@ export const departmentService = {
 
   getAdminDepartmentStats: async (departmentId: string) => {
     try {
-      const response = await axios.get(
-        `${BASE_URL}/departments/stats/admin/${departmentId}`,
-        {
-          withCredentials: true,
-        }
+      const response = await api.get(
+        `${BASE_URL}/departments/stats/admin/${departmentId}`
       );
       return response.data.data;
     } catch (error) {
@@ -269,11 +270,8 @@ export const departmentService = {
 
   getUserStats: async (userId: string) => {
     try {
-      const response = await axios.get(
-        `${BASE_URL}/departments/stats/user/${userId}`,
-        {
-          withCredentials: true,
-        }
+      const response = await api.get(
+        `${BASE_URL}/departments/stats/user/${userId}`
       );
       return response.data.data;
     } catch (error) {
@@ -307,7 +305,7 @@ export const departmentService = {
     return useQuery<AdminResponse[]>({
       queryKey: ["departmentAdmins"],
       queryFn: async () => {
-        const response = await axios.get(`${BASE_URL}/super-admin/admins`);
+        const response = await api.get(`${BASE_URL}/super-admin/admins`);
         return response.data.admins;
       },
     });
@@ -315,7 +313,7 @@ export const departmentService = {
 
   getChartStats: async (): Promise<ChartStats> => {
     try {
-      const response = await axios.get<{ data: ChartStats }>(
+      const response = await api.get<{ data: ChartStats }>(
         `${BASE_URL}/departments/chart-stats`
       );
       return response.data.data;
@@ -327,11 +325,8 @@ export const departmentService = {
 
   getAdminDepartmentChartStats: async () => {
     try {
-      const response = await axios.get(
-        `${BASE_URL}/admin/department/stats/charts`,
-        {
-          withCredentials: true,
-        }
+      const response = await api.get(
+        `${BASE_URL}/admin/department/stats/charts`
       );
       return response.data.data;
     } catch (error) {
@@ -345,5 +340,105 @@ export const departmentService = {
       queryKey: ["adminDepartmentChartStats"],
       queryFn: () => departmentService.getAdminDepartmentChartStats(),
     });
+  },
+
+  getDepartmentEmployees: async (departmentId: string, filters?: any) => {
+    try {
+      const params = new URLSearchParams();
+      if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value && value !== "all") {
+            params.append(key, value.toString());
+          }
+        });
+      }
+
+      const response = await api.get(
+        `${BASE_URL}/departments/${departmentId}/employees?${params}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching department employees:", error);
+      toast.error("Failed to fetch department employees");
+      throw error;
+    }
+  },
+
+  getDepartmentStats: async (departmentId: string) => {
+    try {
+      const response = await api.get(
+        `${BASE_URL}/departments/${departmentId}/stats`
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error("Error fetching department stats:", error);
+      toast.error("Failed to fetch department statistics");
+      throw error;
+    }
+  },
+
+  getAdminDepartments: async (): Promise<Department[]> => {
+    try {
+      const response = await api.get(`${BASE_URL}/admin/departments`);
+      return response.data.data || [];
+    } catch (error) {
+      console.error("Error fetching admin departments:", error);
+      toast.error("Failed to fetch departments");
+      throw error;
+    }
+  },
+
+  createAdminDepartment: async (
+    data: DepartmentFormData
+  ): Promise<Department> => {
+    try {
+      const response = await api.post(`${BASE_URL}/admin/departments`, data);
+      toast.success("Department created successfully");
+      return response.data.data;
+    } catch (error) {
+      console.error("Error creating admin department:", error);
+      toast.error("Failed to create department");
+      throw error;
+    }
+  },
+
+  updateAdminDepartment: async (
+    id: string,
+    data: DepartmentFormData
+  ): Promise<Department> => {
+    try {
+      const response = await api.put(
+        `${BASE_URL}/admin/departments/${id}`,
+        data
+      );
+      toast.success("Department updated successfully");
+      return response.data.data;
+    } catch (error) {
+      console.error("Error updating admin department:", error);
+      toast.error("Failed to update department");
+      throw error;
+    }
+  },
+
+  deleteAdminDepartment: async (id: string): Promise<void> => {
+    try {
+      await api.delete(`${BASE_URL}/admin/departments/${id}`);
+      toast.success("Department deleted successfully");
+    } catch (error) {
+      console.error("Error deleting admin department:", error);
+      toast.error("Failed to delete department");
+      throw error;
+    }
+  },
+
+  getAdminDepartmentById: async (id: string): Promise<Department> => {
+    try {
+      const response = await api.get(`${BASE_URL}/admin/departments/${id}`);
+      return response.data.data;
+    } catch (error) {
+      console.error("Error fetching admin department:", error);
+      toast.error("Failed to fetch department");
+      throw error;
+    }
   },
 };

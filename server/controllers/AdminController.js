@@ -2823,17 +2823,52 @@ export class AdminController {
   }
 
   static async createEmployee(req, res, next) {
+    console.log("🚀 [AdminController] Starting employee creation request");
+    console.log("📋 [AdminController] Request body:", {
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+      email: req.body.email,
+      phone: req.body.phone,
+      position: req.body.position,
+      gradeLevel: req.body.gradeLevel,
+      workLocation: req.body.workLocation,
+      dateJoined: req.body.dateJoined,
+    });
+    console.log("👤 [AdminController] Request user:", {
+      id: req.user.id,
+      role: req.user.role,
+      department: req.user.department,
+    });
+
     try {
+      console.log("🔐 [AdminController] Checking permissions...");
       if (!PermissionChecker.hasPermission(req.user, Permission.CREATE_USER)) {
+        console.error(
+          "❌ [AdminController] Permission denied: User lacks CREATE_USER permission"
+        );
         throw new ApiError(403, "Not authorized to create employees");
       }
+      console.log("✅ [AdminController] Permissions validated");
 
+      console.log("👤 [AdminController] Fetching admin details...");
       const admin = await UserModel.findById(req.user.id);
       if (!admin?.department) {
+        console.error(
+          "❌ [AdminController] Admin not assigned to department:",
+          {
+            adminId: req.user.id,
+            hasDepartment: !!admin?.department,
+          }
+        );
         throw new ApiError(400, "Admin is not assigned to any department");
       }
+      console.log("✅ [AdminController] Admin details fetched:", {
+        adminId: admin._id,
+        department: admin.department,
+      });
 
       // Generate employee ID with dynamic prefix
+      console.log("🆔 [AdminController] Generating employee ID...");
       const today = new Date();
       const day = today.getDate().toString().padStart(2, "0");
       const month = (today.getMonth() + 1).toString().padStart(2, "0");
@@ -2850,12 +2885,19 @@ export class AdminController {
 
       const prefix = "EMP"; // Always EMP for regular employees
       const employeeId = `${prefix}${day}${month}${sequentialNumber}`;
+      console.log("✅ [AdminController] Employee ID generated:", employeeId);
 
       // Generate invitation token
+      console.log("🎫 [AdminController] Generating invitation token...");
       const invitationToken = uuidv4();
       const invitationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      console.log(
+        "✅ [AdminController] Invitation token generated:",
+        invitationToken.substring(0, 8) + "..."
+      );
 
       // Ensure the employee is created in the admin's department
+      console.log("📝 [AdminController] Preparing employee data...");
       const employeeData = {
         ...req.body,
         employeeId,
@@ -2866,16 +2908,32 @@ export class AdminController {
         invitationExpires,
         createdBy: req.user.id,
       };
+      console.log("✅ [AdminController] Employee data prepared:", {
+        employeeId: employeeData.employeeId,
+        department: employeeData.department,
+        role: employeeData.role,
+        status: employeeData.status,
+      });
 
       // Send the invitation email
+      console.log("📧 [AdminController] Sending invitation email...");
       try {
         await EmailService.sendInvitationEmail(
           employeeData.email,
           invitationToken,
           UserRole.USER
         );
+        console.log("✅ [AdminController] Invitation email sent successfully");
       } catch (emailError) {
-        console.error("Failed to send invitation email:", emailError);
+        console.error(
+          "❌ [AdminController] Failed to send invitation email:",
+          emailError
+        );
+        console.error("❌ [AdminController] Email error details:", {
+          email: employeeData.email,
+          error: emailError.message,
+          stack: emailError.stack,
+        });
         throw new ApiError(
           500,
           "Failed to send invitation email. Employee not created."
@@ -2883,19 +2941,38 @@ export class AdminController {
       }
 
       // Create the employee after successful email sending
+      console.log("💾 [AdminController] Creating employee in database...");
       const employee = await UserModel.create(employeeData);
+      console.log(
+        "✅ [AdminController] Employee created in database:",
+        employee._id
+      );
 
       // Remove sensitive data from response
+      console.log(
+        "🔒 [AdminController] Removing sensitive data from response..."
+      );
       const employeeResponse = employee.toObject();
       delete employeeResponse.password;
       delete employeeResponse.invitationToken;
+      console.log("✅ [AdminController] Sensitive data removed");
 
+      console.log("📤 [AdminController] Sending successful response");
       res.status(201).json({
         success: true,
         message: "Employee created successfully. Invitation sent.",
         employee: employeeResponse,
       });
+      console.log(
+        "✅ [AdminController] Employee creation process completed successfully"
+      );
     } catch (error) {
+      console.error("❌ [AdminController] Error in createEmployee:", error);
+      console.error("❌ [AdminController] Error details:", {
+        message: error.message,
+        statusCode: error.statusCode,
+        stack: error.stack,
+      });
       const { statusCode, message } = handleError(error);
       res.status(statusCode).json({ success: false, message });
     }

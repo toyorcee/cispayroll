@@ -1181,11 +1181,6 @@ UserSchema.pre("save", function (next) {
 UserSchema.set("toJSON", {
   virtuals: true,
   transform: function (_doc, ret) {
-    if (ret.profileImage) {
-      ret.profileImageUrl = ret.profileImage;
-    } else {
-      ret.profileImageUrl = "uploads/profiles/default-avatar.png";
-    }
     delete ret.password;
     delete ret.__v;
     return ret;

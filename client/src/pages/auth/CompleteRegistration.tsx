@@ -190,7 +190,7 @@ const CompleteRegistration = () => {
       try {
         setIsLoading(true);
         const response = await api.get(`/api/invitation/verify/${token}`, {
-          withCredentials: true, 
+          withCredentials: true,
         });
 
         if (response.data.success) {
@@ -275,7 +275,6 @@ const CompleteRegistration = () => {
       );
 
       if (response.data.success) {
-        toast.success("Registration completed successfully!");
         navigate("/auth/signin", {
           state: {
             message:

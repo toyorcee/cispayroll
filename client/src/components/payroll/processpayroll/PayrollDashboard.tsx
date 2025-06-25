@@ -7,6 +7,12 @@ import {
   Card,
   CardContent,
   useTheme,
+  TextField,
+  MenuItem,
+  Button,
+  FormControl,
+  InputLabel,
+  Select,
 } from "@mui/material";
 import {
   PieChart,
@@ -22,12 +28,17 @@ import {
   AdminPayrollProcessingStats,
 } from "../../../services/adminPayrollService";
 import { useAuth } from "../../../context/AuthContext";
+import { UserRole } from "../../../types/auth";
 import { toast } from "react-toastify";
 import {
   CheckCircle as CheckCircleIcon,
   PendingActions as PendingActionsIcon,
   Payment as PaymentIcon,
   Assessment as AssessmentIcon,
+  Search as SearchIcon,
+  FilterList as FilterIcon,
+  TrendingUp as TrendingUpIcon,
+  AccountBalance as AccountBalanceIcon,
 } from "@mui/icons-material";
 
 interface PayrollDashboardProps {
@@ -92,6 +103,11 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
             name: "Processing",
             value: stats.processingPayrolls,
             color: STATUS_COLORS.processing,
+          },
+          {
+            name: "Completed",
+            value: stats.completedPayrolls || 0,
+            color: STATUS_COLORS.completed,
           },
           {
             name: "Pending Payment",
@@ -162,6 +178,11 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
           color: STATUS_COLORS.processing,
         },
         {
+          name: "Completed",
+          value: initialProcessingStats.completedPayrolls || 0,
+          color: STATUS_COLORS.completed,
+        },
+        {
           name: "Pending Payment",
           value: initialProcessingStats.pendingPaymentPayrolls,
           color: STATUS_COLORS.pendingPayment,
@@ -227,144 +248,168 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
       </Typography>
 
       <Grid container spacing={4}>
-        {/* Summary Cards */}
-        <Grid item xs={12} md={3}>
+        {/* Single Summary Card for ALL Users */}
+        <Grid item xs={12} md={4}>
           <Card
-            elevation={3}
+            elevation={4}
             sx={{
               height: "100%",
-              backgroundColor: theme.palette.primary.light,
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
               color: "white",
+              position: "relative",
+              overflow: "hidden",
+              "&::before": {
+                content: '""',
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: "rgba(255, 255, 255, 0.1)",
+                clipPath: "polygon(0 0, 100% 0, 100% 85%, 0 100%)",
+              },
             }}
           >
-            <CardContent>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                <AssessmentIcon sx={{ fontSize: 32, mr: 1 }} />
-                <Typography variant="subtitle1" sx={{ fontWeight: "medium" }}>
-              Total Payrolls
-            </Typography>
+            <CardContent sx={{ position: "relative", zIndex: 1, p: 3 }}>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                <AccountBalanceIcon sx={{ fontSize: 40, mr: 2 }} />
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: "bold", mb: 0.5 }}>
+                    Payroll Overview
+                  </Typography>
+                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                    {user?.role === UserRole.SUPER_ADMIN
+                      ? "Super Admin"
+                      : "Admin"}{" "}
+                    Dashboard
+                  </Typography>
+                </Box>
               </Box>
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: "bold",
-                  fontSize: "1.5rem",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {processingStats?.totalPayrolls || totalPayrolls}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
 
-        <Grid item xs={12} md={3}>
-          <Card
-            elevation={3}
-            sx={{
-              height: "100%",
-              backgroundColor: theme.palette.success.light,
-              color: "white",
-            }}
-          >
-            <CardContent>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                <PaymentIcon sx={{ fontSize: 32, mr: 1 }} />
-                <Typography variant="subtitle1" sx={{ fontWeight: "medium" }}>
-              Total Amount
-            </Typography>
-              </Box>
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: "bold",
-                  fontSize: "1.5rem",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                ₦
-                {(
-                  processingStats?.totalAmountPaid || totalAmount
-                ).toLocaleString()}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} md={3}>
-          <Card
-            elevation={3}
-            sx={{
-              height: "100%",
-              backgroundColor: theme.palette.warning.light,
-              color: "white",
-            }}
-          >
-            <CardContent>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                <PendingActionsIcon sx={{ fontSize: 32, mr: 1 }} />
-                <Typography variant="subtitle1" sx={{ fontWeight: "medium" }}>
-                  Processing
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h3" sx={{ fontWeight: "bold", mb: 1 }}>
+                  {processingStats?.totalPayrolls || totalPayrolls}
+                </Typography>
+                <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                  Total Payrolls
                 </Typography>
               </Box>
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: "bold",
-                  fontSize: "1.5rem",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {processingStats?.processingPayrolls || 0}
-              </Typography>
-              <Typography variant="caption" sx={{ fontSize: "0.875rem" }}>
-                {processingStats?.processingRate
-                  ? `${processingStats.processingRate.toFixed(1)}% of total`
-                  : ""}
-            </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
 
-        <Grid item xs={12} md={3}>
-          <Card
-            elevation={3}
-            sx={{
-              height: "100%",
-              backgroundColor: theme.palette.info.light,
-              color: "white",
-            }}
-          >
-            <CardContent>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
-                <CheckCircleIcon sx={{ fontSize: 32, mr: 1 }} />
-                <Typography variant="subtitle1" sx={{ fontWeight: "medium" }}>
-                  Paid
-                </Typography>
-              </Box>
-              <Typography
-                variant="h5"
+              <Box
                 sx={{
-                  fontWeight: "bold",
-                  fontSize: "1.5rem",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  mb: 2,
                 }}
               >
-                {processingStats?.paidPayrolls || 0}
-            </Typography>
-              <Typography variant="caption" sx={{ fontSize: "0.875rem" }}>
-                {processingStats?.paymentRate
-                  ? `${processingStats.paymentRate.toFixed(1)}% of total`
-                  : ""}
-            </Typography>
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: "bold" }}>
+                    ₦
+                    {(
+                      processingStats?.totalAmountPaid || totalAmount
+                    ).toLocaleString()}
+                  </Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                    Total Amount
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: "right" }}>
+                  <Typography variant="h5" sx={{ fontWeight: "bold" }}>
+                    {processingStats?.paidPayrolls || 0}
+                  </Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                    Paid
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  mb: 2,
+                }}
+              >
+                <Box sx={{ display: "flex", alignItems: "center" }}>
+                  <TrendingUpIcon sx={{ fontSize: 20, mr: 1 }} />
+                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                    {processingStats?.paymentRate
+                      ? `${processingStats.paymentRate.toFixed(1)}%`
+                      : "0%"}{" "}
+                    Success Rate
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* Status Badges */}
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                <Box
+                  sx={{
+                    px: 2,
+                    py: 0.5,
+                    borderRadius: 2,
+                    backgroundColor: "rgba(255, 255, 255, 0.2)",
+                    backdropFilter: "blur(10px)",
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: "bold" }}>
+                    {processingStats?.approvedPayrolls || 0} Approved
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    px: 2,
+                    py: 0.5,
+                    borderRadius: 2,
+                    backgroundColor: STATUS_COLORS.completed,
+                    color: "white",
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: "bold" }}>
+                    {processingStats?.completedPayrolls || 0} Completed
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    px: 2,
+                    py: 0.5,
+                    borderRadius: 2,
+                    backgroundColor: STATUS_COLORS.processing,
+                    color: "white",
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: "bold" }}>
+                    {processingStats?.processingPayrolls || 0} Processing
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    px: 2,
+                    py: 0.5,
+                    borderRadius: 2,
+                    backgroundColor: STATUS_COLORS.pendingPayment,
+                    color: "white",
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: "bold" }}>
+                    {processingStats?.pendingPaymentPayrolls || 0} Pending
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    px: 2,
+                    py: 0.5,
+                    borderRadius: 2,
+                    backgroundColor: STATUS_COLORS.failed,
+                    color: "white",
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: "bold" }}>
+                    {processingStats?.failedPayrolls || 0} Failed
+                  </Typography>
+                </Box>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
@@ -381,13 +426,13 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
             </Typography>
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={450}>
-              <PieChart>
-                <Pie
+                <PieChart>
+                  <Pie
                     data={chartData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
                     outerRadius={160}
                     innerRadius={80}
                     labelLine={false}
@@ -399,9 +444,9 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
                   >
                     {chartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
+                    ))}
+                  </Pie>
+                  <Tooltip />
                   <Legend
                     verticalAlign="bottom"
                     height={36}
@@ -411,8 +456,8 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
                       </span>
                     )}
                   />
-              </PieChart>
-            </ResponsiveContainer>
+                </PieChart>
+              </ResponsiveContainer>
             ) : (
               <Box
                 display="flex"
@@ -422,7 +467,7 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
               >
                 <Typography variant="body1" color="textSecondary">
                   No payroll data available
-            </Typography>
+                </Typography>
               </Box>
             )}
           </Card>

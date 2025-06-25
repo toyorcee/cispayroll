@@ -1,17 +1,19 @@
 import { useAuth } from "../../../context/AuthContext.js";
-import { UserRole } from "../../../types/auth.js";
+import { UserRole, Permission } from "../../../types/auth.js";
 import {
   Card,
   Typography,
   Box,
   Avatar,
   Divider,
+  CircularProgress,
+  Button,
+  TextField,
+  Grid,
   IconButton,
   Tooltip,
-  CircularProgress,
 } from "@mui/material";
 import {
-  Edit as EditIcon,
   Email as EmailIcon,
   Phone as PhoneIcon,
   Badge as BadgeIcon,
@@ -20,12 +22,14 @@ import {
   ContactEmergency as EmergencyIcon,
   AccountBalance as AccountBalanceIcon,
   Circle as CircleIcon,
+  Edit as EditIcon,
+  Save as SaveIcon,
 } from "@mui/icons-material";
-import { Permission } from "../../../types/auth.js";
-import { useState, useRef, useEffect } from "react";
-import { toast } from "react-toastify";
+import { useState, useEffect, useRef } from "react";
 import { employeeService } from "../../../services/employeeService";
 import { getProfileImageUrl } from "../../../utils/imageUtils";
+import { profileService } from "../../../services/profileService";
+import { toast } from "react-toastify";
 
 interface Qualification {
   _id: string;
@@ -44,42 +48,194 @@ interface OnboardingTask {
 }
 
 export default function UserProfile() {
-  const { user: authUser, hasPermission } = useAuth();
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { data: user, isLoading } = employeeService.useGetUserProfile();
-  const { mutate: updateImage } = employeeService.useUpdateProfileImage();
+  const { user: authUser, hasPermission, refreshUser } = useAuth();
+  const {
+    data: user,
+    isLoading,
+    refetch,
+  } = employeeService.useGetUserProfile();
+
+  const [editMode, setEditMode] = useState(false);
+  const [form, setForm] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
 
   // Add state for image URL
   const [profileImageUrl, setProfileImageUrl] = useState<string>("");
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Update image URL when user changes
   useEffect(() => {
     setProfileImageUrl(getProfileImageUrl(user || {}));
+    if (user) {
+      setForm(user);
+    }
   }, [user]);
 
-  const canEditProfile =
-    !!authUser &&
-    !!user &&
-    authUser._id === user._id &&
-    hasPermission(Permission.EDIT_PERSONAL_INFO);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handlePersonalDetailsChange = (e: any) => {
+    setForm({
+      ...form,
+      personalDetails: {
+        ...form.personalDetails,
+        [e.target.name]: e.target.value,
+      },
+    });
+  };
+
+  const handleAddressChange = (e: any) => {
+    setForm({
+      ...form,
+      personalDetails: {
+        ...form.personalDetails,
+        address: {
+          ...form.personalDetails.address,
+          [e.target.name]: e.target.value,
+        },
+      },
+    });
+  };
+
+  const handleQualificationChange = (index: number, e: any) => {
+    const newQualifications = [...form.personalDetails.qualifications];
+    newQualifications[index] = {
+      ...newQualifications[index],
+      [e.target.name]: e.target.value,
+    };
+    setForm({
+      ...form,
+      personalDetails: {
+        ...form.personalDetails,
+        qualifications: newQualifications,
+      },
+    });
+  };
+
+  const addQualification = () => {
+    const newQualification = {
+      _id: `temp-${Date.now()}`,
+      highestEducation: "",
+      institution: "",
+      yearGraduated: "",
+      id: `temp-${Date.now()}`,
+    };
+    setForm({
+      ...form,
+      personalDetails: {
+        ...form.personalDetails,
+        qualifications: [
+          ...(form.personalDetails?.qualifications || []),
+          newQualification,
+        ],
+      },
+    });
+  };
+
+  const removeQualification = (index: number) => {
+    const newQualifications = [...form.personalDetails.qualifications];
+    newQualifications.splice(index, 1);
+    setForm({
+      ...form,
+      personalDetails: {
+        ...form.personalDetails,
+        qualifications: newQualifications,
+      },
+    });
+  };
+
+  const handleEmergencyContactChange = (e: any) => {
+    setForm({
+      ...form,
+      emergencyContact: {
+        ...form.emergencyContact,
+        [e.target.name]: e.target.value,
+      },
+    });
+  };
+
+  const handleBankDetailsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm({
+      ...form,
+      bankDetails: {
+        ...form.bankDetails,
+        [e.target.name]: e.target.value,
+      },
+    });
+  };
 
   const handleImageClick = () => {
-    if (canEditProfile) {
       fileInputRef.current?.click();
-    }
   };
 
   const handleImageUpload = async (file: File) => {
-    try {
+    if (!file) return;
       setIsUploading(true);
-      await updateImage(file);
-      toast.success("Profile image updated successfully");
+    try {
+      await profileService.updateProfileImage(file);
+      refetch();
+      await refreshUser();
+      toast.success("Profile image updated successfully!");
     } catch (error) {
-      console.error("Error uploading image:", error);
-      toast.error("Failed to update profile image");
+      toast.error("Failed to update profile image.");
+      console.error(error);
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const allowed = [
+        "firstName",
+        "lastName",
+        "phone",
+        "personalDetails",
+        "emergencyContact",
+        "bankDetails",
+      ];
+      const data: any = {};
+      for (const key of allowed) {
+        if (form[key] !== undefined) data[key] = form[key];
+      }
+      if (
+        data.personalDetails &&
+        Array.isArray(data.personalDetails.qualifications)
+      ) {
+        data.personalDetails.qualifications =
+          data.personalDetails.qualifications.map((qual: any) => {
+            const cleaned = { ...qual };
+            if (
+              cleaned._id &&
+              typeof cleaned._id === "string" &&
+              cleaned._id.startsWith("temp-")
+            ) {
+              delete cleaned._id;
+            }
+            if (
+              cleaned.id &&
+              typeof cleaned.id === "string" &&
+              cleaned.id.startsWith("temp-")
+            ) {
+              delete cleaned.id;
+            }
+            return cleaned;
+          });
+      }
+      await profileService.updateProfile(data);
+      toast.success("Profile updated successfully!");
+      setEditMode(false);
+      refetch();
+      await refreshUser();
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.message || "Update failed. Please try again."
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -152,37 +308,137 @@ export default function UserProfile() {
   };
 
   const renderQualifications = () => {
-    if (!user?.personalDetails?.qualifications?.length) return null;
+    const qualifications = user?.personalDetails?.qualifications || [];
+    const hasQualifications = qualifications.length > 0;
 
     return (
       <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-300 border border-gray-100 mt-4">
-        <Box className="flex items-center space-x-2 mb-4">
+        <Box className="flex items-center justify-between mb-4">
+          <Box className="flex items-center space-x-2">
           <BadgeIcon className="text-green-600" />
           <Typography variant="h6" className="text-gray-800 font-semibold">
             Qualifications
           </Typography>
         </Box>
+          {editMode && (
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={addQualification}
+              sx={{
+                borderColor: "#16a34a",
+                color: "#16a34a",
+                "&:hover": {
+                  borderColor: "#15803d",
+                  backgroundColor: "#f0fdf4",
+                },
+              }}
+            >
+              Add Qualification
+            </Button>
+          )}
+        </Box>
+
+        {!hasQualifications && !editMode ? (
+          <Typography
+            variant="body2"
+            className="text-gray-500 text-center py-4"
+          >
+            No qualifications added yet.
+          </Typography>
+        ) : (
         <div className="space-y-4">
-          {user.personalDetails.qualifications.map((qual: Qualification) => (
+            {editMode
+              ? (form.personalDetails?.qualifications || []).map(
+                  (qual: Qualification, index: number) => (
+                    <div
+                      key={qual._id || index}
+                      className="border border-gray-200 rounded-lg p-4"
+                    >
+                      <Box className="flex justify-between items-center mb-3">
+                        <Typography
+                          variant="subtitle2"
+                          className="text-gray-700"
+                        >
+                          Qualification {index + 1}
+                        </Typography>
+                        <Button
+                          variant="text"
+                          size="small"
+                          onClick={() => removeQualification(index)}
+                          sx={{
+                            color: "#dc2626",
+                            "&:hover": { backgroundColor: "#fef2f2" },
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </Box>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={4}>
+                          <TextField
+                            label="Highest Education"
+                            name="highestEducation"
+                            value={qual.highestEducation || ""}
+                            onChange={(e) =>
+                              handleQualificationChange(index, e)
+                            }
+                            fullWidth
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                          <TextField
+                            label="Institution"
+                            name="institution"
+                            value={qual.institution || ""}
+                            onChange={(e) =>
+                              handleQualificationChange(index, e)
+                            }
+                            fullWidth
+                            size="small"
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                          <TextField
+                            label="Year Graduated"
+                            name="yearGraduated"
+                            value={qual.yearGraduated || ""}
+                            onChange={(e) =>
+                              handleQualificationChange(index, e)
+                            }
+                            fullWidth
+                            size="small"
+                          />
+                        </Grid>
+                      </Grid>
+                    </div>
+                  )
+                )
+              : qualifications.map((qual: Qualification) => (
             <div
               key={qual._id}
-              className="flex items-start space-x-3 p-2 hover:bg-gray-50 rounded-lg"
+                    className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg border border-gray-100"
             >
               <BadgeIcon className="text-green-600 mt-1" />
-              <div>
-                <Typography variant="subtitle1" className="font-medium">
-                  {qual.highestEducation}
+                    <div className="flex-1">
+                      <Typography
+                        variant="subtitle1"
+                        className="font-medium text-gray-800"
+                      >
+                        {qual.highestEducation || "Not specified"}
                 </Typography>
                 <Typography variant="body2" className="text-gray-600">
-                  {qual.institution}
+                        {qual.institution || "Institution not specified"}
                 </Typography>
                 <Typography variant="caption" className="text-gray-500">
-                  Graduated: {qual.yearGraduated}
+                        Graduated: {qual.yearGraduated || "Year not specified"}
                 </Typography>
               </div>
             </div>
           ))}
         </div>
+        )}
       </Card>
     );
   };
@@ -266,13 +522,79 @@ export default function UserProfile() {
     );
   };
 
+  const canEditProfile =
+    !!authUser &&
+    !!user &&
+    (authUser._id === user._id || hasPermission(Permission.EDIT_USER));
+
   return (
-    <div className="flex flex-col p-4 sm:p-6 max-w-7xl mx-auto w-full">
-      {isLoading ? (
+    <div className="flex flex-col p-4 sm:p-6 max-w-7xl mx-auto w-full relative">
+      {/* Top action buttons */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: 24,
+          right: 24,
+          zIndex: 10,
+          display: "flex",
+          gap: 2,
+        }}
+      >
+        {!editMode ? (
+          <Button
+            variant="contained"
+            startIcon={<EditIcon />}
+            onClick={() => setEditMode(true)}
+            sx={{
+              backgroundColor: "#16a34a",
+              color: "white",
+              borderRadius: 2,
+              px: 3,
+              py: 1,
+              fontWeight: 600,
+              boxShadow: 2,
+              "&:hover": { backgroundColor: "#15803d" },
+            }}
+          >
+            Edit
+          </Button>
+        ) : (
+          <>
+            <Button
+              variant="contained"
+              startIcon={<SaveIcon />}
+              onClick={handleSave}
+              sx={{
+                backgroundColor: "#16a34a",
+                color: "white",
+                borderRadius: 2,
+                px: 3,
+                py: 1,
+                fontWeight: 600,
+                boxShadow: 2,
+                "&:hover": { backgroundColor: "#15803d" },
+              }}
+              disabled={saving}
+            >
+              {saving ? "Saving..." : "Save"}
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => setEditMode(false)}
+              sx={{ ml: 1 }}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+          </>
+        )}
+      </Box>
+      {isLoading || !form ? (
         <div className="flex justify-center items-center min-h-[50vh]">
           <CircularProgress />
         </div>
       ) : (
+        <>
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
           {/* Left column - Personal Information */}
           <div className="w-full lg:w-1/3">
@@ -280,25 +602,19 @@ export default function UserProfile() {
               <Box className="flex flex-col items-center mb-4 sm:mb-6">
                 <div className="relative">
                   <Avatar
-                    src={profileImageUrl}
+                      src={getProfileImageUrl(user)}
                     alt={`${user?.firstName} ${user?.lastName}`}
                     sx={{
-                      width: { xs: 100, sm: 120 },
-                      height: { xs: 100, sm: 120 },
+                        width: 100,
+                        height: 100,
                       mb: 2,
-                      border: "4px solid #fff",
-                      boxShadow: "0 0 20px rgba(0,0,0,0.1)",
-                      cursor: canEditProfile ? "pointer" : "default",
-                      backgroundColor: "#e5e7eb",
+                        cursor: "pointer",
                     }}
-                    onClick={canEditProfile ? handleImageClick : undefined}
+                      onClick={handleImageClick}
                   >
-                    {!user?.profileImageUrl &&
-                      !user?.profileImage &&
+                      {!user?.profileImage &&
                       `${user?.firstName?.[0]}${user?.lastName?.[0]}`}
                   </Avatar>
-
-                  {canEditProfile && (
                     <>
                       <input
                         type="file"
@@ -315,12 +631,7 @@ export default function UserProfile() {
                         <IconButton
                           size="small"
                           className="absolute bottom-0 right-0 bg-green-50 hover:bg-green-100 shadow-md"
-                          sx={{
-                            border: "2px solid #fff",
-                            "&:hover": {
-                              backgroundColor: "#f0fdf4",
-                            },
-                          }}
+                          sx={{ border: "2px solid #fff" }}
                           onClick={handleImageClick}
                           disabled={isUploading}
                         >
@@ -335,7 +646,6 @@ export default function UserProfile() {
                         </IconButton>
                       </Tooltip>
                     </>
-                  )}
                 </div>
                 <Typography
                   variant="h5"
@@ -381,12 +691,22 @@ export default function UserProfile() {
                     >
                       Phone
                     </Typography>
+                      {editMode ? (
+                        <TextField
+                          name="phone"
+                          value={form.phone || ""}
+                          onChange={handleChange}
+                          variant="standard"
+                          size="small"
+                        />
+                      ) : (
                     <Typography
                       variant="body2"
                       className="text-gray-700 text-sm sm:text-base"
                     >
                       {user?.phone}
                     </Typography>
+                      )}
                   </div>
                 </div>
 
@@ -399,6 +719,66 @@ export default function UserProfile() {
                     >
                       Address
                     </Typography>
+                      {editMode ? (
+                        <Grid container spacing={2}>
+                          <Grid item xs={12}>
+                            <TextField
+                              label="Street"
+                              name="street"
+                              value={
+                                form.personalDetails?.address?.street || ""
+                              }
+                              onChange={handleAddressChange}
+                              fullWidth
+                              margin="normal"
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              label="City"
+                              name="city"
+                              value={form.personalDetails?.address?.city || ""}
+                              onChange={handleAddressChange}
+                              fullWidth
+                              margin="normal"
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              label="State"
+                              name="state"
+                              value={form.personalDetails?.address?.state || ""}
+                              onChange={handleAddressChange}
+                              fullWidth
+                              margin="normal"
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              label="Country"
+                              name="country"
+                              value={
+                                form.personalDetails?.address?.country || ""
+                              }
+                              onChange={handleAddressChange}
+                              fullWidth
+                              margin="normal"
+                            />
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <TextField
+                              label="Zip Code"
+                              name="zipCode"
+                              value={
+                                form.personalDetails?.address?.zipCode || ""
+                              }
+                              onChange={handleAddressChange}
+                              fullWidth
+                              margin="normal"
+                            />
+                          </Grid>
+                        </Grid>
+                      ) : (
                     <Typography
                       variant="body2"
                       className="text-gray-700 text-sm sm:text-base"
@@ -407,10 +787,10 @@ export default function UserProfile() {
                       {user?.personalDetails?.address?.city},
                       {user?.personalDetails?.address?.state}
                     </Typography>
+                      )}
                   </div>
                 </div>
 
-                {canEditProfile && (
                   <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
                     <AccountBalanceIcon className="text-green-600 text-base sm:text-lg" />
                     <div>
@@ -420,6 +800,26 @@ export default function UserProfile() {
                       >
                         Bank Details
                       </Typography>
+                      {editMode ? (
+                        <Box display="flex" flexDirection="column" gap={1}>
+                          <TextField
+                            label="Bank Name"
+                            name="bankName"
+                            value={form.bankDetails?.bankName || ""}
+                            onChange={handleBankDetailsChange}
+                            variant="standard"
+                            size="small"
+                          />
+                          <TextField
+                            label="Account Number"
+                            name="accountNumber"
+                            value={form.bankDetails?.accountNumber || ""}
+                            onChange={handleBankDetailsChange}
+                            variant="standard"
+                            size="small"
+                          />
+                        </Box>
+                      ) : (
                       <Typography
                         variant="body2"
                         className="text-gray-700 text-sm sm:text-base"
@@ -427,9 +827,9 @@ export default function UserProfile() {
                         {user?.bankDetails?.bankName} -{" "}
                         {user?.bankDetails?.accountNumber}
                       </Typography>
+                      )}
                     </div>
                   </div>
-                )}
 
                 <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
                   <EmergencyIcon className="text-green-600 text-base sm:text-lg" />
@@ -440,6 +840,34 @@ export default function UserProfile() {
                     >
                       Emergency Contact
                     </Typography>
+                      {editMode ? (
+                        <Box display="flex" flexDirection="column" gap={1}>
+                          <TextField
+                            label="Name"
+                            name="name"
+                            value={form.emergencyContact?.name || ""}
+                            onChange={handleEmergencyContactChange}
+                            variant="standard"
+                            size="small"
+                          />
+                          <TextField
+                            label="Relationship"
+                            name="relationship"
+                            value={form.emergencyContact?.relationship || ""}
+                            onChange={handleEmergencyContactChange}
+                            variant="standard"
+                            size="small"
+                          />
+                          <TextField
+                            label="Phone"
+                            name="phone"
+                            value={form.emergencyContact?.phone || ""}
+                            onChange={handleEmergencyContactChange}
+                            variant="standard"
+                            size="small"
+                          />
+                        </Box>
+                      ) : (
                     <Typography
                       variant="body2"
                       className="text-gray-700 text-sm sm:text-base"
@@ -449,6 +877,7 @@ export default function UserProfile() {
                       <br />
                       {user?.emergencyContact?.phone}
                     </Typography>
+                      )}
                   </div>
                 </div>
 
@@ -461,6 +890,53 @@ export default function UserProfile() {
                     >
                       Personal Information
                     </Typography>
+                      {editMode ? (
+                        <Box display="flex" flexDirection="column" gap={1}>
+                          <TextField
+                            label="Middle Name"
+                            name="middleName"
+                            value={
+                              editMode
+                                ? form.personalDetails?.middleName
+                                : user.personalDetails?.middleName
+                            }
+                            onChange={handlePersonalDetailsChange}
+                            InputProps={{ readOnly: !editMode }}
+                            fullWidth
+                            margin="normal"
+                          />
+                          <TextField
+                            label="Date of Birth"
+                            name="dateOfBirth"
+                            type="date"
+                            value={
+                              form.personalDetails?.dateOfBirth
+                                ? form.personalDetails.dateOfBirth.split("T")[0]
+                                : ""
+                            }
+                            onChange={handlePersonalDetailsChange}
+                            variant="standard"
+                            size="small"
+                            InputLabelProps={{ shrink: true }}
+                          />
+                          <TextField
+                            label="Marital Status"
+                            name="maritalStatus"
+                            value={form.personalDetails?.maritalStatus || ""}
+                            onChange={handlePersonalDetailsChange}
+                            variant="standard"
+                            size="small"
+                          />
+                          <TextField
+                            label="Nationality"
+                            name="nationality"
+                            value={form.personalDetails?.nationality || ""}
+                            onChange={handlePersonalDetailsChange}
+                            variant="standard"
+                            size="small"
+                          />
+                        </Box>
+                      ) : (
                     <div>
                       {user?.personalDetails?.middleName && (
                         <Typography
@@ -505,34 +981,7 @@ export default function UserProfile() {
                         {user?.personalDetails?.nationality || "Not set"}
                       </Typography>
                     </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
-                  <LocationIcon className="text-green-600 text-base sm:text-lg" />
-                  <div>
-                    <Typography
-                      variant="caption"
-                      className="text-gray-500 text-xs sm:text-sm"
-                    >
-                      Full Address
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      className="text-gray-700 text-sm sm:text-base"
-                    >
-                      {user?.personalDetails?.address ? (
-                        <>
-                          {user.personalDetails.address.street},<br />
-                          {user.personalDetails.address.city},<br />
-                          {user.personalDetails.address.state},<br />
-                          {user.personalDetails.address.country}{" "}
-                          {user.personalDetails.address.zipCode}
-                        </>
-                      ) : (
-                        "Address not set"
                       )}
-                    </Typography>
                   </div>
                 </div>
               </Box>
@@ -703,10 +1152,13 @@ export default function UserProfile() {
                           className="text-gray-700 text-sm sm:text-base"
                         >
                           {user?.lastLogin
-                            ? new Date(user.lastLogin).toLocaleString("en-US", {
+                              ? new Date(user.lastLogin).toLocaleString(
+                                  "en-US",
+                                  {
                                 dateStyle: "medium",
                                 timeStyle: "short",
-                              })
+                                  }
+                                )
                             : "Not available"}
                         </Typography>
                       </div>
@@ -725,7 +1177,9 @@ export default function UserProfile() {
                           variant="body2"
                           className="text-gray-700 text-sm sm:text-base"
                         >
-                          {user?.isEmailVerified ? "Verified" : "Not Verified"}
+                            {user?.isEmailVerified
+                              ? "Verified"
+                              : "Not Verified"}
                         </Typography>
                       </div>
                     </div>
@@ -744,6 +1198,66 @@ export default function UserProfile() {
             {renderOnboardingStatus()}
           </div>
         </div>
+          {/* Bottom action buttons */}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              mt: 6,
+              mb: 2,
+              gap: 2,
+            }}
+          >
+            {!editMode ? (
+              <Button
+                variant="contained"
+                startIcon={<EditIcon />}
+                onClick={() => setEditMode(true)}
+                sx={{
+                  backgroundColor: "#16a34a",
+                  color: "white",
+                  borderRadius: 2,
+                  px: 3,
+                  py: 1,
+                  fontWeight: 600,
+                  boxShadow: 2,
+                  "&:hover": { backgroundColor: "#15803d" },
+                }}
+              >
+                Edit
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="contained"
+                  startIcon={<SaveIcon />}
+                  onClick={handleSave}
+                  sx={{
+                    backgroundColor: "#16a34a",
+                    color: "white",
+                    borderRadius: 2,
+                    px: 3,
+                    py: 1,
+                    fontWeight: 600,
+                    boxShadow: 2,
+                    "&:hover": { backgroundColor: "#15803d" },
+                  }}
+                  disabled={saving}
+                >
+                  {saving ? "Saving..." : "Save"}
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => setEditMode(false)}
+                  sx={{ ml: 1 }}
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
+              </>
+            )}
+          </Box>
+        </>
       )}
     </div>
   );

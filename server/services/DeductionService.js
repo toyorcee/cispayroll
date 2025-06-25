@@ -212,8 +212,11 @@ export class DeductionService {
         calculationMethod: data.calculationMethod,
         value: data.value,
         effectiveDate: data.effectiveDate || new Date(),
+        category: data.category || "general",
+        scope: data.scope || DeductionScope.COMPANY_WIDE,
+        department: data.department,
+        assignedEmployees: data.assignedEmployees,
         isActive: true,
-        isCustom: data.isCustom || false,
         createdBy: userId,
         updatedBy: userId,
       };

@@ -4,11 +4,11 @@ export const getProfileImageUrl = (profileData: {
   profileImage?: string;
   profileImageUrl?: string;
 }) => {
-  console.log("Profile Image Data:", {
-    profileImage: profileData.profileImage,
-    profileImageUrl: profileData.profileImageUrl,
-    apiUrl: import.meta.env.VITE_API_URL,
-  });
+  // console.log("Profile Image Data:", {
+  //   profileImage: profileData.profileImage,
+  //   profileImageUrl: profileData.profileImageUrl,
+  //   apiUrl: import.meta.env.VITE_API_URL,
+  // });
 
   if (profileData.profileImageUrl?.startsWith("http")) {
     console.log(

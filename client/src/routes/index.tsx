@@ -334,9 +334,9 @@ export const routes: RouteConfig[] = [
       {
         path: "",
         label: "General Settings",
-        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
-        permissions: [Permission.MANAGE_SYSTEM_SETTINGS],
-        requireAllPermissions: true,
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER],
+        permissions: [],
+        requireAllPermissions: false,
         element: <GeneralSettings />,
       },
       {

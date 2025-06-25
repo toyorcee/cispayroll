@@ -7,6 +7,7 @@ import {
   FaIdCard,
   FaBriefcase,
   FaCheckCircle,
+  FaLeaf,
 } from "react-icons/fa";
 import { useQuery } from "@tanstack/react-query";
 import { adminEmployeeService } from "../../../../services/adminEmployeeService";
@@ -61,9 +62,15 @@ const SuccessAnimation = () => (
   </div>
 );
 
+const MAIN_GREEN = "#27ae60";
+const LIGHT_GREEN_BG = "#f6fcf7";
+const LIGHT_GREEN_ACCENT = "#eafaf1";
+
 const SingleEmployeeProcessModal = ({
   isOpen,
   onClose,
+  onSubmit,
+  onSuccess,
 }: SingleEmployeeProcessModalProps) => {
   const { isSuperAdmin } = useAuth();
   const [formData, setFormData] = useState({
@@ -452,7 +459,24 @@ const SingleEmployeeProcessModal = ({
       }, 1500);
     } catch (error) {
       console.error("❌ Error processing payroll:", error);
-      toast.error("Failed to process payroll");
+
+      // Handle specific error cases with better messages
+      let errorMessage = "Failed to process payroll";
+
+      if (error instanceof Error) {
+        if (error.message.includes("already exists")) {
+          errorMessage =
+            "A payroll for this employee already exists for this period";
+        } else if (error.message.includes("No grade level assigned")) {
+          errorMessage = "Employee does not have a grade level assigned";
+        } else if (error.message.includes("No active salary grade")) {
+          errorMessage = "No active salary grade found for employee";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      toast.error(errorMessage);
     } finally {
       console.log("🏁 Setting isSubmitting to false");
       setIsSubmitting(false);
@@ -525,24 +549,54 @@ const SingleEmployeeProcessModal = ({
       {showSuccess && <SuccessAnimation />}
       <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="mx-auto max-w-4xl w-full bg-white rounded-xl shadow-lg max-h-[90vh] flex flex-col">
+        <Dialog.Panel
+          className="mx-auto max-w-4xl w-full rounded-xl shadow-lg max-h-[90vh] flex flex-col"
+          style={{
+            background: MAIN_GREEN,
+            borderRadius: 18,
+            boxShadow: "0 4px 24px 0 rgba(39, 174, 96, 0.10)",
+            border: `2px solid ${LIGHT_GREEN_ACCENT}`,
+          }}
+        >
           {/* Fixed Header */}
-          <div className="p-4 border-b">
-            <div className="flex items-center justify-between">
-              <Dialog.Title className="text-xl font-semibold text-gray-900">
-                Process Payroll for Selected Employees
-              </Dialog.Title>
-              <button
-                onClick={handleClose}
-                className="text-gray-400 hover:text-gray-500"
-              >
-                <FaTimes />
-              </button>
-            </div>
+          <div
+            className="p-4 border-b"
+            style={{
+              borderBottom: `3px solid #fff`,
+              background: MAIN_GREEN,
+              borderTopLeftRadius: 18,
+              borderTopRightRadius: 18,
+              boxShadow: "0 1px 6px 0 rgba(39, 174, 96, 0.04)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Dialog.Title
+              className="text-xl font-bold"
+              style={{ color: "#fff", letterSpacing: 0.5 }}
+            >
+              <FaLeaf style={{ marginRight: 8, verticalAlign: "middle" }} />
+              Process Payroll for Selected Employees
+            </Dialog.Title>
+            <button
+              onClick={handleClose}
+              className="text-gray-100 hover:text-gray-200"
+              style={{ fontSize: 22, cursor: "pointer" }}
+            >
+              <FaTimes />
+            </button>
           </div>
 
           {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div
+            className="flex-1 overflow-y-auto p-6"
+            style={{
+              background: "#fff",
+              borderBottomLeftRadius: 18,
+              borderBottomRightRadius: 18,
+            }}
+          >
             <div className="space-y-4">
               {/* Department Selection for Super Admin */}
               {isSuperAdmin() && (
@@ -553,8 +607,13 @@ const SingleEmployeeProcessModal = ({
                   <select
                     value={formData.departmentId}
                     onChange={(e) => handleDepartmentChange(e.target.value)}
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-green-200 focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-green-400 sm:text-sm rounded-md bg-white"
                     disabled={departmentsLoading}
+                    style={{
+                      cursor: "pointer",
+                      background: LIGHT_GREEN_BG,
+                      fontWeight: 600,
+                    }}
                   >
                     <option value="">
                       {departmentsLoading
@@ -572,7 +631,7 @@ const SingleEmployeeProcessModal = ({
 
               {/* Show message if Super Admin hasn't selected department */}
               {isSuperAdmin() && !formData.departmentId && (
-                <div className="text-center py-4 text-gray-500">
+                <div className="text-center py-4 text-black">
                   Please select a department to view employees
                 </div>
               )}
@@ -590,7 +649,7 @@ const SingleEmployeeProcessModal = ({
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         onFocus={handleSearchFocus}
-                        className="w-full p-2 pl-10 border border-gray-300 rounded-md"
+                        className="w-full p-2 pl-10 border border-green-200 rounded-md focus:ring-2 focus:ring-green-400 focus:border-green-400"
                         placeholder="Search by name, ID, or position"
                       />
                       <FaSearch className="absolute left-3 top-3 text-gray-400" />
@@ -600,7 +659,7 @@ const SingleEmployeeProcessModal = ({
                     </div>
 
                     {/* Employee List - Always visible */}
-                    <div className="mt-2 border border-gray-300 rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                    <div className="mt-2 border border-green-200 rounded-md shadow-lg max-h-[200px] overflow-y-auto">
                       {/* Select All Button and Toggle */}
                       <div className="sticky top-0 bg-white border-b px-4 py-2 flex items-center justify-between z-10">
                         <div className="flex items-center space-x-2">
@@ -809,7 +868,7 @@ const SingleEmployeeProcessModal = ({
                     Month
                   </label>
                   <select
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                    className="mt-1 block w-full rounded-md border-green-200 focus:ring-2 focus:ring-green-400 focus:border-green-400"
                     value={formData.month}
                     onChange={(e) =>
                       setFormData({
@@ -835,7 +894,7 @@ const SingleEmployeeProcessModal = ({
                   </label>
                   <input
                     type="number"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                    className="mt-1 block w-full rounded-md border-green-200 focus:ring-2 focus:ring-green-400 focus:border-green-400"
                     value={formData.year}
                     onChange={(e) =>
                       setFormData({ ...formData, year: Number(e.target.value) })
@@ -852,7 +911,7 @@ const SingleEmployeeProcessModal = ({
                   Frequency
                 </label>
                 <select
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+                  className="mt-1 block w-full rounded-md border-green-200 focus:ring-2 focus:ring-green-400 focus:border-green-400"
                   value={formData.frequency}
                   onChange={(e) =>
                     setFormData({ ...formData, frequency: e.target.value })
@@ -862,6 +921,8 @@ const SingleEmployeeProcessModal = ({
                   <option value="monthly">Monthly</option>
                   <option value="weekly">Weekly</option>
                   <option value="biweekly">Bi-weekly</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="annual">Annual</option>
                 </select>
               </div>
             </div>

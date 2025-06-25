@@ -104,6 +104,64 @@ const RotatingHourglass = styled(HourglassTopIcon)(() => ({
   },
 }));
 
+const MAIN_GREEN = "#27ae60";
+const LIGHT_GREEN_BG = "#f6fcf7";
+const LIGHT_GREEN_ACCENT = "#eafaf1";
+
+const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
+  background: "#fff",
+  borderRadius: 18,
+  boxShadow: "0 4px 24px 0 rgba(39, 174, 96, 0.10)",
+  marginTop: theme.spacing(2),
+  marginBottom: theme.spacing(2),
+}));
+
+const StyledTableHead = styled(TableHead)(({ theme }) => ({
+  background: MAIN_GREEN,
+  "& .MuiTableCell-head": {
+    color: "#fff",
+    fontWeight: 700,
+    fontSize: 16,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    background: MAIN_GREEN,
+    letterSpacing: 0.5,
+    paddingTop: 16,
+    paddingBottom: 16,
+  },
+}));
+
+const StyledTableRow = styled(TableRow)(({ theme }) => ({
+  "&:nth-of-type(odd)": {
+    backgroundColor: LIGHT_GREEN_BG,
+  },
+  "&:nth-of-type(even)": {
+    backgroundColor: "#fff",
+  },
+  "&:hover": {
+    backgroundColor: LIGHT_GREEN_ACCENT,
+    transition: "background 0.2s",
+  },
+}));
+
+const StyledTableCell = styled(TableCell)(({ theme }) => ({
+  padding: "14px 16px",
+  fontSize: 15,
+  color: "#222",
+  borderBottom: `1px solid ${LIGHT_GREEN_ACCENT}`,
+}));
+
+const StyledActionButton = styled(IconButton)(({ theme }) => ({
+  color: MAIN_GREEN,
+  background: LIGHT_GREEN_BG,
+  borderRadius: 8,
+  margin: "0 2px",
+  "&:hover": {
+    background: LIGHT_GREEN_ACCENT,
+    color: "#219150",
+  },
+}));
+
 const PayrollTable: React.FC<PayrollTableProps> = ({
   payrolls,
   onApprove,
@@ -443,9 +501,9 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
           </Select>
         </FormControl>
       </Box>
-      <TableContainer sx={{ maxHeight: 440 }}>
+      <StyledTableContainer>
         <Table stickyHeader aria-label="payroll table">
-          <TableHead>
+          <StyledTableHead>
             <TableRow
               sx={{
                 "& th": { fontWeight: 700, borderBottom: "2px solid #2e7d32" },
@@ -508,12 +566,12 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
               </TableCell>
               <TableCell align="center">Actions</TableCell>
             </TableRow>
-          </TableHead>
+          </StyledTableHead>
           <TableBody>
             {filteredAndSortedPayrolls
               .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
               .map((payroll) => (
-                <TableRow
+                <StyledTableRow
                   hover
                   key={payroll._id}
                   selected={selectedPayrolls.includes(payroll._id)}
@@ -570,22 +628,22 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                       sx={{ display: "flex", justifyContent: "center", gap: 1 }}
                     >
                       <Tooltip title="View Details">
-                        <IconButton
+                        <StyledActionButton
                           size="small"
                           onClick={() => onView(payroll)}
                         >
                           <VisibilityIcon />
-                        </IconButton>
+                        </StyledActionButton>
                       </Tooltip>
 
                       {payroll.status === "DRAFT" && onSubmitForApproval && (
                         <Tooltip title="Submit for Approval">
-                          <IconButton
+                          <StyledActionButton
                             size="small"
                             onClick={() => onSubmitForApproval(payroll)}
                           >
                             <SendIcon />
-                          </IconButton>
+                          </StyledActionButton>
                         </Tooltip>
                       )}
 
@@ -595,33 +653,33 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                             payroll.approvalFlow?.history || []
                           ) ? (
                             <Tooltip title="Rejected - Click to view rejection details">
-                              <IconButton
+                              <StyledActionButton
                                 size="small"
                                 onClick={() => onView(payroll)}
                                 color="error"
                               >
                                 <ErrorOutlineIcon />
-                              </IconButton>
+                              </StyledActionButton>
                             </Tooltip>
                           ) : isCurrentApprover(payroll) ? (
                             <>
                               <Tooltip title="Approve">
-                                <IconButton
+                                <StyledActionButton
                                   size="small"
                                   onClick={() => onApprove(payroll)}
                                   color="success"
                                 >
                                   <CheckCircleIcon />
-                                </IconButton>
+                                </StyledActionButton>
                               </Tooltip>
                               <Tooltip title="Reject">
-                                <IconButton
+                                <StyledActionButton
                                   size="small"
                                   onClick={() => onReject(payroll)}
                                   color="error"
                                 >
                                   <CancelIcon />
-                                </IconButton>
+                                </StyledActionButton>
                               </Tooltip>
                             </>
                           ) : (
@@ -630,13 +688,13 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                                 payroll.approvalFlow?.currentLevel
                               )}`}
                             >
-                              <IconButton
+                              <StyledActionButton
                                 size="small"
                                 onClick={() => onViewApprovalJourney(payroll)}
                                 color="info"
                               >
                                 <RotatingHourglass />
-                              </IconButton>
+                              </StyledActionButton>
                             </Tooltip>
                           )}
                         </>
@@ -644,46 +702,46 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
 
                       {payroll.status === "COMPLETED" && (
                         <Tooltip title="Fully Approved">
-                          <IconButton
+                          <StyledActionButton
                             size="small"
                             onClick={() => onView(payroll)}
                             color="success"
                           >
                             <DoneIcon />
-                          </IconButton>
+                          </StyledActionButton>
                         </Tooltip>
                       )}
 
                       {payroll.status === "APPROVED" && onProcessPayment && (
                         <Tooltip title="Process Payment">
-                          <IconButton
+                          <StyledActionButton
                             size="small"
                             onClick={() => onProcessPayment(payroll)}
                             color="primary"
                           >
                             <PaymentIcon />
-                          </IconButton>
+                          </StyledActionButton>
                         </Tooltip>
                       )}
 
                       {payroll.status === "REJECTED" && onResubmit && (
                         <Tooltip title="Resubmit Payroll">
-                          <IconButton
+                          <StyledActionButton
                             size="small"
                             onClick={() => onResubmit(payroll)}
                             color="primary"
                           >
                             <SendIcon />
-                          </IconButton>
+                          </StyledActionButton>
                         </Tooltip>
                       )}
                     </Box>
                   </TableCell>
-                </TableRow>
+                </StyledTableRow>
               ))}
           </TableBody>
         </Table>
-      </TableContainer>
+      </StyledTableContainer>
       <TablePagination
         rowsPerPageOptions={[5, 10, 25]}
         component="div"

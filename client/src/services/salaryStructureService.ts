@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "./api";
 import { toast } from "react-toastify";
 import {
   ISalaryGrade,
@@ -8,10 +8,7 @@ import {
 } from "../types/salary";
 import { UserRole } from "../types/auth";
 
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
-
-// Set default axios config
-axios.defaults.withCredentials = true;
+const BASE_URL = `/api`;
 
 interface UpdateSalaryGradeInput {
   level?: string;
@@ -31,7 +28,7 @@ export const salaryStructureService = {
           ? `${BASE_URL}/super-admin/salary-grades`
           : `${BASE_URL}/admin/salary-grades`;
 
-      const response = await axios.get(endpoint);
+      const response = await api.get(endpoint);
 
       // Handle both response structures
       const salaryGrades = response.data.data || response.data.salaryGrades;
@@ -44,10 +41,11 @@ export const salaryStructureService = {
       return salaryGrades;
     } catch (error: unknown) {
       console.error("Salary grades fetch error:", error);
-      if (axios.isAxiosError(error) && error.response) {
-        console.error("Error response:", error.response.data);
+      if (error && typeof error === "object" && "response" in error) {
+        const axiosError = error as any;
+        console.error("Error response:", axiosError.response.data);
         toast.error(
-          error.response.data?.message || "Failed to fetch salary grades"
+          axiosError.response.data?.message || "Failed to fetch salary grades"
         );
       } else {
         toast.error("Failed to fetch salary grades");
@@ -76,7 +74,7 @@ export const salaryStructureService = {
 
       console.log("📤 Sending formatted data:", formattedData);
 
-      const response = await axios.post<{ data: ISalaryGrade }>(
+      const response = await api.post<{ data: ISalaryGrade }>(
         `${BASE_URL}/super-admin/salary-grades`,
         formattedData
       );
@@ -94,16 +92,17 @@ export const salaryStructureService = {
   ): Promise<ISalaryGrade> => {
     try {
       console.log("📤 Updating salary grade:", { id, data });
-      const response = await axios.patch<{ data: ISalaryGrade }>(
+      const response = await api.patch<{ data: ISalaryGrade }>(
         `${BASE_URL}/super-admin/salary-grades/${id}`,
         data
       );
       return response.data.data;
     } catch (error: unknown) {
       console.error("❌ Update failed:", error);
-      if (axios.isAxiosError(error) && error.response) {
+      if (error && typeof error === "object" && "response" in error) {
+        const axiosError = error as any;
         toast.error(
-          error.response.data?.message || "Failed to update salary grade"
+          axiosError.response.data?.message || "Failed to update salary grade"
         );
       } else {
         toast.error("Failed to update salary grade");
@@ -117,15 +116,16 @@ export const salaryStructureService = {
     component: ISalaryComponentInput
   ): Promise<ISalaryGrade> => {
     try {
-      const response = await axios.post<{ data: ISalaryGrade }>(
+      const response = await api.post<{ data: ISalaryGrade }>(
         `${BASE_URL}/super-admin/salary-grades/${gradeId}/components`,
         component
       );
       return response.data.data;
     } catch (error: unknown) {
-      if (axios.isAxiosError(error) && error.response) {
+      if (error && typeof error === "object" && "response" in error) {
+        const axiosError = error as any;
         toast.error(
-          error.response.data?.message || "Failed to add salary component"
+          axiosError.response.data?.message || "Failed to add salary component"
         );
       } else {
         toast.error("Failed to add salary component");
@@ -140,16 +140,17 @@ export const salaryStructureService = {
     updates: Partial<ISalaryComponent>
   ) => {
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `${BASE_URL}/super-admin/salary-grades/${gradeId}/components/${componentId}`,
         updates
       );
       toast.success("Component updated successfully");
       return response.data.data;
     } catch (error: unknown) {
-      if (axios.isAxiosError(error) && error.response) {
+      if (error && typeof error === "object" && "response" in error) {
+        const axiosError = error as any;
         toast.error(
-          error.response.data?.message || "Failed to update component"
+          axiosError.response.data?.message || "Failed to update component"
         );
       } else {
         toast.error("Failed to update component");
@@ -160,14 +161,15 @@ export const salaryStructureService = {
 
   getSalaryGrade: async (id: string): Promise<ISalaryGrade> => {
     try {
-      const response = await axios.get<{ data: ISalaryGrade }>(
+      const response = await api.get<{ data: ISalaryGrade }>(
         `${BASE_URL}/super-admin/salary-grades/${id}`
       );
       return response.data.data;
     } catch (error: unknown) {
-      if (axios.isAxiosError(error) && error.response) {
+      if (error && typeof error === "object" && "response" in error) {
+        const axiosError = error as any;
         toast.error(
-          error.response.data?.message || "Failed to fetch salary grade"
+          axiosError.response.data?.message || "Failed to fetch salary grade"
         );
       } else {
         toast.error("Failed to fetch salary grade");
@@ -178,12 +180,13 @@ export const salaryStructureService = {
 
   deleteSalaryGrade: async (id: string): Promise<void> => {
     try {
-      await axios.delete(`${BASE_URL}/super-admin/salary-grades/${id}`);
+      await api.delete(`${BASE_URL}/super-admin/salary-grades/${id}`);
       toast.success("Salary grade deleted successfully");
     } catch (error: unknown) {
-      if (axios.isAxiosError(error) && error.response) {
+      if (error && typeof error === "object" && "response" in error) {
+        const axiosError = error as any;
         toast.error(
-          error.response.data?.message || "Failed to delete salary grade"
+          axiosError.response.data?.message || "Failed to delete salary grade"
         );
       } else {
         toast.error("Failed to delete salary grade");

@@ -4,22 +4,13 @@ import { ApiError, asyncHandler } from "../utils/errorHandler.js";
 class NotificationController {
   // Get all notifications for the current user
   static getNotifications = asyncHandler(async (req, res) => {
-    console.log(`🔍 Fetching notifications for user: ${req.user._id}`);
-
     const notifications = await Notification.find({ recipient: req.user._id })
       .sort({ createdAt: -1 })
       .limit(50);
-
     const unreadCount = await Notification.countDocuments({
       recipient: req.user._id,
       read: false,
     });
-
-    console.log(
-      `📬 Found ${notifications.length} notifications for user ${req.user._id}`
-    );
-    console.log(`📭 Unread notifications: ${unreadCount}`);
-
     res.status(200).json({
       success: true,
       data: {

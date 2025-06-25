@@ -16,7 +16,7 @@ const BulkProcessModal = ({
   const [formData, setFormData] = useState({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
-    frequency: "MONTHLY",
+    frequency: "monthly",
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -95,9 +95,11 @@ const BulkProcessModal = ({
                 }
                 required
               >
-                <option value="MONTHLY">Monthly</option>
-                <option value="WEEKLY">Weekly</option>
-                <option value="BIWEEKLY">Bi-weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="weekly">Weekly</option>
+                <option value="biweekly">Bi-weekly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="annual">Annual</option>
               </select>
             </div>
 

@@ -1,119 +1,263 @@
-import axios from "axios";
-import { OnboardingEmployee, Task } from "../types/employee";
+import api from "./api";
 import { toast } from "react-toastify";
 
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
-axios.defaults.withCredentials = true;
+const BASE_URL = `/api`;
 
-export interface OnboardingFilters {
-  page?: number;
-  limit?: number;
-  status?: string;
-  department?: string;
-  search?: string;
-  sortBy?: string;
-  sortOrder?: "asc" | "desc";
+export interface OnboardingTask {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  deadline: Date;
+  completed: boolean;
+  completedAt?: Date;
+  completedBy?: {
+    id: string;
+    name: string;
+  };
+  notes?: string;
 }
 
-export interface OnboardingResponse {
-  success: boolean;
-  data: OnboardingEmployee[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
+export interface OnboardingEmployee {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  department: {
+    id: string;
+    name: string;
   };
-  stats: {
-    total: number;
-    byStatus: Record<string, number>;
-    departments: string[];
+  position: string;
+  startDate: Date;
+  onboardingStatus: string;
+  progress: number;
+  tasks: OnboardingTask[];
+  supervisor: {
+    id: string;
+    name: string;
   };
 }
 
 export const onboardingService = {
-  getOnboardingEmployees: async (
-    filters?: OnboardingFilters
-  ): Promise<OnboardingResponse> => {
+  // Get all onboarding employees
+  getOnboardingEmployees: async (): Promise<OnboardingEmployee[]> => {
     try {
-      const response = await axios.get(`${BASE_URL}/onboarding`, {
-        params: filters,
-      });
-      return response.data;
+      const response = await api.get(
+        `${BASE_URL}/super-admin/onboarding-employees`
+      );
+      return response.data.data || [];
     } catch (error: any) {
       console.error("Failed to fetch onboarding employees:", error);
-      toast.error(error.response?.data?.message || "Failed to fetch employees");
-      return {
-        success: false,
-        data: [],
-        pagination: {
-          total: 0,
-          page: 1,
-          limit: 10,
-          totalPages: 0,
-        },
-        stats: {
-          total: 0,
-          byStatus: {},
-          departments: [],
-        },
-      };
-    }
-  },
-
-  // Update onboarding progress
-  updateProgress: async (userId: string, progress: number): Promise<void> => {
-    try {
-      await axios.patch(`${BASE_URL}/onboarding/${userId}/progress`, {
-        progress,
-      });
-      toast.success("Progress updated successfully");
-    } catch (error: any) {
-      console.error("Failed to update progress:", error);
-      toast.error(error.response?.data?.message || "Failed to update progress");
+      toast.error(
+        error.response?.data?.message || "Failed to fetch onboarding employees"
+      );
       throw error;
     }
   },
 
-  // Complete a specific task
-  completeTask: async (userId: string, taskName: string): Promise<void> => {
+  // Get onboarding employee by ID
+  getOnboardingEmployeeById: async (
+    employeeId: string
+  ): Promise<OnboardingEmployee> => {
     try {
-      await axios.patch(`${BASE_URL}/onboarding/${userId}/tasks/${taskName}`);
-      toast.success("Task completed successfully");
-    } catch (error: any) {
-      console.error("Failed to complete task:", error);
-      toast.error(error.response?.data?.message || "Failed to complete task");
-      throw error;
-    }
-  },
-
-  // Get onboarding tasks for an employee
-  getEmployeeTasks: async (userId: string): Promise<Task[]> => {
-    try {
-      const response = await axios.get(
-        `${BASE_URL}/onboarding/${userId}/tasks`
+      const response = await api.get(
+        `${BASE_URL}/super-admin/onboarding-employees/${employeeId}`
       );
       return response.data.data;
     } catch (error: any) {
-      console.error("Failed to fetch tasks:", error);
-      toast.error(error.response?.data?.message || "Failed to fetch tasks");
-      return [];
+      console.error("Failed to fetch onboarding employee:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch onboarding employee"
+      );
+      throw error;
     }
   },
 
-  // Add the updateOnboardingStage method here
-  updateOnboardingStage: async (employeeId: string, stage: string) => {
+  // Update onboarding task
+  updateOnboardingTask: async (
+    employeeId: string,
+    taskId: string,
+    updates: Partial<OnboardingTask>
+  ): Promise<OnboardingTask> => {
     try {
-      const response = await axios.put(
-        `${BASE_URL}/onboarding/${employeeId}/stage`,
-        { stage }
+      const response = await api.patch(
+        `${BASE_URL}/super-admin/onboarding-employees/${employeeId}/tasks/${taskId}`,
+        updates
       );
-      toast.success("Onboarding stage updated successfully");
-      return response.data;
+      toast.success("Onboarding task updated successfully");
+      return response.data.data;
     } catch (error: any) {
-      console.error("Failed to update onboarding stage:", error);
-      toast.error(error.response?.data?.message || "Failed to update stage");
+      console.error("Failed to update onboarding task:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to update onboarding task"
+      );
       throw error;
     }
+  },
+
+  // Complete onboarding task
+  completeOnboardingTask: async (
+    employeeId: string,
+    taskId: string,
+    notes?: string
+  ): Promise<OnboardingTask> => {
+    try {
+      const response = await api.post(
+        `${BASE_URL}/super-admin/onboarding-employees/${employeeId}/tasks/${taskId}/complete`,
+        { notes }
+      );
+      toast.success("Onboarding task completed successfully");
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Failed to complete onboarding task:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to complete onboarding task"
+      );
+      throw error;
+    }
+  },
+
+  // Add custom onboarding task
+  addOnboardingTask: async (
+    employeeId: string,
+    taskData: Omit<
+      OnboardingTask,
+      "id" | "completed" | "completedAt" | "completedBy"
+    >
+  ): Promise<OnboardingTask> => {
+    try {
+      const response = await api.post(
+        `${BASE_URL}/super-admin/onboarding-employees/${employeeId}/tasks`,
+        taskData
+      );
+      toast.success("Onboarding task added successfully");
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Failed to add onboarding task:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to add onboarding task"
+      );
+      throw error;
+    }
+  },
+
+  // Delete onboarding task
+  deleteOnboardingTask: async (
+    employeeId: string,
+    taskId: string
+  ): Promise<void> => {
+    try {
+      await api.delete(
+        `${BASE_URL}/super-admin/onboarding-employees/${employeeId}/tasks/${taskId}`
+      );
+      toast.success("Onboarding task deleted successfully");
+    } catch (error: any) {
+      console.error("Failed to delete onboarding task:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to delete onboarding task"
+      );
+      throw error;
+    }
+  },
+
+  // Complete onboarding process
+  completeOnboarding: async (
+    employeeId: string
+  ): Promise<OnboardingEmployee> => {
+    try {
+      const response = await api.post(
+        `${BASE_URL}/super-admin/onboarding-employees/${employeeId}/complete`
+      );
+      toast.success("Onboarding process completed successfully");
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Failed to complete onboarding process:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to complete onboarding process"
+      );
+      throw error;
+    }
+  },
+
+  // Get onboarding statistics
+  getOnboardingStats: async () => {
+    try {
+      const response = await api.get(
+        `${BASE_URL}/super-admin/onboarding-stats`
+      );
+      return response.data.data;
+    } catch (error: any) {
+      console.error("Failed to fetch onboarding stats:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch onboarding statistics"
+      );
+      throw error;
+    }
+  },
+
+  // Admin-specific operations
+  adminService: {
+    getDepartmentOnboardingEmployees: async (): Promise<
+      OnboardingEmployee[]
+    > => {
+      try {
+        const response = await api.get(
+          `${BASE_URL}/admin/onboarding-employees`
+        );
+        return response.data.data || [];
+      } catch (error: any) {
+        console.error(
+          "Failed to fetch department onboarding employees:",
+          error
+        );
+        toast.error(
+          error.response?.data?.message ||
+            "Failed to fetch onboarding employees"
+        );
+        throw error;
+      }
+    },
+
+    updateDepartmentOnboardingTask: async (
+      employeeId: string,
+      taskId: string,
+      updates: Partial<OnboardingTask>
+    ): Promise<OnboardingTask> => {
+      try {
+        const response = await api.patch(
+          `${BASE_URL}/admin/onboarding-employees/${employeeId}/tasks/${taskId}`,
+          updates
+        );
+        toast.success("Onboarding task updated successfully");
+        return response.data.data;
+      } catch (error: any) {
+        console.error("Failed to update department onboarding task:", error);
+        toast.error(
+          error.response?.data?.message || "Failed to update onboarding task"
+        );
+        throw error;
+      }
+    },
+
+    completeDepartmentOnboardingTask: async (
+      employeeId: string,
+      taskId: string,
+      notes?: string
+    ): Promise<OnboardingTask> => {
+      try {
+        const response = await api.post(
+          `${BASE_URL}/admin/onboarding-employees/${employeeId}/tasks/${taskId}/complete`,
+          { notes }
+        );
+        toast.success("Onboarding task completed successfully");
+        return response.data.data;
+      } catch (error: any) {
+        console.error("Failed to complete department onboarding task:", error);
+        toast.error(
+          error.response?.data?.message || "Failed to complete onboarding task"
+        );
+        throw error;
+      }
+    },
   },
 };

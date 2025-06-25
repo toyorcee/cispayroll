@@ -1,5 +1,9 @@
 import { Router } from "express";
 import { EmailService } from "../services/emailService.js";
+import {
+  requireAuth,
+  requireSuperAdmin,
+} from "../middleware/authMiddleware.js";
 
 const router = Router();
 
@@ -16,5 +20,31 @@ router.post("/test-email", async (req, res) => {
     });
   }
 });
+
+// Test email configuration endpoint
+router.get(
+  "/email-config",
+  requireAuth,
+  requireSuperAdmin,
+  async (req, res) => {
+    try {
+      console.log("🧪 [TestRoute] Testing email configuration...");
+      const result = await EmailService.testEmailConfiguration();
+
+      res.json({
+        success: true,
+        message: "Email configuration test completed",
+        result,
+      });
+    } catch (error) {
+      console.error("❌ [TestRoute] Email configuration test failed:", error);
+      res.status(500).json({
+        success: false,
+        message: "Email configuration test failed",
+        error: error.message,
+      });
+    }
+  }
+);
 
 export default router;

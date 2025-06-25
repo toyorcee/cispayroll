@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "./api";
 import { toast } from "react-toastify";
 import { UserRole } from "../types/auth";
 
@@ -71,7 +71,6 @@ export const FAILED_PAYROLLS_QUERY_KEY = "failedPayrolls";
 
 // Use the same BASE_URL pattern as other services
 const baseURL = "/api";
-axios.defaults.withCredentials = true;
 
 class AuditService {
   private baseUrl: string;
@@ -103,7 +102,7 @@ class AuditService {
   // Get recent activities
   async getRecentActivities(limit: number = 10): Promise<RecentActivity[]> {
     try {
-      const response = await axios.get<RecentActivitiesResponse>(
+      const response = await api.get<RecentActivitiesResponse>(
         `${this.baseUrl}/recent`,
         {
           params: { limit },
@@ -125,7 +124,7 @@ class AuditService {
     filters?: AuditFilters
   ): Promise<AuditLogResponse> {
     try {
-      const response = await axios.get<AuditLogResponse>(
+      const response = await api.get<AuditLogResponse>(
         `${this.baseUrl}/logs`,
         {
           params: {
@@ -156,7 +155,7 @@ class AuditService {
   // Get user activity
   async getUserActivity(userId: string): Promise<AuditLog[]> {
     try {
-      const response = await axios.get<AuditLogResponse>(
+      const response = await api.get<AuditLogResponse>(
         `${this.baseUrl}/user/${userId}`
       );
       this.handleRefreshHeader(response);
@@ -174,7 +173,7 @@ class AuditService {
     entityId: string
   ): Promise<AuditLog[]> {
     try {
-      const response = await axios.get<AuditLogResponse>(
+      const response = await api.get<AuditLogResponse>(
         `${this.baseUrl}/entity/${entity}/${entityId}`
       );
       this.handleRefreshHeader(response);
@@ -192,7 +191,7 @@ class AuditService {
     recentFailures: AuditLog[];
   }> {
     try {
-      const response = await axios.get(`${this.baseUrl}/failed-payrolls`);
+      const response = await api.get(`${this.baseUrl}/failed-payrolls`);
       this.handleRefreshHeader(response);
       return response.data.data;
     } catch (error) {
@@ -205,16 +204,46 @@ class AuditService {
     }
   }
 
+  // Get audit log by ID
+  async getAuditLogById(logId: string): Promise<AuditLog | null> {
+    try {
+      const response = await api.get(`${this.baseUrl}/logs/${logId}`);
+      this.handleRefreshHeader(response);
+      return response.data.data;
+    } catch (error) {
+      console.error("Error fetching audit log:", error);
+      toast.error("Failed to fetch audit log");
+      return null;
+    }
+  }
+
+  // Export audit logs
+  async exportAuditLogs(filters?: AuditFilters): Promise<Blob> {
+    try {
+      const response = await api.get(`${this.baseUrl}/export`, {
+        params: filters,
+        responseType: "blob",
+      });
+      this.handleRefreshHeader(response);
+      return response.data;
+    } catch (error) {
+      console.error("Error exporting audit logs:", error);
+      toast.error("Failed to export audit logs");
+      throw error;
+    }
+  }
+
   // Invalidate all audit-related queries
   invalidateAllQueries(queryClient: any) {
-    queryClient.invalidateQueries({ queryKey: [AUDIT_LOGS_QUERY_KEY] });
-    queryClient.invalidateQueries({ queryKey: [RECENT_ACTIVITIES_QUERY_KEY] });
-    queryClient.invalidateQueries({ queryKey: [USER_ACTIVITY_QUERY_KEY] });
-    queryClient.invalidateQueries({ queryKey: [ENTITY_HISTORY_QUERY_KEY] });
-    queryClient.invalidateQueries({ queryKey: [FAILED_PAYROLLS_QUERY_KEY] });
+    if (queryClient) {
+      queryClient.invalidateQueries({ queryKey: [AUDIT_LOGS_QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: [RECENT_ACTIVITIES_QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: [USER_ACTIVITY_QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: [ENTITY_HISTORY_QUERY_KEY] });
+      queryClient.invalidateQueries({ queryKey: [FAILED_PAYROLLS_QUERY_KEY] });
+    }
   }
 }
 
-// Create a singleton instance
-const auditService = new AuditService();
-export { auditService };
+// Export singleton instance
+export const auditService = new AuditService();
