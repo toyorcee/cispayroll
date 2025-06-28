@@ -381,23 +381,27 @@ export default function MyPayslipsPage() {
                           <h4 className="text-xs font-semibold text-gray-500 mb-1">
                             Personal Bonuses
                           </h4>
-                          {selectedPayslip.earnings?.bonuses?.items?.length >
-                          0 ? (
-                            selectedPayslip.earnings.bonuses.items.map(
-                              (bonus, index) => (
-                                <div
-                                  key={bonus._id || index}
-                                  className="flex justify-between text-gray-700 text-xs sm:text-sm"
-                                >
-                                  <span className="font-medium">
-                                    {bonus.description || "Personal Bonus"}
-                                  </span>
-                                  <span className="font-semibold">
-                                    ₦{bonus.amount.toLocaleString()}
-                                  </span>
-                                </div>
-                              )
-                            )
+                          {(selectedPayslip.earnings as any)?.bonus?.length >
+                            0 ||
+                          selectedPayslip.earnings?.bonuses?.items?.length >
+                            0 ? (
+                            (
+                              (selectedPayslip.earnings as any)?.bonus ||
+                              selectedPayslip.earnings?.bonuses?.items ||
+                              []
+                            ).map((bonus: any, index: number) => (
+                              <div
+                                key={bonus._id || index}
+                                className="flex justify-between text-gray-700 text-xs sm:text-sm"
+                              >
+                                <span className="font-medium">
+                                  {bonus.description || "Personal Bonus"}
+                                </span>
+                                <span className="font-semibold">
+                                  ₦{bonus.amount.toLocaleString()}
+                                </span>
+                              </div>
+                            ))
                           ) : (
                             <div className="text-gray-500 text-xs">
                               No personal bonuses

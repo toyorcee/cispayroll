@@ -71,9 +71,8 @@ const DeductionPreferences: React.FC<DeductionPreferencesProps> = ({
         setDeductions(allDeductions);
 
         // Fetch user preferences
-        const preferences = await deductionService.getUserDeductionPreferences(
-          userId
-        );
+        const preferences =
+          await deductionService.userService.getMyDeductions();
         setUserPreferences(preferences);
       } catch (error) {
         console.error("Error fetching deduction data:", error);
@@ -109,12 +108,13 @@ const DeductionPreferences: React.FC<DeductionPreferencesProps> = ({
   // Handle opt-out for a deduction
   const handleOptOut = async (deductionId: string) => {
     try {
-      await deductionService.removeVoluntaryDeduction(deductionId, userId);
+      await deductionService.userService.optOutOfDeduction(
+        deductionId,
+        "User opted out"
+      );
 
       // Refresh user preferences
-      const preferences = await deductionService.getUserDeductionPreferences(
-        userId
-      );
+      const preferences = await deductionService.userService.getMyDeductions();
       setUserPreferences(preferences);
     } catch (error) {
       console.error("Error opting out of deduction:", error);
@@ -137,22 +137,31 @@ const DeductionPreferences: React.FC<DeductionPreferencesProps> = ({
     if (!selectedDeduction) return;
 
     try {
-      await deductionService.addVoluntaryDeduction(
+      await deductionService.userService.updateDeductionPreferences(
         selectedDeduction._id,
         {
-          startDate,
-          endDate,
-          amount: amount ? Number(amount) : undefined,
-          percentage: percentage ? Number(percentage) : undefined,
-          notes,
-        },
-        userId
+          statutory: { standardStatutory: [], customStatutory: [] },
+          voluntary: {
+            standardVoluntary: [
+              {
+                deduction: selectedDeduction._id,
+                opted: true,
+                startDate: startDate.toISOString(),
+                endDate: endDate?.toISOString(),
+                optedAt: new Date().toISOString(),
+                optedBy: userId || "",
+                amount: amount ? Number(amount) : undefined,
+                percentage: percentage ? Number(percentage) : undefined,
+                notes,
+              },
+            ],
+            customVoluntary: [],
+          },
+        }
       );
 
       // Refresh user preferences
-      const preferences = await deductionService.getUserDeductionPreferences(
-        userId
-      );
+      const preferences = await deductionService.userService.getMyDeductions();
       setUserPreferences(preferences);
 
       handleCloseDialog();

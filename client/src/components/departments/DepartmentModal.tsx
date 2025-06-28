@@ -1,5 +1,11 @@
 import { Dialog } from "@headlessui/react";
-import { FaTimes, FaSpinner, FaEdit, FaTrash } from "react-icons/fa";
+import {
+  FaTimes,
+  FaSpinner,
+  FaEdit,
+  FaTrash,
+  FaBuilding,
+} from "react-icons/fa";
 import { useState, useMemo } from "react";
 import { Department, DepartmentFormData } from "../../types/department";
 // import { User } from "../../types/user";
@@ -187,31 +193,45 @@ export const DepartmentModal = ({
   return (
     <>
       <Dialog open={isOpen} onClose={onClose} className="relative z-50">
-        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+          aria-hidden="true"
+        />
 
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="mx-auto max-w-6xl w-full rounded-xl bg-white p-6 shadow-xl max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center mb-6">
-              <Dialog.Title className="text-xl font-semibold text-gray-900">
-                Manage Departments
-              </Dialog.Title>
+          <Dialog.Panel className="mx-auto max-w-6xl w-full rounded-2xl shadow-2xl bg-gradient-to-br from-white via-blue-50 to-emerald-50 p-0 max-h-[90vh] flex flex-col">
+            {/* Beautiful Gradient Header */}
+            <div className="sticky top-0 z-10 bg-gradient-to-r from-green-500 via-emerald-500 to-blue-500 rounded-t-2xl px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FaBuilding className="text-white text-xl" />
+                <div>
+                  <h2 className="text-lg font-bold text-white">
+                    Manage Departments
+                  </h2>
+                  <p className="text-xs text-emerald-100">
+                    {departments.length} departments
+                  </p>
+                </div>
+              </div>
               <button
                 onClick={onClose}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-white hover:text-emerald-200 focus:outline-none text-xl bg-white/20 rounded-full p-2 hover:bg-white/30 transition-all duration-200"
               >
-                <FaTimes />
+                <FaTimes className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden p-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
-                <div className="bg-white p-6 rounded-lg border border-gray-200 overflow-y-auto max-h-[calc(90vh-120px)]">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">
+                {/* Form Section with Gradient Background */}
+                <div className="bg-gradient-to-br from-white to-blue-50 p-6 rounded-xl shadow-sm border border-gray-100 overflow-y-auto max-h-[calc(90vh-120px)]">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <FaBuilding className="text-green-500" />
                     {editingId ? "Edit Department" : "Create Department"}
                   </h3>
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Name *
                       </label>
                       <input
@@ -221,12 +241,12 @@ export const DepartmentModal = ({
                         onChange={(e) =>
                           setFormData({ ...formData, name: e.target.value })
                         }
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                        className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Code *
                       </label>
                       <input
@@ -239,12 +259,12 @@ export const DepartmentModal = ({
                             code: e.target.value.toUpperCase(),
                           })
                         }
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                        className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                       />
                     </div>
 
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Head of Department
                       </label>
                       <div className="relative">
@@ -263,7 +283,7 @@ export const DepartmentModal = ({
                         >
                           <div className="relative">
                             <Combobox.Input
-                              className="w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-green-500 focus:outline-none focus:ring-green-500 sm:text-sm"
+                              className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                               onChange={(event) => {
                                 const newValue = event.target.value;
                                 setQuery(newValue);
@@ -309,7 +329,7 @@ export const DepartmentModal = ({
                               placeholder="Search or enter HOD name..."
                             />
                             {query && (
-                              <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                              <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
                                 {filteredHODs.length > 0 ? (
                                   filteredHODs.map((hod) => (
                                     <Combobox.Option
@@ -318,7 +338,7 @@ export const DepartmentModal = ({
                                       className={({ active }) =>
                                         `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
                                           active
-                                            ? "bg-green-600 text-white"
+                                            ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
                                             : "text-gray-900"
                                         }`
                                       }
@@ -357,7 +377,7 @@ export const DepartmentModal = ({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Description
                       </label>
                       <textarea
@@ -368,24 +388,24 @@ export const DepartmentModal = ({
                             description: e.target.value,
                           })
                         }
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                        className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                         rows={3}
                       />
                     </div>
 
-                    <div className="flex justify-end space-x-3">
+                    <div className="flex justify-end space-x-3 pt-4">
                       {editingId && (
                         <button
                           type="button"
                           onClick={resetForm}
-                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                          className="px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-400 transition"
                         >
                           Cancel
                         </button>
                       )}
                       <button
                         type="submit"
-                        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                        className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-lg shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-400 transition disabled:opacity-50"
                         disabled={isSaving}
                       >
                         {isSaving ? (
@@ -400,7 +420,7 @@ export const DepartmentModal = ({
                         <button
                           type="button"
                           onClick={resetForm}
-                          className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+                          className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-lg shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 transition"
                         >
                           Create New
                         </button>
@@ -409,66 +429,77 @@ export const DepartmentModal = ({
                   </form>
                 </div>
 
-                <div className="bg-white p-4 rounded-lg border border-gray-200 overflow-hidden flex flex-col">
-                  <h3 className="text-base font-medium text-gray-900 mb-3">
+                {/* Departments Table Section with Gradient Background */}
+                <div className="bg-gradient-to-br from-white to-emerald-50 p-4 rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+                  <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <FaBuilding className="text-green-500" />
                     Current Departments
                   </h3>
                   <div className="overflow-y-auto flex-1 max-h-[calc(90vh-120px)]">
-                    <table className="w-full divide-y divide-gray-200 table-fixed">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase w-[35%]">
-                            Name
-                          </th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase w-[15%]">
-                            Code
-                          </th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase w-[35%]">
-                            HOD
-                          </th>
-                          <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase w-[15%]">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {departments.map((dept) => (
-                          <tr key={dept._id} className="hover:bg-gray-50">
-                            <td className="px-2 py-2 text-sm truncate">
-                              {dept.name}
-                            </td>
-                            <td className="px-2 py-2 text-sm truncate">
-                              {dept.code}
-                            </td>
-                            <td className="px-2 py-2 text-sm truncate">
-                              {(() => {
-                                const hod = findHODForDepartment(dept._id);
-                                if (hod) {
-                                  return `${hod.firstName} ${hod.lastName}`;
-                                }
-                                return "Not Assigned";
-                              })()}
-                            </td>
-                            <td className="px-2 py-2 text-sm text-right">
-                              <button
-                                onClick={() => handleEdit(dept)}
-                                className="inline-flex items-center text-blue-600 hover:text-blue-900 mr-4"
-                                title="Edit"
-                              >
-                                <FaEdit className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(dept)}
-                                className="inline-flex items-center text-red-600 hover:text-red-900"
-                                title="Delete"
-                              >
-                                <FaTrash className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
+                    <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg overflow-hidden">
+                      <table className="w-full divide-y divide-gray-200">
+                        <thead className="bg-gradient-to-r from-green-500 to-emerald-500">
+                          <tr>
+                            <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase w-[35%]">
+                              Name
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase w-[15%]">
+                              Code
+                            </th>
+                            <th className="px-3 py-3 text-left text-xs font-bold text-white uppercase w-[35%]">
+                              HOD
+                            </th>
+                            <th className="px-3 py-3 text-right text-xs font-bold text-white uppercase w-[15%]">
+                              Actions
+                            </th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {departments.map((dept, index) => (
+                            <tr
+                              key={dept._id}
+                              className={`hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 transition-all duration-200 ${
+                                index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                              }`}
+                            >
+                              <td className="px-3 py-3 text-sm font-medium text-gray-900">
+                                {dept.name}
+                              </td>
+                              <td className="px-3 py-3 text-sm text-gray-600 font-mono">
+                                {dept.code}
+                              </td>
+                              <td className="px-3 py-3 text-sm text-gray-600">
+                                {(() => {
+                                  const hod = findHODForDepartment(dept._id);
+                                  if (hod) {
+                                    return `${hod.firstName} ${hod.lastName}`;
+                                  }
+                                  return "Not Assigned";
+                                })()}
+                              </td>
+                              <td className="px-3 py-3 text-sm text-right">
+                                <div className="flex items-center justify-end gap-3">
+                                  <button
+                                    onClick={() => handleEdit(dept)}
+                                    className="inline-flex items-center text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
+                                    title="Edit"
+                                  >
+                                    <FaEdit className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(dept)}
+                                    className="inline-flex items-center text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors"
+                                    title="Delete"
+                                  >
+                                    <FaTrash className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               </div>

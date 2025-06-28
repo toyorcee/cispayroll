@@ -26,7 +26,7 @@ export default function Integrations() {
   const [webhookInput, setWebhookInput] = useState(apiAccess.webhookUrl);
   const [savingWebhook, setSavingWebhook] = useState(false);
   const [integrationsData, setIntegrationsData] = useState(integrations);
-  const [apiAccessData, setApiAccessData] = useState(apiAccess);
+  const [_apiAccessData, setApiAccessData] = useState(apiAccess);
 
   const iconMap = {
     CloudArrowUpIcon: FaCloud,

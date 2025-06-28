@@ -9,6 +9,7 @@ import { traceError, ApiError } from "./utils/errorHandler.js";
 import multer from "multer";
 import fs, { readdirSync, existsSync } from "fs";
 import { startAutomatedPayrollTask } from "./services/AutomatedPayrollService.js";
+import payrollSummaryRoutes from "./routes/payrollSummaryRoutes.js";
 
 // Environment
 dotenv.config();
@@ -185,6 +186,7 @@ app.use("/api/allowances", routeErrorWrapper(allowanceRoutes));
 app.use("/api/test", routeErrorWrapper(testRoutes));
 app.use("/api/profile", profileRoutes);
 app.use("/api/settings", routeErrorWrapper(settingsRoutes));
+app.use("/api/payroll-summaries", payrollSummaryRoutes);
 
 // Health Check
 app.get("/api/health", (_req, res) =>
@@ -305,24 +307,32 @@ if (isDevelopment) {
   });
 }
 
-// if (isProduction) {
-//   const clientBuildPath = path.join(__dirname, "../../client/dist");
-//   console.log("🔍 Final client path:", clientBuildPath);
+// Production: Serve React App
+if (isProduction) {
+  const clientBuildPath = path.join(__dirname, "../client/dist");
+  console.log("🔍 Production client path:", clientBuildPath);
 
-//   if (existsSync(clientBuildPath)) {
-//     console.log("📂 Contents:", readdirSync(clientBuildPath));
+  if (existsSync(clientBuildPath)) {
+    console.log("📂 Client build found, serving static files");
 
-//     app.use(express.static(clientBuildPath));
+    // Serve static files from the React build
+    app.use(express.static(clientBuildPath));
 
-//     app.get("/api/*", (req, res, next) => next());
+    // Handle API routes
+    app.get("/api/*", (req, res, next) => next());
 
-//     app.get("*", (req, res) => {
-//       res.sendFile(path.join(clientBuildPath, "index.html"));
-//     });
-//   } else {
-//     console.error("❌ Client build not found at:", clientBuildPath);
-//   }
-// }
+    // Handle React routing, return all requests to React app
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(clientBuildPath, "index.html"));
+    });
+  } else {
+    console.error("❌ Client build not found at:", clientBuildPath);
+    console.log(
+      "📂 Available directories:",
+      readdirSync(path.dirname(clientBuildPath))
+    );
+  }
+}
 
 // Connect to DB and start server
 connectDB().then(() => {

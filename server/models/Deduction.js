@@ -84,6 +84,25 @@ const DeductionSchema = new Schema(
       type: Boolean,
       default: true,
     },
+    deductionDuration: {
+      type: String,
+      enum: ["ongoing", "one-off"],
+      default: "ongoing",
+    },
+    appliesToPeriod: {
+      periodType: {
+        type: String,
+        enum: ["monthly", "weekly", "biweekly", "quarterly", "annual"],
+        required: function () {
+          return this.deductionDuration === "one-off";
+        },
+      },
+      month: Number, // for monthly
+      year: Number, // for monthly, quarterly, annual
+      week: Number, // for weekly
+      biweek: Number, // for biweekly
+      quarter: Number, // for quarterly
+    },
     effectiveDate: {
       type: Date,
       default: Date.now,

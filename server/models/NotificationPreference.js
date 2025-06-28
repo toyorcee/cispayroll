@@ -58,8 +58,6 @@ const NotificationPreferenceSchema = new Schema(
   { timestamps: true }
 );
 
-NotificationPreferenceSchema.index({ user: 1 });
-
 NotificationPreferenceSchema.statics.getOrCreatePreferences = async function (
   userId
 ) {

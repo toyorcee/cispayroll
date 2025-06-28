@@ -3,14 +3,13 @@ import {
   FaEdit,
   FaToggleOn,
   FaToggleOff,
-  FaInfoCircle,
   FaTrash,
-  FaSearch,
   FaFilter,
-  FaEye,
-  FaEyeSlash,
 } from "react-icons/fa";
-import { Deduction, TaxBracket } from "../../../types/deduction";
+import {
+  Deduction,
+  TaxBracket,
+} from "../../../types/deduction";
 import { TableSkeleton } from "./Skeletons";
 import { EmptyState } from "./EmptyState";
 
@@ -40,8 +39,8 @@ const TaxBracketsModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-      <div className="relative mx-auto w-full max-w-2xl bg-white rounded-2xl shadow-2xl">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2">
+      <div className="relative w-full max-w-lg mx-auto bg-white rounded-2xl shadow-2xl border border-gray-200">
         <div className="flex justify-between items-center p-6 border-b border-gray-200">
           <h3 className="text-xl font-semibold text-gray-900">
             Tax Brackets Configuration
@@ -53,31 +52,37 @@ const TaxBracketsModal = ({
             <span className="text-2xl">×</span>
           </button>
         </div>
-        <div className="p-6">
-          <div className="space-y-4 max-h-96 overflow-y-auto">
-            {brackets.map((bracket, index) => (
-              <div
-                key={index}
-                className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200"
-              >
-                <div className="flex justify-between items-center">
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-gray-900">
-                      Bracket {index + 1}
+        <div className="p-6 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-4">
+            {brackets.length === 0 ? (
+              <div className="text-center text-gray-400">
+                No tax brackets defined.
+              </div>
+            ) : (
+              brackets.map((bracket, index) => (
+                <div
+                  key={index}
+                  className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 hover:shadow-md transition-all duration-200"
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-gray-900">
+                        Bracket {index + 1}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        ₦{bracket.min.toLocaleString()}
+                        {bracket.max
+                          ? ` - ₦${bracket.max.toLocaleString()}`
+                          : " and above"}
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-600">
-                      ₦{bracket.min.toLocaleString()}
-                      {bracket.max
-                        ? ` - ₦${bracket.max.toLocaleString()}`
-                        : " and above"}
+                    <div className="text-lg font-bold text-green-600 bg-green-100 px-3 py-1 rounded-full">
+                      {bracket.rate}%
                     </div>
-                  </div>
-                  <div className="text-lg font-bold text-green-600 bg-green-100 px-3 py-1 rounded-full">
-                    {bracket.rate}%
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -105,6 +110,7 @@ export const DeductionsTable = ({
     null
   );
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     show: boolean;
     id: string | null;
@@ -125,8 +131,13 @@ export const DeductionsTable = ({
 
   const confirmDelete = async () => {
     if (deleteConfirm.id) {
-      await onDelete(deleteConfirm.id);
-      setDeleteConfirm({ show: false, id: null });
+      setDeletingId(deleteConfirm.id);
+      try {
+        await onDelete(deleteConfirm.id);
+        setDeleteConfirm({ show: false, id: null });
+      } finally {
+        setDeletingId(null);
+      }
     }
   };
 
@@ -171,6 +182,48 @@ export const DeductionsTable = ({
     } else {
       return `₦${deduction.value.toLocaleString()}`;
     }
+  };
+
+  const renderValueCell = (deduction: Deduction) => {
+    if (
+      deduction.type?.toLowerCase() === "statutory" &&
+      deduction.calculationMethod?.toLowerCase() === "progressive"
+    ) {
+      return (
+        <div className="flex flex-col items-start space-y-1 min-w-[100px]">
+          <span className="text-sm font-medium text-gray-900">
+            Tax Brackets
+          </span>
+          <button
+            onClick={() => setSelectedBrackets(deduction.taxBrackets || [])}
+            className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors duration-150 mt-1"
+            title="View tax brackets"
+          >
+            <span>View</span>
+            <svg
+              className="w-3 h-3 ml-1"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+          </button>
+        </div>
+      );
+    }
+    // For all other deductions, show the value
+    return (
+      <div className="text-sm font-medium text-gray-900">
+        {formatValue(deduction)}
+      </div>
+    );
   };
 
   const getTypeBadge = (type: string) => {
@@ -311,19 +364,7 @@ export const DeductionsTable = ({
                     {getTypeBadge(deduction.type)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {formatValue(deduction)}
-                    </div>
-                    {deduction.calculationMethod === "PROGRESSIVE" && (
-                      <button
-                        onClick={() =>
-                          setSelectedBrackets(deduction.taxBrackets || [])
-                        }
-                        className="text-xs text-green-600 hover:text-green-800 font-medium"
-                      >
-                        View brackets
-                      </button>
-                    )}
+                    {renderValueCell(deduction)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {getStatusBadge(deduction.isActive)}
@@ -362,10 +403,15 @@ export const DeductionsTable = ({
                       </button>
                       <button
                         onClick={() => handleDelete(deduction._id)}
+                        disabled={deletingId === deduction._id}
                         className="text-red-600 hover:text-red-900 p-1 rounded-md hover:bg-red-50 transition-colors duration-150"
                         title="Delete deduction"
                       >
-                        <FaTrash className="h-4 w-4" />
+                        {deletingId === deduction._id ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                        ) : (
+                          <FaTrash className="h-4 w-4" />
+                        )}
                       </button>
                     </div>
                   </td>
@@ -410,9 +456,17 @@ export const DeductionsTable = ({
                   </button>
                   <button
                     onClick={confirmDelete}
-                    className="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
+                    disabled={deletingId === deleteConfirm.id}
+                    className="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Delete
+                    {deletingId === deleteConfirm.id ? (
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Deleting...
+                      </div>
+                    ) : (
+                      "Delete"
+                    )}
                   </button>
                 </div>
               </div>

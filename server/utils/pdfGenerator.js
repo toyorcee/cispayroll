@@ -32,27 +32,9 @@ const generatePayslipPDF = async (payrollData) => {
   // Reset opacity for rest of the content
   doc.setGState(new doc.GState({ opacity: 1 }));
 
-  // Header
-  doc.setTextColor(22, 163, 74); // Green color
-  doc.setFontSize(24);
-  doc.text("PMS", 105, 20, { align: "center" });
-
-  doc.setTextColor(0, 0, 0); // Reset to black
-  doc.setFontSize(18);
-  doc.text("Payslip", 105, 30, { align: "center" });
-
-  // Employee Details
-  doc.setFontSize(10);
-  doc.setTextColor(100, 100, 100); // Dark gray
-  doc.text(
-    `Employee: ${payrollData.employee?.firstName} ${payrollData.employee?.lastName}`,
-    20,
-    45
-  );
-  doc.text(`Employee ID: ${payrollData.employee?.employeeId}`, 20, 52);
-  doc.text(`Department: ${payrollData.department?.name || "N/A"}`, 20, 59);
-
-  // Pay period with better styling
+  // Use full payment date for header
+  const paymentDateObj = new Date(payrollData.paymentDetails.paymentDate);
+  const day = paymentDateObj.getDate();
   const monthNames = [
     "January",
     "February",
@@ -67,6 +49,30 @@ const generatePayslipPDF = async (payrollData) => {
     "November",
     "December",
   ];
+  const month = monthNames[paymentDateObj.getMonth()];
+  const year = paymentDateObj.getFullYear();
+  const fullDate = `${day} ${month} ${year}`;
+
+  // Header
+  doc.setTextColor(22, 163, 74); // Green color
+  doc.setFontSize(24);
+  doc.text("PMS", 105, 20, { align: "center" });
+  doc.setTextColor(0, 0, 0); // Reset to black
+  doc.setFontSize(18);
+  doc.text(`Payslip for ${fullDate}`, 105, 30, { align: "center" });
+
+  // Employee Details
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100); // Dark gray
+  doc.text(
+    `Employee: ${payrollData.employee?.firstName} ${payrollData.employee?.lastName}`,
+    20,
+    45
+  );
+  doc.text(`Employee ID: ${payrollData.employee?.employeeId}`, 20, 52);
+  doc.text(`Department: ${payrollData.department?.name || "N/A"}`, 20, 59);
+
+  // Pay period with better styling
   doc.text(
     `Period: ${monthNames[payrollData.month - 1]} ${payrollData.year}`,
     20,
@@ -156,30 +162,100 @@ const generatePayslipPDF = async (payrollData) => {
   });
 
   // Deductions table
-  const deductionsData = [
-    ["PAYE Tax", formatCurrency(payrollData.deductions.tax.amount)],
-    ["Pension", formatCurrency(payrollData.deductions.pension.amount)],
-    ["NHF", formatCurrency(payrollData.deductions.nhf.amount)],
-  ];
-
-  // Add loans if any
-  if (payrollData.deductions.loans && payrollData.deductions.loans.length > 0) {
-    payrollData.deductions.loans.forEach((loan) => {
-      deductionsData.push([loan.description, formatCurrency(loan.amount)]);
+  const deductionsData = [];
+  const breakdown = payrollData.deductions?.breakdown || {};
+  if (breakdown.statutory && breakdown.statutory.length > 0) {
+    deductionsData.push([
+      {
+        content: "Statutory Deductions",
+        colSpan: 2,
+        styles: {
+          fontStyle: "bold",
+          textColor: [22, 163, 74],
+          fillColor: [245, 245, 245],
+        },
+      },
+    ]);
+    breakdown.statutory.forEach((ded) => {
+      let label = ded.name;
+      if (
+        ded.name === "PAYE Tax" &&
+        typeof payrollData.deductions?.tax?.taxRate === "number"
+      ) {
+        label += ` (${payrollData.deductions.tax.taxRate}%)`;
+      } else if (ded.calculationMethod && ded.calculationMethod !== "fixed") {
+        if (ded.calculationMethod.toLowerCase() === "percentage") {
+          label += ` (${ded.rate || ded.value || ""}%)`;
+        } else if (ded.calculationMethod.toLowerCase() === "progressive") {
+          label += ` (Progressive)`;
+        }
+      }
+      deductionsData.push([label, formatCurrency(ded.amount)]);
     });
   }
-
-  // Add other deductions if any
-  if (
-    payrollData.deductions.others &&
-    payrollData.deductions.others.length > 0
-  ) {
-    payrollData.deductions.others.forEach((deduction) => {
-      deductionsData.push([
-        deduction.description,
-        formatCurrency(deduction.amount),
-      ]);
+  if (breakdown.voluntary && breakdown.voluntary.length > 0) {
+    deductionsData.push([
+      {
+        content: "Voluntary Deductions",
+        colSpan: 2,
+        styles: {
+          fontStyle: "bold",
+          textColor: [22, 163, 74],
+          fillColor: [245, 245, 245],
+        },
+      },
+    ]);
+    breakdown.voluntary.forEach((ded) => {
+      let label = ded.name;
+      if (ded.calculationMethod && ded.calculationMethod !== "fixed") {
+        if (ded.calculationMethod.toLowerCase() === "percentage") {
+          label += ` (${ded.rate || ded.value || ""}%)`;
+        } else if (ded.calculationMethod.toLowerCase() === "progressive") {
+          label += ` (Progressive)`;
+        }
+      }
+      deductionsData.push([label, formatCurrency(ded.amount)]);
     });
+  }
+  // Fallback for legacy fields if breakdown is missing
+  if (deductionsData.length === 0) {
+    if (payrollData.deductions.tax) {
+      deductionsData.push([
+        "PAYE Tax",
+        formatCurrency(payrollData.deductions.tax.amount),
+      ]);
+    }
+    if (payrollData.deductions.pension) {
+      deductionsData.push([
+        "Pension",
+        formatCurrency(payrollData.deductions.pension.amount),
+      ]);
+    }
+    if (payrollData.deductions.nhf) {
+      deductionsData.push([
+        "NHF",
+        formatCurrency(payrollData.deductions.nhf.amount),
+      ]);
+    }
+    if (
+      payrollData.deductions.loans &&
+      payrollData.deductions.loans.length > 0
+    ) {
+      payrollData.deductions.loans.forEach((loan) => {
+        deductionsData.push([loan.description, formatCurrency(loan.amount)]);
+      });
+    }
+    if (
+      payrollData.deductions.others &&
+      payrollData.deductions.others.length > 0
+    ) {
+      payrollData.deductions.others.forEach((deduction) => {
+        deductionsData.push([
+          deduction.description,
+          formatCurrency(deduction.amount),
+        ]);
+      });
+    }
   }
 
   autoTable(doc, {

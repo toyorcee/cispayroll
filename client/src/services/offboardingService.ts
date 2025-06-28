@@ -2,7 +2,7 @@ import api from "./api";
 import { toast } from "react-toastify";
 // import { OffboardingType, OffboardingData } from "../types/offboarding";
 
-const BASE_URL = `/api`;
+const BASE_URL = `/api/offboarding`;
 
 // Helper function for consistent logging
 // const logOffboardingAction = (action: string, data: any) => {
@@ -50,9 +50,10 @@ export const offboardingService = {
   // Get all offboarding employees
   getOffboardingEmployees: async (): Promise<OffboardingEmployee[]> => {
     try {
-      const response = await api.get(
-        `${BASE_URL}/super-admin/offboarding-employees`
+      console.log(
+        "[offboardingService.getOffboardingEmployees] GET /offboarding/employees"
       );
+      const response = await api.get(`${BASE_URL}/employees`);
       return response.data.data || [];
     } catch (error: any) {
       console.error("Failed to fetch offboarding employees:", error);
@@ -68,9 +69,10 @@ export const offboardingService = {
     employeeId: string
   ): Promise<OffboardingEmployee> => {
     try {
-      const response = await api.get(
-        `${BASE_URL}/super-admin/offboarding-employees/${employeeId}`
+      console.log(
+        `[offboardingService.getOffboardingEmployeeById] GET /offboarding/details/${employeeId}`
       );
+      const response = await api.get(`${BASE_URL}/details/${employeeId}`);
       return response.data.data;
     } catch (error: any) {
       console.error("Failed to fetch offboarding employee:", error);
@@ -87,16 +89,19 @@ export const offboardingService = {
     data: {
       reason: string;
       type: string;
-      exitDate: Date;
+      targetExitDate: Date;
       notes?: string;
     }
   ): Promise<OffboardingEmployee> => {
     try {
-      const response = await api.post(
-        `${BASE_URL}/super-admin/offboarding-employees/${employeeId}/initiate`,
+      console.log(
+        `[offboardingService.initiateOffboarding] POST /offboarding/initiate/${employeeId} | Data:`,
         data
       );
-      toast.success("Offboarding process initiated successfully");
+      const response = await api.post(
+        `${BASE_URL}/initiate/${employeeId}`,
+        data
+      );
       return response.data.data;
     } catch (error: any) {
       console.error("Failed to initiate offboarding:", error);
@@ -114,11 +119,14 @@ export const offboardingService = {
     updates: Partial<OffboardingTask>
   ): Promise<OffboardingTask> => {
     try {
-      const response = await api.patch(
-        `${BASE_URL}/super-admin/offboarding-employees/${employeeId}/tasks/${taskId}`,
+      console.log(
+        `[offboardingService.updateOffboardingTask] PATCH /offboarding/tasks/${employeeId}/${taskId} | Updates:`,
         updates
       );
-      toast.success("Offboarding task updated successfully");
+      const response = await api.patch(
+        `${BASE_URL}/tasks/${employeeId}/${taskId}`,
+        updates
+      );
       return response.data.data;
     } catch (error: any) {
       console.error("Failed to update offboarding task:", error);
@@ -132,15 +140,19 @@ export const offboardingService = {
   // Complete offboarding task
   completeOffboardingTask: async (
     employeeId: string,
-    taskId: string,
+    taskName: string,
+    completed: boolean,
     notes?: string
   ): Promise<OffboardingTask> => {
     try {
-      const response = await api.post(
-        `${BASE_URL}/super-admin/offboarding-employees/${employeeId}/tasks/${taskId}/complete`,
-        { notes }
+      console.log(
+        `[offboardingService.completeOffboardingTask] POST /offboarding/complete-task/${employeeId}/${taskName} | Completed: ${completed}, Notes:`,
+        notes
       );
-      toast.success("Offboarding task completed successfully");
+      const response = await api.post(
+        `${BASE_URL}/complete-task/${employeeId}/${taskName}`,
+        { completed, notes }
+      );
       return response.data.data;
     } catch (error: any) {
       console.error("Failed to complete offboarding task:", error);
@@ -160,11 +172,14 @@ export const offboardingService = {
     >
   ): Promise<OffboardingTask> => {
     try {
-      const response = await api.post(
-        `${BASE_URL}/super-admin/offboarding-employees/${employeeId}/tasks`,
+      console.log(
+        `[offboardingService.addOffboardingTask] POST /offboarding/tasks/${employeeId} | TaskData:`,
         taskData
       );
-      toast.success("Offboarding task added successfully");
+      const response = await api.post(
+        `${BASE_URL}/tasks/${employeeId}`,
+        taskData
+      );
       return response.data.data;
     } catch (error: any) {
       console.error("Failed to add offboarding task:", error);
@@ -181,10 +196,10 @@ export const offboardingService = {
     taskId: string
   ): Promise<void> => {
     try {
-      await api.delete(
-        `${BASE_URL}/super-admin/offboarding-employees/${employeeId}/tasks/${taskId}`
+      console.log(
+        `[offboardingService.deleteOffboardingTask] DELETE /offboarding/tasks/${employeeId}/${taskId}`
       );
-      toast.success("Offboarding task deleted successfully");
+      await api.delete(`${BASE_URL}/tasks/${employeeId}/${taskId}`);
     } catch (error: any) {
       console.error("Failed to delete offboarding task:", error);
       toast.error(
@@ -199,10 +214,10 @@ export const offboardingService = {
     employeeId: string
   ): Promise<OffboardingEmployee> => {
     try {
-      const response = await api.post(
-        `${BASE_URL}/super-admin/offboarding-employees/${employeeId}/complete`
+      console.log(
+        `[offboardingService.completeOffboarding] POST /offboarding/complete/${employeeId}`
       );
-      toast.success("Offboarding process completed successfully");
+      const response = await api.post(`${BASE_URL}/complete/${employeeId}`);
       return response.data.data;
     } catch (error: any) {
       console.error("Failed to complete offboarding process:", error);
@@ -219,10 +234,10 @@ export const offboardingService = {
     employeeId: string
   ): Promise<OffboardingEmployee> => {
     try {
-      const response = await api.post(
-        `${BASE_URL}/super-admin/offboarding-employees/${employeeId}/cancel`
+      console.log(
+        `[offboardingService.cancelOffboarding] POST /offboarding/cancel/${employeeId}`
       );
-      toast.success("Offboarding process cancelled successfully");
+      const response = await api.post(`${BASE_URL}/cancel/${employeeId}`);
       return response.data.data;
     } catch (error: any) {
       console.error("Failed to cancel offboarding process:", error);
@@ -236,9 +251,10 @@ export const offboardingService = {
   // Get offboarding statistics
   getOffboardingStats: async () => {
     try {
-      const response = await api.get(
-        `${BASE_URL}/super-admin/offboarding-stats`
+      console.log(
+        "[offboardingService.getOffboardingStats] GET /offboarding/stats"
       );
+      const response = await api.get(`${BASE_URL}/stats`);
       return response.data.data;
     } catch (error: any) {
       console.error("Failed to fetch offboarding stats:", error);
@@ -250,124 +266,28 @@ export const offboardingService = {
     }
   },
 
-  // Admin-specific operations
-  adminService: {
-    getDepartmentOffboardingEmployees: async (): Promise<
-      OffboardingEmployee[]
-    > => {
-      try {
-        const response = await api.get(
-          `${BASE_URL}/admin/offboarding-employees`
-        );
-        return response.data.data || [];
-      } catch (error: any) {
-        console.error(
-          "Failed to fetch department offboarding employees:",
-          error
-        );
-        toast.error(
-          error.response?.data?.message ||
-            "Failed to fetch offboarding employees"
-        );
-        throw error;
-      }
-    },
-
-    initiateDepartmentOffboarding: async (
-      employeeId: string,
-      data: {
-        reason: string;
-        type: string;
-        exitDate: Date;
-        notes?: string;
-      }
-    ): Promise<OffboardingEmployee> => {
-      try {
-        const response = await api.post(
-          `${BASE_URL}/admin/offboarding-employees/${employeeId}/initiate`,
-          data
-        );
-        toast.success("Offboarding process initiated successfully");
-        return response.data.data;
-      } catch (error: any) {
-        console.error("Failed to initiate department offboarding:", error);
-        toast.error(
-          error.response?.data?.message || "Failed to initiate offboarding"
-        );
-        throw error;
-      }
-    },
-
-    updateDepartmentOffboardingTask: async (
-      employeeId: string,
-      taskId: string,
-      updates: Partial<OffboardingTask>
-    ): Promise<OffboardingTask> => {
-      try {
-        const response = await api.patch(
-          `${BASE_URL}/admin/offboarding-employees/${employeeId}/tasks/${taskId}`,
-          updates
-        );
-        toast.success("Offboarding task updated successfully");
-        return response.data.data;
-      } catch (error: any) {
-        console.error("Failed to update department offboarding task:", error);
-        toast.error(
-          error.response?.data?.message || "Failed to update offboarding task"
-        );
-        throw error;
-      }
-    },
-
-    completeDepartmentOffboardingTask: async (
-      employeeId: string,
-      taskId: string,
-      notes?: string
-    ): Promise<OffboardingTask> => {
-      try {
-        const response = await api.post(
-          `${BASE_URL}/admin/offboarding-employees/${employeeId}/tasks/${taskId}/complete`,
-          { notes }
-        );
-        toast.success("Offboarding task completed successfully");
-        return response.data.data;
-      } catch (error: any) {
-        console.error("Failed to complete department offboarding task:", error);
-        toast.error(
-          error.response?.data?.message || "Failed to complete offboarding task"
-        );
-        throw error;
-      }
-    },
-  },
-
   getFinalSettlementReport: async (employeeId: string) => {
     try {
       console.log(
-        "Requesting final settlement report for employee:",
-        employeeId
+        `[offboardingService.getFinalSettlementReport] GET /offboarding/final-settlement-report/${employeeId}`
       );
-
       const response = await api.get(
-        `${BASE_URL}/offboarding/final-settlement-report/${employeeId}`,
+        `${BASE_URL}/final-settlement-report/${employeeId}`,
         {
           responseType: "blob",
         }
       );
-
       console.log("Final settlement report response received:", {
         status: response.status,
         contentType: response.headers["content-type"],
         contentLength: response.headers["content-length"],
       });
-
       // Create a blob from the PDF data
       const blob = new Blob([response.data], { type: "application/pdf" });
       console.log("Created PDF blob:", {
         size: blob.size,
         type: blob.type,
       });
-
       return blob;
     } catch (error: any) {
       console.error("Error getting final settlement report:", error);
@@ -377,8 +297,11 @@ export const offboardingService = {
 
   emailFinalSettlementReport: async (employeeId: string) => {
     try {
+      console.log(
+        `[offboardingService.emailFinalSettlementReport] POST /offboarding/email-final-settlement-report/${employeeId}`
+      );
       const response = await api.post(
-        `${BASE_URL}/offboarding/email-final-settlement-report/${employeeId}`,
+        `${BASE_URL}/email-final-settlement-report/${employeeId}`,
         {},
         {
           headers: {
@@ -389,6 +312,92 @@ export const offboardingService = {
       return response.data;
     } catch (error) {
       console.error("Error emailing final settlement report:", error);
+      throw error;
+    }
+  },
+
+  // Bulk email final settlement reports to multiple or all offboarding employees
+  emailFinalSettlementReportBulk: async (employeeIds?: string[]) => {
+    try {
+      console.log(
+        `[offboardingService.emailFinalSettlementReportBulk] POST /offboarding/email-final-settlement-report | EmployeeIds:`,
+        employeeIds
+      );
+      const response = await api.post(
+        `${BASE_URL}/email-final-settlement-report`,
+        { employeeIds },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error bulk emailing final settlement reports:", error);
+      throw error;
+    }
+  },
+
+  // Bulk generate final settlement reports for multiple employees
+  getFinalSettlementReportBulk: async (employeeIds?: string[]) => {
+    try {
+      console.log(
+        `[offboardingService.getFinalSettlementReportBulk] POST /offboarding/final-settlement-report | EmployeeIds:`,
+        employeeIds
+      );
+      const response = await api.post(
+        `${BASE_URL}/final-settlement-report`,
+        { employeeIds },
+        {
+          responseType: "blob",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      const blob = new Blob([response.data], { type: "application/zip" });
+      return blob;
+    } catch (error: any) {
+      console.error("Error bulk generating final settlement reports:", error);
+      throw error;
+    }
+  },
+
+  // Bulk get final settlement details for CSV export
+  getFinalSettlementDetailsBulk: async (employeeIds?: string[]) => {
+    try {
+      console.log(
+        `[offboardingService.getFinalSettlementDetailsBulk] POST /offboarding/final-settlement-details | EmployeeIds:`,
+        employeeIds
+      );
+      const response = await api.post(
+        `${BASE_URL}/final-settlement-details`,
+        { employeeIds },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      return response.data.settlementDetails;
+    } catch (error: any) {
+      console.error("Error bulk fetching final settlement details:", error);
+      throw error;
+    }
+  },
+
+  getFinalSettlementDetails: async (employeeId: string) => {
+    try {
+      console.log(
+        `[offboardingService.getFinalSettlementDetails] GET /offboarding/final-settlement-details/${employeeId}`
+      );
+      const response = await api.get(
+        `${BASE_URL}/final-settlement-details/${employeeId}`
+      );
+      return response.data.settlementDetails;
+    } catch (error: any) {
+      console.error("Failed to fetch final settlement details:", error);
       throw error;
     }
   },

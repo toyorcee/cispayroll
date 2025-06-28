@@ -1,5 +1,5 @@
 import { useAuth } from "../../../context/AuthContext.js";
-import { UserRole, Permission } from "../../../types/auth.js";
+import { UserRole } from "../../../types/auth.js";
 import {
   Card,
   Typography,
@@ -48,7 +48,7 @@ interface OnboardingTask {
 }
 
 export default function UserProfile() {
-  const { user: authUser, hasPermission, refreshUser } = useAuth();
+  const { refreshUser } = useAuth();
   const {
     data: user,
     isLoading,
@@ -60,7 +60,7 @@ export default function UserProfile() {
   const [saving, setSaving] = useState(false);
 
   // Add state for image URL
-  const [profileImageUrl, setProfileImageUrl] = useState<string>("");
+  const [_profileImageUrl, setProfileImageUrl] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -167,12 +167,12 @@ export default function UserProfile() {
   };
 
   const handleImageClick = () => {
-      fileInputRef.current?.click();
+    fileInputRef.current?.click();
   };
 
   const handleImageUpload = async (file: File) => {
     if (!file) return;
-      setIsUploading(true);
+    setIsUploading(true);
     try {
       await profileService.updateProfileImage(file);
       refetch();
@@ -315,11 +315,11 @@ export default function UserProfile() {
       <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-300 border border-gray-100 mt-4">
         <Box className="flex items-center justify-between mb-4">
           <Box className="flex items-center space-x-2">
-          <BadgeIcon className="text-green-600" />
-          <Typography variant="h6" className="text-gray-800 font-semibold">
-            Qualifications
-          </Typography>
-        </Box>
+            <BadgeIcon className="text-green-600" />
+            <Typography variant="h6" className="text-gray-800 font-semibold">
+              Qualifications
+            </Typography>
+          </Box>
           {editMode && (
             <Button
               variant="outlined"
@@ -347,7 +347,7 @@ export default function UserProfile() {
             No qualifications added yet.
           </Typography>
         ) : (
-        <div className="space-y-4">
+          <div className="space-y-4">
             {editMode
               ? (form.personalDetails?.qualifications || []).map(
                   (qual: Qualification, index: number) => (
@@ -416,28 +416,28 @@ export default function UserProfile() {
                   )
                 )
               : qualifications.map((qual: Qualification) => (
-            <div
-              key={qual._id}
+                  <div
+                    key={qual._id}
                     className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-lg border border-gray-100"
-            >
-              <BadgeIcon className="text-green-600 mt-1" />
+                  >
+                    <BadgeIcon className="text-green-600 mt-1" />
                     <div className="flex-1">
                       <Typography
                         variant="subtitle1"
                         className="font-medium text-gray-800"
                       >
                         {qual.highestEducation || "Not specified"}
-                </Typography>
-                <Typography variant="body2" className="text-gray-600">
+                      </Typography>
+                      <Typography variant="body2" className="text-gray-600">
                         {qual.institution || "Institution not specified"}
-                </Typography>
-                <Typography variant="caption" className="text-gray-500">
+                      </Typography>
+                      <Typography variant="caption" className="text-gray-500">
                         Graduated: {qual.yearGraduated || "Year not specified"}
-                </Typography>
-              </div>
-            </div>
-          ))}
-        </div>
+                      </Typography>
+                    </div>
+                  </div>
+                ))}
+          </div>
         )}
       </Card>
     );
@@ -522,11 +522,6 @@ export default function UserProfile() {
     );
   };
 
-  const canEditProfile =
-    !!authUser &&
-    !!user &&
-    (authUser._id === user._id || hasPermission(Permission.EDIT_USER));
-
   return (
     <div className="flex flex-col p-4 sm:p-6 max-w-7xl mx-auto w-full relative">
       {/* Top action buttons */}
@@ -595,26 +590,26 @@ export default function UserProfile() {
         </div>
       ) : (
         <>
-        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
-          {/* Left column - Personal Information */}
-          <div className="w-full lg:w-1/3">
-            <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-300 border border-gray-100">
-              <Box className="flex flex-col items-center mb-4 sm:mb-6">
-                <div className="relative">
-                  <Avatar
+          <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
+            {/* Left column - Personal Information */}
+            <div className="w-full lg:w-1/3">
+              <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-300 border border-gray-100">
+                <Box className="flex flex-col items-center mb-4 sm:mb-6">
+                  <div className="relative">
+                    <Avatar
                       src={getProfileImageUrl(user)}
-                    alt={`${user?.firstName} ${user?.lastName}`}
-                    sx={{
+                      alt={`${user?.firstName} ${user?.lastName}`}
+                      sx={{
                         width: 100,
                         height: 100,
-                      mb: 2,
+                        mb: 2,
                         cursor: "pointer",
-                    }}
+                      }}
                       onClick={handleImageClick}
-                  >
+                    >
                       {!user?.profileImage &&
-                      `${user?.firstName?.[0]}${user?.lastName?.[0]}`}
-                  </Avatar>
+                        `${user?.firstName?.[0]}${user?.lastName?.[0]}`}
+                    </Avatar>
                     <>
                       <input
                         type="file"
@@ -646,51 +641,51 @@ export default function UserProfile() {
                         </IconButton>
                       </Tooltip>
                     </>
-                </div>
-                <Typography
-                  variant="h5"
-                  className="text-gray-800 font-semibold mt-4 text-base sm:text-lg md:text-xl text-center"
-                >
-                  {user?.firstName} {user?.lastName}
-                </Typography>
-                <Typography
-                  variant="body2"
-                  className="text-gray-500 text-sm sm:text-base"
-                >
-                  {user?.role}
-                </Typography>
-              </Box>
-
-              <Divider className="my-3 sm:my-4" />
-
-              <Box className="space-y-3 sm:space-y-4">
-                <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
-                  <EmailIcon className="text-green-600 text-base sm:text-lg" />
-                  <div>
-                    <Typography
-                      variant="caption"
-                      className="text-gray-500 text-xs sm:text-sm"
-                    >
-                      Email
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      className="text-gray-700 text-sm sm:text-base break-all"
-                    >
-                      {user?.email}
-                    </Typography>
                   </div>
-                </div>
+                  <Typography
+                    variant="h5"
+                    className="text-gray-800 font-semibold mt-4 text-base sm:text-lg md:text-xl text-center"
+                  >
+                    {user?.firstName} {user?.lastName}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    className="text-gray-500 text-sm sm:text-base"
+                  >
+                    {user?.role}
+                  </Typography>
+                </Box>
 
-                <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
-                  <PhoneIcon className="text-green-600 text-base sm:text-lg" />
-                  <div>
-                    <Typography
-                      variant="caption"
-                      className="text-gray-500 text-xs sm:text-sm"
-                    >
-                      Phone
-                    </Typography>
+                <Divider className="my-3 sm:my-4" />
+
+                <Box className="space-y-3 sm:space-y-4">
+                  <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                    <EmailIcon className="text-green-600 text-base sm:text-lg" />
+                    <div>
+                      <Typography
+                        variant="caption"
+                        className="text-gray-500 text-xs sm:text-sm"
+                      >
+                        Email
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        className="text-gray-700 text-sm sm:text-base break-all"
+                      >
+                        {user?.email}
+                      </Typography>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                    <PhoneIcon className="text-green-600 text-base sm:text-lg" />
+                    <div>
+                      <Typography
+                        variant="caption"
+                        className="text-gray-500 text-xs sm:text-sm"
+                      >
+                        Phone
+                      </Typography>
                       {editMode ? (
                         <TextField
                           name="phone"
@@ -700,25 +695,25 @@ export default function UserProfile() {
                           size="small"
                         />
                       ) : (
-                    <Typography
-                      variant="body2"
-                      className="text-gray-700 text-sm sm:text-base"
-                    >
-                      {user?.phone}
-                    </Typography>
+                        <Typography
+                          variant="body2"
+                          className="text-gray-700 text-sm sm:text-base"
+                        >
+                          {user?.phone}
+                        </Typography>
                       )}
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
-                  <LocationIcon className="text-green-600 text-base sm:text-lg" />
-                  <div>
-                    <Typography
-                      variant="caption"
-                      className="text-gray-500 text-xs sm:text-sm"
-                    >
-                      Address
-                    </Typography>
+                  <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                    <LocationIcon className="text-green-600 text-base sm:text-lg" />
+                    <div>
+                      <Typography
+                        variant="caption"
+                        className="text-gray-500 text-xs sm:text-sm"
+                      >
+                        Address
+                      </Typography>
                       {editMode ? (
                         <Grid container spacing={2}>
                           <Grid item xs={12}>
@@ -779,17 +774,17 @@ export default function UserProfile() {
                           </Grid>
                         </Grid>
                       ) : (
-                    <Typography
-                      variant="body2"
-                      className="text-gray-700 text-sm sm:text-base"
-                    >
-                      {user?.personalDetails?.address?.street},
-                      {user?.personalDetails?.address?.city},
-                      {user?.personalDetails?.address?.state}
-                    </Typography>
+                        <Typography
+                          variant="body2"
+                          className="text-gray-700 text-sm sm:text-base"
+                        >
+                          {user?.personalDetails?.address?.street},
+                          {user?.personalDetails?.address?.city},
+                          {user?.personalDetails?.address?.state}
+                        </Typography>
                       )}
+                    </div>
                   </div>
-                </div>
 
                   <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
                     <AccountBalanceIcon className="text-green-600 text-base sm:text-lg" />
@@ -820,26 +815,26 @@ export default function UserProfile() {
                           />
                         </Box>
                       ) : (
-                      <Typography
-                        variant="body2"
-                        className="text-gray-700 text-sm sm:text-base"
-                      >
-                        {user?.bankDetails?.bankName} -{" "}
-                        {user?.bankDetails?.accountNumber}
-                      </Typography>
+                        <Typography
+                          variant="body2"
+                          className="text-gray-700 text-sm sm:text-base"
+                        >
+                          {user?.bankDetails?.bankName} -{" "}
+                          {user?.bankDetails?.accountNumber}
+                        </Typography>
                       )}
                     </div>
                   </div>
 
-                <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
-                  <EmergencyIcon className="text-green-600 text-base sm:text-lg" />
-                  <div>
-                    <Typography
-                      variant="caption"
-                      className="text-gray-500 text-xs sm:text-sm"
-                    >
-                      Emergency Contact
-                    </Typography>
+                  <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                    <EmergencyIcon className="text-green-600 text-base sm:text-lg" />
+                    <div>
+                      <Typography
+                        variant="caption"
+                        className="text-gray-500 text-xs sm:text-sm"
+                      >
+                        Emergency Contact
+                      </Typography>
                       {editMode ? (
                         <Box display="flex" flexDirection="column" gap={1}>
                           <TextField
@@ -868,28 +863,28 @@ export default function UserProfile() {
                           />
                         </Box>
                       ) : (
-                    <Typography
-                      variant="body2"
-                      className="text-gray-700 text-sm sm:text-base"
-                    >
-                      {user?.emergencyContact?.name} (
-                      {user?.emergencyContact?.relationship})
-                      <br />
-                      {user?.emergencyContact?.phone}
-                    </Typography>
+                        <Typography
+                          variant="body2"
+                          className="text-gray-700 text-sm sm:text-base"
+                        >
+                          {user?.emergencyContact?.name} (
+                          {user?.emergencyContact?.relationship})
+                          <br />
+                          {user?.emergencyContact?.phone}
+                        </Typography>
                       )}
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
-                  <BadgeIcon className="text-green-600 text-base sm:text-lg" />
-                  <div>
-                    <Typography
-                      variant="caption"
-                      className="text-gray-500 text-xs sm:text-sm"
-                    >
-                      Personal Information
-                    </Typography>
+                  <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                    <BadgeIcon className="text-green-600 text-base sm:text-lg" />
+                    <div>
+                      <Typography
+                        variant="caption"
+                        className="text-gray-500 text-xs sm:text-sm"
+                      >
+                        Personal Information
+                      </Typography>
                       {editMode ? (
                         <Box display="flex" flexDirection="column" gap={1}>
                           <TextField
@@ -937,267 +932,267 @@ export default function UserProfile() {
                           />
                         </Box>
                       ) : (
-                    <div>
-                      {user?.personalDetails?.middleName && (
-                        <Typography
-                          variant="body2"
-                          className="text-gray-700 text-sm sm:text-base"
-                        >
-                          Middle Name: {user.personalDetails.middleName}
-                        </Typography>
-                      )}
-                      <Typography
-                        variant="body2"
-                        className="text-gray-700 text-sm sm:text-base"
-                      >
-                        Date of Birth:{" "}
-                        {user?.personalDetails?.dateOfBirth
-                          ? new Date(
-                              user.personalDetails.dateOfBirth
-                            ).toLocaleDateString("en-US", {
-                              day: "numeric",
-                              month: "long",
-                              year: "numeric",
-                            })
-                          : "Not set"}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        className="text-gray-700 text-sm sm:text-base"
-                      >
-                        Marital Status:{" "}
-                        {user?.personalDetails?.maritalStatus
-                          ? user.personalDetails.maritalStatus
-                              .charAt(0)
-                              .toUpperCase() +
-                            user.personalDetails.maritalStatus.slice(1)
-                          : "Not set"}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        className="text-gray-700 text-sm sm:text-base"
-                      >
-                        Nationality:{" "}
-                        {user?.personalDetails?.nationality || "Not set"}
-                      </Typography>
-                    </div>
-                      )}
-                  </div>
-                </div>
-              </Box>
-            </Card>
-          </div>
-
-          {/* Right column - Role-specific and Employment Details */}
-          <div className="w-full lg:w-2/3">
-            {renderRoleSpecificInfo()}
-
-            <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-300 border border-gray-100">
-              <Box className="flex items-center space-x-2 mb-4">
-                <BadgeIcon className="text-green-600" />
-                <Typography
-                  variant="h6"
-                  className="text-gray-800 font-semibold"
-                >
-                  Employment Details
-                </Typography>
-              </Box>
-
-              {/* Replace inner Grid with flex */}
-              <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-                {/* Left column */}
-                <div className="w-full sm:w-1/2">
-                  <div className="space-y-3 sm:space-y-4">
-                    <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
-                      <CalendarIcon className="text-green-600 text-base sm:text-lg" />
-                      <div>
-                        <Typography
-                          variant="caption"
-                          className="text-gray-500 text-xs sm:text-sm"
-                        >
-                          Join Date
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          className="text-gray-700 text-sm sm:text-base"
-                        >
-                          {user?.dateJoined
-                            ? new Date(user.dateJoined).toLocaleDateString(
-                                "en-US",
-                                {
+                        <div>
+                          {user?.personalDetails?.middleName && (
+                            <Typography
+                              variant="body2"
+                              className="text-gray-700 text-sm sm:text-base"
+                            >
+                              Middle Name: {user.personalDetails.middleName}
+                            </Typography>
+                          )}
+                          <Typography
+                            variant="body2"
+                            className="text-gray-700 text-sm sm:text-base"
+                          >
+                            Date of Birth:{" "}
+                            {user?.personalDetails?.dateOfBirth
+                              ? new Date(
+                                  user.personalDetails.dateOfBirth
+                                ).toLocaleDateString("en-US", {
                                   day: "numeric",
                                   month: "long",
                                   year: "numeric",
-                                }
-                              )
-                            : "Not set"}
-                        </Typography>
-                      </div>
+                                })
+                              : "Not set"}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            className="text-gray-700 text-sm sm:text-base"
+                          >
+                            Marital Status:{" "}
+                            {user?.personalDetails?.maritalStatus
+                              ? user.personalDetails.maritalStatus
+                                  .charAt(0)
+                                  .toUpperCase() +
+                                user.personalDetails.maritalStatus.slice(1)
+                              : "Not set"}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            className="text-gray-700 text-sm sm:text-base"
+                          >
+                            Nationality:{" "}
+                            {user?.personalDetails?.nationality || "Not set"}
+                          </Typography>
+                        </div>
+                      )}
                     </div>
+                  </div>
+                </Box>
+              </Card>
+            </div>
 
-                    <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
-                      <BadgeIcon className="text-green-600 text-base sm:text-lg" />
-                      <div>
-                        <Typography
-                          variant="caption"
-                          className="text-gray-500 text-xs sm:text-sm"
-                        >
-                          Position
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          className="text-gray-700 text-sm sm:text-base"
-                        >
-                          {user?.position || "Not set"}
-                        </Typography>
+            {/* Right column - Role-specific and Employment Details */}
+            <div className="w-full lg:w-2/3">
+              {renderRoleSpecificInfo()}
+
+              <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-300 border border-gray-100">
+                <Box className="flex items-center space-x-2 mb-4">
+                  <BadgeIcon className="text-green-600" />
+                  <Typography
+                    variant="h6"
+                    className="text-gray-800 font-semibold"
+                  >
+                    Employment Details
+                  </Typography>
+                </Box>
+
+                {/* Replace inner Grid with flex */}
+                <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+                  {/* Left column */}
+                  <div className="w-full sm:w-1/2">
+                    <div className="space-y-3 sm:space-y-4">
+                      <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                        <CalendarIcon className="text-green-600 text-base sm:text-lg" />
+                        <div>
+                          <Typography
+                            variant="caption"
+                            className="text-gray-500 text-xs sm:text-sm"
+                          >
+                            Join Date
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            className="text-gray-700 text-sm sm:text-base"
+                          >
+                            {user?.dateJoined
+                              ? new Date(user.dateJoined).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    day: "numeric",
+                                    month: "long",
+                                    year: "numeric",
+                                  }
+                                )
+                              : "Not set"}
+                          </Typography>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
-                      <BadgeIcon className="text-green-600 text-base sm:text-lg" />
-                      <div>
-                        <Typography
-                          variant="caption"
-                          className="text-gray-500 text-xs sm:text-sm"
-                        >
-                          Grade Level
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          className="text-gray-700 text-sm sm:text-base"
-                        >
-                          {user?.gradeLevel || "Not set"}
-                        </Typography>
+                      <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                        <BadgeIcon className="text-green-600 text-base sm:text-lg" />
+                        <div>
+                          <Typography
+                            variant="caption"
+                            className="text-gray-500 text-xs sm:text-sm"
+                          >
+                            Position
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            className="text-gray-700 text-sm sm:text-base"
+                          >
+                            {user?.position || "Not set"}
+                          </Typography>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center space-x-2 sm:space-x-3 p-4 bg-gray-50 shadow-sm rounded-lg hover:bg-gray-100 transition-colors duration-200">
-                      <BadgeIcon className="text-green-600 text-lg sm:text-xl" />
-                      <div className="truncate">
-                        <Typography
-                          variant="caption"
-                          className="text-gray-500 text-xs sm:text-sm font-medium"
-                        >
-                          Employee ID
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          className="text-gray-800 text-sm sm:text-base font-semibold truncate"
-                        >
-                          {user?.employeeId || "Not set"}
-                        </Typography>
+                      <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                        <BadgeIcon className="text-green-600 text-base sm:text-lg" />
+                        <div>
+                          <Typography
+                            variant="caption"
+                            className="text-gray-500 text-xs sm:text-sm"
+                          >
+                            Grade Level
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            className="text-gray-700 text-sm sm:text-base"
+                          >
+                            {user?.gradeLevel || "Not set"}
+                          </Typography>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2 sm:space-x-3 p-4 bg-gray-50 shadow-sm rounded-lg hover:bg-gray-100 transition-colors duration-200">
+                        <BadgeIcon className="text-green-600 text-lg sm:text-xl" />
+                        <div className="truncate">
+                          <Typography
+                            variant="caption"
+                            className="text-gray-500 text-xs sm:text-sm font-medium"
+                          >
+                            Employee ID
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            className="text-gray-800 text-sm sm:text-base font-semibold truncate"
+                          >
+                            {user?.employeeId || "Not set"}
+                          </Typography>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Right column */}
-                <div className="w-full sm:w-1/2">
-                  <div className="space-y-3 sm:space-y-4">
-                    <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
-                      <LocationIcon className="text-green-600 text-base sm:text-lg" />
-                      <div>
-                        <Typography
-                          variant="caption"
-                          className="text-gray-500 text-xs sm:text-sm"
-                        >
-                          Work Location
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          className="text-gray-700 text-sm sm:text-base"
-                        >
-                          {user?.workLocation || "Not set"}
-                        </Typography>
+                  {/* Right column */}
+                  <div className="w-full sm:w-1/2">
+                    <div className="space-y-3 sm:space-y-4">
+                      <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                        <LocationIcon className="text-green-600 text-base sm:text-lg" />
+                        <div>
+                          <Typography
+                            variant="caption"
+                            className="text-gray-500 text-xs sm:text-sm"
+                          >
+                            Work Location
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            className="text-gray-700 text-sm sm:text-base"
+                          >
+                            {user?.workLocation || "Not set"}
+                          </Typography>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-green-50 rounded-lg transition-colors duration-200">
-                      <CircleIcon
-                        className={`${getStatusColor(
-                          user?.status
-                        )} animate-pulse`}
-                        sx={{ fontSize: "12px" }}
-                      />
-                      <div>
-                        <Typography
-                          variant="caption"
-                          className="text-gray-500 text-xs sm:text-sm"
-                        >
-                          Employment Status
-                        </Typography>
-                        <Typography
-                          variant="body2"
+                      <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-green-50 rounded-lg transition-colors duration-200">
+                        <CircleIcon
                           className={`${getStatusColor(
                             user?.status
-                          )} font-medium text-sm sm:text-base`}
-                        >
-                          {user?.status?.charAt(0).toUpperCase() +
-                            user?.status?.slice(1) || "Not set"}
-                        </Typography>
+                          )} animate-pulse`}
+                          sx={{ fontSize: "12px" }}
+                        />
+                        <div>
+                          <Typography
+                            variant="caption"
+                            className="text-gray-500 text-xs sm:text-sm"
+                          >
+                            Employment Status
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            className={`${getStatusColor(
+                              user?.status
+                            )} font-medium text-sm sm:text-base`}
+                          >
+                            {user?.status?.charAt(0).toUpperCase() +
+                              user?.status?.slice(1) || "Not set"}
+                          </Typography>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
-                      <CalendarIcon className="text-green-600 text-base sm:text-lg" />
-                      <div>
-                        <Typography
-                          variant="caption"
-                          className="text-gray-500 text-xs sm:text-sm"
-                        >
-                          Last Login
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          className="text-gray-700 text-sm sm:text-base"
-                        >
-                          {user?.lastLogin
+                      <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                        <CalendarIcon className="text-green-600 text-base sm:text-lg" />
+                        <div>
+                          <Typography
+                            variant="caption"
+                            className="text-gray-500 text-xs sm:text-sm"
+                          >
+                            Last Login
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            className="text-gray-700 text-sm sm:text-base"
+                          >
+                            {user?.lastLogin
                               ? new Date(user.lastLogin).toLocaleString(
                                   "en-US",
                                   {
-                                dateStyle: "medium",
-                                timeStyle: "short",
+                                    dateStyle: "medium",
+                                    timeStyle: "short",
                                   }
                                 )
-                            : "Not available"}
-                        </Typography>
+                              : "Not available"}
+                          </Typography>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
-                      <EmailIcon className="text-green-600 text-base sm:text-lg" />
-                      <div>
-                        <Typography
-                          variant="caption"
-                          className="text-gray-500 text-xs sm:text-sm"
-                        >
-                          Email Status
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          className="text-gray-700 text-sm sm:text-base"
-                        >
+                      <div className="flex items-center space-x-2 sm:space-x-3 p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                        <EmailIcon className="text-green-600 text-base sm:text-lg" />
+                        <div>
+                          <Typography
+                            variant="caption"
+                            className="text-gray-500 text-xs sm:text-sm"
+                          >
+                            Email Status
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            className="text-gray-700 text-sm sm:text-base"
+                          >
                             {user?.isEmailVerified
                               ? "Verified"
                               : "Not Verified"}
-                        </Typography>
+                          </Typography>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </Card>
+              </Card>
 
-            {/* Qualifications */}
-            {renderQualifications()}
+              {/* Qualifications */}
+              {renderQualifications()}
 
-            {/* Next of Kin */}
-            {renderNextOfKin()}
+              {/* Next of Kin */}
+              {renderNextOfKin()}
 
-            {/* Onboarding Status */}
-            {renderOnboardingStatus()}
+              {/* Onboarding Status */}
+              {renderOnboardingStatus()}
+            </div>
           </div>
-        </div>
           {/* Bottom action buttons */}
           <Box
             sx={{

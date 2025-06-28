@@ -26,6 +26,7 @@ import AuditService from "../services/AuditService.js";
 import BaseApprovalController from "./BaseApprovalController.js";
 import { AuditAction, AuditEntity } from "../models/Audit.js";
 import SalaryGrade from "../models/SalaryStructure.js";
+import DeductionModel from "../models/Deduction.js";
 
 // Define the order of approval levels
 const APPROVAL_ORDER = [
@@ -393,10 +394,60 @@ export class AdminController {
 
       console.log(`✅ Found ${payrolls.length} payrolls`);
 
+      // Log the first payroll's deductions for debugging
+      if (payrolls.length > 0) {
+        console.log(
+          "🔍 First payroll deductions from DB:",
+          payrolls[0].deductions
+        );
+      }
+
+      // Add breakdown to payrolls that don't have it
+      const payrollsWithBreakdown = payrolls.map((payroll) => {
+        const payrollObj = payroll.toObject();
+
+        // If deductions don't have breakdown, calculate it
+        if (!payrollObj.deductions.breakdown) {
+          const breakdown = [
+            {
+              name: "PAYE Tax",
+              type: "statutory",
+              amount: payrollObj.deductions.tax?.amount || 0,
+              calculationMethod: "PROGRESSIVE",
+            },
+            {
+              name: "Pension",
+              type: "statutory",
+              amount: payrollObj.deductions.pension?.amount || 0,
+              calculationMethod: "PERCENTAGE",
+            },
+            {
+              name: "NHF",
+              type: "statutory",
+              amount: payrollObj.deductions.nhf?.amount || 0,
+              calculationMethod: "PERCENTAGE",
+            },
+            // Add any other deductions from the others array
+            ...(payrollObj.deductions.others || []).map((deduction) => ({
+              name: deduction.name,
+              type: deduction.type || "voluntary",
+              amount: deduction.amount,
+              calculationMethod: deduction.calculationMethod,
+              description: deduction.description,
+              scope: deduction.scope,
+            })),
+          ];
+
+          payrollObj.deductions.breakdown = breakdown;
+        }
+
+        return payrollObj;
+      });
+
       return res.status(200).json({
         success: true,
         data: {
-          payrolls,
+          payrolls: payrollsWithBreakdown,
           pagination: {
             total,
             page: parseInt(page),
@@ -437,6 +488,47 @@ export class AdminController {
 
       if (!payroll) {
         throw new ApiError(404, "Payroll not found in your department");
+      }
+
+      // Add deduction breakdown if missing (for backward compatibility)
+      if (payroll.deductions && !payroll.deductions.breakdown) {
+        console.log(
+          "🔧 Adding missing deduction breakdown to admin payroll:",
+          payroll._id
+        );
+
+        // Get statutory deductions
+        const statutoryDeductions = await DeductionModel.find({
+          type: "statutory",
+          isActive: true,
+        }).lean();
+
+        // Get voluntary deductions
+        const voluntaryDeductions = await DeductionModel.find({
+          type: "voluntary",
+          isActive: true,
+        }).lean();
+
+        // Create breakdown structure
+        payroll.deductions.breakdown = {
+          statutory: statutoryDeductions.map((deduction) => ({
+            name: deduction.name,
+            amount: payroll.deductions[deduction.code] || 0,
+            code: deduction.code,
+            description: deduction.description,
+          })),
+          voluntary: voluntaryDeductions.map((deduction) => ({
+            name: deduction.name,
+            amount: payroll.deductions[deduction.code] || 0,
+            code: deduction.code,
+            description: deduction.description,
+          })),
+        };
+
+        console.log(
+          "✅ Added deduction breakdown to admin payroll:",
+          payroll._id
+        );
       }
 
       res.status(200).json({
@@ -602,6 +694,49 @@ export class AdminController {
         employee: employeeId,
         department: admin.department,
       }).sort({ createdAt: -1 });
+
+      // Add deduction breakdown to each payroll record if missing (for backward compatibility)
+      for (const payroll of payrolls) {
+        if (payroll.deductions && !payroll.deductions.breakdown) {
+          console.log(
+            "🔧 Adding missing deduction breakdown to admin payroll in history:",
+            payroll._id
+          );
+
+          // Get statutory deductions
+          const statutoryDeductions = await DeductionModel.find({
+            type: "statutory",
+            isActive: true,
+          }).lean();
+
+          // Get voluntary deductions
+          const voluntaryDeductions = await DeductionModel.find({
+            type: "voluntary",
+            isActive: true,
+          }).lean();
+
+          // Create breakdown structure
+          payroll.deductions.breakdown = {
+            statutory: statutoryDeductions.map((deduction) => ({
+              name: deduction.name,
+              amount: payroll.deductions[deduction.code] || 0,
+              code: deduction.code,
+              description: deduction.description,
+            })),
+            voluntary: voluntaryDeductions.map((deduction) => ({
+              name: deduction.name,
+              amount: payroll.deductions[deduction.code] || 0,
+              code: deduction.code,
+              description: deduction.description,
+            })),
+          };
+
+          console.log(
+            "✅ Added deduction breakdown to admin payroll in history:",
+            payroll._id
+          );
+        }
+      }
 
       res.status(200).json({
         success: true,
@@ -1618,6 +1753,47 @@ export class AdminController {
 
       if (!payroll) {
         throw new ApiError(404, "No paid payroll found for this employee");
+      }
+
+      // Add deduction breakdown if missing (for backward compatibility)
+      if (payroll.deductions && !payroll.deductions.breakdown) {
+        console.log(
+          "🔧 Adding missing deduction breakdown to admin payslip payroll:",
+          payroll._id
+        );
+
+        // Get statutory deductions
+        const statutoryDeductions = await DeductionModel.find({
+          type: "statutory",
+          isActive: true,
+        }).lean();
+
+        // Get voluntary deductions
+        const voluntaryDeductions = await DeductionModel.find({
+          type: "voluntary",
+          isActive: true,
+        }).lean();
+
+        // Create breakdown structure
+        payroll.deductions.breakdown = {
+          statutory: statutoryDeductions.map((deduction) => ({
+            name: deduction.name,
+            amount: payroll.deductions[deduction.code] || 0,
+            code: deduction.code,
+            description: deduction.description,
+          })),
+          voluntary: voluntaryDeductions.map((deduction) => ({
+            name: deduction.name,
+            amount: payroll.deductions[deduction.code] || 0,
+            code: deduction.code,
+            description: deduction.description,
+          })),
+        };
+
+        console.log(
+          "✅ Added deduction breakdown to admin payslip payroll:",
+          payroll._id
+        );
       }
 
       res.status(200).json({
@@ -3217,8 +3393,35 @@ export class AdminController {
 
   static async processSingleEmployeePayroll(req, res, next) {
     try {
+      console.log("🔄 Starting single employee payroll processing (Admin)");
+      console.log("📝 Request data:", JSON.stringify(req.body, null, 2));
+
       const { employeeId, month, year, frequency, departmentId, salaryGrade } =
         req.body;
+
+      // Initialize comprehensive summary object
+      const processingSummary = {
+        totalAttempted: 1,
+        processed: 0,
+        skipped: 0,
+        failed: 0,
+        errors: [],
+        warnings: [],
+        details: {
+          employeeId,
+          departmentId,
+          month,
+          year,
+          frequency,
+          employeeName: null,
+          departmentName: null,
+          netPay: null,
+          processingTime: null,
+          payrollStatus: null,
+        },
+      };
+
+      const startTime = Date.now();
 
       // Fetch admin with full details
       const admin = await UserModel.findById(req.user.id)
@@ -3227,13 +3430,39 @@ export class AdminController {
 
       // Check if admin exists and has necessary permissions
       if (!admin) {
-        throw new ApiError(404, "Admin not found");
+        const error = "Admin not found";
+        processingSummary.failed = 1;
+        processingSummary.errors.push({
+          type: "AUTHENTICATION_ERROR",
+          message: error,
+          code: "ADMIN_NOT_FOUND",
+        });
+
+        console.error(`❌ ${error}`);
+        return res.status(404).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
 
       // Validate department access
       const targetDepartment = departmentId || admin.department?._id;
       if (!targetDepartment) {
-        throw new ApiError(400, "No department specified");
+        const error = "No department specified";
+        processingSummary.failed = 1;
+        processingSummary.errors.push({
+          type: "VALIDATION_ERROR",
+          message: error,
+          code: "MISSING_DEPARTMENT",
+        });
+
+        console.error(`❌ ${error}`);
+        return res.status(400).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
 
       // Check if admin has access to this department
@@ -3242,7 +3471,22 @@ export class AdminController {
         admin.department?._id.toString() === targetDepartment.toString();
 
       if (!hasAccess) {
-        throw new ApiError(403, "You don't have access to this department");
+        const error = "You don't have access to this department";
+        processingSummary.failed = 1;
+        processingSummary.errors.push({
+          type: "PERMISSION_ERROR",
+          message: error,
+          code: "DEPARTMENT_ACCESS_DENIED",
+          adminDepartment: admin.department?._id,
+          targetDepartment,
+        });
+
+        console.error(`❌ ${error}`);
+        return res.status(403).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
 
       // Get employee with proper department check
@@ -3253,8 +3497,26 @@ export class AdminController {
       });
 
       if (!employee) {
-        throw new ApiError(404, "Employee not found or not active");
+        const error = "Employee not found or not active";
+        processingSummary.failed = 1;
+        processingSummary.errors.push({
+          type: "EMPLOYEE_ERROR",
+          message: error,
+          code: "EMPLOYEE_NOT_FOUND_OR_INACTIVE",
+          employeeId,
+          departmentId: targetDepartment,
+        });
+
+        console.error(`❌ ${error}`);
+        return res.status(404).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
+
+      // Update summary with employee details
+      processingSummary.details.employeeName = `${employee.firstName} ${employee.lastName}`;
 
       // Check for existing payroll
       const existingPayroll = await PayrollModel.findOne({
@@ -3265,10 +3527,31 @@ export class AdminController {
       });
 
       if (existingPayroll) {
-        throw new ApiError(400, "Payroll already exists for this period");
+        const error = "Payroll already exists for this period";
+        processingSummary.skipped = 1;
+        processingSummary.warnings.push({
+          type: "DUPLICATE_PAYROLL",
+          message: error,
+          code: "PAYROLL_ALREADY_EXISTS",
+          employeeId,
+          employeeName: processingSummary.details.employeeName,
+          period: `${month}/${year} (${frequency})`,
+        });
+
+        console.warn(
+          `⚠️ ${error} for employee: ${processingSummary.details.employeeName}`
+        );
+        return res.status(400).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
 
       // Calculate payroll using PayrollService
+      console.log(
+        `🧮 Calculating payroll for employee: ${processingSummary.details.employeeName}`
+      );
       const payrollData = await PayrollService.calculatePayroll(
         employeeId,
         salaryGrade,
@@ -3279,7 +3562,24 @@ export class AdminController {
       );
 
       if (!payrollData) {
-        throw new ApiError(400, "Failed to calculate payroll");
+        const error = "Failed to calculate payroll";
+        processingSummary.failed = 1;
+        processingSummary.errors.push({
+          type: "CALCULATION_ERROR",
+          message: error,
+          code: "PAYROLL_CALCULATION_FAILED",
+          employeeId,
+          employeeName: processingSummary.details.employeeName,
+        });
+
+        console.error(
+          `❌ ${error} for employee: ${processingSummary.details.employeeName}`
+        );
+        return res.status(400).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
 
       // Enhanced HR Head detection
@@ -3303,7 +3603,17 @@ export class AdminController {
           .includes("human resources"),
       });
 
+      // Get department name for summary
+      const department = await DepartmentModel.findById(
+        targetDepartment
+      ).select("name");
+      processingSummary.details.departmentName =
+        department?.name || "Unknown Department";
+
       // Create payroll record
+      console.log(
+        `💾 Creating payroll record for employee: ${processingSummary.details.employeeName}`
+      );
       const payroll = await PayrollModel.create({
         ...payrollData,
         department: targetDepartment,
@@ -3339,6 +3649,21 @@ export class AdminController {
         },
       });
 
+      // Update summary with success details
+      processingSummary.processed = 1;
+      processingSummary.details.netPay = payroll.totals?.netPay;
+      processingSummary.details.processingTime = Date.now() - startTime;
+      processingSummary.details.payrollStatus = payroll.status;
+
+      console.log(
+        `✅ Payroll created successfully for employee: ${processingSummary.details.employeeName}`
+      );
+      console.log(`💰 Net Pay: ₦${payroll.totals?.netPay?.toLocaleString()}`);
+      console.log(`📊 Status: ${payroll.status}`);
+      console.log(
+        `⏱️ Processing time: ${processingSummary.details.processingTime}ms`
+      );
+
       // Create audit log for payroll creation
       await AuditService.logAction(
         "CREATE",
@@ -3357,6 +3682,7 @@ export class AdminController {
           createdBy: admin._id,
           position: admin.position,
           role: admin.role,
+          processingTime: processingSummary.details.processingTime,
         }
       );
 
@@ -3418,21 +3744,110 @@ export class AdminController {
         "x-refresh-audit-logs": "true",
       });
 
+      console.log(
+        `🎉 Single employee payroll processing completed successfully!`
+      );
+      console.log(`📊 Summary:`, JSON.stringify(processingSummary, null, 2));
+
       return res.status(201).json({
         success: true,
         message: "Payroll processed successfully",
         data: payroll,
+        summary: processingSummary,
       });
     } catch (error) {
-      next(error);
+      console.error(`❌ Error processing payroll: ${error.message}`);
+      console.error("Stack trace:", error.stack);
+
+      // Create error summary
+      const errorSummary = {
+        totalAttempted: 1,
+        processed: 0,
+        skipped: 0,
+        failed: 1,
+        errors: [
+          {
+            type: "SYSTEM_ERROR",
+            message: error.message,
+            code: "UNEXPECTED_ERROR",
+            stack: error.stack,
+          },
+        ],
+        warnings: [],
+        details: {
+          employeeId: req.body?.employeeId,
+          departmentId: req.body?.departmentId,
+          month: req.body?.month,
+          year: req.body?.year,
+          frequency: req.body?.frequency,
+          employeeName: null,
+          departmentName: null,
+          netPay: null,
+          processingTime: null,
+          payrollStatus: null,
+        },
+      };
+
+      return res.status(500).json({
+        success: false,
+        message: "An unexpected error occurred while processing payroll",
+        summary: errorSummary,
+      });
     }
   }
 
   static async processMultipleEmployeesPayroll(req, res, next) {
     try {
-      console.log("Starting multiple employees payroll processing");
+      console.log("🔄 Starting multiple employees payroll processing (Admin)");
+      console.log("📝 Request data:", JSON.stringify(req.body, null, 2));
+
       const { employeeIds, departmentId, month, year, frequency, userRole } =
         req.body;
+
+      // Initialize comprehensive summary object
+      const processingSummary = {
+        totalAttempted: employeeIds?.length || 0,
+        processed: 0,
+        skipped: 0,
+        failed: 0,
+        errors: [],
+        warnings: [],
+        details: {
+          departmentId,
+          month,
+          year,
+          frequency,
+          userRole,
+          processingTime: null,
+          totalNetPay: 0,
+          departmentBreakdown: {},
+          employeeDetails: [],
+        },
+      };
+
+      const startTime = Date.now();
+
+      // Validate input
+      if (
+        !employeeIds ||
+        !Array.isArray(employeeIds) ||
+        employeeIds.length === 0
+      ) {
+        const error = "No employee IDs provided or invalid format";
+        processingSummary.errors.push({
+          type: "VALIDATION_ERROR",
+          message: error,
+          code: "INVALID_EMPLOYEE_IDS",
+        });
+
+        console.error(`❌ ${error}`);
+        return res.status(400).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
+      }
+
       console.log("Processing request:", {
         departmentId,
         month,
@@ -3445,17 +3860,38 @@ export class AdminController {
       // Check if admin is assigned to department
       const admin = await Admin.findById(req.user._id);
       if (!admin) {
-        console.error("Admin not found:", req.user._id);
-        return res
-          .status(404)
-          .json({ success: false, message: "Admin not found" });
+        const error = "Admin not found";
+        processingSummary.failed = processingSummary.totalAttempted;
+        processingSummary.errors.push({
+          type: "AUTHENTICATION_ERROR",
+          message: error,
+          code: "ADMIN_NOT_FOUND",
+          adminId: req.user._id,
+        });
+
+        console.error(`❌ ${error}:`, req.user._id);
+        return res.status(404).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
 
       if (userRole !== "superadmin" && !admin.departmentId) {
-        console.error("Admin not assigned to any department:", req.user._id);
+        const error = "You are not assigned to any department";
+        processingSummary.failed = processingSummary.totalAttempted;
+        processingSummary.errors.push({
+          type: "PERMISSION_ERROR",
+          message: error,
+          code: "NO_DEPARTMENT_ASSIGNED",
+          adminId: req.user._id,
+        });
+
+        console.error(`❌ ${error}:`, req.user._id);
         return res.status(400).json({
           success: false,
-          message: "You are not assigned to any department",
+          message: error,
+          summary: processingSummary,
         });
       }
 
@@ -3463,13 +3899,25 @@ export class AdminController {
         userRole !== "superadmin" &&
         admin.departmentId.toString() !== departmentId
       ) {
-        console.error("Admin department mismatch:", {
+        const error =
+          "You can only process payroll for your assigned department";
+        processingSummary.failed = processingSummary.totalAttempted;
+        processingSummary.errors.push({
+          type: "PERMISSION_ERROR",
+          message: error,
+          code: "DEPARTMENT_ACCESS_DENIED",
+          adminDepartment: admin.departmentId,
+          requestedDepartment: departmentId,
+        });
+
+        console.error(`❌ ${error}:`, {
           adminDepartment: admin.departmentId,
           requestedDepartment: departmentId,
         });
         return res.status(403).json({
           success: false,
-          message: "You can only process payroll for your assigned department",
+          message: error,
+          summary: processingSummary,
         });
       }
 
@@ -3479,157 +3927,445 @@ export class AdminController {
         skipped: 0,
         failed: 0,
         errors: [],
+        successful: [],
+        skippedDetails: [],
+        failedDetails: [],
+        processedDetails: [],
       };
 
       console.log("Starting to process employees");
 
-      // Process each employee's payroll
-      for (const employeeId of employeeIds) {
+      // Process each employee's payroll with individual error handling
+      for (let i = 0; i < employeeIds.length; i++) {
+        const employeeId = employeeIds[i];
+        const employeeIndex = i + 1;
+
         try {
-          console.log(`🔄 Processing employee: ${employeeId}`);
+          console.log(
+            `\n🔄 Processing employee ${employeeIndex}/${employeeIds.length}: ${employeeId}`
+          );
 
           // Get the employee
           const employee = await UserModel.findById(employeeId);
           if (!employee) {
-            console.error(`❌ Employee not found: ${employeeId}`);
+            const error = `Employee not found: ${employeeId}`;
+            console.error(`❌ ${error}`);
+
             results.failed++;
-            results.errors.push({
+            results.failedDetails.push(error);
+            processingSummary.errors.push({
+              type: "EMPLOYEE_ERROR",
+              message: error,
+              code: "EMPLOYEE_NOT_FOUND",
               employeeId,
-              reason: "Employee not found",
+              index: employeeIndex,
+            });
+            continue;
+          }
+
+          console.log(
+            `✅ Found employee: ${employee.firstName} ${employee.lastName} (${employee.employeeId})`
+          );
+
+          // Check for existing payroll
+          const existingPayroll = await PayrollModel.findOne({
+            employee: employeeId,
+            month,
+            year,
+            frequency,
+          });
+
+          if (existingPayroll) {
+            const warning = `${employee.firstName} ${employee.lastName} (${employee.employeeId}): Payroll already exists for ${month}/${year}`;
+            console.warn(`⚠️ ${warning}`);
+
+            results.skipped++;
+            results.skippedDetails.push(warning);
+            processingSummary.warnings.push({
+              type: "DUPLICATE_PAYROLL",
+              message: warning,
+              code: "PAYROLL_ALREADY_EXISTS",
+              employeeId,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+              period: `${month}/${year} (${frequency})`,
+            });
+            continue;
+          }
+
+          // Get employee's salary grade
+          if (!employee.gradeLevel) {
+            const error = `${employee.firstName} ${employee.lastName} (${employee.employeeId}): No grade level assigned`;
+            console.error(`❌ ${error}`);
+
+            results.failed++;
+            results.failedDetails.push(error);
+            processingSummary.errors.push({
+              type: "GRADE_ERROR",
+              message: error,
+              code: "NO_GRADE_LEVEL",
+              employeeId,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+            });
+            continue;
+          }
+
+          const salaryGrade = await SalaryGrade.findOne({
+            level: employee.gradeLevel,
+            isActive: true,
+          });
+
+          if (!salaryGrade) {
+            const error = `${employee.firstName} ${employee.lastName} (${employee.employeeId}): No active salary grade found for level ${employee.gradeLevel}`;
+            console.error(`❌ ${error}`);
+
+            results.failed++;
+            results.failedDetails.push(error);
+            processingSummary.errors.push({
+              type: "GRADE_ERROR",
+              message: error,
+              code: "NO_ACTIVE_SALARY_GRADE",
+              employeeId,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+              gradeLevel: employee.gradeLevel,
             });
             continue;
           }
 
           // Calculate payroll
+          console.log(
+            `🧮 Calculating payroll for ${employee.firstName} ${employee.lastName} (${employee.employeeId})`
+          );
           const payrollData = await PayrollService.calculatePayroll(
             employeeId,
-            salaryGradeId,
+            salaryGrade._id,
             month,
             year,
             frequency,
             admin.department._id
           );
 
-          if (payrollData) {
-            // Create payroll record
-            const payroll = await PayrollModel.create({
-              ...payrollData,
-              status: PAYROLL_STATUS.DRAFT, // Start with DRAFT status for consistency
-              processedBy: adminId,
-              createdBy: adminId,
-              updatedBy: adminId,
-              payment: {
-                accountName: "Pending",
-                accountNumber: "Pending",
-                bankName: "Pending",
-              },
-              approvalFlow: {
-                currentLevel: APPROVAL_LEVELS.DRAFT,
-                history: [],
-                submittedBy: adminId,
-                submittedAt: new Date(),
-                status: PAYROLL_STATUS.DRAFT,
-                remarks: "Initial payroll creation",
-              },
-            });
+          if (!payrollData) {
+            const error = `${employee.firstName} ${employee.lastName} (${employee.employeeId}): Failed to calculate payroll`;
+            console.error(`❌ ${error}`);
 
-            console.log(`✅ Payroll created with ID: ${payroll._id}`);
-
-            // Create notification for the employee
-            console.log(`🔔 Creating notification for employee: ${employeeId}`);
-            await NotificationService.createPayrollNotification(
-              employeeId,
-              "PAYROLL_DRAFT_CREATED",
-              payroll
-            );
-
-            // Create notification for the admin
-            console.log(`🔔 Creating notification for admin: ${adminId}`);
-            await NotificationService.createPayrollNotification(
-              adminId,
-              "PAYROLL_DRAFT_CREATED",
-              payroll
-            );
-
-            results.processed++;
-            results.successful.push({
-              employeeId,
-              payrollId: payroll._id,
-            });
-
-            console.log(
-              `✅ Successfully processed payroll for employee: ${employeeId}`
-            );
-          } else {
-            console.error(
-              `❌ Failed to calculate payroll for employee ${employeeId}`
-            );
             results.failed++;
-            results.errors.push({
+            results.failedDetails.push(error);
+            processingSummary.errors.push({
+              type: "CALCULATION_ERROR",
+              message: error,
+              code: "PAYROLL_CALCULATION_FAILED",
               employeeId,
-              reason: "Failed to calculate payroll",
+              employeeName: `${employee.firstName} ${employee.lastName}`,
             });
+            continue;
           }
+
+          console.log(
+            `✅ Payroll calculation completed for ${employee.firstName} ${employee.lastName}:`,
+            {
+              basicSalary: payrollData.basicSalary,
+              totalAllowances: payrollData.totals.totalAllowances,
+              totalBonuses: payrollData.totals.totalBonuses,
+              grossEarnings: payrollData.totals.grossEarnings,
+              totalDeductions: payrollData.totals.totalDeductions,
+              netPay: payrollData.totals.netPay,
+            }
+          );
+
+          // Create payroll record
+          console.log(
+            `💾 Creating payroll record for ${employee.firstName} ${employee.lastName}`
+          );
+          const payroll = await PayrollModel.create({
+            ...payrollData,
+            status: PAYROLL_STATUS.DRAFT, // Start with DRAFT status for consistency
+            processedBy: admin._id,
+            createdBy: admin._id,
+            updatedBy: admin._id,
+            payment: {
+              accountName: "Pending",
+              accountNumber: "Pending",
+              bankName: "Pending",
+            },
+            approvalFlow: {
+              currentLevel: APPROVAL_LEVELS.DRAFT,
+              history: [],
+              submittedBy: admin._id,
+              submittedAt: new Date(),
+              status: PAYROLL_STATUS.DRAFT,
+              remarks: "Initial payroll creation",
+            },
+          });
+
+          // Update summary with success details
+          const employeeDetail = {
+            employeeId: employee._id,
+            employeeName: `${employee.firstName} ${employee.lastName}`,
+            employeeCode: employee.employeeId,
+            departmentName: employee.department?.name || "Unknown",
+            netPay: payroll.totals?.netPay,
+            payrollId: payroll._id,
+          };
+
+          processingSummary.details.employeeDetails.push(employeeDetail);
+          processingSummary.details.totalNetPay += payroll.totals?.netPay || 0;
+
+          // Update department breakdown
+          const deptName = employee.department?.name || "Unknown";
+          if (!processingSummary.details.departmentBreakdown[deptName]) {
+            processingSummary.details.departmentBreakdown[deptName] = {
+              count: 0,
+              totalNetPay: 0,
+            };
+          }
+          processingSummary.details.departmentBreakdown[deptName].count++;
+          processingSummary.details.departmentBreakdown[deptName].totalNetPay +=
+            payroll.totals?.netPay || 0;
+
+          console.log(`✅ Payroll created with ID: ${payroll._id}`);
+
+          // Create notification for the employee
+          console.log(`🔔 Creating notification for employee: ${employeeId}`);
+          await NotificationService.createPayrollNotification(
+            employeeId,
+            "PAYROLL_DRAFT_CREATED",
+            payroll
+          );
+
+          // Create notification for the admin
+          console.log(`🔔 Creating notification for admin: ${admin._id}`);
+          await NotificationService.createPayrollNotification(
+            admin._id,
+            "PAYROLL_DRAFT_CREATED",
+            payroll
+          );
+
+          results.processed++;
+          results.processedDetails.push(
+            `${employee.firstName} ${employee.lastName} (${employee.employeeId})`
+          );
+          results.successful.push({
+            employeeId,
+            payrollId: payroll._id,
+          });
+
+          console.log(
+            `✅ Successfully processed payroll for employee: ${employeeId}`
+          );
         } catch (error) {
           console.error(
             `❌ Error processing employee ${employeeId}: ${error.message}`
           );
+          const errorMessage = `Employee ID ${employeeId}: ${
+            error.message || "Unknown error occurred"
+          }`;
+
           results.failed++;
-          results.errors.push({
+          results.failedDetails.push(errorMessage);
+          processingSummary.errors.push({
+            type: "PROCESSING_ERROR",
+            message: errorMessage,
+            code: "EMPLOYEE_PROCESSING_FAILED",
             employeeId,
-            reason: error.message || "Unknown error occurred",
+            index: employeeIndex,
+            originalError: error.message,
           });
         }
       }
 
-      console.log(`\n📊 Payroll processing summary:`);
+      // Update final summary
+      processingSummary.processed = results.processed;
+      processingSummary.skipped = results.skipped;
+      processingSummary.failed = results.failed;
+      processingSummary.details.processingTime = Date.now() - startTime;
+
+      console.log(`\n Payroll processing summary:`);
       console.log(`- Total employees: ${results.total}`);
       console.log(`- Successfully processed: ${results.processed}`);
       console.log(`- Skipped: ${results.skipped}`);
       console.log(`- Failed: ${results.failed}`);
 
+      // Create audit log for batch payroll processing
+      await AuditService.logAction(
+        "CREATE",
+        "PAYROLL_BATCH",
+        null,
+        req.user._id,
+        {
+          action: "BATCH_PAYROLL_PROCESSED",
+          totalAttempted: results.total,
+          processed: results.processed,
+          skipped: results.skipped,
+          failed: results.failed,
+          departmentId: req.body?.departmentId,
+          month: req.body?.month,
+          year: req.body?.year,
+          frequency: req.body?.frequency,
+          userRole: req.body?.userRole,
+          processingTime: processingSummary.details.processingTime,
+          createdBy: req.user._id,
+          position: req.user.position,
+          role: req.user.role,
+        }
+      );
+
       res.status(200).json({
         success: true,
         message: "Multiple employee payrolls processed",
-        data: results,
+        data: {
+          total: results.total,
+          processed: results.processed,
+          skipped: results.skipped,
+          failed: results.failed,
+          processedDetails: results.processedDetails,
+          skippedDetails: results.skippedDetails,
+          failedDetails: results.failedDetails,
+        },
+        summary: processingSummary,
       });
     } catch (error) {
       console.error(`❌ Error processing multiple payrolls: ${error.message}`);
-      next(error);
+
+      // Create comprehensive error summary
+      const errorSummary = {
+        totalAttempted: req.body?.employeeIds?.length || 0,
+        processed: 0,
+        skipped: 0,
+        failed: req.body?.employeeIds?.length || 0,
+        errors: [
+          {
+            type: "SYSTEM_ERROR",
+            message: error.message,
+            code: "BATCH_PROCESSING_FAILED",
+            stack: error.stack,
+          },
+        ],
+        warnings: [],
+        details: {
+          departmentId: req.body?.departmentId,
+          month: req.body?.month,
+          year: req.body?.year,
+          frequency: req.body?.frequency,
+          userRole: req.body?.userRole,
+          processingTime: null,
+          totalNetPay: 0,
+          departmentBreakdown: {},
+          employeeDetails: [],
+        },
+      };
+
+      return res.status(500).json({
+        success: false,
+        message: "An unexpected error occurred during batch payroll processing",
+        summary: errorSummary,
+      });
     }
   }
 
   static async processDepartmentPayroll(req, res) {
     try {
       console.log("🔄 Processing department payroll:", req.body);
+      console.log("📝 Request data:", JSON.stringify(req.body, null, 2));
+
       const { month, year, frequency, employeeSalaryGrades } = req.body;
       const adminId = req.user._id;
 
+      // Initialize comprehensive summary object
+      const processingSummary = {
+        totalAttempted: employeeSalaryGrades?.length || 0,
+        processed: 0,
+        skipped: 0,
+        failed: 0,
+        errors: [],
+        warnings: [],
+        details: {
+          month,
+          year,
+          frequency,
+          processingTime: null,
+          totalNetPay: 0,
+          departmentBreakdown: {},
+          employeeDetails: [],
+          departmentName: null,
+        },
+      };
+
+      const startTime = Date.now();
+
       // Get admin's department
-      const admin = await UserModel.findById(adminId).select("department");
+      const admin = await UserModel.findById(adminId)
+        .populate("department", "name code")
+        .select("department");
       if (!admin?.department) {
-        console.error("❌ Admin is not assigned to any department");
+        const error = "Admin must be assigned to a department";
+        processingSummary.failed = processingSummary.totalAttempted;
+        processingSummary.errors.push({
+          type: "PERMISSION_ERROR",
+          message: error,
+          code: "NO_DEPARTMENT_ASSIGNED",
+          adminId,
+        });
+
+        console.error(`❌ ${error}`);
         return res.status(400).json({
           success: false,
-          message: "Admin must be assigned to a department",
+          message: error,
+          summary: processingSummary,
         });
       }
 
+      processingSummary.details.departmentName = admin.department.name;
+
       console.log(`👤 Admin processing department payroll: ${admin._id}`);
-      console.log(`🏢 Department: ${admin.department}`);
+      console.log(
+        `🏢 Department: ${admin.department.name} (${admin.department._id})`
+      );
+
+      // Validate input
+      if (
+        !employeeSalaryGrades ||
+        !Array.isArray(employeeSalaryGrades) ||
+        employeeSalaryGrades.length === 0
+      ) {
+        const error = "No employee salary grades provided or invalid format";
+        processingSummary.errors.push({
+          type: "VALIDATION_ERROR",
+          message: error,
+          code: "INVALID_EMPLOYEE_SALARY_GRADES",
+        });
+
+        console.error(`❌ ${error}`);
+        return res.status(400).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
+      }
 
       // Get all active employees in the department
       const employees = await UserModel.find({
-        department: admin.department,
+        department: admin.department._id,
         status: "active",
         role: "employee",
-      }).select("employeeId firstName lastName email gradeLevel bankDetails");
+      }).select(
+        "employeeId firstName lastName email gradeLevel bankDetails department"
+      );
 
       if (!employees.length) {
-        console.error("❌ No active employees found in department");
+        const error = "No active employees found in department";
+        processingSummary.errors.push({
+          type: "DATA_ERROR",
+          message: error,
+          code: "NO_ACTIVE_EMPLOYEES",
+          departmentId: admin.department._id,
+          departmentName: admin.department.name,
+        });
+
+        console.error(`❌ ${error}`);
         return res.status(404).json({
           success: false,
-          message: "No active employees found in department",
+          message: error,
+          summary: processingSummary,
         });
       }
 
@@ -3638,36 +4374,50 @@ export class AdminController {
       );
 
       const results = {
-        total: employees.length,
+        total: employeeSalaryGrades.length,
         processed: 0,
         skipped: 0,
         failed: 0,
         errors: [],
         successful: [],
+        skippedDetails: [],
+        failedDetails: [],
+        processedDetails: [],
       };
 
       // Process each employee
-      for (const { employeeId, salaryGradeId } of employeeSalaryGrades) {
+      for (let i = 0; i < employeeSalaryGrades.length; i++) {
+        const { employeeId, salaryGradeId } = employeeSalaryGrades[i];
+        const employeeIndex = i + 1;
+
         try {
+          console.log(
+            `\n🔄 Processing employee ${employeeIndex}/${employeeSalaryGrades.length}: ${employeeId}`
+          );
+
           // Find the employee in our employees array
           const employee = employees.find(
             (e) => e._id.toString() === employeeId.toString()
           );
 
           if (!employee) {
-            console.log(
-              `⚠️ Employee ${employeeId} not found in department, skipping`
-            );
+            const warning = `Employee ${employeeId} not found in department, skipping`;
+            console.warn(`⚠️ ${warning}`);
+
             results.skipped++;
-            results.errors.push({
+            results.skippedDetails.push(warning);
+            processingSummary.warnings.push({
+              type: "EMPLOYEE_NOT_FOUND",
+              message: warning,
+              code: "EMPLOYEE_NOT_IN_DEPARTMENT",
               employeeId,
-              reason: "Employee not found in department",
+              index: employeeIndex,
             });
             continue;
           }
 
           console.log(
-            `\n🔄 Processing employee: ${employee.employeeId} (${employee.firstName} ${employee.lastName})`
+            `✅ Found employee: ${employee.employeeId} (${employee.firstName} ${employee.lastName})`
           );
 
           // Skip if employee has no bank details
@@ -3675,14 +4425,18 @@ export class AdminController {
             !employee.bankDetails?.accountNumber ||
             !employee.bankDetails?.bankName
           ) {
-            console.log(
-              `⚠️ Employee ${employee.employeeId} has incomplete bank details, skipping`
-            );
+            const warning = `Employee ${employee.employeeId} has incomplete bank details, skipping`;
+            console.warn(`⚠️ ${warning}`);
+
             results.skipped++;
-            results.errors.push({
-              employeeId: employee.employeeId,
-              name: `${employee.firstName} ${employee.lastName}`,
-              reason: "Incomplete bank details",
+            results.skippedDetails.push(warning);
+            processingSummary.warnings.push({
+              type: "BANK_DETAILS_WARNING",
+              message: warning,
+              code: "INCOMPLETE_BANK_DETAILS",
+              employeeId: employee._id,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+              employeeCode: employee.employeeId,
             });
             continue;
           }
@@ -3696,14 +4450,60 @@ export class AdminController {
           });
 
           if (existingPayroll) {
-            console.log(
-              `⚠️ Payroll already exists for employee ${employee.employeeId}, skipping`
-            );
+            const warning = `Payroll already exists for employee ${employee.employeeId} for ${month}/${year}, skipping`;
+            console.warn(`⚠️ ${warning}`);
+
             results.skipped++;
-            results.errors.push({
-              employeeId: employee.employeeId,
-              name: `${employee.firstName} ${employee.lastName}`,
-              reason: "Payroll already exists for this period",
+            results.skippedDetails.push(warning);
+            processingSummary.warnings.push({
+              type: "DUPLICATE_PAYROLL",
+              message: warning,
+              code: "PAYROLL_ALREADY_EXISTS",
+              employeeId: employee._id,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+              employeeCode: employee.employeeId,
+              period: `${month}/${year}`,
+            });
+            continue;
+          }
+
+          // Get employee's salary grade
+          if (!employee.gradeLevel) {
+            const error = `${employee.firstName} ${employee.lastName} (${employee.employeeId}): No grade level assigned`;
+            console.error(`❌ ${error}`);
+
+            results.failed++;
+            results.failedDetails.push(error);
+            processingSummary.errors.push({
+              type: "GRADE_ERROR",
+              message: error,
+              code: "NO_GRADE_LEVEL",
+              employeeId: employee._id,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+              employeeCode: employee.employeeId,
+            });
+            continue;
+          }
+
+          const salaryGrade = await SalaryGrade.findOne({
+            level: employee.gradeLevel,
+            isActive: true,
+          });
+
+          if (!salaryGrade) {
+            const error = `${employee.firstName} ${employee.lastName} (${employee.employeeId}): No active salary grade found for level ${employee.gradeLevel}`;
+            console.error(`❌ ${error}`);
+
+            results.failed++;
+            results.failedDetails.push(error);
+            processingSummary.errors.push({
+              type: "GRADE_ERROR",
+              message: error,
+              code: "NO_ACTIVE_SALARY_GRADE",
+              employeeId: employee._id,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+              employeeCode: employee.employeeId,
+              gradeLevel: employee.gradeLevel,
             });
             continue;
           }
@@ -3717,10 +4517,43 @@ export class AdminController {
             salaryGradeId,
             month,
             year,
-            frequency
+            frequency,
+            admin.department._id
+          );
+
+          if (!payrollData) {
+            const error = `${employee.firstName} ${employee.lastName} (${employee.employeeId}): Failed to calculate payroll`;
+            console.error(`❌ ${error}`);
+
+            results.failed++;
+            results.failedDetails.push(error);
+            processingSummary.errors.push({
+              type: "CALCULATION_ERROR",
+              message: error,
+              code: "PAYROLL_CALCULATION_FAILED",
+              employeeId: employee._id,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+              employeeCode: employee.employeeId,
+            });
+            continue;
+          }
+
+          console.log(
+            `✅ Payroll calculation completed for ${employee.firstName} ${employee.lastName}:`,
+            {
+              basicSalary: payrollData.basicSalary,
+              totalAllowances: payrollData.totals.totalAllowances,
+              totalBonuses: payrollData.totals.totalBonuses,
+              grossEarnings: payrollData.totals.grossEarnings,
+              totalDeductions: payrollData.totals.totalDeductions,
+              netPay: payrollData.totals.netPay,
+            }
           );
 
           // Create payroll record
+          console.log(
+            `💾 Creating payroll record for ${employee.firstName} ${employee.lastName}`
+          );
           const payroll = await PayrollModel.create({
             ...payrollData,
             status: PAYROLL_STATUS.DRAFT,
@@ -3741,6 +4574,31 @@ export class AdminController {
               remarks: "Initial payroll creation",
             },
           });
+
+          // Update summary with success details
+          const employeeDetail = {
+            employeeId: employee._id,
+            employeeName: `${employee.firstName} ${employee.lastName}`,
+            employeeCode: employee.employeeId,
+            departmentName: employee.department?.name || admin.department.name,
+            netPay: payroll.totals?.netPay,
+            payrollId: payroll._id,
+          };
+
+          processingSummary.details.employeeDetails.push(employeeDetail);
+          processingSummary.details.totalNetPay += payroll.totals?.netPay || 0;
+
+          // Update department breakdown
+          const deptName = employee.department?.name || admin.department.name;
+          if (!processingSummary.details.departmentBreakdown[deptName]) {
+            processingSummary.details.departmentBreakdown[deptName] = {
+              count: 0,
+              totalNetPay: 0,
+            };
+          }
+          processingSummary.details.departmentBreakdown[deptName].count++;
+          processingSummary.details.departmentBreakdown[deptName].totalNetPay +=
+            payroll.totals?.netPay || 0;
 
           console.log(`✅ Payroll created with ID: ${payroll._id}`);
 
@@ -3763,6 +4621,9 @@ export class AdminController {
           );
 
           results.processed++;
+          results.processedDetails.push(
+            `${employee.firstName} ${employee.lastName} (${employee.employeeId})`
+          );
           results.successful.push({
             employeeId: employee.employeeId,
             name: `${employee.firstName} ${employee.lastName}`,
@@ -3776,31 +4637,108 @@ export class AdminController {
           console.error(
             `❌ Error processing employee ${employeeId}: ${error.message}`
           );
+          const errorMessage = `Employee ID ${employeeId}: ${
+            error.message || "Unknown error occurred"
+          }`;
+
           results.failed++;
-          results.errors.push({
+          results.failedDetails.push(errorMessage);
+          processingSummary.errors.push({
+            type: "PROCESSING_ERROR",
+            message: errorMessage,
+            code: "EMPLOYEE_PROCESSING_FAILED",
             employeeId,
-            reason: error.message || "Unknown error occurred",
+            index: employeeIndex,
+            originalError: error.message,
           });
         }
       }
 
-      console.log(`\n📊 Department payroll processing summary:`);
+      // Update final summary
+      processingSummary.processed = results.processed;
+      processingSummary.skipped = results.skipped;
+      processingSummary.failed = results.failed;
+      processingSummary.details.processingTime = Date.now() - startTime;
+
+      console.log(`\n Payroll processing summary:`);
       console.log(`- Total employees: ${results.total}`);
       console.log(`- Successfully processed: ${results.processed}`);
       console.log(`- Skipped: ${results.skipped}`);
       console.log(`- Failed: ${results.failed}`);
 
+      // Create audit log for batch payroll processing
+      await AuditService.logAction(
+        "CREATE",
+        "PAYROLL_BATCH",
+        null,
+        req.user._id,
+        {
+          action: "BATCH_PAYROLL_PROCESSED",
+          totalAttempted: results.total,
+          processed: results.processed,
+          skipped: results.skipped,
+          failed: results.failed,
+          departmentId: req.body?.departmentId,
+          month: req.body?.month,
+          year: req.body?.year,
+          frequency: req.body?.frequency,
+          userRole: req.body?.userRole,
+          processingTime: processingSummary.details.processingTime,
+          createdBy: req.user._id,
+          position: req.user.position,
+          role: req.user.role,
+        }
+      );
+
       return res.status(200).json({
         success: true,
         message: "Department payroll processed",
-        data: results,
+        data: {
+          total: results.total,
+          processed: results.processed,
+          skipped: results.skipped,
+          failed: results.failed,
+          processedDetails: results.processedDetails,
+          skippedDetails: results.skippedDetails,
+          failedDetails: results.failedDetails,
+        },
+        summary: processingSummary,
       });
     } catch (error) {
       console.error(`❌ Error processing department payroll: ${error.message}`);
+
+      // Create comprehensive error summary
+      const errorSummary = {
+        totalAttempted: req.body?.employeeSalaryGrades?.length || 0,
+        processed: 0,
+        skipped: 0,
+        failed: req.body?.employeeSalaryGrades?.length || 0,
+        errors: [
+          {
+            type: "SYSTEM_ERROR",
+            message: error.message,
+            code: "DEPARTMENT_PROCESSING_FAILED",
+            stack: error.stack,
+          },
+        ],
+        warnings: [],
+        details: {
+          month: req.body?.month,
+          year: req.body?.year,
+          frequency: req.body?.frequency,
+          processingTime: null,
+          totalNetPay: 0,
+          departmentBreakdown: {},
+          employeeDetails: [],
+          departmentName: null,
+        },
+      };
+
       return res.status(500).json({
         success: false,
-        message: "Error processing department payroll",
-        error: error.message,
+        message:
+          "An unexpected error occurred during department payroll processing",
+        summary: errorSummary,
       });
     }
   }
@@ -3808,22 +4746,66 @@ export class AdminController {
   static async submitDepartmentPayrolls(req, res, next) {
     try {
       console.log("🔄 Submitting department payrolls:", req.body);
+      console.log("📝 Request data:", JSON.stringify(req.body, null, 2));
+
       const { month, year, remarks } = req.body;
-      const admin = await UserModel.findById(req.user.id);
+      const adminId = req.user.id;
+
+      // Initialize comprehensive summary object
+      const processingSummary = {
+        totalAttempted: 0,
+        submitted: 0,
+        skipped: 0,
+        failed: 0,
+        errors: [],
+        warnings: [],
+        details: {
+          month,
+          year,
+          remarks,
+          processingTime: null,
+          departmentName: null,
+          nextApprover: null,
+          payrollDetails: [],
+        },
+      };
+
+      const startTime = Date.now();
+
+      const admin = await UserModel.findById(adminId).populate(
+        "department",
+        "name code"
+      );
 
       if (!admin?.department) {
-        console.error("❌ Admin is not assigned to any department");
-        throw new ApiError(400, "Admin is not assigned to any department");
+        const error = "Admin is not assigned to any department";
+        processingSummary.errors.push({
+          type: "PERMISSION_ERROR",
+          message: error,
+          code: "NO_DEPARTMENT_ASSIGNED",
+          adminId,
+        });
+
+        console.error(`❌ ${error}`);
+        return res.status(400).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
+
+      processingSummary.details.departmentName = admin.department.name;
 
       console.log(
         `👤 Admin submitting payrolls: ${admin.firstName} ${admin.lastName} (${admin._id})`
       );
-      console.log(`🏢 Department: ${admin.department}`);
+      console.log(
+        `🏢 Department: ${admin.department.name} (${admin.department._id})`
+      );
 
       // Get department head based on position - using a more reliable approach
       let departmentHead = await UserModel.findOne({
-        department: admin.department,
+        department: admin.department._id,
         position: {
           $in: [
             "Head of Department",
@@ -3839,7 +4821,7 @@ export class AdminController {
       // If no exact match, try a more flexible approach
       if (!departmentHead) {
         const allDepartmentUsers = await UserModel.find({
-          department: admin.department,
+          department: admin.department._id,
           status: "active",
         });
 
@@ -3855,12 +4837,30 @@ export class AdminController {
           );
           departmentHead = potentialHead;
         } else {
-          throw new ApiError(
-            404,
-            "No department head found for your department"
-          );
+          const error = "No department head found for your department";
+          processingSummary.errors.push({
+            type: "APPROVAL_ERROR",
+            message: error,
+            code: "NO_DEPARTMENT_HEAD",
+            departmentId: admin.department._id,
+            departmentName: admin.department.name,
+          });
+
+          console.error(`❌ ${error}`);
+          return res.status(404).json({
+            success: false,
+            message: error,
+            summary: processingSummary,
+          });
         }
       }
+
+      processingSummary.details.nextApprover = {
+        id: departmentHead._id,
+        name: `${departmentHead.firstName} ${departmentHead.lastName}`,
+        position: departmentHead.position,
+        level: "DEPARTMENT_HEAD",
+      };
 
       // Get HR Manager (Head of Human Resources) - using a more reliable approach
       const hrDepartment = await DepartmentModel.findOne({
@@ -3907,29 +4907,59 @@ export class AdminController {
         : null;
 
       // Find all draft payrolls for the department in the specified month and year
+      console.log(
+        `🔍 Searching for draft payrolls in ${admin.department.name} for ${month}/${year}`
+      );
       const draftPayrolls = await PayrollModel.find({
-        department: admin.department,
+        department: admin.department._id,
         month,
         year,
         status: PAYROLL_STATUS.DRAFT,
-      });
+      }).populate("employee", "firstName lastName employeeId");
 
       if (draftPayrolls.length === 0) {
-        console.error("❌ No draft payrolls found for submission");
-        throw new ApiError(404, "No draft payrolls found for submission");
+        const error = "No draft payrolls found for submission";
+        processingSummary.errors.push({
+          type: "DATA_ERROR",
+          message: error,
+          code: "NO_DRAFT_PAYROLLS",
+          departmentId: admin.department._id,
+          departmentName: admin.department.name,
+          month,
+          year,
+        });
+
+        console.error(`❌ ${error}`);
+        return res.status(404).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
 
+      processingSummary.totalAttempted = draftPayrolls.length;
       console.log(`📋 Found ${draftPayrolls.length} draft payrolls to submit`);
 
       // Update all payrolls to PENDING status
-      const updatedPayrolls = await Promise.all(
-        draftPayrolls.map(async (payroll) => {
-          console.log(`🔄 Updating payroll status to PENDING: ${payroll._id}`);
+      const updatedPayrolls = [];
+      const failedPayrolls = [];
+
+      for (let i = 0; i < draftPayrolls.length; i++) {
+        const payroll = draftPayrolls[i];
+        const payrollIndex = i + 1;
+
+        try {
+          console.log(
+            `\n🔄 Updating payroll ${payrollIndex}/${draftPayrolls.length} to PENDING: ${payroll._id}`
+          );
+          console.log(
+            `👤 Employee: ${payroll.employee?.firstName} ${payroll.employee?.lastName} (${payroll.employee?.employeeId})`
+          );
 
           // Special case for HR department - skip Department Head level if submitter is HR Manager/Head
           const isHRDepartment =
             hrDepartment &&
-            admin.department.toString() === hrDepartment._id.toString();
+            admin.department._id.toString() === hrDepartment._id.toString();
 
           const isHRManager =
             admin.position &&
@@ -3981,79 +5011,128 @@ export class AdminController {
                 .toLowerCase()} approval`,
           };
 
-          return payroll.save();
-        })
-      );
+          const savedPayroll = await payroll.save();
+          updatedPayrolls.push(savedPayroll);
+
+          // Add to summary details
+          processingSummary.details.payrollDetails.push({
+            payrollId: savedPayroll._id,
+            employeeId: savedPayroll.employee?._id,
+            employeeName: `${savedPayroll.employee?.firstName} ${savedPayroll.employee?.lastName}`,
+            employeeCode: savedPayroll.employee?.employeeId,
+            netPay: savedPayroll.totals?.netPay,
+            approvalLevel: initialApprovalLevel,
+          });
+
+          console.log(`✅ Successfully updated payroll: ${savedPayroll._id}`);
+        } catch (error) {
+          console.error(
+            `❌ Error updating payroll ${payroll._id}: ${error.message}`
+          );
+          failedPayrolls.push({
+            payrollId: payroll._id,
+            employeeName: `${payroll.employee?.firstName} ${payroll.employee?.lastName}`,
+            error: error.message,
+          });
+
+          processingSummary.errors.push({
+            type: "UPDATE_ERROR",
+            message: `Failed to update payroll: ${error.message}`,
+            code: "PAYROLL_UPDATE_FAILED",
+            payrollId: payroll._id,
+            employeeName: `${payroll.employee?.firstName} ${payroll.employee?.lastName}`,
+            index: payrollIndex,
+          });
+        }
+      }
+
+      // Update summary counts
+      processingSummary.submitted = updatedPayrolls.length;
+      processingSummary.failed = failedPayrolls.length;
+      processingSummary.details.processingTime = Date.now() - startTime;
+
+      console.log(`\n Payroll submission summary:`);
+      console.log(`- Total payrolls: ${processingSummary.totalAttempted}`);
+      console.log(`- Successfully submitted: ${processingSummary.submitted}`);
+      console.log(`- Failed: ${processingSummary.failed}`);
 
       // Create notifications for all stakeholders
-      const notificationPromises = [];
+      if (updatedPayrolls.length > 0) {
+        console.log(
+          `🔔 Creating notifications for ${updatedPayrolls.length} payrolls`
+        );
+        const notificationPromises = [];
 
-      // Notify department head
-      notificationPromises.push(
-        NotificationService.createBatchPayrollNotifications(
-          departmentHead._id,
-          NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
-          updatedPayrolls,
-          remarks || "Submitted for department head approval"
-        )
-      );
-
-      // Notify HR Manager if found
-      if (hrManager) {
+        // Notify department head
         notificationPromises.push(
           NotificationService.createBatchPayrollNotifications(
-            hrManager._id,
+            departmentHead._id,
             NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
             updatedPayrolls,
             remarks || "Submitted for department head approval"
           )
         );
+
+        // Notify HR Manager if found
+        if (hrManager) {
+          notificationPromises.push(
+            NotificationService.createBatchPayrollNotifications(
+              hrManager._id,
+              NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
+              updatedPayrolls,
+              remarks || "Submitted for department head approval"
+            )
+          );
+        }
+
+        // Notify Finance Director if found
+        if (financeDirector) {
+          notificationPromises.push(
+            NotificationService.createBatchPayrollNotifications(
+              financeDirector._id,
+              NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
+              updatedPayrolls,
+              remarks || "Submitted for department head approval"
+            )
+          );
+        }
+
+        // Notify super admins
+        const superAdmins = await UserModel.find({
+          role: "SUPER_ADMIN",
+          status: "active",
+        });
+        for (const superAdmin of superAdmins) {
+          notificationPromises.push(
+            NotificationService.createBatchPayrollNotifications(
+              superAdmin._id,
+              NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
+              updatedPayrolls,
+              remarks || "Submitted for department head approval"
+            )
+          );
+        }
+
+        // Create notifications for employees
+        for (const payroll of updatedPayrolls) {
+          notificationPromises.push(
+            NotificationService.createPayrollNotification(
+              payroll.employee,
+              NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
+              payroll,
+              remarks || "Submitted for department head approval"
+            )
+          );
+        }
+
+        await Promise.all(notificationPromises);
+        console.log(`✅ Notifications sent successfully`);
       }
 
-      // Notify Finance Director if found
-      if (financeDirector) {
-        notificationPromises.push(
-          NotificationService.createBatchPayrollNotifications(
-            financeDirector._id,
-            NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
-            updatedPayrolls,
-            remarks || "Submitted for department head approval"
-          )
-        );
-      }
-
-      // Notify super admins
-      const superAdmins = await UserModel.find({
-        role: "SUPER_ADMIN",
-        status: "active",
-      });
-      for (const superAdmin of superAdmins) {
-        notificationPromises.push(
-          NotificationService.createBatchPayrollNotifications(
-            superAdmin._id,
-            NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
-            updatedPayrolls,
-            remarks || "Submitted for department head approval"
-          )
-        );
-      }
-
-      // Create notifications for employees
-      for (const payroll of updatedPayrolls) {
-        notificationPromises.push(
-          NotificationService.createPayrollNotification(
-            payroll.employee,
-            NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
-            payroll,
-            remarks || "Submitted for department head approval"
-          )
-        );
-      }
-
-      await Promise.all(notificationPromises);
-
+      console.log(`\n Payroll submission completed!`);
       console.log(
-        `✅ Successfully submitted ${updatedPayrolls.length} payrolls`
+        `📊 Final Summary:`,
+        JSON.stringify(processingSummary, null, 2)
       );
 
       return res.status(200).json({
@@ -4061,12 +5140,51 @@ export class AdminController {
         message: "Payrolls submitted successfully for approval",
         data: {
           submitted: updatedPayrolls.length,
+          failed: failedPayrolls.length,
           payrolls: updatedPayrolls,
+          failedPayrolls,
           nextApprover: departmentHead,
         },
+        summary: processingSummary,
       });
     } catch (error) {
-      next(error);
+      console.error(
+        `❌ Error submitting department payrolls: ${error.message}`
+      );
+      console.error("Stack trace:", error.stack);
+
+      // Create comprehensive error summary
+      const errorSummary = {
+        totalAttempted: 0,
+        submitted: 0,
+        skipped: 0,
+        failed: 0,
+        errors: [
+          {
+            type: "SYSTEM_ERROR",
+            message: error.message,
+            code: "DEPARTMENT_SUBMISSION_FAILED",
+            stack: error.stack,
+          },
+        ],
+        warnings: [],
+        details: {
+          month: req.body?.month,
+          year: req.body?.year,
+          remarks: req.body?.remarks,
+          processingTime: null,
+          departmentName: null,
+          nextApprover: null,
+          payrollDetails: [],
+        },
+      };
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "An unexpected error occurred during department payroll submission",
+        summary: errorSummary,
+      });
     }
   }
 
@@ -4157,6 +5275,7 @@ export class AdminController {
             );
         }
         nextLevel = APPROVAL_LEVELS.HR_MANAGER;
+        approvalMessage = "Department Head";
         console.log("Department Head approval check:", {
           canApprove,
           position: admin.position,
@@ -4183,6 +5302,7 @@ export class AdminController {
             "HR Director",
           ].some((pos) => admin.position.includes(pos));
         nextLevel = APPROVAL_LEVELS.FINANCE_DIRECTOR;
+        approvalMessage = "HR Manager";
         console.log("HR Manager approval check:", {
           canApprove,
           position: admin.position,
@@ -4223,60 +5343,197 @@ export class AdminController {
         );
       }
 
+      // Initialize approval summary
+      const approvalSummary = {
+        totalPayrolls: pendingPayrolls.length,
+        approved: 0,
+        failed: 0,
+        errors: [],
+        warnings: [],
+        departmentInfo: {
+          departmentId: admin.department.toString(),
+          departmentName: admin.department,
+          month,
+          year,
+        },
+        approvalDetails: {
+          currentLevel,
+          nextLevel: nextLevel || "COMPLETED",
+          approver: {
+            id: admin._id,
+            name: admin.firstName + " " + admin.lastName,
+            position: admin.position,
+            role: admin.role,
+          },
+          approvalMessage,
+          timestamp: new Date(),
+        },
+        performance: {
+          startTime: Date.now(),
+          endTime: null,
+          duration: null,
+        },
+      };
+
+      console.log(`🚀 Starting department payroll approval process:`, {
+        department: approvalSummary.departmentInfo,
+        approvalLevel: currentLevel,
+        totalPayrolls: approvalSummary.totalPayrolls,
+        approver: approvalSummary.approvalDetails.approver,
+      });
+
       // Update all payrolls
       const updatedPayrolls = await Promise.all(
-        pendingPayrolls.map(async (payroll) => {
-          // Add to approval history
-          payroll.approvalFlow.history.push({
-            level: currentLevel,
-            status: "APPROVED",
-            action: "APPROVE",
-            user: admin._id,
-            timestamp: new Date(),
-            remarks: remarks || `Approved by ${approvalMessage}`,
-          });
+        pendingPayrolls.map(async (payroll, index) => {
+          try {
+            console.log(
+              `�� Processing payroll ${index + 1}/${pendingPayrolls.length}:`,
+              {
+                employeeId: payroll.employee._id,
+                employeeName:
+                  payroll.employee.firstName + " " + payroll.employee.lastName,
+                currentLevel,
+                nextLevel,
+              }
+            );
 
-          // Update current level to next level if not final approval
-          if (nextLevel) {
-            payroll.approvalFlow.currentLevel = nextLevel;
-          } else {
-            // This is the final approval
-            payroll.status = PAYROLL_STATUS.APPROVED;
-            payroll.approvalFlow.currentLevel = "COMPLETED";
+            // Add to approval history
+            payroll.approvalFlow.history.push({
+              level: currentLevel,
+              status: "APPROVED",
+              action: "APPROVE",
+              user: admin._id,
+              timestamp: new Date(),
+              remarks: remarks || `Approved by ${approvalMessage}`,
+            });
+
+            // Update current level to next level if not final approval
+            if (nextLevel) {
+              payroll.approvalFlow.currentLevel = nextLevel;
+            } else {
+              // This is the final approval
+              payroll.status = PAYROLL_STATUS.APPROVED;
+              payroll.approvalFlow.currentLevel = "COMPLETED";
+            }
+
+            await payroll.save();
+
+            // Send individual notifications to employees
+            await NotificationService.createPayrollNotification(
+              payroll.employee._id,
+              "PAYROLL_APPROVED",
+              payroll,
+              remarks || `Approved by ${approvalMessage}`
+            );
+
+            approvalSummary.approved++;
+            console.log(
+              `✅ Successfully approved payroll for ${payroll.employee.firstName} ${payroll.employee.lastName}`
+            );
+
+            return payroll;
+          } catch (error) {
+            approvalSummary.failed++;
+            const errorMessage = `Failed to approve payroll for ${payroll.employee.firstName} ${payroll.employee.lastName}: ${error.message}`;
+            approvalSummary.errors.push(errorMessage);
+            console.error(`❌ ${errorMessage}`, error);
+
+            // Return the original payroll for error tracking
+            return {
+              ...payroll.toObject(),
+              approvalError: error.message,
+            };
           }
-
-          await payroll.save();
-
-          // Send individual notifications to employees
-          await NotificationService.createPayrollNotification(
-            payroll.employee._id,
-            "PAYROLL_APPROVED",
-            payroll,
-            remarks || `Approved by ${approvalMessage}`
-          );
-
-          return payroll;
         })
       );
 
+      // Calculate performance metrics
+      approvalSummary.performance.endTime = Date.now();
+      approvalSummary.performance.duration =
+        approvalSummary.performance.endTime -
+        approvalSummary.performance.startTime;
+
       // Send batch notification to department admin
-      await NotificationService.createPayrollNotification(
-        admin._id,
-        "DEPARTMENT_PAYROLL_APPROVED",
-        { month, year },
-        remarks || `Approved by ${approvalMessage}`
-      );
+      try {
+        await NotificationService.createPayrollNotification(
+          admin._id,
+          "DEPARTMENT_PAYROLL_APPROVED",
+          { month, year },
+          remarks || `Approved by ${approvalMessage}`
+        );
+        console.log(`📧 Sent batch notification to department admin`);
+      } catch (error) {
+        const warningMessage = `Failed to send batch notification: ${error.message}`;
+        approvalSummary.warnings.push(warningMessage);
+        console.warn(`⚠️ ${warningMessage}`);
+      }
+
+      // Log final summary
+      console.log(`�� Department Payroll Approval Summary:`, {
+        department: approvalSummary.departmentInfo.departmentName,
+        month: approvalSummary.departmentInfo.month,
+        year: approvalSummary.departmentInfo.year,
+        totalPayrolls: approvalSummary.totalPayrolls,
+        approved: approvalSummary.approved,
+        failed: approvalSummary.failed,
+        successRate: `${(
+          (approvalSummary.approved / approvalSummary.totalPayrolls) *
+          100
+        ).toFixed(2)}%`,
+        approvalLevel: currentLevel,
+        nextLevel: nextLevel || "COMPLETED",
+        approver: approvalSummary.approvalDetails.approver.name,
+        duration: `${approvalSummary.performance.duration}ms`,
+        errors: approvalSummary.errors.length,
+        warnings: approvalSummary.warnings.length,
+      });
+
+      // Log detailed errors if any
+      if (approvalSummary.errors.length > 0) {
+        console.error(
+          `❌ Approval Errors (${approvalSummary.errors.length}):`,
+          approvalSummary.errors
+        );
+      }
+
+      // Log warnings if any
+      if (approvalSummary.warnings.length > 0) {
+        console.warn(
+          `⚠️ Approval Warnings (${approvalSummary.warnings.length}):`,
+          approvalSummary.warnings
+        );
+      }
 
       res.status(200).json({
         success: true,
         message: `Department payrolls approved by ${approvalMessage} successfully`,
         data: {
-          approved: updatedPayrolls.length,
+          approved: approvalSummary.approved,
+          failed: approvalSummary.failed,
+          total: approvalSummary.totalPayrolls,
+          successRate: `${(
+            (approvalSummary.approved / approvalSummary.totalPayrolls) *
+            100
+          ).toFixed(2)}%`,
           payrolls: updatedPayrolls,
           currentLevel: nextLevel || "COMPLETED",
+          summary: {
+            department: approvalSummary.departmentInfo,
+            approvalDetails: approvalSummary.approvalDetails,
+            performance: approvalSummary.performance,
+            errors: approvalSummary.errors,
+            warnings: approvalSummary.warnings,
+          },
         },
       });
     } catch (error) {
+      console.error(`�� Department Payroll Approval Failed:`, {
+        error: error.message,
+        stack: error.stack,
+        department: admin?.department,
+        month,
+        year,
+      });
       next(error);
     }
   }
@@ -4301,72 +5558,141 @@ export class AdminController {
         throw new ApiError(404, "No pending payrolls found in the department");
       }
 
+      // Initialize rejection summary
+      const rejectionSummary = {
+        totalPayrolls: payrolls.length,
+        rejected: 0,
+        failed: 0,
+        errors: [],
+        warnings: [],
+        departmentInfo: {
+          departmentId: departmentId,
+          departmentName: admin.department,
+        },
+        rejectionDetails: {
+          rejector: {
+            id: admin._id,
+            name: admin.firstName + " " + admin.lastName,
+            position: admin.position,
+            role: admin.role,
+          },
+          remarks: remarks || "Bulk rejected by HR Admin/HOD",
+          timestamp: new Date(),
+        },
+        notificationSummary: {
+          employeeNotifications: 0,
+          departmentHeadNotifications: 0,
+          adminNotifications: 0,
+          failedNotifications: 0,
+        },
+        performance: {
+          startTime: Date.now(),
+          endTime: null,
+          duration: null,
+        },
+      };
+
+      console.log(`🚫 Starting department payroll rejection process:`, {
+        department: rejectionSummary.departmentInfo,
+        totalPayrolls: rejectionSummary.totalPayrolls,
+        rejector: rejectionSummary.rejectionDetails.rejector,
+        remarks: rejectionSummary.rejectionDetails.remarks,
+      });
+
       const notificationPromises = [];
 
       // Update each payroll
       for (const payroll of payrolls) {
-        // Update payroll status and add to approval history
-        payroll.status = PAYROLL_STATUS.REJECTED;
-        payroll.approvalFlow.history.push({
-          level: payroll.approvalFlow.currentLevel,
-          status: PAYROLL_STATUS.REJECTED,
-          action: "REJECT",
-          user: admin._id,
-          timestamp: new Date(),
-          remarks: remarks || "Bulk rejected by HR Admin/HOD",
-        });
+        try {
+          console.log(`🔄 Processing rejection for payroll:`, {
+            employeeId: payroll.employee._id,
+            employeeName:
+              payroll.employee.firstName + " " + payroll.employee.lastName,
+            currentLevel: payroll.approvalFlow.currentLevel,
+          });
 
-        // Update legacy fields for backward compatibility
-        payroll.approvalFlow.rejectedBy = admin._id;
-        payroll.approvalFlow.rejectedAt = new Date();
+          // Update payroll status and add to approval history
+          payroll.status = PAYROLL_STATUS.REJECTED;
+          payroll.approvalFlow.history.push({
+            level: payroll.approvalFlow.currentLevel,
+            status: PAYROLL_STATUS.REJECTED,
+            action: "REJECT",
+            user: admin._id,
+            timestamp: new Date(),
+            remarks: remarks || "Bulk rejected by HR Admin/HOD",
+          });
 
-        await payroll.save();
+          // Update legacy fields for backward compatibility
+          payroll.approvalFlow.rejectedBy = admin._id;
+          payroll.approvalFlow.rejectedAt = new Date();
 
-        // Notify each employee
-        notificationPromises.push(
-          NotificationService.createPayrollNotification(
-            payroll.employee._id,
-            NOTIFICATION_TYPES.PAYROLL_REJECTED,
-            {
-              _id: payroll._id,
-              month: payroll.month,
-              year: payroll.year,
-              status: PAYROLL_STATUS.REJECTED,
-              approvalFlow: payroll.approvalFlow,
-              employee: {
-                _id: payroll.employee._id,
-                firstName: payroll.employee.firstName,
-                lastName: payroll.employee.lastName,
-                email: payroll.employee.email,
-                department: payroll.employee.department,
+          await payroll.save();
+
+          // Notify each employee
+          try {
+            await NotificationService.createPayrollNotification(
+              payroll.employee._id,
+              NOTIFICATION_TYPES.PAYROLL_REJECTED,
+              {
+                _id: payroll._id,
+                month: payroll.month,
+                year: payroll.year,
+                status: PAYROLL_STATUS.REJECTED,
+                approvalFlow: payroll.approvalFlow,
+                employee: {
+                  _id: payroll.employee._id,
+                  firstName: payroll.employee.firstName,
+                  lastName: payroll.employee.lastName,
+                  email: payroll.employee.email,
+                  department: payroll.employee.department,
+                },
               },
-            },
-            remarks || "Bulk rejected by HR Admin/HOD"
-          )
-        );
+              remarks || "Bulk rejected by HR Admin/HOD"
+            );
+            rejectionSummary.notificationSummary.employeeNotifications++;
+            console.log(
+              `📧 Sent rejection notification to ${payroll.employee.firstName} ${payroll.employee.lastName}`
+            );
+          } catch (notificationError) {
+            const warningMessage = `Failed to notify employee ${payroll.employee.firstName} ${payroll.employee.lastName}: ${notificationError.message}`;
+            rejectionSummary.warnings.push(warningMessage);
+            rejectionSummary.notificationSummary.failedNotifications++;
+            console.warn(`⚠️ ${warningMessage}`);
+          }
+
+          rejectionSummary.rejected++;
+          console.log(
+            `✅ Successfully rejected payroll for ${payroll.employee.firstName} ${payroll.employee.lastName}`
+          );
+        } catch (error) {
+          rejectionSummary.failed++;
+          const errorMessage = `Failed to reject payroll for ${payroll.employee.firstName} ${payroll.employee.lastName}: ${error.message}`;
+          rejectionSummary.errors.push(errorMessage);
+          console.error(`❌ ${errorMessage}`, error);
+        }
       }
 
       // Notify the department head
-      const departmentHead = await UserModel.findOne({
-        department: departmentId,
-        position: {
-          $in: [
-            "Head of Department",
-            "Department Head",
-            "Head",
-            "Director",
-            "Manager",
-          ],
-        },
-        status: "active",
-      });
+      try {
+        const departmentHead = await UserModel.findOne({
+          department: departmentId,
+          position: {
+            $in: [
+              "Head of Department",
+              "Department Head",
+              "Head",
+              "Director",
+              "Manager",
+            ],
+          },
+          status: "active",
+        });
 
-      if (
-        departmentHead &&
-        departmentHead._id.toString() !== admin._id.toString()
-      ) {
-        notificationPromises.push(
-          NotificationService.createPayrollNotification(
+        if (
+          departmentHead &&
+          departmentHead._id.toString() !== admin._id.toString()
+        ) {
+          await NotificationService.createPayrollNotification(
             departmentHead._id,
             NOTIFICATION_TYPES.DEPARTMENT_PAYROLL_REJECTED,
             {
@@ -4378,13 +5704,26 @@ export class AdminController {
               approvalFlow: payrolls[0].approvalFlow,
             },
             remarks || "Bulk rejected by HR Admin/HOD"
-          )
-        );
+          );
+          rejectionSummary.notificationSummary.departmentHeadNotifications++;
+          console.log(
+            `📧 Sent rejection notification to department head: ${departmentHead.firstName} ${departmentHead.lastName}`
+          );
+        } else {
+          console.log(
+            `ℹ️ No department head found or admin is the department head`
+          );
+        }
+      } catch (error) {
+        const warningMessage = `Failed to notify department head: ${error.message}`;
+        rejectionSummary.warnings.push(warningMessage);
+        rejectionSummary.notificationSummary.failedNotifications++;
+        console.warn(`⚠️ ${warningMessage}`);
       }
 
       // Notify the admin who rejected
-      notificationPromises.push(
-        NotificationService.createPayrollNotification(
+      try {
+        await NotificationService.createPayrollNotification(
           admin._id,
           NOTIFICATION_TYPES.DEPARTMENT_PAYROLL_REJECTED,
           {
@@ -4396,20 +5735,91 @@ export class AdminController {
             approvalFlow: payrolls[0].approvalFlow,
           },
           remarks || "Bulk rejected by HR Admin/HOD"
-        )
-      );
+        );
+        rejectionSummary.notificationSummary.adminNotifications++;
+        console.log(`📧 Sent confirmation notification to admin`);
+      } catch (error) {
+        const warningMessage = `Failed to notify admin: ${error.message}`;
+        rejectionSummary.warnings.push(warningMessage);
+        rejectionSummary.notificationSummary.failedNotifications++;
+        console.warn(`⚠️ ${warningMessage}`);
+      }
 
-      await Promise.all(notificationPromises);
+      // Calculate performance metrics
+      rejectionSummary.performance.endTime = Date.now();
+      rejectionSummary.performance.duration =
+        rejectionSummary.performance.endTime -
+        rejectionSummary.performance.startTime;
+
+      // Log final summary
+      console.log(`�� Department Payroll Rejection Summary:`, {
+        department: rejectionSummary.departmentInfo.departmentName,
+        totalPayrolls: rejectionSummary.totalPayrolls,
+        rejected: rejectionSummary.rejected,
+        failed: rejectionSummary.failed,
+        successRate: `${(
+          (rejectionSummary.rejected / rejectionSummary.totalPayrolls) *
+          100
+        ).toFixed(2)}%`,
+        rejector: rejectionSummary.rejectionDetails.rejector.name,
+        remarks: rejectionSummary.rejectionDetails.remarks,
+        duration: `${rejectionSummary.performance.duration}ms`,
+        notifications: {
+          employees: rejectionSummary.notificationSummary.employeeNotifications,
+          departmentHead:
+            rejectionSummary.notificationSummary.departmentHeadNotifications,
+          admin: rejectionSummary.notificationSummary.adminNotifications,
+          failed: rejectionSummary.notificationSummary.failedNotifications,
+        },
+        errors: rejectionSummary.errors.length,
+        warnings: rejectionSummary.warnings.length,
+      });
+
+      // Log detailed errors if any
+      if (rejectionSummary.errors.length > 0) {
+        console.error(
+          `❌ Rejection Errors (${rejectionSummary.errors.length}):`,
+          rejectionSummary.errors
+        );
+      }
+
+      // Log warnings if any
+      if (rejectionSummary.warnings.length > 0) {
+        console.warn(
+          `⚠️ Rejection Warnings (${rejectionSummary.warnings.length}):`,
+          rejectionSummary.warnings
+        );
+      }
 
       res.status(200).json({
         success: true,
-        message: `Successfully rejected ${payrolls.length} payrolls`,
+        message: `Successfully rejected ${rejectionSummary.rejected} payrolls`,
         data: {
-          rejectedCount: payrolls.length,
+          rejectedCount: rejectionSummary.rejected,
+          failedCount: rejectionSummary.failed,
+          total: rejectionSummary.totalPayrolls,
+          successRate: `${(
+            (rejectionSummary.rejected / rejectionSummary.totalPayrolls) *
+            100
+          ).toFixed(2)}%`,
           department: departmentId,
+          summary: {
+            departmentInfo: rejectionSummary.departmentInfo,
+            rejectionDetails: rejectionSummary.rejectionDetails,
+            notificationSummary: rejectionSummary.notificationSummary,
+            performance: rejectionSummary.performance,
+            errors: rejectionSummary.errors,
+            warnings: rejectionSummary.warnings,
+          },
         },
       });
     } catch (error) {
+      console.error(`�� Department Payroll Rejection Failed:`, {
+        error: error.message,
+        stack: error.stack,
+        departmentId,
+        admin: admin?._id,
+      });
       next(error);
     }
   }
@@ -4423,7 +5833,57 @@ export class AdminController {
         throw new ApiError(400, "Please provide an array of payroll IDs");
       }
 
-      console.log(`🔄 Submitting ${payrollIds.length} payrolls for approval`);
+      // Initialize submission summary
+      const submissionSummary = {
+        totalRequested: payrollIds.length,
+        found: 0,
+        submitted: 0,
+        failed: 0,
+        errors: [],
+        warnings: [],
+        departmentInfo: {
+          departmentId: admin.department.toString(),
+          departmentName: admin.department,
+        },
+        submissionDetails: {
+          submitter: {
+            id: admin._id,
+            name: admin.firstName + " " + admin.lastName,
+            position: admin.position,
+            role: admin.role,
+          },
+          remarks: remarks || "Submitted for approval",
+          frequency: frequency || "Not specified",
+          timestamp: new Date(),
+        },
+        approvalFlow: {
+          departmentHead: null,
+          hrManager: null,
+          financeDirector: null,
+          superAdmins: 0,
+          initialLevel: null,
+        },
+        notificationSummary: {
+          departmentHead: 0,
+          hrManager: 0,
+          financeDirector: 0,
+          superAdmins: 0,
+          employees: 0,
+          failed: 0,
+        },
+        performance: {
+          startTime: Date.now(),
+          endTime: null,
+          duration: null,
+        },
+      };
+
+      console.log(`🚀 Starting bulk payroll submission process:`, {
+        totalRequested: submissionSummary.totalRequested,
+        department: submissionSummary.departmentInfo,
+        submitter: submissionSummary.submissionDetails.submitter,
+        remarks: submissionSummary.submissionDetails.remarks,
+      });
 
       // Get all payrolls for the admin's department
       const payrolls = await PayrollModel.find({
@@ -4436,17 +5896,27 @@ export class AdminController {
         throw new ApiError(404, "No draft payrolls found in your department");
       }
 
-      console.log(`📋 Found ${payrolls.length} draft payrolls to submit`);
+      submissionSummary.found = payrolls.length;
+      console.log(
+        `�� Found ${submissionSummary.found} draft payrolls to submit`
+      );
 
       // Update frequency if provided
       if (frequency) {
         if (!Object.values(PayrollFrequency).includes(frequency)) {
           throw new ApiError(400, "Invalid payroll frequency");
         }
-        await PayrollModel.updateMany(
-          { _id: { $in: payrollIds } },
-          { $set: { frequency } }
-        );
+        try {
+          await PayrollModel.updateMany(
+            { _id: { $in: payrollIds } },
+            { $set: { frequency } }
+          );
+          console.log(`✅ Updated frequency to ${frequency} for all payrolls`);
+        } catch (error) {
+          const warningMessage = `Failed to update frequency: ${error.message}`;
+          submissionSummary.warnings.push(warningMessage);
+          console.warn(`⚠️ ${warningMessage}`);
+        }
       }
 
       // Get department head
@@ -4489,6 +5959,12 @@ export class AdminController {
         }
       }
 
+      submissionSummary.approvalFlow.departmentHead = {
+        id: departmentHead._id,
+        name: departmentHead.firstName + " " + departmentHead.lastName,
+        position: departmentHead.position,
+      };
+
       // Get HR Manager
       const hrDepartment = await DepartmentModel.findOne({
         name: { $in: ["Human Resources", "HR"] },
@@ -4510,6 +5986,14 @@ export class AdminController {
             status: "active",
           })
         : null;
+
+      if (hrManager) {
+        submissionSummary.approvalFlow.hrManager = {
+          id: hrManager._id,
+          name: hrManager.firstName + " " + hrManager.lastName,
+          position: hrManager.position,
+        };
+      }
 
       // Get Finance Director
       const financeDepartment = await DepartmentModel.findOne({
@@ -4533,150 +6017,302 @@ export class AdminController {
           })
         : null;
 
+      if (financeDirector) {
+        submissionSummary.approvalFlow.financeDirector = {
+          id: financeDirector._id,
+          name: financeDirector.firstName + " " + financeDirector.lastName,
+          position: financeDirector.position,
+        };
+      }
+
       // Update all payrolls
-      const updatePromises = payrolls.map(async (payroll) => {
-        console.log(`🔄 Updating payroll status to PENDING: ${payroll._id}`);
-
-        // Special case for HR department - skip Department Head level if submitter is HR Manager/Head
-        const isHRDepartment =
-          hrDepartment &&
-          admin.department.toString() === hrDepartment._id.toString();
-
-        const isHRManager =
-          admin.position &&
-          [
-            "Head of Human Resources",
-            "HR Manager",
-            "HR Head",
-            "HR Director",
-            "Human Resources Manager",
-            "Head of HR",
-            "HR HOD",
-            "HR Department Head",
-          ].some((position) =>
-            admin.position.toLowerCase().includes(position.toLowerCase())
+      const updatePromises = payrolls.map(async (payroll, index) => {
+        try {
+          console.log(
+            `�� Processing payroll ${index + 1}/${payrolls.length}:`,
+            {
+              payrollId: payroll._id,
+              employeeId: payroll.employee,
+            }
           );
 
-        // Skip department head level only if submitter is HR Manager/Head
-        const initialApprovalLevel =
-          isHRDepartment && isHRManager
-            ? APPROVAL_LEVELS.HR_MANAGER
-            : APPROVAL_LEVELS.DEPARTMENT_HEAD;
+          // Special case for HR department - skip Department Head level if submitter is HR Manager/Head
+          const isHRDepartment =
+            hrDepartment &&
+            admin.department.toString() === hrDepartment._id.toString();
 
-        // Update payroll status and add to approval flow
-        payroll.status = PAYROLL_STATUS.PENDING;
+          const isHRManager =
+            admin.position &&
+            [
+              "Head of Human Resources",
+              "HR Manager",
+              "HR Head",
+              "HR Director",
+              "Human Resources Manager",
+              "Head of HR",
+              "HR HOD",
+              "HR Department Head",
+            ].some((position) =>
+              admin.position.toLowerCase().includes(position.toLowerCase())
+            );
 
-        // Set approval flow with a single history entry
-        payroll.approvalFlow = {
-          currentLevel: initialApprovalLevel,
-          history: [
-            {
-              level: initialApprovalLevel,
-              status: PAYROLL_STATUS.PENDING,
-              action: "SUBMIT",
-              user: admin._id,
-              timestamp: new Date(),
-              remarks:
-                remarks ||
-                `Submitted for ${initialApprovalLevel
-                  .replace(/_/g, " ")
-                  .toLowerCase()} approval`,
-            },
-          ],
-          submittedBy: admin._id,
-          submittedAt: new Date(),
-          remarks:
-            remarks ||
-            `Submitted for ${initialApprovalLevel
-              .replace(/_/g, " ")
-              .toLowerCase()} approval`,
-        };
+          // Skip department head level only if submitter is HR Manager/Head
+          const initialApprovalLevel =
+            isHRDepartment && isHRManager
+              ? APPROVAL_LEVELS.HR_MANAGER
+              : APPROVAL_LEVELS.DEPARTMENT_HEAD;
 
-        return payroll.save();
+          submissionSummary.approvalFlow.initialLevel = initialApprovalLevel;
+
+          // Update payroll status and add to approval flow
+          payroll.status = PAYROLL_STATUS.PENDING;
+
+          // Set approval flow with a single history entry
+          payroll.approvalFlow = {
+            currentLevel: initialApprovalLevel,
+            history: [
+              {
+                level: initialApprovalLevel,
+                status: PAYROLL_STATUS.PENDING,
+                action: "SUBMIT",
+                user: admin._id,
+                timestamp: new Date(),
+                remarks:
+                  remarks ||
+                  `Submitted for ${initialApprovalLevel
+                    .replace(/_/g, " ")
+                    .toLowerCase()} approval`,
+              },
+            ],
+            submittedBy: admin._id,
+            submittedAt: new Date(),
+            remarks:
+              remarks ||
+              `Submitted for ${initialApprovalLevel
+                .replace(/_/g, " ")
+                .toLowerCase()} approval`,
+          };
+
+          await payroll.save();
+          submissionSummary.submitted++;
+          console.log(`✅ Successfully submitted payroll ${payroll._id}`);
+
+          return payroll;
+        } catch (error) {
+          submissionSummary.failed++;
+          const errorMessage = `Failed to submit payroll ${payroll._id}: ${error.message}`;
+          submissionSummary.errors.push(errorMessage);
+          console.error(`❌ ${errorMessage}`, error);
+
+          // Return the original payroll for error tracking
+          return {
+            ...payroll.toObject(),
+            submissionError: error.message,
+          };
+        }
       });
 
       const updatedPayrolls = await Promise.all(updatePromises);
       console.log(
-        `✅ Successfully updated ${updatedPayrolls.length} payrolls to PENDING status`
+        `✅ Successfully updated ${submissionSummary.submitted} payrolls to PENDING status`
       );
 
       // Create notifications for all stakeholders
       const notificationPromises = [];
 
       // Notify department head
-      notificationPromises.push(
-        NotificationService.createBatchPayrollNotifications(
+      try {
+        await NotificationService.createBatchPayrollNotifications(
           departmentHead._id,
           NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
           updatedPayrolls,
           remarks || "Submitted for department head approval"
-        )
-      );
+        );
+        submissionSummary.notificationSummary.departmentHead++;
+        console.log(
+          `📧 Sent notification to department head: ${departmentHead.firstName} ${departmentHead.lastName}`
+        );
+      } catch (error) {
+        const warningMessage = `Failed to notify department head: ${error.message}`;
+        submissionSummary.warnings.push(warningMessage);
+        submissionSummary.notificationSummary.failed++;
+        console.warn(`⚠️ ${warningMessage}`);
+      }
 
       // Notify HR Manager if found
       if (hrManager) {
-        notificationPromises.push(
-          NotificationService.createBatchPayrollNotifications(
+        try {
+          await NotificationService.createBatchPayrollNotifications(
             hrManager._id,
             NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
             updatedPayrolls,
             remarks || "Submitted for department head approval"
-          )
-        );
+          );
+          submissionSummary.notificationSummary.hrManager++;
+          console.log(
+            `📧 Sent notification to HR Manager: ${hrManager.firstName} ${hrManager.lastName}`
+          );
+        } catch (error) {
+          const warningMessage = `Failed to notify HR Manager: ${error.message}`;
+          submissionSummary.warnings.push(warningMessage);
+          submissionSummary.notificationSummary.failed++;
+          console.warn(`⚠️ ${warningMessage}`);
+        }
       }
 
       // Notify Finance Director if found
       if (financeDirector) {
-        notificationPromises.push(
-          NotificationService.createBatchPayrollNotifications(
+        try {
+          await NotificationService.createBatchPayrollNotifications(
             financeDirector._id,
             NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
             updatedPayrolls,
             remarks || "Submitted for department head approval"
-          )
-        );
+          );
+          submissionSummary.notificationSummary.financeDirector++;
+          console.log(
+            `📧 Sent notification to Finance Director: ${financeDirector.firstName} ${financeDirector.lastName}`
+          );
+        } catch (error) {
+          const warningMessage = `Failed to notify Finance Director: ${error.message}`;
+          submissionSummary.warnings.push(warningMessage);
+          submissionSummary.notificationSummary.failed++;
+          console.warn(`⚠️ ${warningMessage}`);
+        }
       }
 
       // Notify super admins
-      const superAdmins = await UserModel.find({
-        role: "SUPER_ADMIN",
-        status: "active",
-      });
-      for (const superAdmin of superAdmins) {
-        notificationPromises.push(
-          NotificationService.createBatchPayrollNotifications(
-            superAdmin._id,
-            NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
-            updatedPayrolls,
-            remarks || "Submitted for department head approval"
-          )
-        );
+      try {
+        const superAdmins = await UserModel.find({
+          role: "SUPER_ADMIN",
+          status: "active",
+        });
+
+        for (const superAdmin of superAdmins) {
+          try {
+            await NotificationService.createBatchPayrollNotifications(
+              superAdmin._id,
+              NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
+              updatedPayrolls,
+              remarks || "Submitted for department head approval"
+            );
+            submissionSummary.notificationSummary.superAdmins++;
+            console.log(
+              `📧 Sent notification to Super Admin: ${superAdmin.firstName} ${superAdmin.lastName}`
+            );
+          } catch (error) {
+            const warningMessage = `Failed to notify Super Admin ${superAdmin.firstName} ${superAdmin.lastName}: ${error.message}`;
+            submissionSummary.warnings.push(warningMessage);
+            submissionSummary.notificationSummary.failed++;
+            console.warn(`⚠️ ${warningMessage}`);
+          }
+        }
+
+        submissionSummary.approvalFlow.superAdmins = superAdmins.length;
+      } catch (error) {
+        const warningMessage = `Failed to fetch or notify Super Admins: ${error.message}`;
+        submissionSummary.warnings.push(warningMessage);
+        submissionSummary.notificationSummary.failed++;
+        console.warn(`⚠️ ${warningMessage}`);
       }
 
       // Create notifications for employees
       for (const payroll of updatedPayrolls) {
-        notificationPromises.push(
-          NotificationService.createPayrollNotification(
+        try {
+          await NotificationService.createPayrollNotification(
             payroll.employee,
             NOTIFICATION_TYPES.PAYROLL_SUBMITTED,
             payroll,
             remarks || "Submitted for department head approval"
-          )
+          );
+          submissionSummary.notificationSummary.employees++;
+        } catch (error) {
+          const warningMessage = `Failed to notify employee for payroll ${payroll._id}: ${error.message}`;
+          submissionSummary.warnings.push(warningMessage);
+          submissionSummary.notificationSummary.failed++;
+          console.warn(`⚠️ ${warningMessage}`);
+        }
+      }
+
+      // Calculate performance metrics
+      submissionSummary.performance.endTime = Date.now();
+      submissionSummary.performance.duration =
+        submissionSummary.performance.endTime -
+        submissionSummary.performance.startTime;
+
+      // Log final summary
+      console.log(` Bulk Payroll Submission Summary:`, {
+        department: submissionSummary.departmentInfo.departmentName,
+        totalRequested: submissionSummary.totalRequested,
+        found: submissionSummary.found,
+        submitted: submissionSummary.submitted,
+        failed: submissionSummary.failed,
+        successRate: `${(
+          (submissionSummary.submitted / submissionSummary.found) *
+          100
+        ).toFixed(2)}%`,
+        submitter: submissionSummary.submissionDetails.submitter.name,
+        initialApprovalLevel: submissionSummary.approvalFlow.initialLevel,
+        duration: `${submissionSummary.performance.duration}ms`,
+        notifications: {
+          departmentHead: submissionSummary.notificationSummary.departmentHead,
+          hrManager: submissionSummary.notificationSummary.hrManager,
+          financeDirector:
+            submissionSummary.notificationSummary.financeDirector,
+          superAdmins: submissionSummary.notificationSummary.superAdmins,
+          employees: submissionSummary.notificationSummary.employees,
+          failed: submissionSummary.notificationSummary.failed,
+        },
+        errors: submissionSummary.errors.length,
+        warnings: submissionSummary.warnings.length,
+      });
+
+      // Log detailed errors if any
+      if (submissionSummary.errors.length > 0) {
+        console.error(
+          `❌ Submission Errors (${submissionSummary.errors.length}):`,
+          submissionSummary.errors
         );
       }
 
-      await Promise.all(notificationPromises);
-      console.log(
-        `✅ Successfully sent notifications for ${updatedPayrolls.length} payrolls`
-      );
+      // Log warnings if any
+      if (submissionSummary.warnings.length > 0) {
+        console.warn(
+          `⚠️ Submission Warnings (${submissionSummary.warnings.length}):`,
+          submissionSummary.warnings
+        );
+      }
 
       res.status(200).json({
         success: true,
-        message: `${updatedPayrolls.length} payrolls submitted successfully for approval`,
-        data: updatedPayrolls,
+        message: `${submissionSummary.submitted} payrolls submitted successfully for approval`,
+        data: {
+          submitted: submissionSummary.submitted,
+          failed: submissionSummary.failed,
+          total: submissionSummary.found,
+          successRate: `${(
+            (submissionSummary.submitted / submissionSummary.found) *
+            100
+          ).toFixed(2)}%`,
+          payrolls: updatedPayrolls,
+          summary: {
+            departmentInfo: submissionSummary.departmentInfo,
+            submissionDetails: submissionSummary.submissionDetails,
+            approvalFlow: submissionSummary.approvalFlow,
+            notificationSummary: submissionSummary.notificationSummary,
+            performance: submissionSummary.performance,
+            errors: submissionSummary.errors,
+            warnings: submissionSummary.warnings,
+          },
+        },
       });
     } catch (error) {
-      console.error(`❌ Error submitting bulk payrolls: ${error.message}`);
+      console.error(` Bulk Payroll Submission Failed:`, {
+        error: error.message,
+        stack: error.stack,
+        payrollIds,
+        admin: admin?._id,
+      });
       next(error);
     }
   }

@@ -1,7 +1,7 @@
 import { Dialog } from "@headlessui/react";
 import { Employee } from "../../types/employee";
 import { useState, useEffect } from "react";
-import { FaTimes, FaSpinner } from "react-icons/fa";
+import { FaTimes, FaSpinner, FaEdit } from "react-icons/fa";
 import { departmentService } from "../../services/departmentService";
 import { toast } from "react-hot-toast";
 import { Department } from "../../types/department";
@@ -108,31 +108,36 @@ export const EditEmployeeModal = ({
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
-      <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+      <div
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+        aria-hidden="true"
+      />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="mx-auto max-w-2xl w-full rounded-xl bg-white p-6 shadow-xl">
-          <div className="flex justify-between items-center mb-6">
-            <Dialog.Title className="text-xl font-semibold text-gray-900">
-              Edit Employee
-            </Dialog.Title>
+        <Dialog.Panel className="mx-auto max-w-2xl w-full rounded-2xl shadow-2xl bg-gradient-to-br from-white via-blue-50 to-emerald-50 p-0">
+          {/* Gradient Header */}
+          <div className="bg-gradient-to-r from-blue-500 via-emerald-500 to-green-500 rounded-t-2xl px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <FaEdit className="text-white text-xl" />
+              <h2 className="text-lg font-bold text-white">Edit Employee</h2>
+            </div>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
+              className="text-white hover:text-emerald-200 focus:outline-none text-xl bg-white/20 rounded-full p-2 hover:bg-white/30 transition-all duration-200"
             >
-              <FaTimes />
+              <FaTimes className="w-5 h-5" />
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 px-6 py-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
                   First Name
                 </label>
                 <input
                   type="text"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                   value={formData.firstName}
                   onChange={(e) =>
                     setFormData((prev) => ({
@@ -144,13 +149,13 @@ export const EditEmployeeModal = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Last Name
                 </label>
                 <input
                   type="text"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                   value={formData.lastName}
                   onChange={(e) =>
                     setFormData((prev) => ({
@@ -162,13 +167,13 @@ export const EditEmployeeModal = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Email
                 </label>
                 <input
                   type="email"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                   value={formData.email}
                   onChange={(e) =>
                     setFormData((prev) => ({
@@ -180,13 +185,13 @@ export const EditEmployeeModal = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Phone
                 </label>
                 <input
                   type="tel"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                   value={formData.phone}
                   onChange={(e) =>
                     setFormData((prev) => ({
@@ -198,13 +203,13 @@ export const EditEmployeeModal = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Position
                 </label>
                 <input
                   type="text"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                   value={formData.position}
                   onChange={(e) =>
                     setFormData((prev) => ({
@@ -216,13 +221,13 @@ export const EditEmployeeModal = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Grade Level
                 </label>
                 <input
                   type="text"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                   value={formData.gradeLevel}
                   onChange={(e) =>
                     setFormData((prev) => ({
@@ -234,13 +239,13 @@ export const EditEmployeeModal = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Work Location
                 </label>
                 <input
                   type="text"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                   value={formData.workLocation}
                   onChange={(e) =>
                     setFormData((prev) => ({
@@ -252,12 +257,12 @@ export const EditEmployeeModal = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Department
                 </label>
                 <select
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                   value={formData.department}
                   onChange={(e) =>
                     setFormData((prev) => ({
@@ -280,7 +285,7 @@ export const EditEmployeeModal = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                className="px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-400 transition"
                 disabled={isSubmitting}
               >
                 Cancel
@@ -288,7 +293,7 @@ export const EditEmployeeModal = ({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                className="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-emerald-600 hover:from-blue-600 hover:to-emerald-700 rounded-lg shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-400 transition disabled:bg-blue-400 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
                   <>

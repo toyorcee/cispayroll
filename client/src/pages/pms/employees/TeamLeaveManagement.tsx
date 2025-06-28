@@ -36,6 +36,13 @@ import { leaveService, LeaveRequest } from "../../../services/leaveService";
 import { LeaveStatus } from "../../../types/employee";
 import InfoIcon from "@mui/icons-material/Info";
 import { toast } from "react-toastify";
+import {
+  FaUsers,
+  FaCheckCircle,
+  FaClock,
+  FaTimesCircle,
+  FaListUl,
+} from "react-icons/fa";
 
 type SortField = "startDate" | "endDate" | "status" | "employee";
 type SortOrder = "asc" | "desc";
@@ -60,7 +67,6 @@ const TeamLeaveManagement: React.FC = () => {
 
   // Use React Query hooks to fetch data
   const { data: teamLeaves, isLoading } = leaveService.useGetTeamLeaves();
-  const { data: leaveStats } = leaveService.useGetLeaveStatistics();
 
   // Approve and reject mutations
   const approveLeaveMutation = leaveService.useApproveLeave();
@@ -250,62 +256,68 @@ const TeamLeaveManagement: React.FC = () => {
         )}
       </Typography>
 
-      {/* Statistics */}
-      {leaveStats && (
-      <Grid container spacing={3} className="mb-6">
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" color="primary">
-                  {leaveStats.pendingRequests || 0}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                Pending Requests
-              </Typography>
-            </CardContent>
-          </Card>
+      <Box mb={6}>
+        <Grid container spacing={3}>
+          <Grid item xs={12} sm={6} md={3}>
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg p-4 flex items-center justify-between border border-blue-200">
+              <div>
+                <p className="text-sm font-medium text-blue-700">
+                  Total Requests
+                </p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {filteredAndSortedLeaves?.length || 0}
+                </p>
+              </div>
+              <FaListUl className="w-8 h-8 text-blue-500" />
+            </div>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-lg p-4 flex items-center justify-between border border-green-200">
+              <div>
+                <p className="text-sm font-medium text-green-700">Approved</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {filteredAndSortedLeaves?.filter(
+                    (l: any) => l.status === "approved"
+                  ).length || 0}
+                </p>
+              </div>
+              <FaCheckCircle className="w-8 h-8 text-green-500" />
+            </div>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl shadow-lg p-4 flex items-center justify-between border border-yellow-200">
+              <div>
+                <p className="text-sm font-medium text-yellow-700">Pending</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {filteredAndSortedLeaves?.filter(
+                    (l: any) => l.status === "pending"
+                  ).length || 0}
+                </p>
+              </div>
+              <FaClock className="w-8 h-8 text-yellow-500" />
+            </div>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl shadow-lg p-4 flex items-center justify-between border border-red-200">
+              <div>
+                <p className="text-sm font-medium text-red-700">
+                  Rejected/Cancelled
+                </p>
+                <p className="text-2xl font-bold text-red-600">
+                  {filteredAndSortedLeaves?.filter(
+                    (l: any) =>
+                      l.status === "rejected" || l.status === "cancelled"
+                  ).length || 0}
+                </p>
+              </div>
+              <FaTimesCircle className="w-8 h-8 text-red-500" />
+            </div>
+          </Grid>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" color="success.main">
-                  {leaveStats.approvedRequests || 0}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                Approved Requests
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" color="error.main">
-                  {leaveStats.rejectedRequests || 0}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                Rejected Requests
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" color="info.main">
-                  {leaveStats.totalLeaveDays || 0}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                Total Leave Days
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-      )}
+      </Box>
 
       {/* Leave Requests Table */}
-      <Card>
+      <Card className="rounded-xl shadow-lg">
         <CardContent>
           <Box
             display="flex"
@@ -313,7 +325,12 @@ const TeamLeaveManagement: React.FC = () => {
             alignItems="center"
             mb={3}
           >
-            <Typography variant="h6">Team Leave Requests</Typography>
+            <Typography
+              variant="h6"
+              className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-t-xl p-4 mb-0"
+            >
+              Team Leave Requests
+            </Typography>
             <Box display="flex" gap={2}>
               <FormControl size="small" sx={{ minWidth: 120 }}>
                 <InputLabel>Status</InputLabel>
@@ -355,7 +372,7 @@ const TeamLeaveManagement: React.FC = () => {
             </Box>
           </Box>
 
-          <TableContainer component={Paper}>
+          <TableContainer component={Paper} className="rounded-xl">
             <Table>
               <TableHead>
                 <TableRow>
@@ -421,8 +438,27 @@ const TeamLeaveManagement: React.FC = () => {
                 ) : !filteredAndSortedLeaves ||
                   filteredAndSortedLeaves.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center">
-                      No leave requests found
+                    <TableCell
+                      colSpan={8}
+                      align="center"
+                      style={{ padding: 0 }}
+                    >
+                      <div style={{ padding: "48px 0" }}>
+                        <div className="flex flex-col items-center justify-center">
+                          <FaUsers
+                            className="text-blue-200"
+                            style={{ fontSize: 64, marginBottom: 16 }}
+                          />
+                          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                            No Team Leave Requests
+                          </h3>
+                          <p className="text-gray-500 mb-4 max-w-md mx-auto">
+                            There are currently no leave requests from your
+                            team. When team members request leave, they will
+                            appear here for your review and action.
+                          </p>
+                        </div>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -446,39 +482,39 @@ const TeamLeaveManagement: React.FC = () => {
                         ) + 1}
                       </TableCell>
                       <TableCell>{leave.reason}</TableCell>
-                    <TableCell>
-                      <Chip
+                      <TableCell>
+                        <Chip
                           label={leave.status.toUpperCase()}
                           color={getStatusColor(leave.status)}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
                         {leave.status === LeaveStatus.pending &&
                         canApproveLeave ? (
-                        <Box>
+                          <Box>
                             <Tooltip title="Approve this leave request">
-                          <Button
-                            size="small"
-                            color="success"
+                              <Button
+                                size="small"
+                                color="success"
                                 onClick={() => openApproveDialog(leave)}
-                            sx={{ mr: 1 }}
+                                sx={{ mr: 1 }}
                                 disabled={approveLeaveMutation.isPending}
-                          >
-                            Approve
-                          </Button>
+                              >
+                                Approve
+                              </Button>
                             </Tooltip>
                             <Tooltip title="Reject this leave request">
-                          <Button
-                            size="small"
-                            color="error"
+                              <Button
+                                size="small"
+                                color="error"
                                 onClick={() => openRejectDialog(leave)}
                                 disabled={rejectLeaveMutation.isPending}
-                          >
-                            Reject
-                          </Button>
+                              >
+                                Reject
+                              </Button>
                             </Tooltip>
-                        </Box>
+                          </Box>
                         ) : (
                           <Typography variant="body2" color="textSecondary">
                             {leave.status === LeaveStatus.approved
@@ -489,9 +525,9 @@ const TeamLeaveManagement: React.FC = () => {
                               ? "Rejected"
                               : ""}
                           </Typography>
-                      )}
-                    </TableCell>
-                  </TableRow>
+                        )}
+                      </TableCell>
+                    </TableRow>
                   ))
                 )}
               </TableBody>

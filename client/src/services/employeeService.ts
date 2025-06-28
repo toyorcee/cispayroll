@@ -1,5 +1,5 @@
 import api from "./api";
-import axios, { isAxiosError } from "axios";
+import { isAxiosError } from "axios";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   Employee,

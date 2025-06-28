@@ -33,6 +33,7 @@ import { NavigationProvider } from "../context/NavigationContext";
 import PersonalLeaveManagement from "../pages/pms/employees/PersonalLeaveManagement";
 import MyAllowances from "../pages/pms/payroll/MyAllowances";
 import MyBonus from "../pages/pms/payroll/MyBonus";
+import PayrollSummaryPage from "../pages/pms/payroll/PayrollSummaryPage";
 
 export interface RouteConfig {
   path: string;
@@ -294,6 +295,14 @@ export const routes: RouteConfig[] = [
         permissions: [Permission.VIEW_OWN_BONUS],
         requireAllPermissions: true,
         element: <MyBonus />,
+      },
+      {
+        path: "summaries",
+        label: "Processing Summary",
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+        permissions: [Permission.VIEW_PAYROLL_STATS],
+        requireAllPermissions: true,
+        element: <PayrollSummaryPage />,
       },
     ],
   },

@@ -11,6 +11,11 @@ import { EmailService } from "../services/emailService.js";
 import DepartmentModel from "../models/Department.js";
 import path from "path";
 import fs from "fs";
+import PayrollStatisticsLogger from "../utils/payrollStatisticsLogger.js";
+import {
+  getOnboardingTasks,
+  getOffboardingTasks,
+} from "../utils/defaultTasks.js";
 
 export class EmployeeController {
   static async createEmployee(req, res, next) {
@@ -61,6 +66,11 @@ export class EmployeeController {
       const invitationToken = uuidv4();
       const invitationExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
+      // Get default onboarding tasks
+      const onboardingTasks = getOnboardingTasks();
+      // Get default offboarding tasks
+      const offboardingTasks = getOffboardingTasks();
+
       // Create the employee first
       employee = new UserModel({
         ...employeeData,
@@ -71,6 +81,18 @@ export class EmployeeController {
         invitationExpires,
         createdBy: creator._id,
         department: department._id,
+        // Always assign onboarding tasks
+        onboarding: {
+          status: "not_started",
+          tasks: onboardingTasks,
+          progress: 0,
+        },
+        // Always assign offboarding tasks
+        offboarding: {
+          status: "not_started",
+          tasks: offboardingTasks,
+          progress: 0,
+        },
       });
 
       await employee.save();

@@ -54,6 +54,7 @@ export interface Allowance {
     lastName: string;
     email: string;
     fullName: string;
+    profileImage?: string;
   };
   type: string;
   amount: number;

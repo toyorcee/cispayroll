@@ -23,15 +23,6 @@ import axios from "axios";
 interface SingleEmployeeProcessModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: {
-    employeeIds: string[];
-    month: number;
-    year: number;
-    frequency: string;
-    salaryGrade?: string;
-    departmentId: string;
-  }) => void;
-  onSuccess?: () => void;
 }
 
 // Add this interface
@@ -69,8 +60,6 @@ const LIGHT_GREEN_ACCENT = "#eafaf1";
 const SingleEmployeeProcessModal = ({
   isOpen,
   onClose,
-  onSubmit,
-  onSuccess,
 }: SingleEmployeeProcessModalProps) => {
   const { isSuperAdmin } = useAuth();
   const [formData, setFormData] = useState({
@@ -89,7 +78,6 @@ const SingleEmployeeProcessModal = ({
   const [selectAll, setSelectAll] = useState(false);
   const [showEmployeeList, setShowEmployeeList] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [, _setErrorMessage] = useState<string | undefined>(undefined);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 

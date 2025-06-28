@@ -24,11 +24,17 @@ import {
 } from "../../../services/adminPayrollService";
 import userService, { UserDashboardStats } from "../../../services/userService";
 import { auditService } from "../../../services/auditService";
+import { getProfileImageUrl } from "../../../utils/imageUtils";
+import PayrollSummaryService from "../../../services/payrollSummaryService";
+import { payrollService } from "../../../services/payrollService";
 
 // Lazy load chart components
 const LineChart = lazy(() => import("../../../components/charts/LineChart"));
 const BarChart = lazy(() => import("../../../components/charts/BarChart"));
 const PieChart = lazy(() => import("../../../components/charts/PieChart"));
+const PayrollAnalyticsChart = lazy(
+  () => import("../../../components/charts/PayrollAnalyticsChart")
+);
 
 const LazyRecentActivities = lazy(() =>
   import("../../../components/dashboard/RecentActivities").then((module) => ({
@@ -65,7 +71,7 @@ const RecentActivitiesLoading = () => (
 );
 
 // Add clock component
-const Clock = () => {
+const Clock = ({ textClassName }: { textClassName?: string }) => {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -88,7 +94,11 @@ const Clock = () => {
   });
 
   return (
-    <div className="flex items-center space-x-4 text-green-600 text-sm font-bold">
+    <div
+      className={`flex items-center space-x-4 text-green-600 text-sm font-bold ${
+        textClassName || ""
+      }`}
+    >
       <FaCalendarAlt className="text-lg" />
       <div>{dateString}</div>
       <FaClock className="text-lg" />
@@ -113,6 +123,25 @@ const StatCardSkeleton = () => (
   </div>
 );
 
+function getDisplayRole(role?: string) {
+  if (!role) return "";
+  const map: Record<string, string> = {
+    SUPER_ADMIN: "Super Administrator",
+    ADMIN: "Administrator",
+    USER: "User",
+  };
+  return (
+    map[role] || role.charAt(0).toUpperCase() + role.slice(1).toLowerCase()
+  );
+}
+
+// Helper to format runtime in seconds
+function formatRuntime(ms?: number) {
+  if (!ms || ms === 0) return "0s";
+  if (ms < 1000) return `${ms} ms`;
+  return `${(ms / 1000).toFixed(2)}s`;
+}
+
 export default function Dashboard() {
   const { user, hasPermission, hasAnyPermission } = useAuth();
   const [error, setError] = useState<string | null>(null);
@@ -125,6 +154,17 @@ export default function Dashboard() {
     useState<AdminPayrollProcessingStats | null>(null);
   const [userRecentActivities, setUserRecentActivities] = useState<number>(0);
   const [recentActivitiesCount, setRecentActivitiesCount] = useState(0);
+  const [avgProcessingTime, setAvgProcessingTime] = useState<number>(0);
+  const [lastMonthStats, setLastMonthStats] = useState({
+    approved: 0,
+    paid: 0,
+    completed: 0,
+  });
+  const [thisMonthStats, setThisMonthStats] = useState({
+    approved: 0,
+    paid: 0,
+    completed: 0,
+  });
 
   // Only fetch the appropriate chart stats based on user role
   const { data: chartStatsData } =
@@ -210,20 +250,21 @@ export default function Dashboard() {
     : null;
 
   // Line Chart - Department Growth Trend
-  const lineChartData = chartStatsData
-    ? {
-        labels: chartStatsData.departmentDistribution.labels,
-        datasets: [
-          {
-            label: "Total Employees",
-            data: chartStatsData.departmentDistribution.datasets[0].data,
-            borderColor: "rgba(75, 192, 192, 1)",
-            backgroundColor: "rgba(75, 192, 192, 0.2)",
-            tension: 0.4,
-          },
-        ],
-      }
-    : null;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // const lineChartData = chartStatsData
+  //   ? {
+  //       labels: chartStatsData.departmentDistribution.labels,
+  //       datasets: [
+  //         {
+  //           label: "Total Employees",
+  //           data: chartStatsData.departmentDistribution.datasets[0].data,
+  //           borderColor: "rgba(75, 192, 192, 1)",
+  //           backgroundColor: "rgba(75, 192, 192, 0.2)",
+  //           tension: 0.4,
+  //         },
+  //       ],
+  //     }
+  //   : null;
 
   // Create admin-specific chart data
   const adminPieChartData = adminChartStatsData
@@ -353,6 +394,39 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDashboardData();
+    // Fetch payroll summary processing statistics for SUPER_ADMIN
+    if (user?.role === UserRole.SUPER_ADMIN) {
+      PayrollSummaryService.getProcessingStatistics()
+        .then((stats) => {
+          setAvgProcessingTime(stats.avgProcessingTime || 0);
+          console.log(
+            "[Dashboard] PayrollSummary avgProcessingTime:",
+            stats.avgProcessingTime
+          );
+        })
+        .catch((err) => {
+          console.error(
+            "[Dashboard] Error fetching PayrollSummary avgProcessingTime:",
+            err
+          );
+        });
+      payrollService
+        .getProcessingStatistics()
+        .then((stats) => {
+          setLastMonthStats(
+            stats.lastMonth || { approved: 0, paid: 0, completed: 0 }
+          );
+          setThisMonthStats(
+            stats.thisMonth || { approved: 0, paid: 0, completed: 0 }
+          );
+        })
+        .catch((err) => {
+          console.error(
+            "[Dashboard] Error fetching lastMonth/thisMonth stats:",
+            err
+          );
+        });
+    }
   }, [user?.role]);
 
   useEffect(() => {
@@ -578,33 +652,43 @@ export default function Dashboard() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className="space-y-6 w-full overflow-x-hidden bg-gradient-to-br from-gray-50 to-white min-h-screen p-6"
+        className="space-y-8 w-full overflow-x-hidden bg-gradient-to-br from-gray-50 to-white min-h-screen p-6"
       >
-        {/* Welcome Section */}
+        {/* Gradient Welcome Card */}
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.3 }}
-          className="mb-8 bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4"
+          className="mb-8 rounded-2xl shadow-2xl bg-gradient-to-r from-green-500 via-emerald-500 to-blue-500 p-8 flex flex-col sm:flex-row justify-between items-center gap-6"
         >
-          <div className="flex flex-col items-center sm:items-start">
-            <h4 className="text-2xl font-semibold text-gray-800">
-              Welcome back, {user?.firstName}!
-            </h4>
-            <p className="mt-1 text-sm text-gray-600">
-              {getRoleSpecificWelcomeMessage(user?.role)}
-            </p>
-            <div className="mt-2 sm:hidden">
-              <Clock />
+          <div className="flex items-center gap-5">
+            <img
+              src={getProfileImageUrl(user || {})}
+              alt={user ? `${user.firstName} ${user.lastName}` : "Profile"}
+              className="w-16 h-16 rounded-full border-4 border-white shadow-lg object-cover bg-white"
+            />
+            <div>
+              <h4 className="text-3xl font-bold text-white mb-1">
+                Welcome back, {user?.firstName}!
+              </h4>
+              <p className="text-lg text-emerald-100">
+                {getRoleSpecificWelcomeMessage(user?.role)}
+              </p>
+              <p className="text-white text-base font-semibold mt-1 opacity-90">
+                {getDisplayRole(user?.role)}
+              </p>
+              <div className="mt-2 sm:hidden">
+                <Clock textClassName="text-white" />
+              </div>
             </div>
           </div>
           <div className="hidden sm:block">
-            <Clock />
+            <Clock textClassName="text-white" />
           </div>
         </motion.div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Stats Grid with Gradient Cards */}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {isLoading
             ? Array(4)
                 .fill(0)
@@ -638,8 +722,126 @@ export default function Dashboard() {
                   />
                 </motion.div>
               ))
-            : // Other roles stats
-              getRoleStats(user?.role ?? UserRole.USER, dashboardStats)
+            : user?.role === UserRole.SUPER_ADMIN
+            ? [
+                ...getRoleStats(user?.role ?? UserRole.USER, dashboardStats)
+                  .map((stat) =>
+                    stat.name === "Recent Activities"
+                      ? { ...stat, value: recentActivitiesCount.toString() }
+                      : stat
+                  )
+                  .map((stat, index) => (
+                    <motion.div
+                      key={stat.name}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="w-full"
+                    >
+                      <StatCard
+                        {...stat}
+                        icon={stat.icon}
+                        subtext={stat.subtext}
+                        href={stat.href}
+                        color={stat.color}
+                      />
+                    </motion.div>
+                  )),
+                <motion.div
+                  key="System Performance"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="w-full"
+                >
+                  <StatCard
+                    name="System Performance"
+                    value={formatRuntime(avgProcessingTime)}
+                    subtext="Avg. Processing Time"
+                    icon={FaClock}
+                    href="#"
+                    color="purple"
+                    customGradient="from-pink-100 via-purple-100 to-pink-200"
+                  />
+                </motion.div>,
+                <motion.div
+                  key="LastMonthStats"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="w-full"
+                >
+                  <StatCard
+                    name="Last Month"
+                    value={
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-xs text-gray-600">
+                          Approved:{" "}
+                          <span className="font-bold text-green-600">
+                            {lastMonthStats.approved}
+                          </span>
+                        </span>
+                        <span className="text-xs text-gray-600">
+                          Paid:{" "}
+                          <span className="font-bold text-blue-600">
+                            {lastMonthStats.paid}
+                          </span>
+                        </span>
+                        <span className="text-xs text-gray-600">
+                          Completed:{" "}
+                          <span className="font-bold text-purple-600">
+                            {lastMonthStats.completed}
+                          </span>
+                        </span>
+                      </div>
+                    }
+                    subtext="Approved, Paid, Completed"
+                    icon={FaCalendarAlt}
+                    href="#"
+                    color="blue"
+                    customGradient="from-blue-100 via-green-100 to-blue-200"
+                  />
+                </motion.div>,
+                <motion.div
+                  key="ThisMonthStats"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 }}
+                  className="w-full"
+                >
+                  <StatCard
+                    name="This Month"
+                    value={
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-xs text-gray-600">
+                          Approved:{" "}
+                          <span className="font-bold text-green-600">
+                            {thisMonthStats.approved}
+                          </span>
+                        </span>
+                        <span className="text-xs text-gray-600">
+                          Paid:{" "}
+                          <span className="font-bold text-blue-600">
+                            {thisMonthStats.paid}
+                          </span>
+                        </span>
+                        <span className="text-xs text-gray-600">
+                          Completed:{" "}
+                          <span className="font-bold text-purple-600">
+                            {thisMonthStats.completed}
+                          </span>
+                        </span>
+                      </div>
+                    }
+                    subtext="Approved, Paid, Completed"
+                    icon={FaCalendarAlt}
+                    href="#"
+                    color="purple"
+                    customGradient="from-purple-100 via-pink-100 to-pink-200"
+                  />
+                </motion.div>,
+              ]
+            : getRoleStats(user?.role ?? UserRole.USER, dashboardStats)
                 .map((stat) =>
                   stat.name === "Recent Activities"
                     ? { ...stat, value: recentActivitiesCount.toString() }
@@ -664,6 +866,9 @@ export default function Dashboard() {
                 ))}
         </div>
 
+        {/* System Performance Stat Card */}
+        {/* Removed the separate grid for System Performance */}
+
         {/* Charts Section */}
         <div className="min-h-[500px]">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -672,27 +877,25 @@ export default function Dashboard() {
             </Suspense>
           </div>
 
-          {/* Department Overview Line Chart */}
+          {/* Payroll Analytics Chart */}
           {hasAnyPermission([
+            Permission.VIEW_PAYROLL_STATS,
             Permission.VIEW_ALL_DEPARTMENTS,
-            Permission.MANAGE_DEPARTMENT_USERS,
-          ]) &&
-            user?.role !== UserRole.ADMIN && (
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[400px] mb-6">
-                <h2 className="text-lg font-semibold mb-4 text-gray-800">
-                  Department Overview
-                </h2>
-                <Suspense fallback={<ChartLoading />}>
-                  {lineChartData && <LineChart data={lineChartData} />}
-                </Suspense>
-              </div>
-            )}
+          ]) && (
+            <div className="mb-6">
+              <Suspense fallback={<ChartLoading />}>
+                <PayrollAnalyticsChart height="500px" />
+              </Suspense>
+            </div>
+          )}
         </div>
 
         {/* Recent Activities Section - At the end */}
         <div className="mb-6">
           <Suspense fallback={<RecentActivitiesLoading />}>
-            <LazyRecentActivities />
+            <div className="rounded-2xl shadow-xl bg-gradient-to-br from-white via-blue-50 to-emerald-50 p-6">
+              <LazyRecentActivities />
+            </div>
           </Suspense>
         </div>
       </motion.div>

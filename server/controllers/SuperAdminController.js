@@ -42,6 +42,8 @@ import DeductionModel from "../models/Deduction.js";
 import AllowanceModel from "../models/Allowance.js";
 import BonusModel from "../models/Bonus.js";
 import PayrollStatisticsLogger from "../utils/payrollStatisticsLogger.js";
+import { SummaryType } from "../models/PayrollSummary.js";
+import PayrollSummaryService from "../services/PayrollSummaryService.js";
 
 const asObjectId = (id) => new Types.ObjectId(id);
 
@@ -825,8 +827,21 @@ export class SuperAdminController {
       }
 
       const payrolls = await queryBuilder;
-
       const total = await PayrollModel.countDocuments(query);
+
+      // Simple fallback for missing breakdown
+      const payrollsWithFallback = payrolls.map((payroll) => {
+        const payrollObj = payroll.toObject();
+
+        if (!payrollObj.deductions.breakdown) {
+          payrollObj.deductions.breakdown = {
+            statutory: [],
+            voluntary: [],
+          };
+        }
+
+        return payrollObj;
+      });
 
       // Calculate frequency-based totals
       const frequencyTotals = await PayrollModel.aggregate([
@@ -921,7 +936,7 @@ export class SuperAdminController {
       res.status(200).json({
         success: true,
         data: {
-          payrolls,
+          payrolls: payrollsWithFallback,
           pagination: {
             total,
             page,
@@ -991,6 +1006,110 @@ export class SuperAdminController {
 
       // Add this debug log
       console.log("Found payroll history:", payrollHistory);
+
+      // Add deduction breakdown to each payroll record if missing (for backward compatibility)
+      for (const payroll of payrollHistory) {
+        if (payroll.deductions && !payroll.deductions.breakdown) {
+          console.log(
+            "🔧 Adding missing deduction breakdown to payroll in history:",
+            payroll._id
+          );
+
+          // Get statutory deductions
+          const statutoryDeductions = await DeductionModel.find({
+            type: "statutory",
+            isActive: true,
+          }).lean();
+
+          // Get voluntary deductions
+          const voluntaryDeductions = await DeductionModel.find({
+            type: "voluntary",
+            isActive: true,
+          }).lean();
+
+          // Create breakdown structure
+          payroll.deductions.breakdown = {
+            statutory: [
+              // Include existing statutory deductions from payroll
+              {
+                name: "PAYE Tax",
+                amount: payroll.deductions.tax?.amount || 0,
+                code: "tax",
+                description: "Pay As You Earn Tax",
+                type: "statutory",
+              },
+              {
+                name: "Pension",
+                amount: payroll.deductions.pension?.amount || 0,
+                code: "pension",
+                description: "Pension Contribution",
+                type: "statutory",
+              },
+              {
+                name: "NHF",
+                amount: payroll.deductions.nhf?.amount || 0,
+                code: "nhf",
+                description: "National Housing Fund",
+                type: "statutory",
+              },
+              // Add any additional statutory deductions from database
+              ...statutoryDeductions
+                .filter(
+                  (deduction) =>
+                    !["tax", "pension", "nhf"].includes(deduction.code)
+                )
+                .map((deduction) => ({
+                  name: deduction.name,
+                  amount: payroll.deductions[deduction.code] || 0,
+                  code: deduction.code,
+                  description: deduction.description,
+                  type: "statutory",
+                })),
+            ],
+            voluntary: [
+              // Include existing loans from payroll
+              ...(payroll.deductions.loans || []).map((loan) => ({
+                name: loan.description,
+                amount: loan.amount,
+                code: "loan",
+                description: loan.description,
+                type: "voluntary",
+              })),
+              // Include existing others from payroll
+              ...(payroll.deductions.others || []).map((other) => ({
+                name: other.description,
+                amount: other.amount,
+                code: "other",
+                description: other.description,
+                type: "voluntary",
+              })),
+              // Include existing department-specific deductions from payroll
+              ...(payroll.deductions.departmentSpecific || []).map(
+                (deduction) => ({
+                  name: deduction.name,
+                  amount: deduction.amount,
+                  code: "department",
+                  description: deduction.description,
+                  type: deduction.type?.toLowerCase() || "voluntary",
+                })
+              ),
+              // Add any additional voluntary deductions from database
+              ...voluntaryDeductions.map((deduction) => ({
+                name: deduction.name,
+                amount: payroll.deductions[deduction.code] || 0,
+                code: deduction.code,
+                description: deduction.description,
+                type: "voluntary",
+              })),
+            ],
+          };
+
+          console.log(
+            "✅ Added deduction breakdown to payroll in history:",
+            payroll._id
+          );
+        }
+      }
 
       // Calculate summary
       const approvedPayrolls = payrollHistory.filter(
@@ -1085,13 +1204,12 @@ export class SuperAdminController {
         });
       }
 
-      // Only allow access to DRAFT payrolls
-      if (payroll.status !== "DRAFT") {
-        return res.status(403).json({
-          success: false,
-          message: "Only draft payrolls can be edited",
-          status: payroll.status,
-        });
+      // Simple fallback for missing breakdown
+      if (payroll.deductions && !payroll.deductions.breakdown) {
+        payroll.deductions.breakdown = {
+          statutory: [],
+          voluntary: [],
+        };
       }
 
       res.json({
@@ -1384,6 +1502,110 @@ export class SuperAdminController {
         .populate("salaryGrade", "level description")
         .lean();
 
+      // Add deduction breakdown to each payroll record if missing (for backward compatibility)
+      for (const payroll of payrollRecords) {
+        if (payroll.deductions && !payroll.deductions.breakdown) {
+          console.log(
+            "🔧 Adding missing deduction breakdown to period payroll:",
+            payroll._id
+          );
+
+          // Get statutory deductions
+          const statutoryDeductions = await DeductionModel.find({
+            type: "statutory",
+            isActive: true,
+          }).lean();
+
+          // Get voluntary deductions
+          const voluntaryDeductions = await DeductionModel.find({
+            type: "voluntary",
+            isActive: true,
+          }).lean();
+
+          // Create breakdown structure
+          payroll.deductions.breakdown = {
+            statutory: [
+              // Include existing statutory deductions from payroll
+              {
+                name: "PAYE Tax",
+                amount: payroll.deductions.tax?.amount || 0,
+                code: "tax",
+                description: "Pay As You Earn Tax",
+                type: "statutory",
+              },
+              {
+                name: "Pension",
+                amount: payroll.deductions.pension?.amount || 0,
+                code: "pension",
+                description: "Pension Contribution",
+                type: "statutory",
+              },
+              {
+                name: "NHF",
+                amount: payroll.deductions.nhf?.amount || 0,
+                code: "nhf",
+                description: "National Housing Fund",
+                type: "statutory",
+              },
+              // Add any additional statutory deductions from database
+              ...statutoryDeductions
+                .filter(
+                  (deduction) =>
+                    !["tax", "pension", "nhf"].includes(deduction.code)
+                )
+                .map((deduction) => ({
+                  name: deduction.name,
+                  amount: payroll.deductions[deduction.code] || 0,
+                  code: deduction.code,
+                  description: deduction.description,
+                  type: "statutory",
+                })),
+            ],
+            voluntary: [
+              // Include existing loans from payroll
+              ...(payroll.deductions.loans || []).map((loan) => ({
+                name: loan.description,
+                amount: loan.amount,
+                code: "loan",
+                description: loan.description,
+                type: "voluntary",
+              })),
+              // Include existing others from payroll
+              ...(payroll.deductions.others || []).map((other) => ({
+                name: other.description,
+                amount: other.amount,
+                code: "other",
+                description: other.description,
+                type: "voluntary",
+              })),
+              // Include existing department-specific deductions from payroll
+              ...(payroll.deductions.departmentSpecific || []).map(
+                (deduction) => ({
+                  name: deduction.name,
+                  amount: deduction.amount,
+                  code: "department",
+                  description: deduction.description,
+                  type: deduction.type?.toLowerCase() || "voluntary",
+                })
+              ),
+              // Add any additional voluntary deductions from database
+              ...voluntaryDeductions.map((deduction) => ({
+                name: deduction.name,
+                amount: payroll.deductions[deduction.code] || 0,
+                code: deduction.code,
+                description: deduction.description,
+                type: "voluntary",
+              })),
+            ],
+          };
+
+          console.log(
+            "✅ Added deduction breakdown to period payroll:",
+            payroll._id
+          );
+        }
+      }
+
       // Calculate period summary
       const summary = {
         totalEmployees: payrollRecords.length,
@@ -1476,9 +1698,12 @@ export class SuperAdminController {
         throw new ApiError(404, "Payroll record not found");
       }
 
-      // Add null check for employee
-      if (!payroll.employee) {
-        throw new ApiError(404, "Employee details not found");
+      // Simple fallback for missing breakdown
+      if (payroll.deductions && !payroll.deductions.breakdown) {
+        payroll.deductions.breakdown = {
+          statutory: [],
+          voluntary: [],
+        };
       }
 
       // Check permissions based on user role and department
@@ -1552,6 +1777,7 @@ export class SuperAdminController {
           loans: payroll.deductions.loans,
           others: payroll.deductions.others,
           totalDeductions: payroll.totals.totalDeductions,
+          breakdown: payroll.deductions.breakdown,
         },
         totals: {
           basicSalary: payroll.totals.basicSalary,
@@ -1618,6 +1844,7 @@ export class SuperAdminController {
       });
     }
   }
+
   static async getPendingPayrolls(req, res) {
     try {
       const pendingPayrolls = await PayrollModel.find({
@@ -1690,6 +1917,2037 @@ export class SuperAdminController {
         .populate("department", "name code")
         .populate("salaryGrade", "level description")
         .sort({ createdAt: -1 });
+
+      // Add deduction breakdown to each payroll record if missing (for backward compatibility)
+      for (const payroll of payrolls) {
+        if (payroll.deductions && !payroll.deductions.breakdown) {
+          console.log(
+            "🔧 Adding missing deduction breakdown to filtered payroll:",
+            payroll._id
+          );
+
+          // Get statutory deductions
+          const statutoryDeductions = await DeductionModel.find({
+            type: "statutory",
+            isActive: true,
+          }).lean();
+
+          // Get voluntary deductions
+          const voluntaryDeductions = await DeductionModel.find({
+            type: "voluntary",
+            isActive: true,
+          }).lean();
+
+          // Create breakdown structure
+          payroll.deductions.breakdown = {
+            statutory: [
+              // Include existing statutory deductions from payroll
+              {
+                name: "PAYE Tax",
+                amount: payroll.deductions.tax?.amount || 0,
+                code: "tax",
+                description: "Pay As You Earn Tax",
+                type: "statutory",
+              },
+              {
+                name: "Pension",
+                amount: payroll.deductions.pension?.amount || 0,
+                code: "pension",
+                description: "Pension Contribution",
+                type: "statutory",
+              },
+              {
+                name: "NHF",
+                amount: payroll.deductions.nhf?.amount || 0,
+                code: "nhf",
+                description: "National Housing Fund",
+                type: "statutory",
+              },
+              // Add any additional statutory deductions from database
+              ...statutoryDeductions
+                .filter(
+                  (deduction) =>
+                    !["tax", "pension", "nhf"].includes(deduction.code)
+                )
+                .map((deduction) => ({
+                  name: deduction.name,
+                  amount: payroll.deductions[deduction.code] || 0,
+                  code: deduction.code,
+                  description: deduction.description,
+                  type: "statutory",
+                })),
+            ],
+            voluntary: [
+              // Include existing loans from payroll
+              ...(payroll.deductions.loans || []).map((loan) => ({
+                name: loan.description,
+                amount: loan.amount,
+                code: "loan",
+                description: loan.description,
+                type: "voluntary",
+              })),
+              // Include existing others from payroll
+              ...(payroll.deductions.others || []).map((other) => ({
+                name: other.description,
+                amount: other.amount,
+                code: "other",
+                description: other.description,
+                type: "voluntary",
+              })),
+              // Include existing department-specific deductions from payroll
+              ...(payroll.deductions.departmentSpecific || []).map(
+                (deduction) => ({
+                  name: deduction.name,
+                  amount: deduction.amount,
+                  code: "department",
+                  description: deduction.description,
+                  type: deduction.type?.toLowerCase() || "voluntary",
+                })
+              ),
+              // Add any additional voluntary deductions from database
+              ...voluntaryDeductions.map((deduction) => ({
+                name: deduction.name,
+                amount: payroll.deductions[deduction.code] || 0,
+                code: deduction.code,
+                description: deduction.description,
+                type: "voluntary",
+              })),
+            ],
+          };
+
+          console.log(
+            "✅ Added deduction breakdown to filtered payroll:",
+            payroll._id
+          );
+        }
+      }
+
+      console.log(`✅ Found ${payrolls.length} payrolls matching filters`);
+
+      res.status(200).json({
+        success: true,
+        data: payrolls,
+        count: payrolls.length,
+      });
+    } catch (error) {
+      console.error("❌ Error fetching filtered payrolls:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async approvePayroll(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { remarks } = req.body;
+      const admin = await UserModel.findById(req.user.id);
+
+      console.log(
+        `\n🔍 Starting Super Admin payroll approval process for ID: ${id}`
+      );
+      console.log(
+        `👤 Approver: ${admin.firstName} ${admin.lastName} (${admin.position})`
+      );
+      console.log(`🏢 Department: ${admin.department?.name || "Not assigned"}`);
+      console.log(`📝 Remarks: ${remarks || "None provided"}`);
+
+      // Check if user is a Super Admin
+      if (
+        admin.role !== "ADMIN" ||
+        !admin.permissions.includes("MANAGE_SYSTEM")
+      ) {
+        console.error(`❌ Permission denied for user: ${admin._id}`);
+        throw new ApiError(
+          403,
+          "You must be a Super Admin to approve at this level"
+        );
+      }
+
+      const payroll = await PayrollModel.findById(id);
+      // ... approval logic
+      // ... notification logic
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updatePayrollStatus(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { status, remarks } = req.body;
+      const user = req.user;
+
+      // Validate status transition
+      const payroll = await PayrollModel.findById(id);
+      if (!payroll) {
+        return res.status(404).json({
+          success: false,
+          message: "Payroll not found",
+        });
+      }
+
+      // Check if user has permission to update payroll status
+      if (!user.hasPermission(Permission.APPROVE_PAYROLL)) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have permission to update payroll status",
+        });
+      }
+
+      // Update payroll status
+      payroll.status = status;
+      if (remarks) payroll.remarks = remarks;
+      await payroll.save();
+
+      // Create audit log
+      await Audit.create({
+        user: user._id,
+        action: "UPDATE_PAYROLL_STATUS",
+        details: {
+          payrollId: id,
+          oldStatus: payroll.status,
+          newStatus: status,
+          remarks,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: "Payroll status updated successfully",
+        data: payroll,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async processPayment(req, res, next) {
+    try {
+      const { id } = req.params;
+      const user = req.user;
+
+      // Find the payroll
+      const payroll = await PayrollModel.findById(id);
+      if (!payroll) {
+        return res.status(404).json({
+          success: false,
+          message: "Payroll not found",
+        });
+      }
+
+      // Check if user has permission to process payments
+      if (!user.hasPermission(Permission.APPROVE_PAYROLL)) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have permission to process payments",
+        });
+      }
+
+      // Validate payroll status
+      if (payroll.status !== PAYROLL_STATUS.APPROVED) {
+        return res.status(400).json({
+          success: false,
+          message: "Only approved payrolls can be processed for payment",
+        });
+      }
+
+      // Update payroll status to PAID
+      payroll.status = PAYROLL_STATUS.PAID;
+      payroll.approvalFlow = {
+        ...payroll.approvalFlow,
+        paidBy: user._id,
+        paidAt: new Date(),
+        remarks: "Payment processed successfully",
+      };
+      await payroll.save();
+
+      // Create payment record
+      await Payment.create({
+        payrollId: payroll._id,
+        employeeId: payroll.employee,
+        amount: payroll.totals.netPay,
+        status: "COMPLETED",
+        processedBy: user._id,
+        processedAt: new Date(),
+        paymentMethod: "BANK_TRANSFER",
+        reference: `PAY-${Date.now()}`,
+        bankDetails: payroll.payment,
+      });
+
+      // Create audit log
+      await Audit.create({
+        user: user._id,
+        action: AuditAction.PROCESS,
+        entity: AuditEntity.PAYROLL,
+        entityId: payroll._id,
+        performedBy: user._id,
+        details: {
+          previousStatus: payroll.status,
+          newStatus: PAYROLL_STATUS.PAID,
+          amount: payroll.totals.netPay,
+        },
+      });
+
+      // Create notification for employee
+      await NotificationService.createPayrollNotification(
+        payroll.employee._id,
+        NOTIFICATION_TYPES.PAYROLL_PAID,
+        payroll,
+        "Your payment has been processed successfully"
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Payment processed successfully",
+        data: {
+          payrollId: payroll._id,
+          amount: payroll.totals.netPay,
+          status: payroll.status,
+          paymentDate: payroll.approvalFlow.paidAt,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  //Onboarding & Offboarding
+
+  static async getActiveEmployees(req, res) {
+    try {
+      const employees = await UserModel.find({
+        status: "active",
+        role: { $ne: UserRole.SUPER_ADMIN },
+      })
+        .select("-password")
+        .populate("department", "name code")
+        .sort({ firstName: 1 });
+
+      res.status(200).json({
+        success: true,
+        data: employees,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+  static async getOnboardingEmployees(req, res) {
+    try {
+      console.log("🔍 Fetching onboarding employees");
+
+      const employees = await UserModel.find({
+        role: UserRole.USER,
+        status: "pending",
+      })
+        .select("-password")
+        .populate("department", "name code")
+        .sort({ createdAt: -1 });
+
+      console.log(`📋 Found ${employees.length} onboarding employees`);
+
+      res.status(200).json({
+        success: true,
+        data: employees,
+      });
+    } catch (error) {
+      console.error("❌ Error in getOnboardingEmployees:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message: "Failed to fetch onboarding employees",
+      });
+    }
+  }
+
+  static async getOffboardingEmployees(req, res) {
+    try {
+      console.log("🔍 Fetching offboarding employees");
+
+      const offboardingEmployees = await UserModel.find({
+        role: UserRole.USER,
+        $or: [
+          { status: "offboarding" },
+          { "offboarding.status": { $in: ["in_progress", "completed"] } },
+        ],
+      })
+        .select("-password")
+        .populate("department", "name code")
+        .populate("offboarding.completedBy", "firstName lastName")
+        .sort({ "offboarding.initiatedAt": -1 });
+
+      console.log(
+        `📋 Found ${offboardingEmployees.length} offboarding employees`
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: offboardingEmployees,
+      });
+    } catch (error) {
+      console.error("❌ Error fetching offboarding employees:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch offboarding employees",
+      });
+    }
+  }
+
+  static async initiateOffboarding(req, res) {
+    try {
+      console.log(
+        "🔄 Processing offboarding request for:",
+        req.params.employeeId
+      );
+
+      const employeeId = req.params.employeeId;
+      const employee = await UserModel.findById(employeeId);
+
+      if (!employee) {
+        return res.status(404).json({
+          success: false,
+          message: "Employee not found",
+        });
+      }
+
+      const updatedEmployee = await UserModel.findByIdAndUpdate(
+        employeeId,
+        {
+          $set: {
+            status: "offboarding",
+            offboarding: {
+              status: "pending_exit",
+              lastWorkingDay: new Date(),
+              initiatedAt: new Date(),
+              initiatedBy: req.user._id,
+              checklist: {
+                exitInterview: false,
+                assetsReturned: false,
+                knowledgeTransfer: false,
+                accessRevoked: false,
+                finalSettlement: false,
+              },
+            },
+          },
+        },
+        { new: true }
+      ).populate("department", "name code");
+
+      console.log("✅ Offboarding initiated successfully for:", employeeId);
+
+      return res.status(200).json({
+        success: true,
+        message: "Offboarding initiated successfully",
+        data: updatedEmployee,
+      });
+    } catch (error) {
+      console.error("❌ Error in initiateOffboarding:", error);
+      const { statusCode, message } = handleError(error);
+      return res.status(statusCode).json({
+        success: false,
+        message: message || "Failed to initiate offboarding",
+      });
+    }
+  }
+
+  static async revertToOnboarding(req, res) {
+    try {
+      console.log(
+        "🔄 Reverting employee to onboarding:",
+        req.params.employeeId
+      );
+
+      const employeeId = req.params.employeeId;
+      const employee = await UserModel.findById(employeeId);
+
+      if (!employee) {
+        return res.status(404).json({
+          success: false,
+          message: "Employee not found",
+        });
+      }
+
+      const updatedEmployee = await UserModel.findByIdAndUpdate(
+        employeeId,
+        {
+          $set: {
+            status: "pending",
+            offboarding: null,
+          },
+        },
+        { new: true }
+      ).populate("department", "name code");
+
+      return res.status(200).json({
+        success: true,
+        message: "Employee reverted to onboarding successfully",
+        data: updatedEmployee,
+      });
+    } catch (error) {
+      console.error("❌ Error in revertToOnboarding:", error);
+      const { statusCode, message } = handleError(error);
+      return res.status(statusCode).json({
+        success: false,
+        message: message || "Failed to revert employee to onboarding",
+      });
+    }
+  }
+
+  static async updateOffboardingStatus(req, res) {
+    try {
+      console.log("🔄 Updating offboarding status for:", req.params.employeeId);
+
+      const employeeId = req.params.employeeId;
+      const updates = req.body;
+
+      const employee = await UserModel.findById(employeeId);
+      if (!employee) {
+        return res.status(404).json({
+          success: false,
+          message: "Employee not found",
+        });
+      }
+
+      // Calculate completion status
+      const checklist = updates.checklist;
+      const totalItems = Object.keys(checklist).length;
+      const completedItems = Object.values(checklist).filter(Boolean).length;
+      const isCompleted = completedItems === totalItems;
+
+      // Update with completion tracking
+      const updatedEmployee = await UserModel.findByIdAndUpdate(
+        employeeId,
+        {
+          $set: {
+            "offboarding.checklist": updates.checklist,
+            "offboarding.status": updates.status,
+            "offboarding.progress": (completedItems / totalItems) * 100,
+            ...(isCompleted
+              ? {
+                  "offboarding.completedAt": new Date(),
+                  "offboarding.completedBy": req.user._id,
+                  status: "completed", // Update main employee status
+                }
+              : {}),
+          },
+        },
+        { new: true }
+      ).populate("department", "name code");
+
+      return res.status(200).json({
+        success: true,
+        message: "Offboarding status updated successfully",
+        data: updatedEmployee,
+      });
+    } catch (error) {
+      console.error("❌ Error updating offboarding status:", error);
+      const { statusCode, message } = handleError(error);
+      return res.status(statusCode).json({
+        success: false,
+        message: message || "Failed to update offboarding status",
+      });
+    }
+  }
+
+  static async archiveEmployee(req, res) {
+    try {
+      console.log("🔄 Archiving employee:", req.params.employeeId);
+
+      const employeeId = req.params.employeeId;
+      const employee = await UserModel.findById(employeeId);
+
+      if (!employee) {
+        return res.status(404).json({
+          success: false,
+          message: "Employee not found",
+        });
+      }
+
+      // Archive the employee
+      const archivedEmployee = await UserModel.findByIdAndUpdate(
+        employeeId,
+        {
+          $set: {
+            status: "archived",
+            "archive.archivedAt": new Date(),
+            "archive.archivedBy": req.user._id,
+          },
+        },
+        { new: true }
+      ).populate("department", "name code");
+
+      return res.status(200).json({
+        success: true,
+        message: "Employee archived successfully",
+        data: archivedEmployee,
+      });
+    } catch (error) {
+      console.error("❌ Error archiving employee:", error);
+      const { statusCode, message } = handleError(error);
+      return res.status(statusCode).json({
+        success: false,
+        message: message || "Failed to archive employee",
+      });
+    }
+  }
+
+  // ===== Payroll Management =====
+  static async createPayroll(req, res) {
+    try {
+      const {
+        employee,
+        month,
+        year,
+        salaryGrade,
+        frequency = PayrollFrequency.MONTHLY,
+      } = req.body;
+
+      // Validate month and year
+      const currentDate = new Date();
+      if (
+        year < currentDate.getFullYear() ||
+        (year === currentDate.getFullYear() &&
+          month < currentDate.getMonth() + 1)
+      ) {
+        throw new ApiError(400, "Cannot create payroll for past dates");
+      }
+
+      if (month < 1 || month > 12) {
+        throw new ApiError(400, "Invalid month");
+      }
+
+      // Validate frequency
+      if (!Object.values(PayrollFrequency).includes(frequency)) {
+        throw new ApiError(400, "Invalid payroll frequency");
+      }
+
+      // Get calculations from PayrollService
+      const calculations = await PayrollService.calculatePayroll(
+        employee,
+        salaryGrade,
+        month,
+        year,
+        frequency
+      );
+
+      // Create payroll data with all required fields
+      const payrollData = {
+        ...calculations,
+        processedBy: req.user.id,
+        createdBy: req.user.id,
+        updatedBy: req.user.id,
+        approvalFlow: {
+          currentLevel: APPROVAL_LEVELS.PROCESSING,
+          history: [],
+          submittedBy: req.user.id,
+          submittedAt: new Date(),
+          status: PAYROLL_STATUS.PROCESSING,
+          remarks: "Initial payroll creation",
+        },
+        status: PAYROLL_STATUS.PROCESSING,
+        payment: {
+          bankName: "Pending",
+          accountNumber: "Pending",
+          accountName: "Pending",
+        },
+      };
+
+      const payroll = await PayrollModel.create(payrollData);
+      const populatedPayroll = await PayrollModel.findById(
+        payroll._id
+      ).populate([
+        {
+          path: "employee",
+          select: "firstName lastName employeeId department",
+          populate: {
+            path: "department",
+            select: "name code",
+          },
+        },
+        { path: "department", select: "name code" },
+        { path: "salaryGrade", select: "level description" },
+        { path: "processedBy", select: "firstName lastName" },
+        { path: "createdBy", select: "firstName lastName" },
+        { path: "updatedBy", select: "firstName lastName" },
+        { path: "approvalFlow.submittedBy", select: "firstName lastName" },
+      ]);
+
+      // Ensure department is set from employee's department if not already set
+      if (
+        !populatedPayroll.department &&
+        populatedPayroll.employee.department
+      ) {
+        populatedPayroll.department = populatedPayroll.employee.department;
+        await populatedPayroll.save();
+      }
+
+      // Consolidated audit logging - replaces redundant logging
+      await PayrollStatisticsLogger.logPayrollAction({
+        action: AuditAction.CREATE,
+        payrollId: payroll._id,
+        userId: req.user.id,
+        status: PAYROLL_STATUS.PROCESSING,
+        details: {
+          employeeId: employee,
+          departmentId:
+            populatedPayroll.department?._id ||
+            populatedPayroll.employee?.department?._id,
+          month,
+          year,
+          frequency,
+          netPay: populatedPayroll.totals?.netPay,
+          employeeName: `${populatedPayroll.employee?.firstName} ${populatedPayroll.employee?.lastName}`,
+          departmentName:
+            populatedPayroll.department?.name ||
+            populatedPayroll.employee?.department?.name,
+          createdBy: req.user.id,
+          position: req.user.position,
+          role: req.user.role,
+          message: `Created payroll for ${populatedPayroll.employee?.firstName} ${populatedPayroll.employee?.lastName}`,
+          approvalLevel: APPROVAL_LEVELS.PROCESSING,
+          remarks: "Initial payroll creation",
+        },
+      });
+
+      // Create notification for the employee
+      console.log(`🔔 Creating notification for employee: ${employee}`);
+      await NotificationService.createPayrollNotification(
+        populatedPayroll,
+        NOTIFICATION_TYPES.PAYROLL_DRAFT_CREATED,
+        populatedPayroll.employee
+      );
+
+      // Create notification for the super admin
+      console.log(`🔔 Creating notification for super admin: ${req.user.id}`);
+      await NotificationService.createPayrollNotification(
+        populatedPayroll,
+        NOTIFICATION_TYPES.PAYROLL_DRAFT_CREATED,
+        req.user
+      );
+
+      res.status(201).json({
+        success: true,
+        message: "Payroll record created successfully",
+        data: populatedPayroll,
+      });
+    } catch (error) {
+      console.error("❌ Error in createPayroll:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to create payroll record",
+        error: error.message,
+      });
+    }
+  }
+
+  static async deletePayroll(req, res) {
+    try {
+      const { id } = req.params;
+      console.log("🗑️ Attempting to delete payroll:", id);
+
+      const payroll = await PayrollModel.findById(id);
+      if (!payroll) {
+        throw new ApiError(404, "Payroll record not found");
+      }
+
+      await PayrollModel.findByIdAndDelete(id);
+
+      res.status(200).json({
+        success: true,
+        message: "Payroll record deleted successfully",
+      });
+    } catch (error) {
+      console.error("❌ Error deleting payroll:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message: message || "Failed to delete payroll record",
+      });
+    }
+  }
+
+  static async getAllPayrolls(req, res) {
+    try {
+      const {
+        month,
+        year,
+        status,
+        department,
+        dateRange,
+        frequency = "monthly",
+        employee,
+      } = req.query;
+
+      let query = {};
+
+      // Period filtering
+      if (month && year) {
+        query.month = parseInt(month);
+        query.year = parseInt(year);
+      } else if (dateRange) {
+        // Handle special date range cases
+        const endDate = new Date();
+        const startDate = new Date();
+
+        if (dateRange === "last3") {
+          startDate.setMonth(startDate.getMonth() - 3);
+        } else if (dateRange === "last6") {
+          startDate.setMonth(startDate.getMonth() - 6);
+        } else if (dateRange === "last12") {
+          startDate.setMonth(startDate.getMonth() - 12);
+        } else if (dateRange === "custom") {
+          startDate.setMonth(startDate.getMonth() - 3);
+        } else {
+          const [startDateStr, endDateStr] = dateRange.split(",");
+          if (startDateStr && endDateStr) {
+            query.createdAt = {
+              $gte: new Date(startDateStr),
+              $lte: new Date(endDateStr),
+            };
+            // Skip the default date range assignment
+            return;
+          }
+        }
+
+        query.createdAt = {
+          $gte: startDate,
+          $lte: endDate,
+        };
+      }
+
+      // Status filtering
+      if (status && status !== "all") {
+        query.status = status;
+      }
+
+      // Department filtering
+      if (department && department !== "all") {
+        query.department = department;
+      }
+
+      // Employee filtering
+      if (employee && employee !== "all") {
+        query.employee = employee;
+      }
+
+      // Frequency filtering
+      if (frequency && frequency !== "all") {
+        query.frequency = frequency;
+      }
+
+      // Get paginated results
+      const page = parseInt(req.query.page) || 1;
+      const limit = req.query.limit ? parseInt(req.query.limit) : null;
+      const skip = limit ? (page - 1) * limit : 0;
+
+      let queryBuilder = PayrollModel.find(query)
+        .sort({ createdAt: -1, year: -1, month: -1 })
+        .populate([
+          { path: "employee", select: "firstName lastName employeeId" },
+          { path: "department", select: "name code" },
+          { path: "salaryGrade", select: "level description" },
+        ]);
+
+      // Only apply pagination if limit is specified
+      if (limit) {
+        queryBuilder = queryBuilder.skip(skip).limit(limit);
+      }
+
+      const payrolls = await queryBuilder;
+      const total = await PayrollModel.countDocuments(query);
+
+      // Simple fallback for missing breakdown
+      const payrollsWithFallback = payrolls.map((payroll) => {
+        const payrollObj = payroll.toObject();
+
+        if (!payrollObj.deductions.breakdown) {
+          payrollObj.deductions.breakdown = {
+            statutory: [],
+            voluntary: [],
+          };
+        }
+
+        return payrollObj;
+      });
+
+      // Calculate frequency-based totals
+      const frequencyTotals = await PayrollModel.aggregate([
+        {
+          $match: {
+            ...query,
+            status: { $ne: PAYROLL_STATUS.DRAFT },
+          },
+        },
+        {
+          $group: {
+            _id: "$frequency",
+            totalNetPay: { $sum: "$totals.netPay" },
+            totalGrossPay: { $sum: "$totals.grossEarnings" },
+            totalDeductions: { $sum: "$totals.totalDeductions" },
+            count: { $sum: 1 },
+            paidCount: {
+              $sum: { $cond: [{ $eq: ["$status", "PAID"] }, 1, 0] },
+            },
+            approvedCount: {
+              $sum: { $cond: [{ $eq: ["$status", "APPROVED"] }, 1, 0] },
+            },
+            pendingCount: {
+              $sum: { $cond: [{ $eq: ["$status", "PENDING"] }, 1, 0] },
+            },
+            pendingPaymentCount: {
+              $sum: { $cond: [{ $eq: ["$status", "PENDING_PAYMENT"] }, 1, 0] },
+            },
+            processingCount: {
+              $sum: { $cond: [{ $eq: ["$status", "PROCESSING"] }, 1, 0] },
+            },
+            rejectedCount: {
+              $sum: { $cond: [{ $eq: ["$status", "REJECTED"] }, 1, 0] },
+            },
+            cancelledCount: {
+              $sum: { $cond: [{ $eq: ["$status", "CANCELLED"] }, 1, 0] },
+            },
+          },
+        },
+      ]);
+
+      // Calculate status breakdown
+      const statusBreakdown = await PayrollModel.aggregate([
+        {
+          $match: {
+            ...query,
+            status: { $ne: PAYROLL_STATUS.DRAFT },
+          },
+        },
+        {
+          $group: {
+            _id: "$status",
+            count: { $sum: 1 },
+            totalNetPay: { $sum: "$totals.netPay" },
+          },
+        },
+      ]);
+
+      // Calculate department breakdown
+      const departmentBreakdown = await PayrollModel.aggregate([
+        {
+          $match: {
+            ...query,
+            status: { $ne: PAYROLL_STATUS.DRAFT },
+          },
+        },
+        {
+          $group: {
+            _id: "$department",
+            count: { $sum: 1 },
+            totalNetPay: { $sum: "$totals.netPay" },
+          },
+        },
+        {
+          $lookup: {
+            from: "departments",
+            localField: "_id",
+            foreignField: "_id",
+            as: "departmentInfo",
+          },
+        },
+        { $unwind: "$departmentInfo" },
+        {
+          $project: {
+            departmentName: "$departmentInfo.name",
+            count: 1,
+            totalNetPay: 1,
+          },
+        },
+      ]);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          payrolls: payrollsWithFallback,
+          pagination: {
+            total,
+            page,
+            pages: Math.ceil(total / limit),
+          },
+          summary: {
+            frequencyTotals,
+            statusBreakdown,
+            departmentBreakdown,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error in getAllPayrolls:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch payrolls",
+        error: error.message,
+      });
+    }
+  }
+
+  static async getEmployeePayrollHistory(req, res) {
+    try {
+      const { employeeId } = req.params;
+      console.log("🔍 Fetching payroll history for employee:", employeeId);
+
+      // Add this debug log
+      console.log("Looking for employee in UserModel with ID:", employeeId);
+
+      // Get employee with populated fields
+      const employee = await UserModel.findById(employeeId).populate([
+        { path: "department", select: "name code" },
+        { path: "salaryGrade", select: "level description" },
+      ]);
+
+      // Add this debug log
+      console.log("Found employee:", employee);
+
+      if (!employee) {
+        return res.status(404).json({
+          success: false,
+          message: "Employee not found",
+        });
+      }
+
+      // Get payroll history - modify this part
+      const payrollHistory = await PayrollModel.find({
+        employee: employeeId, // Changed from asObjectId(employeeId)
+      })
+        .populate([
+          {
+            path: "employee",
+            select: "firstName lastName employeeId bankDetails",
+          },
+          {
+            path: "department",
+            select: "name code",
+          },
+          {
+            path: "salaryGrade",
+            select: "level description",
+          },
+        ])
+        .sort({ year: -1, month: -1 })
+        .lean();
+
+      // Add this debug log
+      console.log("Found payroll history:", payrollHistory);
+
+      // Add deduction breakdown to each payroll record if missing (for backward compatibility)
+      for (const payroll of payrollHistory) {
+        if (payroll.deductions && !payroll.deductions.breakdown) {
+          console.log(
+            "🔧 Adding missing deduction breakdown to payroll in history:",
+            payroll._id
+          );
+
+          // Get statutory deductions
+          const statutoryDeductions = await DeductionModel.find({
+            type: "statutory",
+            isActive: true,
+          }).lean();
+
+          // Get voluntary deductions
+          const voluntaryDeductions = await DeductionModel.find({
+            type: "voluntary",
+            isActive: true,
+          }).lean();
+
+          // Create breakdown structure
+          payroll.deductions.breakdown = {
+            statutory: [
+              // Include existing statutory deductions from payroll
+              {
+                name: "PAYE Tax",
+                amount: payroll.deductions.tax?.amount || 0,
+                code: "tax",
+                description: "Pay As You Earn Tax",
+                type: "statutory",
+              },
+              {
+                name: "Pension",
+                amount: payroll.deductions.pension?.amount || 0,
+                code: "pension",
+                description: "Pension Contribution",
+                type: "statutory",
+              },
+              {
+                name: "NHF",
+                amount: payroll.deductions.nhf?.amount || 0,
+                code: "nhf",
+                description: "National Housing Fund",
+                type: "statutory",
+              },
+              // Add any additional statutory deductions from database
+              ...statutoryDeductions
+                .filter(
+                  (deduction) =>
+                    !["tax", "pension", "nhf"].includes(deduction.code)
+                )
+                .map((deduction) => ({
+                  name: deduction.name,
+                  amount: payroll.deductions[deduction.code] || 0,
+                  code: deduction.code,
+                  description: deduction.description,
+                  type: "statutory",
+                })),
+            ],
+            voluntary: [
+              // Include existing loans from payroll
+              ...(payroll.deductions.loans || []).map((loan) => ({
+                name: loan.description,
+                amount: loan.amount,
+                code: "loan",
+                description: loan.description,
+                type: "voluntary",
+              })),
+              // Include existing others from payroll
+              ...(payroll.deductions.others || []).map((other) => ({
+                name: other.description,
+                amount: other.amount,
+                code: "other",
+                description: other.description,
+                type: "voluntary",
+              })),
+              // Include existing department-specific deductions from payroll
+              ...(payroll.deductions.departmentSpecific || []).map(
+                (deduction) => ({
+                  name: deduction.name,
+                  amount: deduction.amount,
+                  code: "department",
+                  description: deduction.description,
+                  type: deduction.type?.toLowerCase() || "voluntary",
+                })
+              ),
+              // Add any additional voluntary deductions from database
+              ...voluntaryDeductions.map((deduction) => ({
+                name: deduction.name,
+                amount: payroll.deductions[deduction.code] || 0,
+                code: deduction.code,
+                description: deduction.description,
+                type: "voluntary",
+              })),
+            ],
+          };
+
+          console.log(
+            "✅ Added deduction breakdown to payroll in history:",
+            payroll._id
+          );
+        }
+      }
+
+      // Calculate summary
+      const approvedPayrolls = payrollHistory.filter(
+        (record) => record.status === PAYROLL_STATUS.APPROVED
+      );
+
+      const totalPaid = approvedPayrolls.reduce(
+        (sum, record) => sum + record.totals.netPay,
+        0
+      );
+
+      // Format payroll history to remove redundancy
+      const formattedPayrollHistory = payrollHistory.map((record) => ({
+        period: {
+          month: record.month,
+          year: record.year,
+        },
+        earnings: {
+          basicSalary: record.basicSalary,
+          allowances: record.allowances,
+          bonuses: record.bonuses,
+          totalEarnings: record.totals.grossEarnings,
+        },
+        deductions: record.deductions,
+        totals: record.totals,
+        status: record.status,
+        processedAt: record.createdAt,
+      }));
+
+      // Get the latest salary grade from the most recent payroll record
+      const latestPayroll = payrollHistory[0];
+      const currentSalaryGrade =
+        latestPayroll?.salaryGrade?.level ||
+        employee.salaryGrade?.level ||
+        "Not Assigned";
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          employee: {
+            id: employee._id,
+            name: `${employee.firstName} ${employee.lastName}`,
+            employeeId: employee.employeeId,
+            department: employee.department?.name || "Not Assigned",
+            salaryGrade: currentSalaryGrade,
+          },
+          payrollHistory: formattedPayrollHistory,
+          summary: {
+            totalRecords: payrollHistory.length,
+            latestPayroll: {
+              period: latestPayroll
+                ? {
+                    month: latestPayroll.month,
+                    year: latestPayroll.year,
+                  }
+                : null,
+              status: latestPayroll?.status || null,
+              totals: latestPayroll?.totals || null,
+            },
+            totalPaid,
+            averagePayroll:
+              approvedPayrolls.length > 0
+                ? totalPaid / approvedPayrolls.length
+                : 0,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error fetching employee payroll history:", error);
+      const { statusCode, message } = handleError(error);
+      return res.status(statusCode).json({
+        success: false,
+        message: message || "Failed to fetch employee payroll history",
+      });
+    }
+  }
+
+  static async getPayrollById(req, res) {
+    try {
+      const { id } = req.params;
+      const payroll = await PayrollModel.findById(id)
+        .populate(
+          "employee",
+          "firstName lastName employeeId position gradeLevel"
+        )
+        .populate("salaryGrade", "level basicSalary allowances deductions");
+
+      if (!payroll) {
+        return res.status(404).json({
+          success: false,
+          message: "Payroll not found",
+        });
+      }
+
+      // Simple fallback for missing breakdown
+      if (payroll.deductions && !payroll.deductions.breakdown) {
+        payroll.deductions.breakdown = {
+          statutory: [],
+          voluntary: [],
+        };
+      }
+
+      res.json({
+        success: true,
+        data: payroll,
+      });
+    } catch (error) {
+      console.error("Error fetching payroll:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error fetching payroll",
+      });
+    }
+  }
+
+  static async updatePayroll(req, res) {
+    try {
+      const { id } = req.params;
+      const { month, year, employee, salaryGrade } = req.body;
+
+      // Find the payroll
+      const payroll = await PayrollModel.findById(id);
+
+      if (!payroll) {
+        return res.status(404).json({
+          success: false,
+          message: "Payroll not found",
+        });
+      }
+
+      // Only allow updates to DRAFT payrolls
+      if (payroll.status !== "DRAFT") {
+        return res.status(403).json({
+          success: false,
+          message: "Only draft payrolls can be edited",
+          status: payroll.status,
+        });
+      }
+
+      // Update the payroll
+      payroll.month = month;
+      payroll.year = year;
+      payroll.employee = employee;
+      payroll.salaryGrade = salaryGrade;
+      payroll.processedDate = new Date(year, month - 1);
+
+      // Recalculate payroll
+      const updatedPayroll = await payroll.save();
+
+      res.json({
+        success: true,
+        message: "Payroll updated successfully",
+        data: updatedPayroll,
+      });
+    } catch (error) {
+      console.error("Error updating payroll:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error updating payroll",
+      });
+    }
+  }
+
+  static async getPayrollPeriods(req, res) {
+    try {
+      const { department } = req.query; // Optional department filter
+
+      const matchStage = department
+        ? { department: new Types.ObjectId(department) }
+        : {};
+
+      const periods = await PayrollModel.aggregate([
+        {
+          $match: matchStage,
+        },
+        {
+          $group: {
+            _id: {
+              year: "$year",
+              month: "$month",
+              department: "$department",
+            },
+            count: { $sum: 1 },
+            totalAmount: { $sum: "$netPay" },
+            statuses: { $addToSet: "$status" },
+            pendingCount: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "PENDING"] }, 1, 0],
+              },
+            },
+            approvedCount: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "APPROVED"] }, 1, 0],
+              },
+            },
+            rejectedCount: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "REJECTED"] }, 1, 0],
+              },
+            },
+            paidCount: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "PAID"] }, 1, 0],
+              },
+            },
+          },
+        },
+        {
+          $lookup: {
+            from: "departments",
+            localField: "_id.department",
+            foreignField: "_id",
+            as: "departmentInfo",
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            year: "$_id.year",
+            month: "$_id.month",
+            department: {
+              $arrayElemAt: ["$departmentInfo.name", 0],
+            },
+            count: 1,
+            totalAmount: 1,
+            statuses: 1,
+            statusCounts: {
+              pending: "$pendingCount",
+              approved: "$approvedCount",
+              rejected: "$rejectedCount",
+              paid: "$paidCount",
+            },
+          },
+        },
+        {
+          $sort: { year: -1, month: -1 },
+        },
+      ]);
+
+      res.status(200).json({
+        success: true,
+        data: periods,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getPayrollStats(req, res) {
+    try {
+      // Allow query parameters to override default current period
+      const month = parseInt(req.query.month) || new Date().getMonth() + 1;
+      const year = parseInt(req.query.year) || new Date().getFullYear();
+      const status = req.query.status;
+      const department = req.query.department;
+      const startDate = req.query.startDate;
+      const endDate = req.query.endDate;
+
+      console.log("Fetching stats for period:", {
+        month,
+        year,
+        status,
+        department,
+        startDate,
+        endDate,
+      });
+
+      // Build match conditions
+      const matchConditions = {
+        month: month,
+        year: year,
+        status: {
+          $in: [
+            "PENDING",
+            "PROCESSING",
+            "APPROVED",
+            "REJECTED",
+            "PAID",
+            "CANCELLED",
+            "FAILED",
+            "COMPLETED",
+            "PENDING_PAYMENT",
+          ],
+        },
+      };
+
+      // Add status filter if provided
+      if (status && status !== "ALL") {
+        matchConditions.status = status;
+      }
+
+      // Add department filter if provided
+      if (department && department !== "ALL") {
+        matchConditions.department = new Types.ObjectId(department);
+      }
+
+      // Add date range filter if provided
+      if (startDate || endDate) {
+        matchConditions.createdAt = {};
+        if (startDate) {
+          matchConditions.createdAt.$gte = new Date(startDate);
+        }
+        if (endDate) {
+          matchConditions.createdAt.$lte = new Date(endDate);
+        }
+      }
+
+      console.log(
+        "Match conditions:",
+        JSON.stringify(matchConditions, null, 2)
+      );
+
+      const stats = await PayrollModel.aggregate([
+        {
+          $match: matchConditions,
+        },
+        {
+          $group: {
+            _id: "$status",
+            count: { $sum: 1 },
+            totalNetPay: { $sum: "$totals.netPay" },
+          },
+        },
+      ]);
+
+      console.log("Aggregated stats:", stats);
+
+      // Calculate totals
+      const totalCount = stats.reduce((sum, stat) => sum + stat.count, 0);
+      const totalAmount = stats.reduce(
+        (sum, stat) => sum + stat.totalNetPay,
+        0
+      );
+
+      res.status(200).json({
+        success: true,
+        data: {
+          stats,
+          summary: {
+            totalCount,
+            totalAmount,
+          },
+        },
+        period: {
+          month,
+          year,
+        },
+        filters: {
+          status,
+          department,
+          startDate,
+          endDate,
+        },
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async getPeriodPayroll(req, res) {
+    try {
+      const { month, year } = req.params;
+
+      // Validate month and year
+      const monthNum = parseInt(month);
+      const yearNum = parseInt(year);
+
+      if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid month",
+        });
+      }
+
+      if (isNaN(yearNum) || yearNum < 2000 || yearNum > 2100) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid year",
+        });
+      }
+
+      // Get all payroll records for the specified period
+      const payrollRecords = await PayrollModel.find({
+        month: monthNum,
+        year: yearNum,
+      })
+        .populate("employee", "firstName lastName fullName employeeId")
+        .populate("department", "name code")
+        .populate("salaryGrade", "level description")
+        .lean();
+
+      // Add deduction breakdown to each payroll record if missing (for backward compatibility)
+      for (const payroll of payrollRecords) {
+        if (payroll.deductions && !payroll.deductions.breakdown) {
+          console.log(
+            "🔧 Adding missing deduction breakdown to period payroll:",
+            payroll._id
+          );
+
+          // Get statutory deductions
+          const statutoryDeductions = await DeductionModel.find({
+            type: "statutory",
+            isActive: true,
+          }).lean();
+
+          // Get voluntary deductions
+          const voluntaryDeductions = await DeductionModel.find({
+            type: "voluntary",
+            isActive: true,
+          }).lean();
+
+          // Create breakdown structure
+          payroll.deductions.breakdown = {
+            statutory: [
+              // Include existing statutory deductions from payroll
+              {
+                name: "PAYE Tax",
+                amount: payroll.deductions.tax?.amount || 0,
+                code: "tax",
+                description: "Pay As You Earn Tax",
+                type: "statutory",
+              },
+              {
+                name: "Pension",
+                amount: payroll.deductions.pension?.amount || 0,
+                code: "pension",
+                description: "Pension Contribution",
+                type: "statutory",
+              },
+              {
+                name: "NHF",
+                amount: payroll.deductions.nhf?.amount || 0,
+                code: "nhf",
+                description: "National Housing Fund",
+                type: "statutory",
+              },
+              // Add any additional statutory deductions from database
+              ...statutoryDeductions
+                .filter(
+                  (deduction) =>
+                    !["tax", "pension", "nhf"].includes(deduction.code)
+                )
+                .map((deduction) => ({
+                  name: deduction.name,
+                  amount: payroll.deductions[deduction.code] || 0,
+                  code: deduction.code,
+                  description: deduction.description,
+                  type: "statutory",
+                })),
+            ],
+            voluntary: [
+              // Include existing loans from payroll
+              ...(payroll.deductions.loans || []).map((loan) => ({
+                name: loan.description,
+                amount: loan.amount,
+                code: "loan",
+                description: loan.description,
+                type: "voluntary",
+              })),
+              // Include existing others from payroll
+              ...(payroll.deductions.others || []).map((other) => ({
+                name: other.description,
+                amount: other.amount,
+                code: "other",
+                description: other.description,
+                type: "voluntary",
+              })),
+              // Include existing department-specific deductions from payroll
+              ...(payroll.deductions.departmentSpecific || []).map(
+                (deduction) => ({
+                  name: deduction.name,
+                  amount: deduction.amount,
+                  code: "department",
+                  description: deduction.description,
+                  type: deduction.type?.toLowerCase() || "voluntary",
+                })
+              ),
+              // Add any additional voluntary deductions from database
+              ...voluntaryDeductions.map((deduction) => ({
+                name: deduction.name,
+                amount: payroll.deductions[deduction.code] || 0,
+                code: deduction.code,
+                description: deduction.description,
+                type: "voluntary",
+              })),
+            ],
+          };
+
+          console.log(
+            "✅ Added deduction breakdown to period payroll:",
+            payroll._id
+          );
+        }
+      }
+
+      // Calculate period summary
+      const summary = {
+        totalEmployees: payrollRecords.length,
+        totalNetPay: payrollRecords.reduce(
+          (sum, record) => sum + record.totals.netPay,
+          0
+        ),
+        totalBasicSalary: payrollRecords.reduce(
+          (sum, record) => sum + record.totals.basicSalary,
+          0
+        ),
+        totalAllowances: payrollRecords.reduce(
+          (sum, record) => sum + record.totals.totalAllowances,
+          0
+        ),
+        totalDeductions: payrollRecords.reduce(
+          (sum, record) => sum + record.totals.totalDeductions,
+          0
+        ),
+        statusBreakdown: payrollRecords.reduce((acc, record) => {
+          acc[record.status] = (acc[record.status] || 0) + 1;
+          return acc;
+        }, {}),
+      };
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          period: {
+            month: monthNum,
+            year: yearNum,
+            monthName: new Date(yearNum, monthNum - 1).toLocaleString(
+              "default",
+              {
+                month: "long",
+              }
+            ),
+          },
+          employees: payrollRecords.map((record) => ({
+            id: record._id,
+            employee: {
+              id: record.employee._id,
+              name: `${record.employee.firstName} ${record.employee.lastName}`,
+              employeeId: record.employee.employeeId,
+            },
+            department: record.department?.name || "Not Assigned",
+            salaryGrade: {
+              level: record.salaryGrade.level,
+              description: record.salaryGrade.description,
+            },
+            payroll: {
+              basicSalary: record.totals.basicSalary,
+              totalAllowances: record.totals.totalAllowances,
+              totalDeductions: record.totals.totalDeductions,
+              netPay: record.totals.netPay,
+            },
+            status: record.status,
+            processedAt: record.createdAt,
+          })),
+          summary,
+        },
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      return res.status(statusCode).json({ success: false, message });
+    }
+  }
+
+  static async viewPayslip(req, res) {
+    try {
+      const user = req.user;
+
+      const payroll = await PayrollModel.findById(req.params.payrollId)
+        .populate([
+          {
+            path: "employee",
+            select: "firstName lastName employeeId bankDetails department",
+          },
+          { path: "department", select: "name code" },
+          { path: "salaryGrade", select: "level description" },
+          { path: "processedBy", select: "firstName lastName" },
+          { path: "createdBy", select: "firstName lastName" },
+          { path: "updatedBy", select: "firstName lastName" },
+          { path: "approvalFlow.submittedBy", select: "firstName lastName" },
+          { path: "approvalFlow.approvedBy", select: "firstName lastName" },
+        ])
+        .lean();
+
+      if (!payroll) {
+        throw new ApiError(404, "Payroll record not found");
+      }
+
+      // Simple fallback for missing breakdown
+      if (payroll.deductions && !payroll.deductions.breakdown) {
+        payroll.deductions.breakdown = {
+          statutory: [],
+          voluntary: [],
+        };
+      }
+
+      // Check permissions based on user role and department
+      if (user.role === UserRole.SUPER_ADMIN) {
+        // Super admin can view all payslips
+        if (!user.hasPermission(Permission.VIEW_OWN_PAYSLIP)) {
+          throw new ApiError(403, "You don't have permission to view payslips");
+        }
+      } else if (user.role === UserRole.ADMIN) {
+        // Admin can only view payslips of their department
+        if (!user.hasPermission(Permission.VIEW_DEPARTMENT_PAYSLIPS)) {
+          throw new ApiError(
+            403,
+            "You don't have permission to view department payslips"
+          );
+        }
+        if (
+          payroll.employee.department.toString() !== user.department.toString()
+        ) {
+          throw new ApiError(
+            403,
+            "You can only view payslips of employees in your department"
+          );
+        }
+      } else {
+        // Regular users can only view their own payslips
+        if (!user.hasPermission(Permission.VIEW_OWN_PAYSLIP)) {
+          throw new ApiError(403, "You don't have permission to view payslips");
+        }
+        if (payroll.employee._id.toString() !== user._id.toString()) {
+          throw new ApiError(403, "You can only view your own payslip");
+        }
+      }
+
+      // Format the response with detailed payslip information
+      const payslipData = {
+        _id: payroll._id,
+        payslipId: `PS${payroll.month}${payroll.year}${payroll.employee.employeeId}`,
+        employee: {
+          id: payroll.employee._id,
+          name: `${payroll.employee.firstName} ${payroll.employee.lastName}`,
+          employeeId: payroll.employee.employeeId,
+          department: payroll.department?.name || "Not Assigned",
+          salaryGrade: payroll.salaryGrade?.level || "Not Assigned",
+        },
+        paymentDetails: {
+          bankName: payroll.employee.bankDetails?.bankName || "Not Provided",
+          accountNumber:
+            payroll.employee.bankDetails?.accountNumber || "Not Provided",
+          accountName:
+            payroll.employee.bankDetails?.accountName || "Not Provided",
+        },
+        period: {
+          month: payroll.month,
+          year: payroll.year,
+          startDate: payroll.periodStart,
+          endDate: payroll.periodEnd,
+          frequency: payroll.frequency,
+        },
+        earnings: {
+          basicSalary: payroll.basicSalary,
+          overtime: payroll.earnings.overtime,
+          bonus: payroll.earnings.bonus,
+          allowances: payroll.allowances,
+          totalEarnings: payroll.totals.grossEarnings,
+        },
+        deductions: {
+          tax: payroll.deductions.tax,
+          pension: payroll.deductions.pension,
+          nhf: payroll.deductions.nhf,
+          loans: payroll.deductions.loans,
+          others: payroll.deductions.others,
+          totalDeductions: payroll.totals.totalDeductions,
+          breakdown: payroll.deductions.breakdown,
+        },
+        totals: {
+          basicSalary: payroll.totals.basicSalary,
+          totalAllowances: payroll.totals.totalAllowances,
+          totalBonuses: payroll.totals.totalBonuses,
+          grossEarnings: payroll.totals.grossEarnings,
+          totalDeductions: payroll.totals.totalDeductions,
+          netPay: payroll.totals.netPay,
+        },
+        components: payroll.components,
+        status: payroll.status,
+        approvalFlow: {
+          submittedBy: payroll.approvalFlow.submittedBy
+            ? {
+                id: payroll.approvalFlow.submittedBy._id,
+                name: `${payroll.approvalFlow.submittedBy.firstName} ${payroll.approvalFlow.submittedBy.lastName}`,
+                role: payroll.approvalFlow.submittedBy.role,
+              }
+            : null,
+          submittedAt: payroll.approvalFlow.submittedAt,
+          approvedBy: payroll.approvalFlow.approvedBy
+            ? {
+                id: payroll.approvalFlow.approvedBy._id,
+                name: `${payroll.approvalFlow.approvedBy.firstName} ${payroll.approvalFlow.approvedBy.lastName}`,
+                role: payroll.approvalFlow.approvedBy.role,
+              }
+            : null,
+          approvedAt: payroll.approvalFlow.approvedAt,
+          remarks: payroll.approvalFlow.remarks || null,
+        },
+        processedBy: {
+          id: payroll.processedBy._id,
+          name: `${payroll.processedBy.firstName} ${payroll.processedBy.lastName}`,
+          role: payroll.processedBy.role,
+        },
+        createdBy: {
+          id: payroll.createdBy._id,
+          name: `${payroll.createdBy.firstName} ${payroll.createdBy.lastName}`,
+          role: payroll.createdBy.role,
+        },
+        updatedBy: {
+          id: payroll.updatedBy._id,
+          name: `${payroll.updatedBy.firstName} ${payroll.updatedBy.lastName}`,
+          role: payroll.updatedBy.role,
+        },
+        timestamps: {
+          createdAt: payroll.createdAt,
+          updatedAt: payroll.updatedAt,
+        },
+        comments: payroll.comments,
+      };
+
+      res.status(200).json({
+        success: true,
+        message: "Payslip details retrieved successfully",
+        data: payslipData,
+      });
+    } catch (error) {
+      console.error("❌ Error fetching payslip details:", error);
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message: message || "Failed to fetch payslip details",
+      });
+    }
+  }
+
+  static async getPendingPayrolls(req, res) {
+    try {
+      const pendingPayrolls = await PayrollModel.find({
+        status: "PENDING",
+      }).select("_id month year employee department");
+
+      console.log("📊 Pending Payrolls Found:", {
+        count: pendingPayrolls.length,
+        payrolls: pendingPayrolls.map((p) => ({
+          id: p._id,
+          period: `${p.month}/${p.year}`,
+        })),
+      });
+
+      return res.status(200).json({
+        success: true,
+        count: pendingPayrolls.length,
+        pendingPayrolls,
+      });
+    } catch (error) {
+      console.error("❌ Error getting pending payrolls:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to get pending payrolls",
+        error: error.message,
+      });
+    }
+  }
+
+  static async getFilteredPayrolls(req, res) {
+    try {
+      console.log("🔍 Fetching filtered payrolls");
+      const { month, year, status, department } = req.query;
+
+      // Build filter object
+      const filter = {};
+
+      // Add month filter if provided
+      if (month) {
+        filter.month = parseInt(month);
+      }
+
+      // Add year filter if provided
+      if (year) {
+        filter.year = parseInt(year);
+      }
+
+      // Add status filter if provided
+      if (status) {
+        filter.status = status;
+      }
+
+      // Handle department filter
+      if (department) {
+        // First find the department by name
+        const departmentDoc = await DepartmentModel.findOne({
+          name: { $regex: new RegExp(department, "i") },
+        });
+
+        if (!departmentDoc) {
+          throw new ApiError(404, `Department "${department}" not found`);
+        }
+
+        filter.department = departmentDoc._id;
+      }
+
+      // Get payrolls with filters
+      const payrolls = await PayrollModel.find(filter)
+        .populate("employee", "firstName lastName employeeId")
+        .populate("department", "name code")
+        .populate("salaryGrade", "level description")
+        .sort({ createdAt: -1 });
+
+      // Add deduction breakdown to each payroll record if missing (for backward compatibility)
+      for (const payroll of payrolls) {
+        if (payroll.deductions && !payroll.deductions.breakdown) {
+          console.log(
+            "🔧 Adding missing deduction breakdown to filtered payroll:",
+            payroll._id
+          );
+
+          // Get statutory deductions
+          const statutoryDeductions = await DeductionModel.find({
+            type: "statutory",
+            isActive: true,
+          }).lean();
+
+          // Get voluntary deductions
+          const voluntaryDeductions = await DeductionModel.find({
+            type: "voluntary",
+            isActive: true,
+          }).lean();
+
+          // Create breakdown structure
+          payroll.deductions.breakdown = {
+            statutory: [
+              // Include existing statutory deductions from payroll
+              {
+                name: "PAYE Tax",
+                amount: payroll.deductions.tax?.amount || 0,
+                code: "tax",
+                description: "Pay As You Earn Tax",
+                type: "statutory",
+              },
+              {
+                name: "Pension",
+                amount: payroll.deductions.pension?.amount || 0,
+                code: "pension",
+                description: "Pension Contribution",
+                type: "statutory",
+              },
+              {
+                name: "NHF",
+                amount: payroll.deductions.nhf?.amount || 0,
+                code: "nhf",
+                description: "National Housing Fund",
+                type: "statutory",
+              },
+              // Add any additional statutory deductions from database
+              ...statutoryDeductions
+                .filter(
+                  (deduction) =>
+                    !["tax", "pension", "nhf"].includes(deduction.code)
+                )
+                .map((deduction) => ({
+                  name: deduction.name,
+                  amount: payroll.deductions[deduction.code] || 0,
+                  code: deduction.code,
+                  description: deduction.description,
+                  type: "statutory",
+                })),
+            ],
+            voluntary: [
+              // Include existing loans from payroll
+              ...(payroll.deductions.loans || []).map((loan) => ({
+                name: loan.description,
+                amount: loan.amount,
+                code: "loan",
+                description: loan.description,
+                type: "voluntary",
+              })),
+              // Include existing others from payroll
+              ...(payroll.deductions.others || []).map((other) => ({
+                name: other.description,
+                amount: other.amount,
+                code: "other",
+                description: other.description,
+                type: "voluntary",
+              })),
+              // Include existing department-specific deductions from payroll
+              ...(payroll.deductions.departmentSpecific || []).map(
+                (deduction) => ({
+                  name: deduction.name,
+                  amount: deduction.amount,
+                  code: "department",
+                  description: deduction.description,
+                  type: deduction.type?.toLowerCase() || "voluntary",
+                })
+              ),
+              // Add any additional voluntary deductions from database
+              ...voluntaryDeductions.map((deduction) => ({
+                name: deduction.name,
+                amount: payroll.deductions[deduction.code] || 0,
+                code: deduction.code,
+                description: deduction.description,
+                type: "voluntary",
+              })),
+            ],
+          };
+
+          console.log(
+            "✅ Added deduction breakdown to filtered payroll:",
+            payroll._id
+          );
+        }
+      }
 
       console.log(`✅ Found ${payrolls.length} payrolls matching filters`);
 
@@ -2854,30 +5112,88 @@ export class SuperAdminController {
 
   static async createVoluntaryDeduction(req, res) {
     try {
-      console.log("📝 Creating voluntary deduction");
+      console.log("🚀 SuperAdminController: Creating voluntary deduction...");
+      console.log("📝 SuperAdminController: Request body:", req.body);
+      console.log("👤 SuperAdminController: User ID:", req.user.id);
+
+      const userId = req.user.id;
 
       // Validate required fields
-      if (
-        !req.body.name ||
-        !req.body.calculationMethod ||
-        req.body.value === undefined
-      ) {
-        throw new ApiError(
-          400,
-          "Missing required fields: name, calculationMethod, value"
-        );
+      if (!req.body.name || !req.body.calculationMethod || !req.body.value) {
+        console.log("❌ SuperAdminController: Missing required fields");
+        return res.status(400).json({
+          success: false,
+          message: "Name, calculation method, and value are required",
+        });
       }
 
       // Validate deduction value
-      if (req.body.value < 0) {
-        throw new ApiError(400, "Deduction value cannot be negative");
+      const value = parseFloat(req.body.value);
+      if (isNaN(value) || value < 0) {
+        console.log("❌ SuperAdminController: Invalid deduction value");
+        return res.status(400).json({
+          success: false,
+          message: "Deduction value must be a positive number",
+        });
       }
 
-      if (req.body.calculationMethod === "PERCENTAGE" && req.body.value > 100) {
-        throw new ApiError(400, "Percentage deduction cannot exceed 100%");
+      // Validate percentage doesn't exceed 100%
+      if (req.body.calculationMethod === "PERCENTAGE" && value > 100) {
+        console.log("❌ SuperAdminController: Percentage exceeds 100%");
+        return res.status(400).json({
+          success: false,
+          message: "Percentage deduction cannot exceed 100%",
+        });
       }
 
-      const userId = asObjectId(req.user.id);
+      // Validate effective date is not in the past
+      const effectiveDate = req.body.effectiveDate
+        ? new Date(req.body.effectiveDate)
+        : new Date();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const isMonthly =
+        req.body.deductionDuration === "ongoing" &&
+        (req.body.appliesToPeriod?.periodType === "monthly" ||
+          !req.body.appliesToPeriod);
+      const minDate = isMonthly ? firstOfMonth : today;
+      if (effectiveDate < minDate) {
+        return res.status(400).json({
+          success: false,
+          message: isMonthly
+            ? "Effective date cannot be before the 1st of this month for monthly payrolls"
+            : "Effective date cannot be in the past",
+        });
+      }
+
+      // Validate scope-specific requirements
+      if (req.body.scope === "department" && !req.body.department) {
+        console.log(
+          "❌ SuperAdminController: Department scope requires department ID"
+        );
+        return res.status(400).json({
+          success: false,
+          message: "Department ID is required for department scope",
+        });
+      }
+
+      if (
+        req.body.scope === "individual" &&
+        (!req.body.assignedEmployees || req.body.assignedEmployees.length === 0)
+      ) {
+        console.log(
+          "❌ SuperAdminController: Individual scope requires assigned employees"
+        );
+        return res.status(400).json({
+          success: false,
+          message:
+            "At least one employee must be assigned for individual scope",
+        });
+      }
+
+      console.log("✅ SuperAdminController: Validation passed");
+
       const deductionData = {
         name: req.body.name,
         type: "VOLUNTARY", // Always voluntary for this endpoint
@@ -2894,43 +5210,85 @@ export class SuperAdminController {
         isActive: true,
         createdBy: userId,
         updatedBy: userId,
+        deductionDuration: req.body.deductionDuration || "ongoing",
+        ...(req.body.deductionDuration === "one-off" && {
+          appliesToPeriod: {
+            periodType: req.body.appliesToPeriod?.periodType,
+            year: req.body.appliesToPeriod?.year,
+            ...(req.body.appliesToPeriod?.periodType === "monthly" && {
+              month: req.body.appliesToPeriod?.month,
+            }),
+            ...(req.body.appliesToPeriod?.periodType === "weekly" && {
+              week: req.body.appliesToPeriod?.week,
+            }),
+            ...(req.body.appliesToPeriod?.periodType === "biweekly" && {
+              biweek: req.body.appliesToPeriod?.biweek,
+            }),
+            ...(req.body.appliesToPeriod?.periodType === "quarterly" && {
+              quarter: req.body.appliesToPeriod?.quarter,
+            }),
+          },
+        }),
       };
 
-      // Validate scope-specific requirements
-      if (deductionData.scope === "department" && !deductionData.department) {
-        throw new ApiError(
-          400,
-          "Department is required for department-scoped deductions"
-        );
-      }
-
-      if (
-        deductionData.scope === "individual" &&
-        (!deductionData.assignedEmployees ||
-          deductionData.assignedEmployees.length === 0)
-      ) {
-        throw new ApiError(
-          400,
-          "At least one employee must be assigned for individual-scoped deductions"
-        );
-      }
-
-      const deduction = await DeductionService.createVoluntaryDeduction(
-        userId,
+      console.log(
+        "📊 SuperAdminController: Deduction data to save:",
         deductionData
       );
+      console.log("🎯 SuperAdminController: Scope:", deductionData.scope);
+      console.log(
+        "⏱️ SuperAdminController: Duration:",
+        deductionData.deductionDuration
+      );
+      if (deductionData.deductionDuration === "one-off") {
+        console.log(
+          "📅 SuperAdminController: Period data:",
+          deductionData.appliesToPeriod
+        );
+      }
+      if (deductionData.scope === "department") {
+        console.log(
+          "🏢 SuperAdminController: Department ID:",
+          deductionData.department
+        );
+      }
+      if (deductionData.scope === "individual") {
+        console.log(
+          "👥 SuperAdminController: Assigned employees:",
+          deductionData.assignedEmployees
+        );
+      }
 
-      console.log("✅ Deduction created successfully:", deduction);
+      const deduction = new Deduction(deductionData);
+      await deduction.save();
+
+      // Log deduction creation
+      await PayrollStatisticsLogger.logDeductionAction({
+        action: "CREATE",
+        deductionId: deduction._id,
+        userId,
+        details: deductionData,
+      });
+
+      console.log("✅ SuperAdminController: Deduction saved successfully");
+      console.log("🆔 SuperAdminController: New deduction ID:", deduction._id);
 
       res.status(201).json({
         success: true,
         message: "Voluntary deduction created successfully",
-        data: deduction,
+        deduction,
       });
     } catch (error) {
-      console.error("❌ Error creating deduction:", error);
-      const { statusCode, message } = handleError(error);
-      res.status(statusCode).json({ success: false, message });
+      console.error(
+        "❌ SuperAdminController: Error creating voluntary deduction:",
+        error
+      );
+      console.error("Error creating voluntary deduction:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to create voluntary deduction",
+        error: error.message,
+      });
     }
   }
 
@@ -2975,7 +5333,7 @@ export class SuperAdminController {
 
   static async updateDeduction(req, res) {
     try {
-      console.log("📝 Updating deduction:", req.params.id);
+      console.log("�� Updating deduction:", req.params.id);
 
       const deduction = await Deduction.findById(req.params.id);
       if (!deduction) {
@@ -3008,23 +5366,7 @@ export class SuperAdminController {
         }
       }
 
-      // Validate dates if provided
-      if (req.body.effectiveDate) {
-        const effectiveDate = new Date(req.body.effectiveDate);
-        if (effectiveDate < new Date()) {
-          throw new ApiError(400, "Effective date cannot be in the past");
-        }
-      }
-
-      if (req.body.expiryDate) {
-        const expiryDate = new Date(req.body.expiryDate);
-        const effectiveDate = req.body.effectiveDate
-          ? new Date(req.body.effectiveDate)
-          : deduction.effectiveDate;
-        if (expiryDate <= effectiveDate) {
-          throw new ApiError(400, "Expiry date must be after effective date");
-        }
-      }
+      // Effective date validation removed - frontend has warnings to guide users
 
       // Store previous values for history
       const historyEntry = {
@@ -4670,7 +7012,8 @@ export class SuperAdminController {
           nhf: payroll.deductions.nhf,
           loans: payroll.deductions.loans,
           others: payroll.deductions.others,
-          totalDeductions: payroll.deductions.totalDeductions,
+          totalDeductions: payroll.totals.totalDeductions,
+          breakdown: payroll.deductions.breakdown,
         },
         totals: {
           grossEarnings: payroll.totals.grossEarnings,
@@ -5303,7 +7646,6 @@ export class SuperAdminController {
   }
 
   // For handling bulk department submissions
-  // For handling bulk department submissions
   static async approveDepartmentPayrolls(req, res, next) {
     try {
       const { departmentId, month, year, remarks } = req.body;
@@ -5410,7 +7752,6 @@ export class SuperAdminController {
     }
   }
 
-  // For handling selective rejection in bulk submissions
   // For handling selective rejection in bulk submissions
   static async rejectSelectedPayrolls(req, res, next) {
     try {
@@ -5532,7 +7873,6 @@ export class SuperAdminController {
     }
   }
 
-  // Process single employee payroll
   static async processSingleEmployeePayroll(req, res, next) {
     try {
       console.log(
@@ -5542,19 +7882,65 @@ export class SuperAdminController {
 
       const { employeeId, departmentId, month, year, frequency } = req.body;
 
+      // Standardized summary object
+      const processingSummary = {
+        totalAttempted: 1,
+        processed: 0,
+        skipped: 0,
+        failed: 0,
+        errors: [],
+        warnings: [],
+        details: {
+          month,
+          year,
+          frequency,
+          processingTime: null,
+          totalNetPay: 0,
+          departmentBreakdown: {},
+          employeeDetails: [],
+        },
+      };
+
+      const startTime = Date.now();
+
       // Get super admin with full details
       const superAdmin = await UserModel.findById(req.user.id)
         .populate("department", "name code")
         .select("+position +role +department");
 
-      // Check if super admin exists
       if (!superAdmin) {
-        throw new ApiError(404, "Super Admin not found");
+        const error = "Super Admin not found";
+        processingSummary.failed = 1;
+        processingSummary.errors.push({
+          type: "AUTHENTICATION_ERROR",
+          message: error,
+          code: "SUPER_ADMIN_NOT_FOUND",
+        });
+
+        console.error(`❌ ${error}`);
+        return res.status(404).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
 
       // Validate department access
       if (!departmentId) {
-        throw new ApiError(400, "No department specified");
+        const error = "No department specified";
+        processingSummary.failed = 1;
+        processingSummary.errors.push({
+          type: "VALIDATION_ERROR",
+          message: error,
+          code: "MISSING_DEPARTMENT",
+        });
+
+        console.error(`❌ ${error}`);
+        return res.status(400).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
 
       // Get employee with proper department check
@@ -5562,18 +7948,60 @@ export class SuperAdminController {
         _id: employeeId,
         department: departmentId,
         status: "active",
-      });
+      }).populate("department", "name code");
 
       if (!employee) {
-        throw new ApiError(404, "Employee not found or not active");
+        const error = "Employee not found or not active";
+        processingSummary.failed = 1;
+        processingSummary.errors.push({
+          type: "EMPLOYEE_ERROR",
+          message: error,
+          code: "EMPLOYEE_NOT_FOUND_OR_INACTIVE",
+          employeeId,
+          departmentId,
+        });
+
+        console.error(`❌ ${error}`);
+        return res.status(404).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
 
       // Get the employee's salary grade based on their grade level
       if (!employee.gradeLevel) {
-        throw new ApiError(
-          400,
-          "Employee does not have a grade level assigned"
+        const error = "Employee does not have a grade level assigned";
+        processingSummary.failed = 1;
+        processingSummary.errors.push({
+          type: "GRADE_ERROR",
+          message: error,
+          code: "NO_GRADE_LEVEL",
+          employeeId,
+          employeeName: `${employee.firstName} ${employee.lastName}`,
+        });
+
+        processingSummary.details.employeeDetails.push({
+          status: "failed",
+          name: `${employee.firstName} ${employee.lastName}`,
+          employeeId: employee._id,
+          employeeCode: employee.employeeId,
+          reason: error,
+          department: employee.department._id,
+          departmentName: employee.department.name,
+          netPay: 0,
+          grossPay: 0,
+          totalDeductions: 0,
+        });
+
+        console.error(
+          `❌ ${error} for employee: ${employee.firstName} ${employee.lastName}`
         );
+        return res.status(400).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
 
       // Find the corresponding salary grade
@@ -5583,10 +8011,38 @@ export class SuperAdminController {
       });
 
       if (!salaryGrade) {
-        throw new ApiError(
-          400,
-          `No active salary grade found for level ${employee.gradeLevel}`
+        const error = `No active salary grade found for level ${employee.gradeLevel}`;
+        processingSummary.failed = 1;
+        processingSummary.errors.push({
+          type: "GRADE_ERROR",
+          message: error,
+          code: "NO_ACTIVE_SALARY_GRADE",
+          employeeId,
+          employeeName: `${employee.firstName} ${employee.lastName}`,
+          gradeLevel: employee.gradeLevel,
+        });
+
+        processingSummary.details.employeeDetails.push({
+          status: "failed",
+          name: `${employee.firstName} ${employee.lastName}`,
+          employeeId: employee._id,
+          employeeCode: employee.employeeId,
+          reason: error,
+          department: employee.department._id,
+          departmentName: employee.department.name,
+          netPay: 0,
+          grossPay: 0,
+          totalDeductions: 0,
+        });
+
+        console.error(
+          `❌ ${error} for employee: ${employee.firstName} ${employee.lastName}`
         );
+        return res.status(400).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
 
       // Check for existing payroll
@@ -5598,10 +8054,45 @@ export class SuperAdminController {
       });
 
       if (existingPayroll) {
-        throw new ApiError(400, "Payroll already exists for this period");
+        const error = "Payroll already exists for this period";
+        processingSummary.skipped = 1;
+        processingSummary.warnings.push({
+          type: "DUPLICATE_PAYROLL",
+          message: error,
+          code: "PAYROLL_ALREADY_EXISTS",
+          employeeId,
+          employeeName: `${employee.firstName} ${employee.lastName}`,
+          existingPayrollId: existingPayroll._id,
+          period: `${month}/${year} (${frequency})`,
+        });
+
+        processingSummary.details.employeeDetails.push({
+          status: "skipped",
+          name: `${employee.firstName} ${employee.lastName}`,
+          employeeId: employee._id,
+          employeeCode: employee.employeeId,
+          reason: error,
+          department: employee.department._id,
+          departmentName: employee.department.name,
+          netPay: 0,
+          grossPay: 0,
+          totalDeductions: 0,
+        });
+
+        console.warn(
+          `⚠️ ${error} for employee: ${employee.firstName} ${employee.lastName}`
+        );
+        return res.status(400).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
 
       // Calculate payroll using PayrollService
+      console.log(
+        `🧮 Calculating payroll for employee: ${employee.firstName} ${employee.lastName}`
+      );
       const payrollData = await PayrollService.calculatePayroll(
         employeeId,
         salaryGrade._id,
@@ -5612,7 +8103,37 @@ export class SuperAdminController {
       );
 
       if (!payrollData) {
-        throw new ApiError(400, "Failed to calculate payroll");
+        const error = "Failed to calculate payroll";
+        processingSummary.failed = 1;
+        processingSummary.errors.push({
+          type: "CALCULATION_ERROR",
+          message: error,
+          code: "PAYROLL_CALCULATION_FAILED",
+          employeeId,
+          employeeName: `${employee.firstName} ${employee.lastName}`,
+        });
+
+        processingSummary.details.employeeDetails.push({
+          status: "failed",
+          name: `${employee.firstName} ${employee.lastName}`,
+          employeeId: employee._id,
+          employeeCode: employee.employeeId,
+          reason: error,
+          department: employee.department._id,
+          departmentName: employee.department.name,
+          netPay: 0,
+          grossPay: 0,
+          totalDeductions: 0,
+        });
+
+        console.error(
+          `❌ ${error} for employee: ${employee.firstName} ${employee.lastName}`
+        );
+        return res.status(400).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
 
       // Validate pay period settings
@@ -5628,6 +8149,12 @@ export class SuperAdminController {
       );
 
       if (!payPeriodValidation.isValidFrequency) {
+        processingSummary.warnings.push({
+          type: "FREQUENCY_WARNING",
+          message: payPeriodValidation.recommendedAction,
+          code: "INVALID_FREQUENCY",
+          frequency,
+        });
         console.warn(
           "⚠️ Invalid frequency detected:",
           payPeriodValidation.recommendedAction
@@ -5635,13 +8162,27 @@ export class SuperAdminController {
       }
 
       if (!payPeriodValidation.isSystemConsistent) {
+        processingSummary.warnings.push({
+          type: "SYSTEM_WARNING",
+          message: payPeriodValidation.recommendedAction,
+          code: "SYSTEM_INCONSISTENCY",
+        });
         console.warn(
           "⚠️ System inconsistency detected:",
           payPeriodValidation.recommendedAction
         );
       }
 
+      // Get department name for logging
+      const department = await DepartmentModel.findById(departmentId).select(
+        "name"
+      );
+      const departmentName = department?.name || "Unknown Department";
+
       // Create payroll record with APPROVED status since Super Admin is bypassing approval
+      console.log(
+        `💾 Creating payroll record for employee: ${employee.firstName} ${employee.lastName}`
+      );
       const payroll = await PayrollModel.create({
         ...payrollData,
         employee: employeeId,
@@ -5673,12 +8214,81 @@ export class SuperAdminController {
         },
       });
 
-      // Get department name for logging
-      const department = await DepartmentModel.findById(departmentId).select(
-        "name"
+      // Calculate processing time
+      const processingTime = Date.now() - startTime;
+
+      // Update summary with success details
+      processingSummary.processed = 1;
+      processingSummary.details.processingTime = processingTime;
+      processingSummary.details.totalNetPay = payroll.totals?.netPay || 0;
+
+      // Department breakdown
+      processingSummary.details.departmentBreakdown[departmentName] = {
+        count: 1,
+        totalNetPay: payroll.totals?.netPay || 0,
+        employees: [
+          {
+            name: `${employee.firstName} ${employee.lastName}`,
+            employeeCode: employee.employeeId,
+            netPay: payroll.totals?.netPay,
+          },
+        ],
+      };
+
+      // Employee details - FIXED VERSION
+      processingSummary.details.employeeDetails.push({
+        status: "success",
+        name: `${employee.firstName} ${employee.lastName}`,
+        employeeId: employee._id,
+        employeeCode: employee.employeeId,
+        netPay: payroll.totals?.netPay,
+        grossPay: payroll.totals?.grossEarnings,
+        totalDeductions: payroll.totals?.totalDeductions,
+        department: employee.department._id,
+        departmentName: employee.department.name,
+        payrollId: payroll._id,
+      });
+
+      console.log(
+        `✅ Payroll created successfully for employee: ${employee.firstName} ${employee.lastName}`
+      );
+      console.log(`💰 Net Pay: ₦${payroll.totals?.netPay?.toLocaleString()}`);
+      console.log(`⏱️ Processing time: ${processingTime}ms`);
+
+      // SAVE SUMMARY TO DATABASE - NEW ADDITION
+      const summaryData = {
+        batchId: `BATCH_SINGLE_${Date.now()}_${Math.random()
+          .toString(36)
+          .substr(2, 9)}`,
+        processedBy: superAdmin._id,
+        department: departmentId,
+        month,
+        year,
+        frequency,
+        processingTime: processingTime,
+        totalAttempted: 1,
+        processed: 1,
+        skipped: 0,
+        failed: 0,
+        totalNetPay: payroll.totals?.netPay || 0,
+        totalGrossPay: payroll.totals?.grossEarnings || 0,
+        totalDeductions: payroll.totals?.totalDeductions || 0,
+        departmentBreakdown: processingSummary.details.departmentBreakdown,
+        employeeDetails: processingSummary.details.employeeDetails,
+        errors: processingSummary.errors,
+        warnings: processingSummary.warnings,
+        summaryType: SummaryType.PROCESSING,
+        createdBy: superAdmin._id,
+      };
+
+      // Save the summary to database
+      await PayrollSummaryService.createSummary(summaryData);
+      console.log(
+        "💾 Payroll summary saved to database with batch ID:",
+        summaryData.batchId
       );
 
-      // Consolidated audit logging - replaces 3 redundant calls
+      // Audit logging
       await PayrollStatisticsLogger.logPayrollAction({
         action: "CREATE",
         payrollId: payroll._id,
@@ -5692,139 +8302,42 @@ export class SuperAdminController {
           frequency,
           netPay: payroll.totals?.netPay,
           employeeName: `${employee.firstName} ${employee.lastName}`,
-          departmentName: department?.name || "Unknown Department", // FIXED HERE
+          departmentName: departmentName,
           createdBy: "SUPER_ADMIN",
           position: superAdmin.position,
           role: superAdmin.role,
           message: `Created and approved payroll for ${employee.firstName} ${employee.lastName}`,
           approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
           remarks: "Payroll created and approved by Super Admin",
+          processingTime: processingTime,
         },
       });
 
-      // Find HR Manager and Finance Director to notify
-      const hrDepartment = await DepartmentModel.findOne({
-        name: { $in: ["Human Resources", "HR"] },
-        status: "active",
-      });
+      // Notification
+      const notificationMessage = `You have successfully created and approved a payroll for ${
+        employee.firstName
+      } ${employee.lastName} (${
+        employee.employeeId
+      }) for ${month}/${year}. Net Pay: ₦${payroll.totals?.netPay?.toLocaleString()}`;
 
-      const financeDepartment = await DepartmentModel.findOne({
-        name: { $in: ["Finance and Accounting", "Finance", "Financial"] },
-        status: "active",
-      });
-
-      let hrManager = null;
-      let financeDirector = null;
-      const notifiedRoles = [];
-      const notifiedUserIds = new Set(); // Track notified users to prevent duplicates
-
-      if (hrDepartment) {
-        hrManager = await UserModel.findOne({
-          department: hrDepartment._id,
-          position: {
-            $in: [
-              "Head of Human Resources",
-              "HR Manager",
-              "HR Head",
-              "Human Resources Manager",
-              "HR Director",
-            ],
+      await NotificationService.createNotification(
+        superAdmin._id,
+        NOTIFICATION_TYPES.PAYROLL_CREATED,
+        employee,
+        payroll,
+        notificationMessage,
+        {
+          approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+          metadata: {
+            payrollId: payroll._id,
+            employeeId: employee._id,
+            departmentId: employee.department._id,
+            status: payroll.status,
+            netPay: payroll.totals?.netPay,
+            processingTime: processingTime,
           },
-          status: "active",
-        });
-
-        if (hrManager) {
-          notifiedRoles.push("HR Manager");
-          // Create notification for HR Manager
-          await NotificationService.createNotification(
-            hrManager._id,
-            NOTIFICATION_TYPES.PAYROLL_CREATED,
-            employee,
-            payroll,
-            `A new payroll has been approved for ${employee.firstName} ${employee.lastName} (${employee.employeeId}) by ${superAdmin.firstName} ${superAdmin.lastName} (Super Admin).`,
-            {
-              approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-              metadata: {
-                payrollId: payroll._id,
-                employeeId: employee._id,
-                departmentId: employee.department._id,
-                status: payroll.status,
-              },
-            }
-          );
-          notifiedUserIds.add(hrManager._id.toString());
         }
-      }
-
-      if (financeDepartment) {
-        financeDirector = await UserModel.findOne({
-          department: financeDepartment._id,
-          position: {
-            $in: [
-              "Head of Finance",
-              "Finance Director",
-              "Finance Head",
-              "Financial Director",
-              "Financial Head",
-            ],
-          },
-          status: "active",
-        });
-
-        if (financeDirector) {
-          notifiedRoles.push("Finance Director");
-          // Create notification for Finance Director
-          await NotificationService.createNotification(
-            financeDirector._id,
-            NOTIFICATION_TYPES.PAYROLL_CREATED,
-            employee,
-            payroll,
-            `A new payroll has been approved for ${employee.firstName} ${employee.lastName} (${employee.employeeId}) by ${superAdmin.firstName} ${superAdmin.lastName} (Super Admin).`,
-            {
-              approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-              metadata: {
-                payrollId: payroll._id,
-                employeeId: employee._id,
-                departmentId: employee.department._id,
-                status: payroll.status,
-              },
-            }
-          );
-          notifiedUserIds.add(financeDirector._id.toString());
-        }
-      }
-
-      // Create a single notification for the Super Admin who created the payroll
-      // Only if they haven't already been notified
-      if (!notifiedUserIds.has(superAdmin._id.toString())) {
-        const notificationMessage =
-          notifiedRoles.length > 0
-            ? `You have created and approved a payroll for ${
-                employee.firstName
-              } ${employee.lastName} (${
-                employee.employeeId
-              }) for ${month}/${year}. Notifications have been sent to ${notifiedRoles.join(
-                " and "
-              )}.`
-            : `You have created and approved a payroll for ${employee.firstName} ${employee.lastName} (${employee.employeeId}) for ${month}/${year}.`;
-
-        await NotificationService.createNotification(
-          superAdmin._id,
-          NOTIFICATION_TYPES.PAYROLL_CREATED,
-          employee,
-          payroll,
-          notificationMessage,
-          {
-            approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-            metadata: {
-              payrollId: payroll._id,
-              employeeId: employee._id,
-              departmentId: employee.department._id,
-              status: payroll.status,
-            },
-          }
-        );
-      }
+      );
 
       // Set response headers to trigger UI updates
       res.set({
@@ -5832,15 +8345,54 @@ export class SuperAdminController {
         "X-Refresh-Audit-Logs": "true",
       });
 
+      console.log(
+        `🎉 Single employee payroll processing completed successfully!`
+      );
+      console.log(`📊 Summary:`, JSON.stringify(processingSummary, null, 2));
+
       return res.status(201).json({
         success: true,
-        message: "Payroll processed and approved successfully",
-        data: payroll,
+        data: {
+          payroll,
+          batchId: summaryData.batchId, // Include batch ID in response
+        },
+        summary: processingSummary,
       });
     } catch (error) {
       console.error(`❌ Error processing payroll: ${error.message}`);
       console.error("Stack trace:", error.stack);
-      next(error);
+
+      // Create error summary
+      const errorSummary = {
+        totalAttempted: 1,
+        processed: 0,
+        skipped: 0,
+        failed: 1,
+        errors: [
+          {
+            type: "SYSTEM_ERROR",
+            message: error.message,
+            code: "UNEXPECTED_ERROR",
+            stack: error.stack,
+          },
+        ],
+        warnings: [],
+        details: {
+          month: req.body?.month,
+          year: req.body?.year,
+          frequency: req.body?.frequency,
+          processingTime: null,
+          totalNetPay: 0,
+          departmentBreakdown: {},
+          employeeDetails: [],
+        },
+      };
+
+      return res.status(500).json({
+        success: false,
+        message: "An unexpected error occurred while processing payroll",
+        summary: errorSummary,
+      });
     }
   }
 
@@ -6065,6 +8617,8 @@ export class SuperAdminController {
       console.log(
         "🔄 Starting multiple employees payroll processing (Super Admin)"
       );
+      console.log("📝 Request data:", JSON.stringify(req.body, null, 2));
+
       const {
         employeeIds,
         month,
@@ -6072,13 +8626,68 @@ export class SuperAdminController {
         frequency = PayrollFrequency.MONTHLY,
       } = req.body;
 
+      // Initialize comprehensive summary object
+      const processingSummary = {
+        totalAttempted: employeeIds?.length || 0,
+        processed: 0,
+        skipped: 0,
+        failed: 0,
+        errors: [],
+        warnings: [],
+        details: {
+          month,
+          year,
+          frequency,
+          processingTime: null,
+          totalNetPay: 0,
+          departmentBreakdown: {},
+          employeeDetails: [],
+        },
+      };
+
+      const startTime = Date.now();
+
       // Get super admin details
       const superAdmin = await UserModel.findById(req.user.id)
         .populate("department", "name code")
         .select("+position +role +department");
 
       if (!superAdmin) {
-        throw new ApiError(404, "Super Admin not found");
+        const error = "Super Admin not found";
+        processingSummary.failed = processingSummary.totalAttempted;
+        processingSummary.errors.push({
+          type: "AUTHENTICATION_ERROR",
+          message: error,
+          code: "SUPER_ADMIN_NOT_FOUND",
+        });
+
+        console.error(`❌ ${error}`);
+        return res.status(404).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
+      }
+
+      // Validate input
+      if (
+        !employeeIds ||
+        !Array.isArray(employeeIds) ||
+        employeeIds.length === 0
+      ) {
+        const error = "No employee IDs provided or invalid format";
+        processingSummary.errors.push({
+          type: "VALIDATION_ERROR",
+          message: error,
+          code: "INVALID_EMPLOYEE_IDS",
+        });
+
+        console.error(`❌ ${error}`);
+        return res.status(400).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
 
       // Validate pay period settings for bulk processing
@@ -6094,6 +8703,12 @@ export class SuperAdminController {
       );
 
       if (!payPeriodValidation.isValidFrequency) {
+        processingSummary.warnings.push({
+          type: "FREQUENCY_WARNING",
+          message: payPeriodValidation.recommendedAction,
+          code: "INVALID_FREQUENCY",
+          frequency,
+        });
         console.warn(
           "⚠️ Invalid frequency detected:",
           payPeriodValidation.recommendedAction
@@ -6101,207 +8716,344 @@ export class SuperAdminController {
       }
 
       if (!payPeriodValidation.isSystemConsistent) {
+        processingSummary.warnings.push({
+          type: "SYSTEM_WARNING",
+          message: payPeriodValidation.recommendedAction,
+          code: "SYSTEM_INCONSISTENCY",
+        });
         console.warn(
           "⚠️ System inconsistency detected:",
           payPeriodValidation.recommendedAction
         );
       }
 
+      // Process each employee
       const results = {
         total: employeeIds.length,
         processed: 0,
         skipped: 0,
         failed: 0,
-        errors: [],
         successful: [],
-        skippedDetails: [],
-        failedDetails: [],
-        processedDetails: [],
+        failedEmployees: [],
+        skippedEmployees: [],
       };
 
-      // Process each employee
-      for (const employeeId of employeeIds) {
-        try {
-          console.log(`Processing payroll for employee: ${employeeId}`);
-          // Get employee with their department
-          const employee = await UserModel.findOne({
-            _id: employeeId,
-            status: "active",
-          }).populate("department");
+      // Get all employees with their departments and salary grades
+      const employees = await UserModel.find({
+        _id: { $in: employeeIds },
+        status: "active",
+      })
+        .populate("department", "name code")
+        .lean();
 
-          if (!employee) {
-            console.log(`Employee ${employeeId} not found or not active`);
-            results.failed++;
-            results.failedDetails.push(
-              `Employee ID ${employeeId} not found or not active`
+      console.log(`👥 Found ${employees.length} active employees to process`);
+
+      // Group employees by department for better organization
+      const employeesByDepartment = {};
+      employees.forEach((emp) => {
+        const deptName = emp.department?.name || "Unknown Department";
+        if (!employeesByDepartment[deptName]) {
+          employeesByDepartment[deptName] = [];
+        }
+        employeesByDepartment[deptName].push(emp);
+      });
+
+      // Process employees by department
+      for (const [departmentName, deptEmployees] of Object.entries(
+        employeesByDepartment
+      )) {
+        console.log(`🏢 Processing department: ${departmentName}`);
+
+        for (const employee of deptEmployees) {
+          try {
+            console.log(
+              `👤 Processing employee: ${employee.firstName} ${employee.lastName} (${employee.employeeId})`
             );
-            continue;
-          }
 
-          console.log(
-            `Found employee: ${employee.firstName} ${employee.lastName}`
-          );
-
-          // Check for existing payroll
-          const existingPayroll = await PayrollModel.findOne({
-            employee: employeeId,
-            month,
-            year,
-            frequency,
-          });
-
-          if (existingPayroll) {
-            results.skipped++;
-            results.skippedDetails.push(
-              `${employee.firstName} ${employee.lastName} (${employee.employeeId}): Payroll already exists`
-            );
-            continue;
-          }
-
-          // Get employee's salary grade
-          if (!employee.gradeLevel) {
-            results.failed++;
-            results.failedDetails.push(
-              `${employee.firstName} ${employee.lastName} (${employee.employeeId}): No grade level assigned`
-            );
-            continue;
-          }
-
-          const salaryGrade = await SalaryGrade.findOne({
-            level: employee.gradeLevel,
-            isActive: true,
-          });
-
-          if (!salaryGrade) {
-            results.failed++;
-            results.failedDetails.push(
-              `${employee.firstName} ${employee.lastName} (${employee.employeeId}): No active salary grade found for level ${employee.gradeLevel}`
-            );
-            continue;
-          }
-
-          // Calculate payroll
-          console.log(
-            `\n🔍 Checking allowances for employee ${employee.firstName} ${employee.lastName} (${employee.employeeId})`
-          );
-          console.log(
-            `📋 Department: ${employee.department.name} (${employee.department._id})`
-          );
-
-          const payrollData = await PayrollService.calculatePayroll(
-            employeeId,
-            salaryGrade._id,
-            month,
-            year,
-            frequency,
-            employee.department._id
-          );
-
-          if (!payrollData) {
-            results.failed++;
-            results.failedDetails.push(
-              `${employee.firstName} ${employee.lastName} (${employee.employeeId}): Failed to calculate payroll`
-            );
-            continue;
-          }
-
-          console.log(
-            `\n✅ Payroll calculation completed for ${employee.firstName} ${employee.lastName}:`,
-            {
-              basicSalary: payrollData.basicSalary,
-              totalAllowances: payrollData.totals.totalAllowances,
-              totalBonuses: payrollData.totals.totalBonuses,
-              grossEarnings: payrollData.totals.grossEarnings,
-              totalDeductions: payrollData.totals.totalDeductions,
-              netPay: payrollData.totals.netPay,
-              allowances: {
-                gradeAllowances: payrollData.allowances.gradeAllowances.length,
-                additionalAllowances:
-                  payrollData.allowances.additionalAllowances.length,
-                totalAllowances: payrollData.allowances.totalAllowances,
-              },
-            }
-          );
-
-          // Create payroll record with APPROVED status
-          const payroll = await PayrollModel.create({
-            ...payrollData,
-            employee: employeeId,
-            department: employee.department._id,
-            status: PAYROLL_STATUS.APPROVED,
-            processedBy: superAdmin._id,
-            createdBy: superAdmin._id,
-            updatedBy: superAdmin._id,
-            payment: {
-              accountName: "Pending",
-              accountNumber: "Pending",
-              bankName: "Pending",
-            },
-            approvalFlow: {
-              currentLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-              history: [
-                {
-                  level: APPROVAL_LEVELS.SUPER_ADMIN,
-                  status: "APPROVED",
-                  action: "APPROVE",
-                  user: superAdmin._id,
-                  timestamp: new Date(),
-                  remarks: "Payroll created and approved by Super Admin",
-                },
-              ],
-              submittedBy: superAdmin._id,
-              submittedAt: new Date(),
-              status: "APPROVED",
-            },
-          });
-
-          // Consolidated audit logging - replaces 4 redundant calls
-          await PayrollStatisticsLogger.logPayrollAction({
-            action: AuditAction.CREATE,
-            payrollId: payroll._id,
-            userId: superAdmin._id,
-            status: PAYROLL_STATUS.APPROVED,
-            details: {
-              employeeId: employee._id,
-              departmentId: employee.department._id,
+            // Check for existing payroll
+            const existingPayroll = await PayrollModel.findOne({
+              employee: employee._id,
               month,
               year,
               frequency,
-              netPay: payroll.totals?.netPay,
-              employeeName: `${employee.firstName} ${employee.lastName}`,
-              departmentName: employee.department?.name,
+            });
+
+            if (existingPayroll) {
+              console.warn(
+                `⚠️ Payroll already exists for ${employee.firstName} ${employee.lastName}`
+              );
+              results.skipped++;
+              results.skippedEmployees.push({
+                employeeId: employee._id,
+                employeeName: `${employee.firstName} ${employee.lastName}`,
+                employeeCode: employee.employeeId,
+                reason: "Payroll already exists for this period",
+                existingPayrollId: existingPayroll._id,
+                department: employee.department._id,
+                departmentName: employee.department.name,
+              });
+              continue;
+            }
+
+            // Get employee's salary grade
+            if (!employee.gradeLevel) {
+              console.error(
+                `❌ No grade level for employee: ${employee.firstName} ${employee.lastName}`
+              );
+              results.failed++;
+              results.failedEmployees.push({
+                employeeId: employee._id,
+                employeeName: `${employee.firstName} ${employee.lastName}`,
+                employeeCode: employee.employeeId,
+                reason: "No grade level assigned",
+                department: employee.department._id,
+                departmentName: employee.department.name,
+              });
+              continue;
+            }
+
+            const salaryGrade = await SalaryGrade.findOne({
+              level: employee.gradeLevel,
+              isActive: true,
+            });
+
+            if (!salaryGrade) {
+              console.error(
+                `❌ No active salary grade for level ${employee.gradeLevel}`
+              );
+              results.failed++;
+              results.failedEmployees.push({
+                employeeId: employee._id,
+                employeeName: `${employee.firstName} ${employee.lastName}`,
+                employeeCode: employee.employeeId,
+                reason: `No active salary grade for level ${employee.gradeLevel}`,
+                department: employee.department._id,
+                departmentName: employee.department.name,
+              });
+              continue;
+            }
+
+            // Calculate payroll
+            const payrollData = await PayrollService.calculatePayroll(
+              employee._id,
+              salaryGrade._id,
+              month,
+              year,
+              frequency,
+              employee.department._id
+            );
+
+            if (!payrollData) {
+              console.error(
+                `❌ Failed to calculate payroll for ${employee.firstName} ${employee.lastName}`
+              );
+              results.failed++;
+              results.failedEmployees.push({
+                employeeId: employee._id,
+                employeeName: `${employee.firstName} ${employee.lastName}`,
+                employeeCode: employee.employeeId,
+                reason: "Payroll calculation failed",
+                department: employee.department._id,
+                departmentName: employee.department.name,
+              });
+              continue;
+            }
+
+            // Create payroll record
+            const payroll = await PayrollModel.create({
+              ...payrollData,
+              employee: employee._id,
+              department: employee.department._id,
+              status: PAYROLL_STATUS.APPROVED,
+              processedBy: superAdmin._id,
               createdBy: superAdmin._id,
-              position: superAdmin.position,
-              role: superAdmin.role,
-              message: `Created and approved payroll for ${employee.firstName} ${employee.lastName}`,
-              approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-              remarks: "Payroll created and approved by Super Admin",
-            },
-          });
+              updatedBy: superAdmin._id,
+              payment: {
+                accountName: "Pending",
+                accountNumber: "Pending",
+                bankName: "Pending",
+              },
+              approvalFlow: {
+                currentLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+                history: [
+                  {
+                    level: APPROVAL_LEVELS.SUPER_ADMIN,
+                    status: "APPROVED",
+                    action: "APPROVE",
+                    user: superAdmin._id,
+                    timestamp: new Date(),
+                    remarks: "Payroll created and approved by Super Admin",
+                  },
+                ],
+                submittedBy: superAdmin._id,
+                submittedAt: new Date(),
+                status: "APPROVED",
+              },
+            });
 
-          console.log(
-            `Created payroll for ${employee.firstName} ${employee.lastName}`
-          );
+            console.log(
+              `✅ Payroll created for ${employee.firstName} ${employee.lastName}`
+            );
 
-          results.processed++;
-          results.processedDetails.push(
-            `${employee.firstName} ${employee.lastName} (${employee.employeeId})`
-          );
-          results.successful.push({
-            employeeId: employee._id,
-            payrollId: payroll._id,
-            department: employee.department._id,
-          });
-        } catch (error) {
-          console.error(`Error processing employee ${employeeId}:`, error);
-          results.failed++;
-          results.failedDetails.push(
-            `Employee ID ${employeeId}: ${error.message}`
-          );
+            results.processed++;
+            results.successful.push({
+              employeeId: employee._id,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+              employeeCode: employee.employeeId,
+              payrollId: payroll._id,
+              payroll: payroll,
+              netPay: payroll.totals?.netPay,
+              grossPay: payroll.totals?.grossEarnings,
+              totalDeductions: payroll.totals?.totalDeductions,
+              department: employee.department._id,
+              departmentName: employee.department.name,
+            });
+
+            // Update department breakdown
+            if (
+              !processingSummary.details.departmentBreakdown[departmentName]
+            ) {
+              processingSummary.details.departmentBreakdown[departmentName] = {
+                count: 0,
+                totalNetPay: 0,
+                employees: [],
+              };
+            }
+            processingSummary.details.departmentBreakdown[departmentName]
+              .count++;
+            processingSummary.details.departmentBreakdown[
+              departmentName
+            ].totalNetPay += payroll.totals?.netPay || 0;
+            processingSummary.details.departmentBreakdown[
+              departmentName
+            ].employees.push({
+              name: `${employee.firstName} ${employee.lastName}`,
+              employeeCode: employee.employeeId,
+              netPay: payroll.totals?.netPay,
+            });
+          } catch (error) {
+            console.error(
+              `❌ Error processing employee ${employee.firstName} ${employee.lastName}:`,
+              error.message
+            );
+            results.failed++;
+            results.failedEmployees.push({
+              employeeId: employee._id,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+              employeeCode: employee.employeeId,
+              reason: error.message,
+              department: employee.department._id,
+              departmentName: employee.department.name,
+            });
+          }
         }
       }
 
-      // Log batch operation summary
+      // Calculate processing time
+      const processingTime = Date.now() - startTime;
+      processingSummary.details.processingTime = processingTime;
+      results.processingTime = processingTime;
+
+      // Update summary totals
+      processingSummary.processed = results.processed;
+      processingSummary.skipped = results.skipped;
+      processingSummary.failed = results.failed;
+      processingSummary.details.totalNetPay = results.successful.reduce(
+        (sum, emp) => sum + (emp.netPay || 0),
+        0
+      );
+
+      // Add employee details to summary - FIXED VERSION
+      processingSummary.details.employeeDetails = [
+        ...results.successful.map((emp) => ({
+          status: "success",
+          name: emp.employeeName,
+          employeeId: emp.employeeId,
+          employeeCode: emp.employeeCode,
+          netPay: emp.netPay,
+          grossPay: emp.grossPay,
+          totalDeductions: emp.totalDeductions,
+          department: emp.department,
+          departmentName: emp.departmentName,
+          payrollId: emp.payrollId,
+        })),
+        ...results.skippedEmployees.map((emp) => ({
+          status: "skipped",
+          name: emp.employeeName,
+          employeeId: emp.employeeId,
+          employeeCode: emp.employeeCode,
+          reason: emp.reason,
+          department: emp.department,
+          departmentName: emp.departmentName,
+          netPay: 0,
+          grossPay: 0,
+          totalDeductions: 0,
+        })),
+        ...results.failedEmployees.map((emp) => ({
+          status: "failed",
+          name: emp.employeeName,
+          employeeId: emp.employeeId,
+          employeeCode: emp.employeeCode,
+          reason: emp.reason,
+          department: emp.department,
+          departmentName: emp.departmentName,
+          netPay: 0,
+          grossPay: 0,
+          totalDeductions: 0,
+        })),
+      ];
+
+      console.log("�� Processing Results:", {
+        total: results.total,
+        processed: results.processed,
+        skipped: results.skipped,
+        failed: results.failed,
+        processingTime: `${processingTime}ms`,
+      });
+
+      // SAVE SUMMARY TO DATABASE - NEW ADDITION
+      const summaryData = {
+        batchId: `BATCH_${Date.now()}_${Math.random()
+          .toString(36)
+          .substr(2, 9)}`,
+        processedBy: superAdmin._id,
+        department: req.body.departmentId || null,
+        month,
+        year,
+        frequency,
+        processingTime: processingTime,
+        totalAttempted: results.total,
+        processed: results.processed,
+        skipped: results.skipped,
+        failed: results.failed,
+        totalNetPay: results.successful.reduce(
+          (sum, emp) => sum + (emp.netPay || 0),
+          0
+        ),
+        totalGrossPay: results.successful.reduce(
+          (sum, emp) => sum + (emp.grossPay || 0),
+          0
+        ),
+        totalDeductions: results.successful.reduce(
+          (sum, emp) => sum + (emp.totalDeductions || 0),
+          0
+        ),
+        departmentBreakdown: processingSummary.details.departmentBreakdown,
+        employeeDetails: processingSummary.details.employeeDetails,
+        errors: processingSummary.errors,
+        warnings: processingSummary.warnings,
+        summaryType: SummaryType.PROCESSING,
+        createdBy: superAdmin._id,
+      };
+
+      // Save the summary to database
+      await PayrollSummaryService.createSummary(summaryData);
+      console.log(
+        "💾 Payroll summary saved to database with batch ID:",
+        summaryData.batchId
+      );
+
+      // Log batch operation with processing time
       if (results.processed > 0) {
         await PayrollStatisticsLogger.logBatchOperation(
           "PROCESS_MULTIPLE_EMPLOYEES",
@@ -6316,180 +9068,48 @@ export class SuperAdminController {
             skippedCount: results.skipped,
             failedCount: results.failed,
             totalAmount: results.successful.reduce(
-              (sum, emp) => sum + (emp.payroll?.totals?.netPay || 0),
+              (sum, emp) => sum + (emp.netPay || 0),
               0
             ),
+            processingTime: processingTime, // Add processing time
             remarks: `Processed ${results.processed} payrolls for ${month}/${year}`,
-            message: `Created and approved ${results.processed} payrolls for ${month}/${year}`,
-            approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-            createdBy: superAdmin._id,
-            position: superAdmin.position,
-            role: superAdmin.role,
-            processedEmployees: results.processedDetails,
-            skippedEmployees: results.skippedDetails,
-            failedEmployees: results.failedDetails,
           }
         );
-
-        // Get unique departments from processed employees
-        const processedDepartments = [
-          ...new Set(
-            results.processedDetails.map((detail) => {
-              const employee = results.successful.find(
-                (s) =>
-                  s.employeeId.toString() === detail.split("(")[1].split(")")[0]
-              );
-              return employee ? employee.department : null;
-            })
-          ),
-        ].filter(Boolean);
-
-        // Create notification metadata
-        const notificationMetadata = {
-          month,
-          year,
-          totalEmployees: results.total,
-          processedCount: results.processed,
-          skippedCount: results.skipped,
-          failedCount: results.failed,
-          departments: processedDepartments,
-          processedBy: `${superAdmin.firstName} ${superAdmin.lastName}`,
-          processedByRole: "Super Admin",
-          totalAmount: results.successful.reduce(
-            (sum, emp) => sum + (emp.payroll?.totals?.netPay || 0),
-            0
-          ),
-          departmentCode: "ALL",
-          statusColor: "green",
-          statusIcon: "check-circle",
-          forceRefresh: true,
-          employeeName: "All Employees",
-          employeeDepartment: "All Departments",
-          employeeDepartmentCode: "ALL",
-          processedEmployees: results.processedDetails,
-          skippedEmployees: results.skippedDetails,
-          failedEmployees: results.failedDetails,
-          departmentBreakdown: Object.entries(processedDepartments).map(
-            ([dept, count]) => ({
-              department: dept,
-              count: count,
-            })
-          ),
-        };
-
-        // Create department breakdown message
-        const departmentBreakdown = Object.entries(processedDepartments)
-          .map(([dept, count]) => `${dept}: ${count}`)
-          .join(", ");
-
-        // Create the notification message with department breakdown
-        const notificationMessage = `You have processed ${results.processed}/${results.total} payrolls for ${month}/${year}. ${results.skipped} skipped, ${results.failed} failed.\n\nDepartment Breakdown:\n${departmentBreakdown}`;
-
-        // Create a payroll object for the notification
-        const notificationPayroll = {
-          _id: new Types.ObjectId(),
-          month,
-          year,
-          status: "APPROVED",
-          totals: {
-            processed: results.processed,
-            skipped: results.skipped,
-            failed: results.failed,
-          },
-        };
-
-        // Notify Super Admin
-        await NotificationService.createNotification(
-          superAdmin._id,
-          NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED,
-          null,
-          notificationPayroll,
-          notificationMessage,
-          {
-            approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-            metadata: notificationMetadata,
-          }
-        );
-
-        // Find HR Manager and Finance Director to notify about all processed payrolls
-        const hrDepartment = await DepartmentModel.findOne({
-          name: { $in: ["Human Resources", "HR"] },
-          status: "active",
-        });
-
-        const financeDepartment = await DepartmentModel.findOne({
-          name: { $in: ["Finance and Accounting", "Finance", "Financial"] },
-          status: "active",
-        });
-
-        // Notify HR Manager
-        if (hrDepartment) {
-          const hrManager = await UserModel.findOne({
-            department: hrDepartment._id,
-            position: {
-              $in: [
-                "Head of Human Resources",
-                "HR Manager",
-                "HR Head",
-                "Human Resources Manager",
-                "HR Director",
-              ],
-            },
-            status: "active",
-          });
-
-          if (hrManager) {
-            await NotificationService.createNotification(
-              hrManager._id,
-              NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED,
-              null,
-              notificationPayroll,
-              `${results.processed} payrolls have been processed and approved by ${superAdmin.firstName} ${superAdmin.lastName} (Super Admin) for ${month}/${year}.`,
-              {
-                approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-                metadata: notificationMetadata,
-              }
-            );
-          }
-        }
-
-        // Notify Finance Director
-        if (financeDepartment) {
-          const financeDirector = await UserModel.findOne({
-            department: financeDepartment._id,
-            position: {
-              $in: [
-                "Head of Finance",
-                "Finance Director",
-                "Finance Head",
-                "Financial Director",
-                "Financial Head",
-              ],
-            },
-            status: "active",
-          });
-
-          if (financeDirector) {
-            await NotificationService.createNotification(
-              financeDirector._id,
-              NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED,
-              null,
-              notificationPayroll,
-              `${results.processed} payrolls have been processed and approved by ${superAdmin.firstName} ${superAdmin.lastName} (Super Admin) for ${month}/${year}.`,
-              {
-                approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
-                metadata: notificationMetadata,
-              }
-            );
-          }
-        }
-
-        console.log("Notifications sent to:", {
-          hrManager: hrDepartment ? "Yes" : "No",
-          financeDirector: financeDepartment ? "Yes" : "No",
-          superAdmin: "Yes",
-        });
       }
+
+      // Create a SINGLE consolidated notification for the Super Admin
+      const notificationMessage = `You have successfully processed ${
+        results.processed
+      } payrolls for ${month}/${year}. ${
+        results.skipped > 0 ? `${results.skipped} were skipped. ` : ""
+      }${
+        results.failed > 0 ? `${results.failed} failed. ` : ""
+      }Total amount: ₦${processingSummary.details.totalNetPay.toLocaleString()}`;
+
+      await NotificationService.createNotification(
+        superAdmin._id,
+        NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED,
+        null, // No specific employee for batch operation
+        null, // No specific payroll for batch operation
+        notificationMessage,
+        {
+          approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
+          metadata: {
+            month,
+            year,
+            frequency,
+            totalEmployees: results.total,
+            processedCount: results.processed,
+            skippedCount: results.skipped,
+            failedCount: results.failed,
+            totalAmount: processingSummary.details.totalNetPay,
+            processingTime: processingTime,
+            departmentBreakdown: processingSummary.details.departmentBreakdown,
+            employeeDetails: processingSummary.details.employeeDetails,
+            message: notificationMessage,
+          },
+        }
+      );
 
       // Set response headers to trigger UI updates
       res.set({
@@ -6497,23 +9117,61 @@ export class SuperAdminController {
         "X-Refresh-Audit-Logs": "true",
       });
 
-      // Send response with detailed results
-      res.status(200).json({
+      console.log(
+        `✅ Multiple employees payroll processing completed successfully!`
+      );
+      console.log(`📊 Summary:`, JSON.stringify(processingSummary, null, 2));
+
+      return res.status(201).json({
         success: true,
-        message: `Processed ${results.processed} payrolls successfully`,
+        // message: `Successfully processed ${results.processed} payrolls for ${month}/${year}`,
         data: {
-          total: results.total,
           processed: results.processed,
           skipped: results.skipped,
           failed: results.failed,
-          processedDetails: results.processedDetails,
-          skippedDetails: results.skippedDetails,
-          failedDetails: results.failedDetails,
+          total: results.total,
+          processingTime: processingTime,
+          batchId: summaryData.batchId, // Include batch ID in response
         },
+        summary: processingSummary,
       });
     } catch (error) {
-      console.error("❌ Error in processMultipleEmployeesPayroll:", error);
-      next(error);
+      console.error(
+        `❌ Error processing multiple employees payroll: ${error.message}`
+      );
+      console.error("Stack trace:", error.stack);
+
+      // Create error summary
+      const errorSummary = {
+        totalAttempted: req.body?.employeeIds?.length || 0,
+        processed: 0,
+        skipped: 0,
+        failed: req.body?.employeeIds?.length || 0,
+        errors: [
+          {
+            type: "SYSTEM_ERROR",
+            message: error.message,
+            code: "UNEXPECTED_ERROR",
+            stack: error.stack,
+          },
+        ],
+        warnings: [],
+        details: {
+          month: req.body?.month,
+          year: req.body?.year,
+          frequency: req.body?.frequency,
+          processingTime: null,
+          totalNetPay: 0,
+          departmentBreakdown: {},
+          employeeDetails: [],
+        },
+      };
+
+      return res.status(500).json({
+        success: false,
+        message: "An unexpected error occurred while processing payrolls",
+        summary: errorSummary,
+      });
     }
   }
 
@@ -6521,7 +9179,30 @@ export class SuperAdminController {
   static async processAllEmployeesPayroll(req, res, next) {
     try {
       console.log("🔄 Starting all employees payroll processing (Super Admin)");
+      console.log("📝 Request data:", JSON.stringify(req.body, null, 2));
+
       const { month, year, frequency = PayrollFrequency.MONTHLY } = req.body;
+
+      // Standardized summary object
+      const processingSummary = {
+        totalAttempted: 0,
+        processed: 0,
+        skipped: 0,
+        failed: 0,
+        errors: [],
+        warnings: [],
+        details: {
+          month,
+          year,
+          frequency,
+          processingTime: null,
+          totalNetPay: 0,
+          departmentBreakdown: {},
+          employeeDetails: [],
+        },
+      };
+
+      const startTime = Date.now();
 
       // Get super admin details
       const superAdmin = await UserModel.findById(req.user.id)
@@ -6529,37 +9210,102 @@ export class SuperAdminController {
         .select("+position +role +department");
 
       if (!superAdmin) {
-        throw new ApiError(404, "Super Admin not found");
+        const error = "Super Admin not found";
+        processingSummary.errors.push({
+          type: "AUTHENTICATION_ERROR",
+          message: error,
+          code: "SUPER_ADMIN_NOT_FOUND",
+        });
+
+        console.error(`❌ ${error}`);
+        return res.status(404).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
+      }
+
+      // Validate pay period settings for bulk processing
+      const payPeriodValidation =
+        await PayrollService.validatePayPeriodSettings(
+          null, // Will be fetched from system settings
+          frequency
+        );
+
+      console.log(
+        "🔍 Pay period validation for all employees processing:",
+        payPeriodValidation
+      );
+
+      if (!payPeriodValidation.isValidFrequency) {
+        processingSummary.warnings.push({
+          type: "FREQUENCY_WARNING",
+          message: payPeriodValidation.recommendedAction,
+          code: "INVALID_FREQUENCY",
+          frequency,
+        });
+        console.warn(
+          "⚠️ Invalid frequency detected:",
+          payPeriodValidation.recommendedAction
+        );
+      }
+
+      if (!payPeriodValidation.isSystemConsistent) {
+        processingSummary.warnings.push({
+          type: "SYSTEM_WARNING",
+          message: payPeriodValidation.recommendedAction,
+          code: "SYSTEM_INCONSISTENCY",
+        });
+        console.warn(
+          "⚠️ System inconsistency detected:",
+          payPeriodValidation.recommendedAction
+        );
       }
 
       // Get all active employees
+      console.log("🔍 Fetching all active employees...");
       const employees = await UserModel.find({
         status: "active",
-        // Remove role filter to include all active employees
       }).populate("department");
 
       if (!employees || employees.length === 0) {
-        throw new ApiError(404, "No active employees found");
+        const error = "No active employees found";
+        processingSummary.errors.push({
+          type: "DATA_ERROR",
+          message: error,
+          code: "NO_ACTIVE_EMPLOYEES",
+        });
+
+        console.error(`❌ ${error}`);
+        return res.status(404).json({
+          success: false,
+          message: error,
+          summary: processingSummary,
+        });
       }
 
-      console.log(`Found ${employees.length} active employees`);
+      processingSummary.totalAttempted = employees.length;
+      console.log(`✅ Found ${employees.length} active employees`);
 
       const results = {
         total: employees.length,
         processed: 0,
         skipped: 0,
         failed: 0,
-        errors: [],
         successful: [],
-        skippedDetails: [],
-        failedDetails: [],
-        processedDetails: [],
+        failedEmployees: [],
+        skippedEmployees: [],
       };
 
-      // Process each employee
-      for (const employee of employees) {
+      // Process each employee with individual error handling
+      for (let i = 0; i < employees.length; i++) {
+        const employee = employees[i];
+        const employeeIndex = i + 1;
+
         try {
-          console.log(`Processing payroll for employee: ${employee._id}`);
+          console.log(
+            `\n🔄 Processing employee ${employeeIndex}/${employees.length}: ${employee.firstName} ${employee.lastName} (${employee.employeeId})`
+          );
 
           // Check for existing payroll
           const existingPayroll = await PayrollModel.findOne({
@@ -6570,19 +9316,51 @@ export class SuperAdminController {
           });
 
           if (existingPayroll) {
+            const warning = `${employee.firstName} ${employee.lastName} (${employee.employeeId}): Payroll already exists for ${month}/${year}`;
+            console.warn(`⚠️ ${warning}`);
+
             results.skipped++;
-            results.skippedDetails.push(
-              `${employee.firstName} ${employee.lastName} (${employee.employeeId}): Payroll already exists`
-            );
+            results.skippedEmployees.push({
+              employeeId: employee._id,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+              employeeCode: employee.employeeId,
+              reason: "Payroll already exists for this period",
+              existingPayrollId: existingPayroll._id,
+              department: employee.department?._id,
+              departmentName: employee.department?.name,
+            });
+            processingSummary.warnings.push({
+              type: "DUPLICATE_PAYROLL",
+              message: warning,
+              code: "PAYROLL_ALREADY_EXISTS",
+              employeeId: employee._id,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+              period: `${month}/${year} (${frequency})`,
+            });
             continue;
           }
 
           // Get employee's salary grade
           if (!employee.gradeLevel) {
+            const error = `${employee.firstName} ${employee.lastName} (${employee.employeeId}): No grade level assigned`;
+            console.error(`❌ ${error}`);
+
             results.failed++;
-            results.failedDetails.push(
-              `${employee.firstName} ${employee.lastName} (${employee.employeeId}): No grade level assigned`
-            );
+            results.failedEmployees.push({
+              employeeId: employee._id,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+              employeeCode: employee.employeeId,
+              reason: "No grade level assigned",
+              department: employee.department?._id,
+              departmentName: employee.department?.name,
+            });
+            processingSummary.errors.push({
+              type: "GRADE_ERROR",
+              message: error,
+              code: "NO_GRADE_LEVEL",
+              employeeId: employee._id,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+            });
             continue;
           }
 
@@ -6592,27 +9370,68 @@ export class SuperAdminController {
           });
 
           if (!salaryGrade) {
+            const error = `${employee.firstName} ${employee.lastName} (${employee.employeeId}): No active salary grade found for level ${employee.gradeLevel}`;
+            console.error(`❌ ${error}`);
+
             results.failed++;
-            results.failedDetails.push(
-              `${employee.firstName} ${employee.lastName} (${employee.employeeId}): No active salary grade found for level ${employee.gradeLevel}`
-            );
+            results.failedEmployees.push({
+              employeeId: employee._id,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+              employeeCode: employee.employeeId,
+              reason: `No active salary grade for level ${employee.gradeLevel}`,
+              department: employee.department?._id,
+              departmentName: employee.department?.name,
+            });
+            processingSummary.errors.push({
+              type: "GRADE_ERROR",
+              message: error,
+              code: "NO_ACTIVE_SALARY_GRADE",
+              employeeId: employee._id,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+              gradeLevel: employee.gradeLevel,
+            });
             continue;
           }
 
           // Calculate payroll
+          console.log(
+            `🧮 Calculating payroll for ${employee.firstName} ${employee.lastName} (${employee.employeeId})`
+          );
+          console.log(
+            `📋 Department: ${employee.department?.name || "Unknown"} (${
+              employee.department?._id || "N/A"
+            })`
+          );
+
           const payrollData = await PayrollService.calculatePayroll(
             employee._id,
             salaryGrade._id,
             month,
             year,
-            frequency
+            frequency,
+            employee.department?._id
           );
 
           if (!payrollData) {
+            const error = `${employee.firstName} ${employee.lastName} (${employee.employeeId}): Failed to calculate payroll`;
+            console.error(`❌ ${error}`);
+
             results.failed++;
-            results.failedDetails.push(
-              `${employee.firstName} ${employee.lastName} (${employee.employeeId}): Failed to calculate payroll`
-            );
+            results.failedEmployees.push({
+              employeeId: employee._id,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+              employeeCode: employee.employeeId,
+              reason: "Payroll calculation failed",
+              department: employee.department?._id,
+              departmentName: employee.department?.name,
+            });
+            processingSummary.errors.push({
+              type: "CALCULATION_ERROR",
+              message: error,
+              code: "PAYROLL_CALCULATION_FAILED",
+              employeeId: employee._id,
+              employeeName: `${employee.firstName} ${employee.lastName}`,
+            });
             continue;
           }
 
@@ -6620,7 +9439,7 @@ export class SuperAdminController {
           const payroll = await PayrollModel.create({
             ...payrollData,
             employee: employee._id,
-            department: employee.department._id,
+            department: employee.department?._id,
             status: PAYROLL_STATUS.APPROVED,
             processedBy: superAdmin._id,
             createdBy: superAdmin._id,
@@ -6648,7 +9467,41 @@ export class SuperAdminController {
             },
           });
 
-          // Consolidated audit logging - replaces 4 redundant calls
+          results.processed++;
+          results.successful.push({
+            employeeId: employee._id,
+            employeeName: `${employee.firstName} ${employee.lastName}`,
+            employeeCode: employee.employeeId,
+            payrollId: payroll._id,
+            payroll: payroll,
+            netPay: payroll.totals?.netPay,
+            grossPay: payroll.totals?.grossEarnings,
+            totalDeductions: payroll.totals?.totalDeductions,
+            department: employee.department?._id,
+            departmentName: employee.department?.name,
+          });
+
+          // Update department breakdown
+          const deptName = employee.department?.name || "Unknown";
+          if (!processingSummary.details.departmentBreakdown[deptName]) {
+            processingSummary.details.departmentBreakdown[deptName] = {
+              count: 0,
+              totalNetPay: 0,
+              employees: [],
+            };
+          }
+          processingSummary.details.departmentBreakdown[deptName].count++;
+          processingSummary.details.departmentBreakdown[deptName].totalNetPay +=
+            payroll.totals?.netPay || 0;
+          processingSummary.details.departmentBreakdown[
+            deptName
+          ].employees.push({
+            name: `${employee.firstName} ${employee.lastName}`,
+            employeeCode: employee.employeeId,
+            netPay: payroll.totals?.netPay,
+          });
+
+          // Audit logging
           await PayrollStatisticsLogger.logPayrollAction({
             action: AuditAction.CREATE,
             payrollId: payroll._id,
@@ -6656,7 +9509,7 @@ export class SuperAdminController {
             status: PAYROLL_STATUS.APPROVED,
             details: {
               employeeId: employee._id,
-              departmentId: employee.department._id,
+              departmentId: employee.department?._id,
               month,
               year,
               frequency,
@@ -6671,30 +9524,134 @@ export class SuperAdminController {
               remarks: "Payroll created and approved by Super Admin",
             },
           });
-
-          console.log(
-            `Created payroll for ${employee.firstName} ${employee.lastName}`
-          );
-
-          results.processed++;
-          results.processedDetails.push(
-            `${employee.firstName} ${employee.lastName} (${employee.employeeId})`
-          );
-          results.successful.push({
-            employeeId: employee._id,
-            payrollId: payroll._id,
-            department: employee.department._id,
-          });
         } catch (error) {
-          console.error(`Error processing employee ${employee._id}:`, error);
+          console.error(`❌ Error processing employee ${employee._id}:`, error);
+          const errorMessage = `Employee ID ${employee._id}: ${error.message}`;
+
           results.failed++;
-          results.failedDetails.push(
-            `Employee ID ${employee._id}: ${error.message}`
-          );
+          results.failedEmployees.push({
+            employeeId: employee._id,
+            employeeName: `${employee.firstName} ${employee.lastName}`,
+            employeeCode: employee.employeeId,
+            reason: error.message,
+            department: employee.department?._id,
+            departmentName: employee.department?.name,
+          });
+          processingSummary.errors.push({
+            type: "PROCESSING_ERROR",
+            message: errorMessage,
+            code: "EMPLOYEE_PROCESSING_FAILED",
+            employeeId: employee._id,
+            employeeName: `${employee.firstName} ${employee.lastName}`,
+            index: employeeIndex,
+            originalError: error.message,
+          });
         }
       }
 
-      // Create a single audit log for the bulk action
+      // Calculate processing time
+      const processingTime = Date.now() - startTime;
+      processingSummary.details.processingTime = processingTime;
+      results.processingTime = processingTime;
+
+      // Update summary totals
+      processingSummary.processed = results.processed;
+      processingSummary.skipped = results.skipped;
+      processingSummary.failed = results.failed;
+      processingSummary.details.totalNetPay = results.successful.reduce(
+        (sum, emp) => sum + (emp.netPay || 0),
+        0
+      );
+
+      // Add employee details to summary - FIXED VERSION
+      processingSummary.details.employeeDetails = [
+        ...results.successful.map((emp) => ({
+          status: "success",
+          name: emp.employeeName,
+          employeeId: emp.employeeId,
+          employeeCode: emp.employeeCode,
+          netPay: emp.netPay,
+          grossPay: emp.grossPay,
+          totalDeductions: emp.totalDeductions,
+          department: emp.department,
+          departmentName: emp.departmentName,
+          payrollId: emp.payrollId,
+        })),
+        ...results.skippedEmployees.map((emp) => ({
+          status: "skipped",
+          name: emp.employeeName,
+          employeeId: emp.employeeId,
+          employeeCode: emp.employeeCode,
+          reason: emp.reason,
+          department: emp.department,
+          departmentName: emp.departmentName,
+          netPay: 0,
+          grossPay: 0,
+          totalDeductions: 0,
+        })),
+        ...results.failedEmployees.map((emp) => ({
+          status: "failed",
+          name: emp.employeeName,
+          employeeId: emp.employeeId,
+          employeeCode: emp.employeeCode,
+          reason: emp.reason,
+          department: emp.department,
+          departmentName: emp.departmentName,
+          netPay: 0,
+          grossPay: 0,
+          totalDeductions: 0,
+        })),
+      ];
+
+      console.log(`\n🎉 All employees processing completed!`);
+      console.log(
+        `📊 Final Summary:`,
+        JSON.stringify(processingSummary, null, 2)
+      );
+
+      // SAVE SUMMARY TO DATABASE - NEW ADDITION
+      const summaryData = {
+        batchId: `BATCH_ALL_${Date.now()}_${Math.random()
+          .toString(36)
+          .substr(2, 9)}`,
+        processedBy: superAdmin._id,
+        department: null, // All departments for all employees
+        month,
+        year,
+        frequency,
+        processingTime: processingTime,
+        totalAttempted: results.total,
+        processed: results.processed,
+        skipped: results.skipped,
+        failed: results.failed,
+        totalNetPay: results.successful.reduce(
+          (sum, emp) => sum + (emp.netPay || 0),
+          0
+        ),
+        totalGrossPay: results.successful.reduce(
+          (sum, emp) => sum + (emp.grossPay || 0),
+          0
+        ),
+        totalDeductions: results.successful.reduce(
+          (sum, emp) => sum + (emp.totalDeductions || 0),
+          0
+        ),
+        departmentBreakdown: processingSummary.details.departmentBreakdown,
+        employeeDetails: processingSummary.details.employeeDetails,
+        errors: processingSummary.errors,
+        warnings: processingSummary.warnings,
+        summaryType: SummaryType.PROCESSING,
+        createdBy: superAdmin._id,
+      };
+
+      // Save the summary to database
+      await PayrollSummaryService.createSummary(summaryData);
+      console.log(
+        "💾 Payroll summary saved to database with batch ID:",
+        summaryData.batchId
+      );
+
+      // Create a single audit log for the bulk action with processing time
       if (results.processed > 0) {
         await PayrollStatisticsLogger.logBatchOperation(
           "PROCESS_ALL_EMPLOYEES",
@@ -6709,27 +9666,42 @@ export class SuperAdminController {
             skippedCount: results.skipped,
             failedCount: results.failed,
             totalAmount: results.successful.reduce(
-              (sum, emp) => sum + (emp.payroll?.totals?.netPay || 0),
+              (sum, emp) => sum + (emp.netPay || 0),
               0
             ),
+            processingTime: processingTime,
             remarks: `Processed ${results.processed} payrolls for ${month}/${year}`,
             message: `Created and approved ${results.processed} payrolls for ${month}/${year}`,
             approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
             createdBy: superAdmin._id,
             position: superAdmin.position,
             role: superAdmin.role,
-            processedEmployees: results.processedDetails,
-            skippedEmployees: results.skippedDetails,
-            failedEmployees: results.failedDetails,
+            processedEmployees: results.successful.map(
+              (emp) => emp.employeeName
+            ),
+            skippedEmployees: results.skippedEmployees.map(
+              (emp) => emp.employeeName
+            ),
+            failedEmployees: results.failedEmployees.map(
+              (emp) => emp.employeeName
+            ),
           }
         );
 
-        // Get unique departments from processed employees
-        const processedDepartments = [
-          ...new Set(results.successful.map((s) => s.department)),
-        ].filter(Boolean);
+        // Create department breakdown for notification
+        const departmentBreakdown = {};
+        results.successful.forEach((result) => {
+          const employee = employees.find(
+            (emp) => emp._id.toString() === result.employeeId.toString()
+          );
+          if (employee && employee.department) {
+            const deptName = employee.department.name || "Unknown";
+            departmentBreakdown[deptName] =
+              (departmentBreakdown[deptName] || 0) + 1;
+          }
+        });
 
-        // Create notification metadata
+        // Notification metadata
         const notificationMetadata = {
           month,
           year,
@@ -6737,62 +9709,70 @@ export class SuperAdminController {
           processedCount: results.processed,
           skippedCount: results.skipped,
           failedCount: results.failed,
-          departments: processedDepartments,
-          processedBy: `${superAdmin.firstName} ${superAdmin.lastName}`,
-          processedByRole: "Super Admin",
           totalAmount: results.successful.reduce(
-            (sum, emp) => sum + (emp.payroll?.totals?.netPay || 0),
+            (sum, emp) => sum + (emp.netPay || 0),
             0
           ),
-          departmentCode: "ALL",
-          statusColor: "green",
-          statusIcon: "check-circle",
-          forceRefresh: true,
-          employeeName:
-            results.processed === 1
-              ? results.processedDetails[0]
-              : `${results.processed} employees processed`,
-          employeeDepartment: "All Departments",
-          employeeDepartmentCode: "ALL",
-          processedEmployees:
-            results.processed === 1
-              ? results.processedDetails
-              : [`${results.processed} employees processed`],
-          skippedEmployees:
-            results.skipped === 1
-              ? results.skippedDetails
-              : [`${results.skipped} employees skipped`],
-          failedEmployees:
-            results.failed === 1
-              ? results.failedDetails
-              : [`${results.failed} employees failed`],
+          processingTime: processingTime,
+          departmentBreakdown: Object.entries(departmentBreakdown).map(
+            ([dept, count]) => ({
+              department: dept,
+              count: count,
+            })
+          ),
         };
 
-        // Notify Super Admin with updated message
+        // Notification message
+        const departmentBreakdownMessage = Object.entries(departmentBreakdown)
+          .map(([dept, count]) => `${dept}: ${count}`)
+          .join(", ");
+        const notificationMessage = `You have processed ${results.processed}/${results.total} payrolls for ${month}/${year}. ${results.skipped} skipped, ${results.failed} failed.\n\nDepartment Breakdown:\n${departmentBreakdownMessage}`;
+
+        // Dummy employee and payroll for notification
+        const notificationPayroll = {
+          _id: new Types.ObjectId(),
+          month,
+          year,
+          status: "APPROVED",
+          totals: {
+            processed: results.processed,
+            skipped: results.skipped,
+            failed: results.failed,
+          },
+          employee: {
+            firstName: "All",
+            lastName: "Employees",
+          },
+        };
+        const dummyEmployee = {
+          _id: new Types.ObjectId(),
+          firstName: "All",
+          lastName: "Employees",
+          email: "bulk@company.com",
+          department: {
+            name: "All Departments",
+            code: "ALL",
+          },
+        };
+
+        // Notify Super Admin
         await NotificationService.createNotification(
           superAdmin._id,
           NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED,
-          null,
-          null,
-          `You have processed ${results.processed}/${results.total} payrolls for ${month}/${year}. ${results.skipped} skipped, ${results.failed} failed.`,
+          dummyEmployee,
+          notificationPayroll,
+          notificationMessage,
           {
             approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
             metadata: notificationMetadata,
           }
         );
 
-        // Find HR Manager and Finance Director to notify about all processed payrolls
+        // Notify HR Manager
         const hrDepartment = await DepartmentModel.findOne({
           name: { $in: ["Human Resources", "HR"] },
           status: "active",
         });
-
-        const financeDepartment = await DepartmentModel.findOne({
-          name: { $in: ["Finance and Accounting", "Finance", "Financial"] },
-          status: "active",
-        });
-
-        // Notify HR Manager
         if (hrDepartment) {
           const hrManager = await UserModel.findOne({
             department: hrDepartment._id,
@@ -6807,13 +9787,12 @@ export class SuperAdminController {
             },
             status: "active",
           });
-
           if (hrManager) {
             await NotificationService.createNotification(
               hrManager._id,
               NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED,
-              null,
-              null,
+              dummyEmployee,
+              notificationPayroll,
               `${results.processed} payrolls have been processed and approved by ${superAdmin.firstName} ${superAdmin.lastName} (Super Admin) for ${month}/${year}.`,
               {
                 approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
@@ -6824,6 +9803,10 @@ export class SuperAdminController {
         }
 
         // Notify Finance Director
+        const financeDepartment = await DepartmentModel.findOne({
+          name: { $in: ["Finance and Accounting", "Finance", "Financial"] },
+          status: "active",
+        });
         if (financeDepartment) {
           const financeDirector = await UserModel.findOne({
             department: financeDepartment._id,
@@ -6838,13 +9821,12 @@ export class SuperAdminController {
             },
             status: "active",
           });
-
           if (financeDirector) {
             await NotificationService.createNotification(
               financeDirector._id,
               NOTIFICATION_TYPES.BULK_PAYROLL_PROCESSED,
-              null,
-              null,
+              dummyEmployee,
+              notificationPayroll,
               `${results.processed} payrolls have been processed and approved by ${superAdmin.firstName} ${superAdmin.lastName} (Super Admin) for ${month}/${year}.`,
               {
                 approvalLevel: APPROVAL_LEVELS.SUPER_ADMIN,
@@ -6853,12 +9835,6 @@ export class SuperAdminController {
             );
           }
         }
-
-        console.log("Notifications sent to:", {
-          hrManager: hrDepartment ? "Yes" : "No",
-          financeDirector: financeDepartment ? "Yes" : "No",
-          superAdmin: "Yes",
-        });
       }
 
       // Set response headers to trigger UI updates
@@ -6867,23 +9843,54 @@ export class SuperAdminController {
         "X-Refresh-Audit-Logs": "true",
       });
 
-      // Send response with detailed results
+      // Send response with detailed results and comprehensive summary
       res.status(200).json({
         success: true,
-        message: `Processed ${results.processed} payrolls successfully`,
         data: {
           total: results.total,
           processed: results.processed,
           skipped: results.skipped,
           failed: results.failed,
-          processedDetails: results.processedDetails,
-          skippedDetails: results.skippedDetails,
-          failedDetails: results.failedDetails,
+          processingTime: processingTime,
+          batchId: summaryData.batchId, // Include batch ID in response
         },
+        summary: processingSummary,
       });
     } catch (error) {
       console.error("❌ Error in processAllEmployeesPayroll:", error);
-      next(error);
+
+      // Create comprehensive error summary
+      const errorSummary = {
+        totalAttempted: 0,
+        processed: 0,
+        skipped: 0,
+        failed: 0,
+        errors: [
+          {
+            type: "SYSTEM_ERROR",
+            message: error.message,
+            code: "ALL_EMPLOYEES_PROCESSING_FAILED",
+            stack: error.stack,
+          },
+        ],
+        warnings: [],
+        details: {
+          month: req.body?.month,
+          year: req.body?.year,
+          frequency: req.body?.frequency,
+          processingTime: null,
+          totalNetPay: 0,
+          departmentBreakdown: {},
+          employeeDetails: [],
+        },
+      };
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "An unexpected error occurred during all employees payroll processing",
+        summary: errorSummary,
+      });
     }
   }
 

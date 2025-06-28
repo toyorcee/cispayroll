@@ -531,6 +531,10 @@ const UserSchema = new Schema(
       },
       targetExitDate: Date,
       actualExitDate: Date,
+      completedBy: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
       tasks: [
         {
           name: {
@@ -546,7 +550,7 @@ const UserSchema = new Schema(
           },
           deadline: {
             type: Date,
-            required: true,
+            required: false,
           },
           completed: {
             type: Boolean,

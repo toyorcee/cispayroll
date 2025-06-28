@@ -3,8 +3,23 @@ import UserModel, {
   UserLifecycleState,
 } from "../models/User.js";
 import { ApiError } from "../utils/errorHandler.js";
+import { getOnboardingTasks } from "../utils/defaultTasks.js";
 
 export class OnboardingController {
+  // Get default onboarding tasks
+  static async getDefaultOnboardingTasks(req, res, next) {
+    try {
+      const defaultTasks = getOnboardingTasks();
+
+      res.status(200).json({
+        success: true,
+        data: defaultTasks,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getOnboardingEmployees(req, res, next) {
     try {
       const {
@@ -17,26 +32,40 @@ export class OnboardingController {
         sortOrder = "desc",
       } = req.query;
 
-      // Build query
+      // Build query for active onboarding (excludes completed)
       const query = {
         "onboarding.status": { $ne: OnboardingStatus.COMPLETED },
+        status: "active",
+      };
+
+      // Build separate query for stats (includes completed)
+      const statsQuery = {
         status: "active",
       };
 
       // If user is an admin, only show employees from their department
       if (req.user.role === "ADMIN") {
         query.department = req.user.department._id;
+        statsQuery.department = req.user.department._id;
       }
 
       // Add filters if provided
       if (status) {
         query["onboarding.status"] = status;
+        statsQuery["onboarding.status"] = status;
       }
       if (department) {
         query.department = department;
+        statsQuery.department = department;
       }
       if (search) {
         query.$or = [
+          { firstName: { $regex: search, $options: "i" } },
+          { lastName: { $regex: search, $options: "i" } },
+          { employeeId: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+        ];
+        statsQuery.$or = [
           { firstName: { $regex: search, $options: "i" } },
           { lastName: { $regex: search, $options: "i" } },
           { employeeId: { $regex: search, $options: "i" } },
@@ -48,10 +77,10 @@ export class OnboardingController {
       const skip = (parseInt(page) - 1) * parseInt(limit);
       const sort = { [sortBy]: sortOrder === "desc" ? -1 : 1 };
 
-      // Get total count for pagination
+      // Get total count for pagination (active onboarding only)
       const total = await UserModel.countDocuments(query);
 
-      // Get paginated results
+      // Get paginated results (active onboarding only)
       const employees = await UserModel.find(query)
         .select("-password")
         .populate("department", "name code")
@@ -59,9 +88,9 @@ export class OnboardingController {
         .skip(skip)
         .limit(parseInt(limit));
 
-      // Calculate onboarding statistics
+      // Calculate comprehensive onboarding statistics (includes completed)
       const stats = await UserModel.aggregate([
-        { $match: query },
+        { $match: statsQuery },
         {
           $group: {
             _id: "$onboarding.status",
@@ -75,6 +104,31 @@ export class OnboardingController {
         acc[curr._id] = curr.count;
         return acc;
       }, {});
+
+      // Calculate additional stats for completed users this month
+      const currentMonth = new Date();
+      const startOfMonth = new Date(
+        currentMonth.getFullYear(),
+        currentMonth.getMonth(),
+        1
+      );
+      const endOfMonth = new Date(
+        currentMonth.getFullYear(),
+        currentMonth.getMonth() + 1,
+        0
+      );
+
+      const completedThisMonth = await UserModel.countDocuments({
+        ...statsQuery,
+        "onboarding.status": OnboardingStatus.COMPLETED,
+        "onboarding.completedAt": {
+          $gte: startOfMonth,
+          $lte: endOfMonth,
+        },
+      });
+
+      // Add completed this month to stats
+      statusStats.completedThisMonth = completedThisMonth;
 
       res.status(200).json({
         success: true,
@@ -121,7 +175,7 @@ export class OnboardingController {
         user.onboarding.status = OnboardingStatus.IN_PROGRESS;
       }
 
-      await user.save();
+      await user.save({ runValidators: false });
 
       res.status(200).json({
         success: true,
@@ -136,6 +190,7 @@ export class OnboardingController {
   static async completeTask(req, res, next) {
     try {
       const { userId, taskName } = req.params;
+      const { completed = true } = req.body;
 
       const user = await UserModel.findById(userId);
       if (!user || !user.onboarding) {
@@ -147,8 +202,9 @@ export class OnboardingController {
         throw new ApiError(404, "Task not found");
       }
 
-      task.completed = true;
-      task.completedAt = new Date();
+      // Toggle task completion status
+      task.completed = completed;
+      task.completedAt = completed ? new Date() : null;
 
       // Calculate progress based on completed tasks
       const completedTasks = user.onboarding.tasks.filter(
@@ -159,7 +215,7 @@ export class OnboardingController {
         (completedTasks / totalTasks) * 100
       );
 
-      // Update status if all tasks completed
+      // Update status based on progress
       if (user.onboarding.progress === 100) {
         user.onboarding.status = OnboardingStatus.COMPLETED;
         user.onboarding.completedAt = new Date();
@@ -179,13 +235,17 @@ export class OnboardingController {
         user.status = "active";
       } else {
         user.onboarding.status = OnboardingStatus.IN_PROGRESS;
+        // Remove completedAt if not 100% complete
+        user.onboarding.completedAt = null;
+        user.lifecycle.onboarding.completedAt = null;
       }
 
-      await user.save();
+      await user.save({ runValidators: false });
 
       res.status(200).json({
         success: true,
         data: user.onboarding,
+        message: `Task ${completed ? "completed" : "uncompleted"} successfully`,
       });
     } catch (error) {
       next(error);

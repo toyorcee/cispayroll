@@ -116,7 +116,7 @@ const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
   marginBottom: theme.spacing(2),
 }));
 
-const StyledTableHead = styled(TableHead)(({ theme }) => ({
+const StyledTableHead = styled(TableHead)(() => ({
   background: MAIN_GREEN,
   "& .MuiTableCell-head": {
     color: "#fff",
@@ -131,7 +131,7 @@ const StyledTableHead = styled(TableHead)(({ theme }) => ({
   },
 }));
 
-const StyledTableRow = styled(TableRow)(({ theme }) => ({
+const StyledTableRow = styled(TableRow)(() => ({
   "&:nth-of-type(odd)": {
     backgroundColor: LIGHT_GREEN_BG,
   },
@@ -142,16 +142,10 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
     backgroundColor: LIGHT_GREEN_ACCENT,
     transition: "background 0.2s",
   },
+  cursor: "pointer",
 }));
 
-const StyledTableCell = styled(TableCell)(({ theme }) => ({
-  padding: "14px 16px",
-  fontSize: 15,
-  color: "#222",
-  borderBottom: `1px solid ${LIGHT_GREEN_ACCENT}`,
-}));
-
-const StyledActionButton = styled(IconButton)(({ theme }) => ({
+const StyledActionButton = styled(IconButton)(() => ({
   color: MAIN_GREEN,
   background: LIGHT_GREEN_BG,
   borderRadius: 8,
@@ -236,10 +230,40 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
   };
 
   const handleSelectPayroll = (payrollId: string) => {
-    const newSelectedPayrolls = selectedPayrolls.includes(payrollId)
-      ? selectedPayrolls.filter((id) => id !== payrollId)
-      : [...selectedPayrolls, payrollId];
-    onSelectionChange(newSelectedPayrolls);
+    const selectedIndex = selectedPayrolls.indexOf(payrollId);
+    let newSelected: string[] = [];
+
+    if (selectedIndex === -1) {
+      newSelected = newSelected.concat(selectedPayrolls, payrollId);
+    } else if (selectedIndex === 0) {
+      newSelected = newSelected.concat(selectedPayrolls.slice(1));
+    } else if (selectedIndex === selectedPayrolls.length - 1) {
+      newSelected = newSelected.concat(selectedPayrolls.slice(0, -1));
+    } else if (selectedIndex > 0) {
+      newSelected = newSelected.concat(
+        selectedPayrolls.slice(0, selectedIndex),
+        selectedPayrolls.slice(selectedIndex + 1)
+      );
+    }
+
+    onSelectionChange(newSelected);
+  };
+
+  // Add row click handler
+  const handleRowClick = (payroll: Payroll) => {
+    onView(payroll);
+  };
+
+  // Handle checkbox click to prevent row click
+  const handleCheckboxClick = (event: React.MouseEvent, payrollId: string) => {
+    event.stopPropagation();
+    handleSelectPayroll(payrollId);
+  };
+
+  // Handle action button click to prevent row click
+  const handleActionClick = (event: React.MouseEvent, action: () => void) => {
+    event.stopPropagation();
+    action();
   };
 
   // Filter and sort payrolls
@@ -344,10 +368,7 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
     );
   };
 
-  const getStatusIcon = (
-    status: string,
-    _approvalFlow?: { currentLevel: string }
-  ) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case PayrollStatus.DRAFT:
         return undefined;
@@ -575,11 +596,14 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                   hover
                   key={payroll._id}
                   selected={selectedPayrolls.includes(payroll._id)}
+                  onClick={() => handleRowClick(payroll)}
                 >
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={selectedPayrolls.includes(payroll._id)}
-                      onChange={() => handleSelectPayroll(payroll._id)}
+                      onChange={(event) =>
+                        handleCheckboxClick(event as any, payroll._id)
+                      }
                     />
                   </TableCell>
                   <TableCell>
@@ -592,10 +616,7 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                         label={payroll.status}
                         color={getStatusColor(payroll.status) as any}
                         size="small"
-                        icon={getStatusIcon(
-                          payroll.status,
-                          payroll.approvalFlow
-                        )}
+                        icon={getStatusIcon(payroll.status)}
                       />
                       {payroll.approvalFlow?.currentLevel &&
                         payroll.status === "PENDING" && (
@@ -630,7 +651,11 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                       <Tooltip title="View Details">
                         <StyledActionButton
                           size="small"
-                          onClick={() => onView(payroll)}
+                          onClick={(event) =>
+                            handleActionClick(event, () =>
+                              handleRowClick(payroll)
+                            )
+                          }
                         >
                           <VisibilityIcon />
                         </StyledActionButton>
@@ -640,7 +665,11 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                         <Tooltip title="Submit for Approval">
                           <StyledActionButton
                             size="small"
-                            onClick={() => onSubmitForApproval(payroll)}
+                            onClick={(event) =>
+                              handleActionClick(event, () =>
+                                onSubmitForApproval(payroll)
+                              )
+                            }
                           >
                             <SendIcon />
                           </StyledActionButton>
@@ -655,7 +684,11 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                             <Tooltip title="Rejected - Click to view rejection details">
                               <StyledActionButton
                                 size="small"
-                                onClick={() => onView(payroll)}
+                                onClick={(event) =>
+                                  handleActionClick(event, () =>
+                                    handleRowClick(payroll)
+                                  )
+                                }
                                 color="error"
                               >
                                 <ErrorOutlineIcon />
@@ -666,7 +699,11 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                               <Tooltip title="Approve">
                                 <StyledActionButton
                                   size="small"
-                                  onClick={() => onApprove(payroll)}
+                                  onClick={(event) =>
+                                    handleActionClick(event, () =>
+                                      onApprove(payroll)
+                                    )
+                                  }
                                   color="success"
                                 >
                                   <CheckCircleIcon />
@@ -675,7 +712,11 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                               <Tooltip title="Reject">
                                 <StyledActionButton
                                   size="small"
-                                  onClick={() => onReject(payroll)}
+                                  onClick={(event) =>
+                                    handleActionClick(event, () =>
+                                      onReject(payroll)
+                                    )
+                                  }
                                   color="error"
                                 >
                                   <CancelIcon />
@@ -690,7 +731,11 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                             >
                               <StyledActionButton
                                 size="small"
-                                onClick={() => onViewApprovalJourney(payroll)}
+                                onClick={(event) =>
+                                  handleActionClick(event, () =>
+                                    onViewApprovalJourney(payroll)
+                                  )
+                                }
                                 color="info"
                               >
                                 <RotatingHourglass />
@@ -704,7 +749,11 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                         <Tooltip title="Fully Approved">
                           <StyledActionButton
                             size="small"
-                            onClick={() => onView(payroll)}
+                            onClick={(event) =>
+                              handleActionClick(event, () =>
+                                handleRowClick(payroll)
+                              )
+                            }
                             color="success"
                           >
                             <DoneIcon />
@@ -716,7 +765,11 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                         <Tooltip title="Process Payment">
                           <StyledActionButton
                             size="small"
-                            onClick={() => onProcessPayment(payroll)}
+                            onClick={(event) =>
+                              handleActionClick(event, () =>
+                                onProcessPayment(payroll)
+                              )
+                            }
                             color="primary"
                           >
                             <PaymentIcon />
@@ -728,7 +781,11 @@ const PayrollTable: React.FC<PayrollTableProps> = ({
                         <Tooltip title="Resubmit Payroll">
                           <StyledActionButton
                             size="small"
-                            onClick={() => onResubmit(payroll)}
+                            onClick={(event) =>
+                              handleActionClick(event, () =>
+                                onResubmit(payroll)
+                              )
+                            }
                             color="primary"
                           >
                             <SendIcon />

@@ -3,6 +3,7 @@ import {
   DepartmentStatus,
 } from "../services/departmentService.js";
 import { handleError } from "../utils/errorHandler.js";
+import PayrollStatisticsLogger from "../utils/payrollStatisticsLogger.js";
 
 export class DepartmentController {
   // Get all departments with pagination and filters

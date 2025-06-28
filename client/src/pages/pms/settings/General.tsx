@@ -78,7 +78,7 @@ const ToggleButton = ({
 export default function General() {
   const { user } = useAuth();
   // System settings state
-  const [systemSettings, setSystemSettings] = useState(null);
+  const [_systemSettings, setSystemSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -98,12 +98,12 @@ export default function General() {
   });
 
   // Quick settings state
-  const [notifications, setNotifications] = useState(true);
+  const [_notifications, setNotifications] = useState(true);
 
   // Notification preferences state
   const [inAppEnabled, setInAppEnabled] = useState(true);
   const [emailEnabled, setEmailEnabled] = useState(true);
-  const [notifPrefLoading, setNotifPrefLoading] = useState(true);
+  const [_notifPrefLoading, setNotifPrefLoading] = useState(true);
 
   const selectClasses = `mt-1 block w-full pl-3 pr-10 py-2 text-sm md:text-base 
                       border-gray-300 focus:outline-none focus:ring-0 
@@ -170,26 +170,6 @@ export default function General() {
   const handlePayrollCancel = () => {
     setTempPayrollSettings(payrollSettings);
     setEditingPayroll(false);
-  };
-
-  const handleNotificationToggle = async () => {
-    try {
-      const newValue = !notifications;
-      const updatedSettings = {
-        quickSettings: {
-          notifications: newValue,
-        },
-      };
-
-      await settingsService.updateSystemSettings(updatedSettings);
-      setNotifications(newValue);
-      toast.success(
-        `Email notifications ${newValue ? "enabled" : "disabled"} successfully`
-      );
-    } catch (error) {
-      console.error("Error updating notification settings:", error);
-      toast.error("Failed to update notification settings");
-    }
   };
 
   // Fetch notification preferences on mount

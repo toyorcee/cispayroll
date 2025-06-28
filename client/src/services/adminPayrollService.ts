@@ -45,6 +45,41 @@ export interface AdminPayrollProcessingStats {
   totalPendingPaymentAmount: number;
   recentActivityCount: number;
   totalAmountPaid: number;
+  totalAmountApproved: number;
+  totalAmountPending: number;
+  totalAmountProcessing: number;
+  totalAmountPendingPayment: number;
+
+  // Processing Time Statistics
+  processingTime?: {
+    currentMonth: {
+      count: number;
+      average: number;
+      total: number;
+      min: number;
+      max: number;
+    };
+    currentYear: {
+      count: number;
+      average: number;
+      total: number;
+      min: number;
+      max: number;
+    };
+    monthlyBreakdown: Array<{
+      month: number;
+      monthName: string;
+      count: number;
+      average: number;
+      total: number;
+    }>;
+    efficiencyBreakdown: {
+      excellent?: number;
+      good?: number;
+      average?: number;
+      slow?: number;
+    };
+  };
 }
 
 export interface AdminPayroll {
@@ -445,7 +480,7 @@ export const adminPayrollService = {
     frequency: string;
     salaryGrade?: string;
     userRole?: string;
-  }): Promise<PayrollData> => {
+  }): Promise<{ data: PayrollData; summary?: any }> => {
     try {
       const endpoint = isSuperAdmin(data.userRole)
         ? `${SUPER_ADMIN_BASE_URL}/payroll/process-single-employee`
@@ -464,7 +499,7 @@ export const adminPayrollService = {
         throw new Error(response.data.message || "Failed to process payroll");
       }
 
-      return response.data.data;
+      return response.data;
     } catch (error: any) {
       console.error("Error in processSingleEmployeePayroll:", error);
 
@@ -647,7 +682,14 @@ export const adminPayrollService = {
     frequency: string;
     departmentId: string;
     userRole?: string;
-  }): Promise<any> => {
+  }): Promise<{
+    processed: number;
+    skipped: number;
+    failed: number;
+    total: number;
+    errors: any[];
+    summary?: any;
+  }> => {
     try {
       // Use different endpoint for Super Admin
       const endpoint = isSuperAdmin(data.userRole)
@@ -684,7 +726,7 @@ export const adminPayrollService = {
     year: number;
     frequency: string;
     userRole?: string;
-  }): Promise<any> => {
+  }): Promise<{ success: boolean; processed: number; summary?: any }> => {
     try {
       // This endpoint is only available for Super Admin
       if (!isSuperAdmin(data.userRole)) {
@@ -745,7 +787,7 @@ export const adminPayrollService = {
       const url = timestamp ? `${endpoint}?t=${timestamp}` : endpoint;
 
       const response = await api.get(url);
-
+      console.log("[getProcessingStatistics] API response:", response.data);
       if (!response.data.success) {
         throw new Error(
           response.data.message || "Failed to fetch processing statistics"

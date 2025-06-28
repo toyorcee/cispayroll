@@ -7,18 +7,12 @@ import {
   Card,
   CardContent,
   useTheme,
-  TextField,
-  MenuItem,
-  Button,
-  FormControl,
-  InputLabel,
-  Select,
 } from "@mui/material";
 import {
   PieChart,
   Pie,
   Cell,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
 } from "recharts";
@@ -31,12 +25,6 @@ import { useAuth } from "../../../context/AuthContext";
 import { UserRole } from "../../../types/auth";
 import { toast } from "react-toastify";
 import {
-  CheckCircle as CheckCircleIcon,
-  PendingActions as PendingActionsIcon,
-  Payment as PaymentIcon,
-  Assessment as AssessmentIcon,
-  Search as SearchIcon,
-  FilterList as FilterIcon,
   TrendingUp as TrendingUpIcon,
   AccountBalance as AccountBalanceIcon,
 } from "@mui/icons-material";
@@ -446,7 +434,7 @@ const PayrollDashboard: React.FC<PayrollDashboardProps> = ({
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <RechartsTooltip />
                   <Legend
                     verticalAlign="bottom"
                     height={36}

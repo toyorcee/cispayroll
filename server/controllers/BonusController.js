@@ -3,6 +3,7 @@ import User from "../models/User.js";
 import Department from "../models/Department.js";
 import { handleError, ApiError, asyncHandler } from "../utils/errorHandler.js";
 import mongoose from "mongoose";
+import PayrollStatisticsLogger from "../utils/payrollStatisticsLogger.js";
 
 /**
  * Create a personal bonus request
@@ -19,6 +20,107 @@ const createPersonalBonus = asyncHandler(async (req, res) => {
   }
 
   try {
+    // Check monthly bonus request limit (max 3 per month)
+    const currentDate = new Date();
+
+    // Use Nigeria timezone for date calculations
+    const nigeriaTime = new Date(
+      currentDate.toLocaleString("en-US", { timeZone: "Africa/Lagos" })
+    );
+    const startOfMonth = new Date(
+      nigeriaTime.getFullYear(),
+      nigeriaTime.getMonth(),
+      1
+    );
+    const endOfMonth = new Date(
+      nigeriaTime.getFullYear(),
+      nigeriaTime.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999
+    );
+
+    console.log("🔍 [BonusController] Monthly count calculation:", {
+      userId,
+      currentDate: currentDate.toISOString(),
+      startOfMonth: startOfMonth.toISOString(),
+      endOfMonth: endOfMonth.toISOString(),
+    });
+
+    // Debug: Get total count of all bonuses for this user
+    const totalUserBonuses = await Bonus.countDocuments({
+      employee: userId,
+    });
+    console.log(
+      "🔍 [BonusController] Total bonuses for user:",
+      totalUserBonuses
+    );
+
+    // Debug: Get actual bonus records to see their creation dates
+    const userBonuses = await Bonus.find({ employee: userId })
+      .select("createdAt paymentDate type reason")
+      .lean();
+    console.log(
+      "🔍 [BonusController] User bonus records:",
+      userBonuses.map((b) => ({
+        id: b._id,
+        type: b.type,
+        reason: b.reason,
+        createdAt: b.createdAt,
+        paymentDate: b.paymentDate,
+        createdAtISO: b.createdAt?.toISOString(),
+        paymentDateISO: b.paymentDate?.toISOString(),
+      }))
+    );
+
+    const monthlyBonusCount = await Bonus.countDocuments({
+      employee: userId,
+      createdAt: {
+        $gte: startOfMonth,
+        $lte: endOfMonth,
+      },
+      approvalStatus: { $in: ["approved", "cancelled"] }, // Only count approved and cancelled requests
+    });
+
+    // Alternative approach: Check by month and year
+    const currentMonth = nigeriaTime.getMonth() + 1;
+    const currentYear = nigeriaTime.getFullYear();
+
+    const monthlyBonusCountAlt = await Bonus.countDocuments({
+      employee: userId,
+      $expr: {
+        $and: [
+          { $eq: [{ $month: "$createdAt" }, currentMonth] },
+          { $eq: [{ $year: "$createdAt" }, currentYear] },
+        ],
+      },
+      approvalStatus: { $in: ["approved", "cancelled"] }, // Only count approved and cancelled requests
+    });
+
+    console.log("🔍 [BonusController] Alternative monthly count:", {
+      currentMonth,
+      currentYear,
+      monthlyBonusCountAlt,
+      usingMongoDBDateOperators: true,
+      countingApprovedAndCancelled: true,
+    });
+
+    console.log("🔍 [BonusController] Monthly count (approved + cancelled):", {
+      monthlyBonusCount,
+      monthlyBonusCountAlt,
+      limit: 3,
+      remaining: Math.max(0, 3 - monthlyBonusCount),
+    });
+
+    if (monthlyBonusCount >= 3) {
+      throw new ApiError(
+        429,
+        "You have reached the monthly limit of 3 bonus requests. Please wait until next month to submit more requests."
+      );
+    }
+
     // Check if user is HR Manager by department and position
     const hrDepartment = await Department.findOne({
       name: { $in: ["Human Resources", "HR"] },
@@ -236,9 +338,9 @@ const getBonusRequests = asyncHandler(async (req, res) => {
   const skip = (page - 1) * limit;
 
   const bonuses = await Bonus.find(query)
-    .populate("employee", "firstName lastName email")
+    .populate("employee", "firstName lastName email profileImage")
     .populate("department", "name code")
-    .populate("approvedBy", "fullName")
+    .populate("approvedBy", "firstName lastName fullName")
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit);
@@ -846,15 +948,65 @@ const getMyBonuses = asyncHandler(async (req, res) => {
   const skip = (page - 1) * limit;
 
   try {
-    const [bonuses, total] = await Promise.all([
-      Bonus.find({ employee: userId })
-        .sort({ createdAt: -1 })
-        .populate("employee", "firstName lastName")
-        .populate("department", "name")
-        .skip(skip)
-        .limit(limit),
-      Bonus.countDocuments({ employee: userId }),
-    ]);
+    // All-time query for the table
+    const allQuery = { employee: userId };
+
+    // Nigeria timezone for monthly stats
+    const currentDate = new Date();
+    const nigeriaTime = new Date(
+      currentDate.toLocaleString("en-US", { timeZone: "Africa/Lagos" })
+    );
+    const startOfMonth = new Date(
+      nigeriaTime.getFullYear(),
+      nigeriaTime.getMonth(),
+      1
+    );
+    const endOfMonth = new Date(
+      nigeriaTime.getFullYear(),
+      nigeriaTime.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999
+    );
+
+    // This month's query for stats
+    const monthQuery = {
+      employee: userId,
+      createdAt: {
+        $gte: startOfMonth,
+        $lte: endOfMonth,
+      },
+      approvalStatus: { $in: ["approved", "cancelled"] }, // Only count approved and cancelled requests
+    };
+
+    // All-time for the table
+    const bonuses = await Bonus.find(allQuery)
+      .sort({ createdAt: -1 })
+      .populate("employee", "firstName lastName")
+      .populate("department", "name")
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Bonus.countDocuments(allQuery);
+
+    // This month for the stats
+    const monthlyCount = await Bonus.countDocuments(monthQuery);
+
+    console.log("🔍 [BonusController] getMyBonuses monthly stats:", {
+      userId,
+      monthlyCount,
+      countingApprovedAndCancelled: true,
+      limit: 3,
+      remaining: Math.max(0, 3 - monthlyCount),
+    });
+
+    const monthlyStats = {
+      requested: monthlyCount,
+      remaining: Math.max(0, 3 - monthlyCount),
+      limit: 3,
+    };
 
     return res.status(200).json({
       success: true,
@@ -866,12 +1018,110 @@ const getMyBonuses = asyncHandler(async (req, res) => {
           limit,
           pages: Math.ceil(total / limit),
         },
+        monthlyStats,
       },
       message: "Personal bonuses retrieved successfully",
     });
   } catch (error) {
     console.error(`[GET MY BONUSES FAILED] User ${userId}: ${error.message}`);
     throw new ApiError(500, "Failed to retrieve personal bonuses");
+  }
+});
+
+/**
+ * Cancel a personal bonus request (for the requesting user only)
+ */
+const cancelPersonalBonus = asyncHandler(async (req, res) => {
+  const { bonusId } = req.params;
+  const userId = req.user._id;
+
+  console.log("🔍 [BonusController] cancelPersonalBonus called with:", {
+    bonusId,
+    userId,
+    timestamp: new Date().toISOString(),
+  });
+
+  try {
+    // Find the bonus and verify ownership
+    const bonus = await Bonus.findOne({
+      _id: bonusId,
+      employee: userId,
+    });
+
+    if (!bonus) {
+      throw new ApiError(
+        404,
+        "Bonus request not found or you don't have permission to cancel it"
+      );
+    }
+
+    // Check if bonus can be cancelled (only pending requests)
+    if (bonus.approvalStatus !== "pending") {
+      throw new ApiError(
+        400,
+        `Cannot cancel bonus with status: ${bonus.approvalStatus}. Only pending requests can be cancelled.`
+      );
+    }
+
+    // Update the bonus status to cancelled
+    const updatedBonus = await Bonus.findByIdAndUpdate(
+      bonusId,
+      {
+        approvalStatus: "cancelled",
+        updatedBy: userId,
+        cancelledAt: new Date(),
+        cancelledBy: userId,
+      },
+      { new: true }
+    );
+
+    // Add audit logging
+    await PayrollStatisticsLogger.logBonusAction({
+      action: "DELETE",
+      bonusIds: [bonus._id],
+      userId: userId,
+      details: {
+        bonusId: bonus._id,
+        previousStatus: bonus.approvalStatus,
+        newStatus: "cancelled",
+        employeeId: userId,
+        departmentId: req.user.department,
+        createdBy: userId,
+        position: req.user.position,
+        role: req.user.role,
+        message: `Cancelled personal bonus request: ${bonus.reason}`,
+      },
+      statisticsDetails: {
+        bonusType: bonus.type,
+        amount: bonus.amount,
+        approvalStatus: "cancelled",
+        scope: "individual",
+      },
+      auditDetails: {
+        entity: "BONUS",
+        entityIds: [bonus._id],
+        action: "DELETE",
+        performedBy: userId,
+        status: "cancelled",
+        remarks: `Cancelled personal bonus request: ${bonus.reason}`,
+      },
+    });
+
+    console.log(
+      `✅ [BonusController] Bonus ${bonusId} cancelled successfully by user ${userId}`
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: updatedBonus,
+      message: "Bonus request cancelled successfully",
+    });
+  } catch (error) {
+    console.error(
+      `❌ [BonusController] Failed to cancel bonus ${bonusId}:`,
+      error.message
+    );
+    throw error;
   }
 });
 
@@ -885,4 +1135,5 @@ export {
   createDepartmentEmployeeBonus,
   createDepartmentWideBonus,
   getMyBonuses,
+  cancelPersonalBonus,
 };

@@ -46,3 +46,53 @@ export const formatPercentage = (value: number | undefined): string => {
   if (value === undefined) return "0%";
   return `${value.toFixed(2)}%`;
 };
+
+/**
+ * Convert settlement details to CSV format
+ * @param settlementDetails The settlement details object (single or bulk)
+ * @returns CSV string
+ */
+export const settlementToCSV = (settlementDetails: any): string => {
+  const headers = [
+    "Employee Name",
+    "Employee ID",
+    "Department",
+    "Position",
+    "Basic Salary",
+    "Total Allowances",
+    "Total Deductions",
+    "Net Pay",
+    "Final Settlement Amount",
+  ];
+
+  // Handle both single and bulk settlement details
+  let settlements = [];
+  if (Array.isArray(settlementDetails)) {
+    settlements = settlementDetails;
+  } else if (
+    settlementDetails.settlementDetails &&
+    Array.isArray(settlementDetails.settlementDetails)
+  ) {
+    settlements = settlementDetails.settlementDetails;
+  } else if (settlementDetails.settlementDetails) {
+    settlements = [settlementDetails];
+  } else {
+    settlements = [settlementDetails];
+  }
+
+  const rows = settlements.map((row: any) => [
+    row.employee?.fullName || "",
+    row.employee?._id || "",
+    row.employee?.department?.name || "",
+    row.employee?.position || "",
+    row.settlementDetails?.basicSalary || 0,
+    row.settlementDetails?.totalAllowances || 0,
+    row.settlementDetails?.totalDeductions || 0,
+    row.settlementDetails?.payrollData?.netSalary || 0,
+    row.settlementDetails?.totalSettlement || 0,
+  ]);
+
+  return [headers.join(","), ...rows.map((row: any[]) => row.join(","))].join(
+    "\n"
+  );
+};

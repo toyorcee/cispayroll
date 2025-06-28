@@ -1,7 +1,7 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { FaBell, FaUser, FaBuilding, FaCalendarAlt } from "react-icons/fa";
 import { format } from "date-fns";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getNotifications } from "../../services/notificationService";
 
 interface Notification {
@@ -30,7 +30,8 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
     const [isOpen, setIsOpen] = useState(false);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
-    const queryClient = useQueryClient();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // const queryClient = useQueryClient();
 
     const {
       data: notificationsData,
@@ -157,7 +158,7 @@ export const NotificationBell = forwardRef<NotificationBellRef>(
                 </div>
               ) : (
                 <div className="divide-y divide-green-700/60">
-                  {notifications.map((notification, index) => {
+                  {notifications.map((notification, _index) => {
                     return (
                       <div
                         key={notification._id}

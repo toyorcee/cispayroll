@@ -8,6 +8,7 @@ import { ApiError } from "../utils/errorHandler.js";
 import Department from "../models/Department.js";
 import { DeductionScope } from "../models/Deduction.js";
 import User from "../models/User.js";
+import PayrollStatisticsLogger from "../utils/payrollStatisticsLogger.js";
 
 export class DeductionService {
   // Standard PAYE tax brackets for Nigeria
@@ -51,6 +52,12 @@ export class DeductionService {
           effectiveDate: new Date(),
         });
         console.log("✅ PAYE created");
+        await PayrollStatisticsLogger.logDeductionAction({
+          action: "CREATE",
+          deductionId: deductions.paye._id,
+          userId,
+          details: deductions.paye.toObject(),
+        });
       } else {
         console.log("ℹ️ PAYE already exists");
       }
@@ -69,6 +76,12 @@ export class DeductionService {
           effectiveDate: new Date(),
         });
         console.log("✅ Pension created");
+        await PayrollStatisticsLogger.logDeductionAction({
+          action: "CREATE",
+          deductionId: deductions.pension._id,
+          userId,
+          details: deductions.pension.toObject(),
+        });
       } else {
         console.log("ℹ️ Pension already exists");
       }
@@ -87,6 +100,12 @@ export class DeductionService {
           effectiveDate: new Date(),
         });
         console.log("✅ NHF created");
+        await PayrollStatisticsLogger.logDeductionAction({
+          action: "CREATE",
+          deductionId: deductions.nhf._id,
+          userId,
+          details: deductions.nhf.toObject(),
+        });
       } else {
         console.log("ℹ️ NHF already exists");
       }
@@ -462,6 +481,17 @@ export class DeductionService {
           },
         ],
       });
+      console.log(
+        "🔍 [DeductionService] Active deductions fetched:",
+        activeDeductions.map((d) => ({
+          name: d.name,
+          type: d.type,
+          scope: d.scope,
+          department: d.department,
+          value: d.value,
+          calculationMethod: d.calculationMethod,
+        }))
+      );
 
       // Separate deductions by type
       const statutoryDeductions = activeDeductions.filter(
@@ -469,6 +499,14 @@ export class DeductionService {
       );
       const voluntaryDeductions = activeDeductions.filter(
         (d) => d.type === DeductionType.VOLUNTARY
+      );
+      console.log(
+        "🔍 [DeductionService] Statutory deductions:",
+        statutoryDeductions.map((d) => d.name)
+      );
+      console.log(
+        "🔍 [DeductionService] Voluntary deductions:",
+        voluntaryDeductions.map((d) => d.name)
       );
 
       // Calculate statutory deductions based on opt-in status and mandatory flag
@@ -478,12 +516,20 @@ export class DeductionService {
         grossSalary,
         user.deductionPreferences.statutory
       );
+      console.log(
+        "🧾 [DeductionService] Statutory deductions breakdown:",
+        statutory
+      );
 
       // Calculate voluntary deductions based on assignments
       const voluntary = await this.processVoluntaryDeductions(
         voluntaryDeductions,
         basicSalary,
         user.deductionPreferences.voluntary
+      );
+      console.log(
+        "🧾 [DeductionService] Voluntary deductions breakdown:",
+        voluntary
       );
 
       // Calculate total deductions
@@ -522,7 +568,10 @@ export class DeductionService {
     userStatutoryPreferences
   ) {
     const result = {};
-
+    console.log(
+      "🔍 [DeductionService] Processing statutory deductions:",
+      deductions.map((d) => d.name)
+    );
     for (const deduction of deductions) {
       if (!deduction.isActive) continue;
 
@@ -676,7 +725,10 @@ export class DeductionService {
     userVoluntaryPreferences
   ) {
     const result = {};
-
+    console.log(
+      "🔍 [DeductionService] Processing voluntary deductions:",
+      deductions.map((d) => d.name)
+    );
     // Process standard voluntary deductions
     for (const deduction of deductions) {
       if (!deduction.isActive) continue;
@@ -895,6 +947,10 @@ export class DeductionService {
     departmentId,
   }) {
     try {
+      console.log(
+        "🔍 [DeductionService] Calculating department-specific deductions for department:",
+        departmentId
+      );
       // Get active department deductions
       const departmentDeductions = await Deduction.find({
         scope: DeductionScope.DEPARTMENT,
@@ -934,6 +990,10 @@ export class DeductionService {
         };
       }
 
+      console.log(
+        "🧾 [DeductionService] Department-specific deductions breakdown:",
+        result
+      );
       return result;
     } catch (error) {
       throw new ApiError(
@@ -1090,5 +1150,164 @@ export class DeductionService {
       console.error("❌ Batch removal failed:", error);
       throw new ApiError(500, `Failed to remove deduction: ${error.message}`);
     }
+  }
+
+  static async getApplicableDeductions(
+    currentPeriodType,
+    currentPeriodData,
+    scopeFilter = {}
+  ) {
+    const {
+      currentMonth,
+      currentYear,
+      currentWeek,
+      currentBiweek,
+      currentQuarter,
+    } = currentPeriodData;
+
+    let payrollPeriodStartDate;
+    if (currentPeriodType === "monthly") {
+      payrollPeriodStartDate = new Date(currentYear, currentMonth - 1, 1);
+    } else if (currentPeriodType === "weekly") {
+      // Calculate start of specific week
+      const startOfYear = new Date(currentYear, 0, 1);
+      const days = (currentWeek - 1) * 7;
+      payrollPeriodStartDate = new Date(
+        startOfYear.getTime() + days * 24 * 60 * 60 * 1000
+      );
+    } else if (currentPeriodType === "biweekly") {
+      // Calculate start of specific biweek
+      const startOfYear = new Date(currentYear, 0, 1);
+      const days = (currentBiweek - 1) * 14;
+      payrollPeriodStartDate = new Date(
+        startOfYear.getTime() + days * 24 * 60 * 60 * 1000
+      );
+    } else if (currentPeriodType === "quarterly") {
+      // Calculate start of specific quarter
+      const quarterStartMonth = (currentQuarter - 1) * 3;
+      payrollPeriodStartDate = new Date(currentYear, quarterStartMonth, 1);
+    } else if (currentPeriodType === "annual") {
+      payrollPeriodStartDate = new Date(currentYear, 0, 1); // January 1st
+    }
+
+    // Calculate payroll period end date to match allowance logic
+    let payrollPeriodEndDate;
+    if (currentPeriodType === "monthly") {
+      payrollPeriodEndDate = new Date(currentYear, currentMonth, 0); // Last day of the month
+    } else if (currentPeriodType === "weekly") {
+      payrollPeriodEndDate = new Date(payrollPeriodStartDate);
+      payrollPeriodEndDate.setDate(payrollPeriodStartDate.getDate() + 6);
+    } else if (currentPeriodType === "biweekly") {
+      payrollPeriodEndDate = new Date(payrollPeriodStartDate);
+      payrollPeriodEndDate.setDate(payrollPeriodStartDate.getDate() + 13);
+    } else if (currentPeriodType === "quarterly") {
+      payrollPeriodEndDate = new Date(currentYear, currentQuarter * 3, 0);
+    } else if (currentPeriodType === "annual") {
+      payrollPeriodEndDate = new Date(currentYear, 11, 31); // December 31st
+    }
+
+    // Build period filter for one-off deductions
+    const periodFilter = {
+      $or: [
+        { deductionDuration: { $ne: "one-off" } }, // Ongoing deductions always apply
+        {
+          deductionDuration: "one-off",
+          "appliesToPeriod.periodType": currentPeriodType,
+          ...(currentPeriodType === "monthly" && {
+            "appliesToPeriod.month": currentMonth,
+            "appliesToPeriod.year": currentYear,
+          }),
+          ...(currentPeriodType === "weekly" && {
+            "appliesToPeriod.week": currentWeek,
+            "appliesToPeriod.year": currentYear,
+          }),
+          ...(currentPeriodType === "biweekly" && {
+            "appliesToPeriod.biweek": currentBiweek,
+            "appliesToPeriod.year": currentYear,
+          }),
+          ...(currentPeriodType === "quarterly" && {
+            "appliesToPeriod.quarter": currentQuarter,
+            "appliesToPeriod.year": currentYear,
+          }),
+          ...(currentPeriodType === "annual" && {
+            "appliesToPeriod.year": currentYear,
+          }),
+        },
+      ],
+    };
+
+    // Build scope filter based on scopeFilter parameter
+    const scopeFilterQuery = {
+      $or: [
+        { scope: DeductionScope.COMPANY_WIDE },
+        ...(scopeFilter.departmentId
+          ? [
+              {
+                scope: DeductionScope.DEPARTMENT,
+                department: scopeFilter.departmentId,
+              },
+            ]
+          : []),
+        ...(scopeFilter.employeeId
+          ? [
+              {
+                scope: DeductionScope.INDIVIDUAL,
+                assignedEmployees: scopeFilter.employeeId,
+              },
+            ]
+          : []),
+      ],
+    };
+
+    console.log("🔍 getApplicableDeductions debug:", {
+      currentPeriodType,
+      currentPeriodData,
+      scopeFilter,
+      payrollPeriodStartDate: payrollPeriodStartDate.toISOString(),
+      payrollPeriodEndDate: payrollPeriodEndDate.toISOString(),
+      scopeFilterQuery,
+    });
+
+    // Build the complete query
+    const query = {
+      isActive: true,
+      // Match allowance logic: deductions effective during the payroll period
+      $or: [
+        // Deductions with no effective date (always apply)
+        { effectiveDate: { $exists: false } },
+        // Deductions effective on or before the end of payroll period
+        { effectiveDate: { $lte: payrollPeriodEndDate } },
+      ],
+      // If deduction has expiry date, it should not have expired before payroll period start
+      $or: [
+        { expiryDate: { $exists: false } },
+        { expiryDate: { $gte: payrollPeriodStartDate } },
+      ],
+      ...periodFilter,
+      ...scopeFilterQuery,
+    };
+
+    console.log("🔍 Final deduction query:", JSON.stringify(query, null, 2));
+
+    const deductions = await Deduction.find(query);
+
+    console.log("🔍 Found applicable deductions:", {
+      total: deductions.length,
+      deductions: deductions.map((d) => ({
+        name: d.name,
+        type: d.type,
+        scope: d.scope,
+        department: d.department,
+        isActive: d.isActive,
+        value: d.value,
+        calculationMethod: d.calculationMethod,
+        effectiveDate: d.effectiveDate,
+        expiryDate: d.expiryDate,
+        deductionDuration: d.deductionDuration,
+        appliesToPeriod: d.appliesToPeriod,
+      })),
+    });
+
+    return deductions;
   }
 }

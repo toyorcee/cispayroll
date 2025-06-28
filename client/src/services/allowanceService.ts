@@ -6,8 +6,6 @@ import type {
   AllowanceType,
 } from "../types/allowance";
 
-const BASE_URL = "/api";
-
 export const allowanceService = {
   createAllowance: async (
     data: CreateAllowanceRequest,
@@ -352,7 +350,7 @@ export const allowanceService = {
     endDate?: string;
     includeInactive?: boolean;
   }) => {
-    const response = await api.get(`${BASE_URL}/requests`, { params });
+    const response = await api.get(`/api/allowances/requests`, { params });
     return response.data;
   },
 
@@ -361,7 +359,20 @@ export const allowanceService = {
     amount: number;
     description: string;
   }) => {
-    const response = await api.post(`${BASE_URL}/personal`, data);
+    const requestData = {
+      name: `${data.type} Allowance`,
+      type: data.type,
+      amount: data.amount,
+      description: data.description,
+      effectiveDate: new Date().toISOString().split("T")[0],
+    };
+
+    console.log(
+      "🔵 [AllowanceService] Creating personal allowance with data:",
+      requestData
+    );
+
+    const response = await api.post(`/api/allowances/personal`, requestData);
     return response.data;
   },
 
@@ -369,6 +380,17 @@ export const allowanceService = {
     const response = await api.get("/api/allowances/personal-requests", {
       params,
     });
+    return response.data;
+  },
+
+  cancelPersonalAllowance: async (allowanceId: string) => {
+    console.log(
+      "🔵 [AllowanceService] Cancelling personal allowance:",
+      allowanceId
+    );
+    const response = await api.patch(
+      `/api/allowances/personal/${allowanceId}/cancel`
+    );
     return response.data;
   },
 };

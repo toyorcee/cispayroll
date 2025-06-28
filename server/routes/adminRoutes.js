@@ -228,6 +228,22 @@ router.post(
   AdminController.requestAllowance
 );
 
+// Add specific route for request to prevent ObjectId casting error
+router.get(
+  "/allowances/request",
+  requirePermission([Permission.VIEW_ALLOWANCES]),
+  (req, res) => {
+    console.log(
+      "🔍 [AdminRoutes] /allowances/request accessed - redirecting to proper endpoint"
+    );
+    res.status(400).json({
+      success: false,
+      message:
+        "Use /api/allowances/requests for listing allowances, not /api/admin/allowances/request",
+    });
+  }
+);
+
 router.post(
   "/allowances",
   requirePermission([Permission.CREATE_ALLOWANCES]),

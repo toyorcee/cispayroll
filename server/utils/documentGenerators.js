@@ -100,25 +100,37 @@ export const generateFinalSettlementReport = async (
   doc.setFontSize(20);
   doc.text("Final Settlement Report", 105, 40, { align: "center" });
 
-  // Employee Details - More concise
+  // Employee Details
   doc.setFontSize(11);
   doc.setTextColor(100, 100, 100); // Dark gray
   const employeeDetails = [
     `ID: ${employee.employeeId}`,
     `Name: ${employee.firstName} ${employee.lastName}`,
     `Dept: ${employee.department?.name || "N/A"}`,
+    `Position: ${employee.position || "N/A"}`,
+    `Grade Level: ${employee.gradeLevel || "N/A"}`,
   ];
   doc.text(employeeDetails, 20, 55);
 
-  // Date information with better formatting
+  // Date information
   doc.setFontSize(10);
   doc.setTextColor(120, 120, 120); // Lighter gray
-  doc.text(`Settlement Date: ${new Date().toLocaleDateString()}`, 20, 75);
+  doc.text(`Settlement Date: ${new Date().toLocaleDateString()}`, 20, 85);
+  if (employee.offboarding?.actualExitDate) {
+    doc.text(
+      `Exit Date: ${new Date(
+        employee.offboarding.actualExitDate
+      ).toLocaleDateString()}`,
+      20,
+      95
+    );
+  }
 
   // Offboarding Status
+  const statusY = employee.offboarding?.actualExitDate ? 110 : 100;
   doc.setFontSize(14);
   doc.setTextColor(22, 163, 74); // Green color
-  doc.text("Offboarding Status", 20, 90);
+  doc.text("Offboarding Status", 20, statusY);
 
   const checklistItems = [
     ["Exit Interview", "Completed"],
@@ -131,7 +143,7 @@ export const generateFinalSettlementReport = async (
   autoTable(doc, {
     head: [["Task", "Status"]],
     body: checklistItems,
-    startY: 95,
+    startY: statusY + 5,
     theme: "grid",
     headStyles: {
       fillColor: [22, 163, 74],
@@ -143,12 +155,8 @@ export const generateFinalSettlementReport = async (
       1: {
         halign: "center",
         cellWidth: 60,
-        fontStyle: function (cell) {
-          return cell.raw === "Completed" ? "bold" : "normal";
-        },
-        textColor: function (cell) {
-          return cell.raw === "Completed" ? [22, 163, 74] : [180, 0, 0];
-        },
+        textColor: [22, 163, 74],
+        fontStyle: "bold",
       },
     },
     alternateRowStyles: {
@@ -156,25 +164,185 @@ export const generateFinalSettlementReport = async (
     },
   });
 
-  // Settlement Details
-  const settlementY = doc.lastAutoTable.finalY + 15;
+  // Detailed Allowances Breakdown
+  const allowancesY = doc.lastAutoTable.finalY + 15;
   doc.setFontSize(14);
   doc.setTextColor(22, 163, 74);
-  doc.text("Settlement Details", 20, settlementY);
+  doc.text("Allowances Breakdown", 20, allowancesY);
 
-  const settlementData = [
-    ["Basic Salary", `NGN ${settlementDetails.basicSalary.toLocaleString()}`],
-    ["Gratuity (10%)", `NGN ${settlementDetails.gratuity.toLocaleString()}`],
+  // Use payrollData.allowances for the breakdown
+  const allowancesArr = settlementDetails.payrollData?.allowances || [];
+  if (allowancesArr.length > 0) {
+    const allowanceData = allowancesArr.map((allowance) => [
+      allowance.name,
+      `NGN ${(allowance.amount ?? allowance.value ?? 0).toLocaleString()}`,
+      allowance.calculationMethod === "percentage"
+        ? `Percentage (${allowance.value}%)`
+        : "Fixed",
+    ]);
+
+    autoTable(doc, {
+      head: [["Allowance", "Amount (NGN)", "Type"]],
+      body: allowanceData,
+      startY: allowancesY + 5,
+      theme: "grid",
+      headStyles: {
+        fillColor: [22, 163, 74],
+        fontSize: 11,
+        fontStyle: "bold",
+      },
+      columnStyles: {
+        0: { fontStyle: "bold" },
+        1: { halign: "right" },
+        2: { halign: "center" },
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245],
+      },
+    });
+
+    // Total Allowances
+    const totalAllowancesY = doc.lastAutoTable.finalY + 5;
+    autoTable(doc, {
+      body: [
+        [
+          "Total Allowances",
+          `NGN ${settlementDetails.totalAllowances?.toLocaleString() || "0"}`,
+        ],
+      ],
+      startY: totalAllowancesY,
+      theme: "grid",
+      styles: {
+        fontSize: 12,
+        fontStyle: "bold",
+        fillColor: [240, 249, 235],
+      },
+      columnStyles: {
+        0: { fontStyle: "bold" },
+        1: { halign: "right", fontStyle: "bold" },
+      },
+    });
+  }
+
+  // Detailed Deductions Breakdown
+  const deductionsY = doc.lastAutoTable.finalY + 15;
+  doc.setFontSize(14);
+  doc.setTextColor(22, 163, 74);
+  doc.text("Deductions Breakdown", 20, deductionsY);
+
+  const deductionData = [];
+
+  // Statutory Deductions
+  if (settlementDetails.payrollData?.deductions?.statutory) {
+    settlementDetails.payrollData.deductions.statutory.forEach((deduction) => {
+      deductionData.push([
+        deduction.name,
+        "Statutory",
+        `NGN ${deduction.amount?.toLocaleString() || "0"}`,
+      ]);
+    });
+  }
+
+  // Voluntary Deductions
+  if (settlementDetails.payrollData?.deductions?.voluntary) {
+    settlementDetails.payrollData.deductions.voluntary.forEach((deduction) => {
+      deductionData.push([
+        deduction.name,
+        "Voluntary",
+        `NGN ${deduction.amount?.toLocaleString() || "0"}`,
+      ]);
+    });
+  }
+
+  if (deductionData.length > 0) {
+    autoTable(doc, {
+      head: [["Deduction", "Type", "Amount"]],
+      body: deductionData,
+      startY: deductionsY + 5,
+      theme: "grid",
+      headStyles: {
+        fillColor: [22, 163, 74],
+        fontSize: 11,
+        fontStyle: "bold",
+      },
+      columnStyles: {
+        0: { fontStyle: "bold" },
+        1: { halign: "center" },
+        2: { halign: "right" },
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245],
+      },
+    });
+
+    // Total Deductions
+    const totalDeductionsY = doc.lastAutoTable.finalY + 5;
+    autoTable(doc, {
+      body: [
+        [
+          "Total Deductions",
+          `NGN ${settlementDetails.totalDeductions?.toLocaleString() || "0"}`,
+        ],
+      ],
+      startY: totalDeductionsY,
+      theme: "grid",
+      styles: {
+        fontSize: 12,
+        fontStyle: "bold",
+        fillColor: [254, 242, 242],
+      },
+      columnStyles: {
+        0: { fontStyle: "bold" },
+        1: { halign: "right", fontStyle: "bold" },
+      },
+    });
+  }
+
+  // Calculation Summary
+  const summaryY = doc.lastAutoTable.finalY + 15;
+  doc.setFontSize(14);
+  doc.setTextColor(22, 163, 74);
+  doc.text("Final Settlement Calculation", 20, summaryY);
+
+  const calculationData = [
     [
-      "Unused Leave Payment",
-      `NGN ${settlementDetails.unusedLeavePayment.toLocaleString()}`,
+      "Basic Salary",
+      `NGN ${settlementDetails.basicSalary?.toLocaleString() || "0"}`,
+    ],
+    [
+      "+ Total Allowances",
+      `NGN ${settlementDetails.totalAllowances?.toLocaleString() || "0"}`,
+    ],
+    [
+      "= Gross Salary",
+      `NGN ${
+        settlementDetails.payrollData?.grossSalary?.toLocaleString() || "0"
+      }`,
+    ],
+    [
+      "- Total Deductions",
+      `NGN ${settlementDetails.totalDeductions?.toLocaleString() || "0"}`,
+    ],
+    [
+      "= Net Salary",
+      `NGN ${
+        settlementDetails.payrollData?.netSalary?.toLocaleString() || "0"
+      }`,
+    ],
+    [
+      "+ Gratuity (10%)",
+      `NGN ${settlementDetails.gratuity?.toLocaleString() || "0"}`,
+    ],
+    [
+      "+ Unused Leave Payment",
+      `NGN ${settlementDetails.unusedLeavePayment?.toLocaleString() || "0"}`,
     ],
   ];
 
   autoTable(doc, {
-    head: [["Component", "Amount"]],
-    body: settlementData,
-    startY: settlementY + 5,
+    head: [["Calculation Step", "Amount (NGN)"]],
+    body: calculationData,
+    startY: summaryY + 5,
     theme: "grid",
     headStyles: {
       fillColor: [22, 163, 74],
@@ -190,35 +358,30 @@ export const generateFinalSettlementReport = async (
     },
   });
 
-  // Summary with enhanced styling
-  const summaryY = doc.lastAutoTable.finalY + 15;
-  doc.setFontSize(14);
-  doc.setTextColor(22, 163, 74);
-  doc.text("Summary", 20, summaryY);
-
-  const summaryData = [
-    [
-      "Total Settlement",
-      `NGN ${settlementDetails.totalSettlement.toLocaleString()}`,
-    ],
-  ];
-
+  // Final Total
+  const finalTotalY = doc.lastAutoTable.finalY + 10;
   autoTable(doc, {
-    body: summaryData,
-    startY: summaryY + 5,
+    body: [
+      [
+        "TOTAL FINAL SETTLEMENT",
+        `NGN ${settlementDetails.totalSettlement?.toLocaleString() || "0"}`,
+      ],
+    ],
+    startY: finalTotalY,
     theme: "grid",
     styles: {
-      fontSize: 14,
+      fontSize: 16,
       fontStyle: "bold",
-      textColor: [22, 163, 74],
+      fillColor: [22, 163, 74],
+      textColor: [255, 255, 255],
     },
     columnStyles: {
       0: { fontStyle: "bold" },
-      1: { halign: "right" },
+      1: { halign: "right", fontStyle: "bold" },
     },
   });
 
-  // Footer with improved styling
+  // Footer
   const footerY = doc.lastAutoTable.finalY + 20;
   doc.setFontSize(9);
   doc.setTextColor(130, 130, 130);

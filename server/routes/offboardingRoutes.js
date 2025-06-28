@@ -70,11 +70,42 @@ router.get(
   OffboardingController.generateFinalSettlementReport
 );
 
+router.get(
+  "/final-settlement-details/:employeeId",
+  requireAuth,
+  requirePermission([Permission.VIEW_OFFBOARDING]),
+  OffboardingController.getFinalSettlementDetails
+);
+
 router.post(
   "/email-final-settlement-report/:employeeId",
   requireAuth,
   requirePermission([Permission.VIEW_OFFBOARDING]),
   OffboardingController.emailFinalSettlementReport
+);
+
+// Bulk Final Settlement Report Routes
+router.post(
+  "/email-final-settlement-report",
+  requireAuth,
+  requirePermission([Permission.VIEW_OFFBOARDING]),
+  OffboardingController.emailFinalSettlementReportBulk
+);
+
+// Bulk PDF generation route
+router.post(
+  "/final-settlement-report",
+  requireAuth,
+  requirePermission([Permission.VIEW_OFFBOARDING]),
+  OffboardingController.generateFinalSettlementReportBulk
+);
+
+// Bulk settlement details route
+router.post(
+  "/final-settlement-details",
+  requireAuth,
+  requirePermission([Permission.VIEW_OFFBOARDING]),
+  OffboardingController.getFinalSettlementDetailsBulk
 );
 
 export default router;

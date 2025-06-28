@@ -3,6 +3,7 @@ import User from "../models/User.js";
 import Department from "../models/Department.js";
 import { asyncHandler, ApiError } from "../utils/errorHandler.js";
 import mongoose, { Types } from "mongoose";
+import PayrollStatisticsLogger from "../utils/payrollStatisticsLogger.js";
 
 // Add this function at the top of the file, after imports
 const validatePaymentDate = (paymentDate) => {
@@ -111,6 +112,9 @@ const createAllowance = asyncHandler(async (req, res) => {
       remarks: `Created general allowance for ${employees.length} employees`,
     },
   });
+
+  const count = await Allowance.countDocuments({ employee: userId });
+  console.log(`[ALLOWANCE COUNT] User ${userId} now has ${count} allowances.`);
 
   return res.status(201).json({
     success: true,
@@ -277,6 +281,9 @@ const createDepartmentAllowance = asyncHandler(async (req, res) => {
     },
   });
 
+  const count = await Allowance.countDocuments({ employee: userId });
+  console.log(`[ALLOWANCE COUNT] User ${userId} now has ${count} allowances.`);
+
   return res.status(201).json({
     success: true,
     data: allowances,
@@ -425,7 +432,7 @@ const createDepartmentEmployeeAllowance = asyncHandler(async (req, res) => {
 
   // Populate the allowance details for the response
   const populatedAllowance = await Allowance.findById(allowance._id)
-    .populate("employee", "firstName lastName email")
+    .populate("employee", "firstName lastName email profileImage")
     .populate("department", "name");
 
   // Add audit logging
@@ -462,6 +469,9 @@ const createDepartmentEmployeeAllowance = asyncHandler(async (req, res) => {
     },
   });
 
+  const count = await Allowance.countDocuments({ employee: userId });
+  console.log(`[ALLOWANCE COUNT] User ${userId} now has ${count} allowances.`);
+
   return res.status(201).json({
     success: true,
     data: populatedAllowance,
@@ -478,11 +488,138 @@ const createPersonalAllowance = asyncHandler(async (req, res) => {
   const userRole = req.user.role;
   const userPosition = req.user.position?.toLowerCase() || "";
 
+  // Add detailed logging to debug the issue
+  console.log("🔍 [AllowancesController] createPersonalAllowance called with:");
+  console.log("📦 Request body:", JSON.stringify(req.body, null, 2));
+  console.log("👤 User info:", {
+    userId: userId,
+    userRole: userRole,
+    userPosition: userPosition,
+    department: req.user.department,
+  });
+  console.log("✅ Extracted fields:", {
+    name: name,
+    type: type,
+    amount: amount,
+    description: description,
+    effectiveDate: effectiveDate,
+  });
+
   if (!name || !type || !amount || !description || !effectiveDate) {
+    console.log("❌ [AllowancesController] Missing required fields:");
+    console.log("  - name:", !!name);
+    console.log("  - type:", !!type);
+    console.log("  - amount:", !!amount);
+    console.log("  - description:", !!description);
+    console.log("  - effectiveDate:", !!effectiveDate);
     throw new ApiError(400, "All required fields must be provided");
   }
 
   try {
+    // Check monthly allowance request limit (max 3 per month)
+    const currentDate = new Date();
+
+    // Use Nigeria timezone for date calculations
+    const nigeriaTime = new Date(
+      currentDate.toLocaleString("en-US", { timeZone: "Africa/Lagos" })
+    );
+    const startOfMonth = new Date(
+      nigeriaTime.getFullYear(),
+      nigeriaTime.getMonth(),
+      1
+    );
+    const endOfMonth = new Date(
+      nigeriaTime.getFullYear(),
+      nigeriaTime.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999
+    );
+
+    console.log("🔍 [AllowancesController] Monthly count calculation:", {
+      userId,
+      currentDate: currentDate.toISOString(),
+      startOfMonth: startOfMonth.toISOString(),
+      endOfMonth: endOfMonth.toISOString(),
+    });
+
+    // Debug: Get total count of all allowances for this user
+    const totalUserAllowances = await Allowance.countDocuments({
+      employee: userId,
+    });
+    console.log(
+      "🔍 [AllowancesController] Total allowances for user:",
+      totalUserAllowances
+    );
+
+    // Debug: Get actual allowance records to see their creation dates
+    const userAllowances = await Allowance.find({ employee: userId })
+      .select("createdAt effectiveDate type name")
+      .lean();
+    console.log(
+      "🔍 [AllowancesController] User allowance records:",
+      userAllowances.map((a) => ({
+        id: a._id,
+        type: a.type,
+        name: a.name,
+        createdAt: a.createdAt,
+        effectiveDate: a.effectiveDate,
+        createdAtISO: a.createdAt?.toISOString(),
+        effectiveDateISO: a.effectiveDate?.toISOString(),
+      }))
+    );
+
+    const monthlyAllowanceCount = await Allowance.countDocuments({
+      employee: userId,
+      createdAt: {
+        $gte: startOfMonth,
+        $lte: endOfMonth,
+      },
+      approvalStatus: { $in: ["approved", "cancelled"] },
+    });
+
+    // Alternative approach: Check by month and year
+    const currentMonth = nigeriaTime.getMonth() + 1; // getMonth() returns 0-11
+    const currentYear = nigeriaTime.getFullYear();
+
+    const monthlyAllowanceCountAlt = await Allowance.countDocuments({
+      employee: userId,
+      $expr: {
+        $and: [
+          { $eq: [{ $month: "$createdAt" }, currentMonth] },
+          { $eq: [{ $year: "$createdAt" }, currentYear] },
+        ],
+      },
+      approvalStatus: { $in: ["approved", "cancelled"] },
+    });
+
+    console.log("🔍 [AllowancesController] Alternative monthly count:", {
+      currentMonth,
+      currentYear,
+      monthlyAllowanceCountAlt,
+      usingMongoDBDateOperators: true,
+      countingApprovedAndCancelled: true,
+    });
+
+    console.log(
+      "🔍 [AllowancesController] Monthly count (approved + cancelled):",
+      {
+        monthlyAllowanceCount,
+        monthlyAllowanceCountAlt,
+        limit: 3,
+        remaining: Math.max(0, 3 - monthlyAllowanceCount),
+      }
+    );
+
+    if (monthlyAllowanceCount >= 3) {
+      throw new ApiError(
+        429,
+        "You have reached the monthly limit of 3 allowance requests. Please wait until next month to submit more requests."
+      );
+    }
+
     // Check if user is HR Manager by department and position
     const hrDepartment = await Department.findOne({
       name: { $in: ["Human Resources", "HR"] },
@@ -526,10 +663,19 @@ const createPersonalAllowance = asyncHandler(async (req, res) => {
     });
 
     // Log the created allowance
-    console.log(
-      "[PERSONAL ALLOWANCE CREATED]",
-      JSON.stringify(allowance, null, 2)
-    );
+    console.log("[NEW ALLOWANCE CREATED]", {
+      id: allowance._id,
+      userId: userId,
+      type: allowance.type,
+      status: allowance.approvalStatus,
+      createdAt: allowance.createdAt,
+      createdAtISO: allowance.createdAt?.toISOString(),
+      effectiveDate: allowance.effectiveDate,
+      effectiveDateISO: allowance.effectiveDate?.toISOString(),
+      nigeriaTimeNow: new Date(
+        new Date().toLocaleString("en-US", { timeZone: "Africa/Lagos" })
+      ).toISOString(),
+    });
 
     // If auto-approved, add to employee's personalAllowances
     if (isAutoApproved) {
@@ -587,6 +733,11 @@ const createPersonalAllowance = asyncHandler(async (req, res) => {
       `[ALLOWANCE REQUEST SUCCESS] User ${userId} created an allowance request for amount ${amount} with status ${allowance.approvalStatus}`
     );
 
+    const count = await Allowance.countDocuments({ employee: userId });
+    console.log(
+      `[ALLOWANCE COUNT] User ${userId} now has ${count} allowances.`
+    );
+
     return res.status(201).json({
       success: true,
       data: allowance,
@@ -606,6 +757,16 @@ const createPersonalAllowance = asyncHandler(async (req, res) => {
  * Get all allowance requests with filtering options
  */
 const getAllowanceRequests = asyncHandler(async (req, res) => {
+  console.log("🔍 [AllowancesController] getAllowanceRequests called by:", {
+    userRole: req.user?.role,
+    userId: req.user?._id,
+    userDepartment: req.user?.department,
+    method: req.method,
+    url: req.url,
+    query: req.query,
+    timestamp: new Date().toISOString(),
+  });
+
   const {
     page = 1,
     limit = 10,
@@ -662,10 +823,19 @@ const getAllowanceRequests = asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 })
     .skip((page - 1) * limit)
     .limit(limit)
-    .populate("employee", "firstName lastName email")
-    .populate("department", "name code");
+    .populate("employee", "firstName lastName email profileImage")
+    .populate("department", "name code")
+    .populate("approvedBy", "firstName lastName fullName email");
 
   const total = await Allowance.countDocuments(query);
+
+  console.log("✅ [AllowancesController] getAllowanceRequests returning:", {
+    totalAllowances: total,
+    returnedAllowances: allowances.length,
+    userRole: req.user?.role,
+    query: query,
+    timestamp: new Date().toISOString(),
+  });
 
   res.json({
     success: true,
@@ -684,23 +854,75 @@ const getAllowanceRequests = asyncHandler(async (req, res) => {
 const getPersonalAllowances = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10 } = req.query;
   const userId = req.user._id;
-  const query = { employee: userId };
 
-  const allowances = await Allowance.find(query)
+  // All-time query for the table
+  const allQuery = { employee: userId };
+
+  // Nigeria timezone for monthly stats
+  const currentDate = new Date();
+  const nigeriaTime = new Date(
+    currentDate.toLocaleString("en-US", { timeZone: "Africa/Lagos" })
+  );
+  const startOfMonth = new Date(
+    nigeriaTime.getFullYear(),
+    nigeriaTime.getMonth(),
+    1
+  );
+  const endOfMonth = new Date(
+    nigeriaTime.getFullYear(),
+    nigeriaTime.getMonth() + 1,
+    0,
+    23,
+    59,
+    59,
+    999
+  );
+
+  // This month's query for stats
+  const monthQuery = {
+    employee: userId,
+    createdAt: {
+      $gte: startOfMonth,
+      $lte: endOfMonth,
+    },
+    approvalStatus: { $in: ["approved", "cancelled"] },
+  };
+
+  // All-time for the table
+  const allowances = await Allowance.find(allQuery)
     .sort({ createdAt: -1 })
     .skip((page - 1) * limit)
     .limit(Number(limit))
     .populate("department", "name code")
     .lean();
 
-  const total = await Allowance.countDocuments(query);
+  const total = await Allowance.countDocuments(allQuery);
 
-  // Patch name/description for frontend display
+  // This month for the stats
+  const monthlyCount = await Allowance.countDocuments(monthQuery);
+
+  console.log(
+    "🔍 [AllowancesController] getPersonalAllowances monthly stats:",
+    {
+      userId,
+      monthlyCount,
+      countingApprovedAndCancelled: true,
+      limit: 3,
+      remaining: Math.max(0, 3 - monthlyCount),
+    }
+  );
+
   const allowancesWithNameDesc = allowances.map((a) => ({
     ...a,
     name: a.name || a.reason || "N/A",
     description: a.description || a.reason || "N/A",
   }));
+
+  const monthlyStats = {
+    requested: monthlyCount,
+    remaining: Math.max(0, 3 - monthlyCount),
+    limit: 3,
+  };
 
   res.json({
     success: true,
@@ -712,8 +934,109 @@ const getPersonalAllowances = asyncHandler(async (req, res) => {
         limit: parseInt(limit),
         pages: Math.ceil(total / limit),
       },
+      monthlyStats,
     },
   });
+});
+
+/**
+ * Cancel a personal allowance request (for the requesting user only)
+ */
+const cancelPersonalAllowance = asyncHandler(async (req, res) => {
+  const { allowanceId } = req.params;
+  const userId = req.user._id;
+
+  console.log(
+    "🔍 [AllowancesController] cancelPersonalAllowance called with:",
+    {
+      allowanceId,
+      userId,
+      timestamp: new Date().toISOString(),
+    }
+  );
+
+  try {
+    // Find the allowance and verify ownership
+    const allowance = await Allowance.findOne({
+      _id: allowanceId,
+      employee: userId,
+    });
+
+    if (!allowance) {
+      throw new ApiError(
+        404,
+        "Allowance request not found or you don't have permission to cancel it"
+      );
+    }
+
+    // Check if allowance can be cancelled (only pending requests)
+    if (allowance.approvalStatus !== "pending") {
+      throw new ApiError(
+        400,
+        `Cannot cancel allowance with status: ${allowance.approvalStatus}. Only pending requests can be cancelled.`
+      );
+    }
+
+    // Update the allowance status to cancelled
+    const updatedAllowance = await Allowance.findByIdAndUpdate(
+      allowanceId,
+      {
+        approvalStatus: "cancelled",
+        updatedBy: userId,
+        cancelledAt: new Date(),
+        cancelledBy: userId,
+      },
+      { new: true }
+    );
+
+    // Add audit logging
+    await PayrollStatisticsLogger.logAllowanceAction({
+      action: "DELETE",
+      allowanceIds: [allowance._id],
+      userId: userId,
+      details: {
+        allowanceId: allowance._id,
+        previousStatus: allowance.approvalStatus,
+        newStatus: "cancelled",
+        employeeId: userId,
+        departmentId: req.user.department,
+        createdBy: userId,
+        position: req.user.position,
+        role: req.user.role,
+        message: `Cancelled personal allowance request: ${allowance.name}`,
+      },
+      statisticsDetails: {
+        allowanceType: allowance.type,
+        amount: allowance.amount,
+        approvalStatus: "cancelled",
+        scope: "individual",
+      },
+      auditDetails: {
+        entity: "ALLOWANCE",
+        entityIds: [allowance._id],
+        action: "DELETE",
+        performedBy: userId,
+        status: "cancelled",
+        remarks: `Cancelled personal allowance request: ${allowance.name}`,
+      },
+    });
+
+    console.log(
+      `✅ [AllowancesController] Allowance ${allowanceId} cancelled successfully by user ${userId}`
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: updatedAllowance,
+      message: "Allowance request cancelled successfully",
+    });
+  } catch (error) {
+    console.error(
+      `❌ [AllowancesController] Failed to cancel allowance ${allowanceId}:`,
+      error.message
+    );
+    throw error;
+  }
 });
 
 export {
@@ -723,4 +1046,5 @@ export {
   createPersonalAllowance,
   getAllowanceRequests,
   getPersonalAllowances,
+  cancelPersonalAllowance,
 };

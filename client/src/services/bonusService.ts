@@ -1,5 +1,5 @@
 import api from "./api";
-import axios, { isAxiosError } from "axios";
+import { isAxiosError } from "axios";
 import { toast } from "react-toastify";
 import type { IBonus, BonusType } from "../types/payroll";
 
@@ -18,6 +18,7 @@ interface CreatePersonalBonusData {
   amount: number;
   reason: string;
   paymentDate: Date;
+  type: string;
 }
 
 interface BonusFilters {
@@ -76,6 +77,11 @@ interface MyBonusResponse {
       limit: number;
       pages: number;
     };
+    monthlyStats: {
+      requested: number;
+      remaining: number;
+      limit: number;
+    };
   };
   message: string;
 }
@@ -100,7 +106,7 @@ export const bonusService = {
 
   createPersonalBonus: async (
     data: CreatePersonalBonusData
-  ): Promise<{ data: IBonus }> => {
+  ): Promise<{ data: IBonus; message: string }> => {
     try {
       const response = await api.post(`${BASE_URL}/bonus/personal`, data);
       return response.data;
@@ -130,6 +136,21 @@ export const bonusService = {
       console.error("Error fetching personal bonuses:", error);
       toast.error(
         error.response?.data?.message || "Failed to fetch personal bonuses"
+      );
+      throw error;
+    }
+  },
+
+  cancelPersonalBonus: async (bonusId: string): Promise<any> => {
+    try {
+      const response = await api.put(
+        `${BASE_URL}/bonus/personal/${bonusId}/cancel`
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error("Error cancelling bonus:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to cancel bonus request"
       );
       throw error;
     }

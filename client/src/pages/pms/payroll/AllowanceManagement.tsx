@@ -5,6 +5,19 @@ import { departmentService } from "../../../services/departmentService";
 import { employeeService } from "../../../services/employeeService";
 import { allowanceService } from "../../../services/allowanceService";
 import { useAuth } from "../../../context/AuthContext";
+import { formatCurrency } from "../../../utils/formatters";
+import { Avatar } from "../../../components/shared/Avatar";
+import {
+  FaInfoCircle,
+  FaCalendarAlt,
+  FaHandHoldingUsd,
+  FaUsers,
+  FaUser,
+  FaClock,
+  FaCheckCircle,
+  FaMoneyBillWave,
+  FaSpinner,
+} from "react-icons/fa";
 import {
   Allowance,
   AllowanceType,
@@ -58,6 +71,183 @@ interface DepartmentEmployeeResponse {
     total: number;
   };
 }
+
+const DepartmentAllowanceInfoSection = () => (
+  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 mb-4 shadow-sm">
+    <div className="flex items-center mb-3">
+      <FaInfoCircle className="text-blue-600 text-lg mr-2" />
+      <h3 className="text-base font-semibold text-gray-800">
+        Department-Wide Allowance Info
+      </h3>
+    </div>
+
+    <div className="space-y-3">
+      {/* Scope Info */}
+      <div className="flex items-start space-x-2">
+        <div className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+          <FaUsers className="text-blue-600 text-xs" />
+        </div>
+        <div>
+          <h4 className="font-medium text-gray-800 text-sm mb-1">Scope</h4>
+          <p className="text-xs text-gray-600 leading-relaxed">
+            This allowance will be applied to{" "}
+            <strong>all active employees</strong> in the selected department.
+          </p>
+        </div>
+      </div>
+
+      {/* Payment Date Info */}
+      <div className="flex items-start space-x-2">
+        <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+          <FaCalendarAlt className="text-green-600 text-xs" />
+        </div>
+        <div>
+          <h4 className="font-medium text-gray-800 text-sm mb-1">
+            Payment Date
+          </h4>
+          <p className="text-xs text-gray-600 leading-relaxed">
+            The allowance will be included in payroll calculations for the month
+            containing this payment date.
+          </p>
+        </div>
+      </div>
+
+      {/* Approval Process */}
+      <div className="flex items-start space-x-2">
+        <div className="flex-shrink-0 w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center">
+          <FaClock className="text-yellow-600 text-xs" />
+        </div>
+        <div>
+          <h4 className="font-medium text-gray-800 text-sm mb-1">
+            Approval Process
+          </h4>
+          <p className="text-xs text-gray-600 leading-relaxed">
+            <strong>Super Admin created allowances</strong> are automatically
+            approved. Department allowances created by others require approval
+            from department head and HR manager before being applied to payroll.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    {/* Quick Tips */}
+    <div className="mt-4 pt-3 border-t border-blue-200">
+      <div className="flex items-center mb-2">
+        <FaCheckCircle className="text-blue-600 text-xs mr-1" />
+        <span className="text-xs font-medium text-gray-700">Quick Tips</span>
+      </div>
+      <div className="grid grid-cols-1 gap-1 text-xs text-gray-600">
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
+          <span>
+            Use clear, descriptive reasons for better approval process
+          </span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
+          <span>Set payment date to the month you want it applied</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>
+          <span>Only active employees will receive the allowance</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-purple-400 rounded-full"></div>
+          <span>Super Admin allowances are automatically approved</span>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// Beautiful Info Section Component for Employee Allowance Modal
+const EmployeeAllowanceInfoSection = () => (
+  <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 mb-4 shadow-sm">
+    <div className="flex items-center mb-3">
+      <FaInfoCircle className="text-green-600 text-lg mr-2" />
+      <h3 className="text-base font-semibold text-gray-800">
+        Individual Employee Allowance Info
+      </h3>
+    </div>
+
+    <div className="space-y-3">
+      {/* Scope Info */}
+      <div className="flex items-start space-x-2">
+        <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+          <FaUser className="text-green-600 text-xs" />
+        </div>
+        <div>
+          <h4 className="font-medium text-gray-800 text-sm mb-1">Scope</h4>
+          <p className="text-xs text-gray-600 leading-relaxed">
+            This allowance will be applied to{" "}
+            <strong>one specific employee</strong> in the selected department.
+          </p>
+        </div>
+      </div>
+
+      {/* Payment Date Info */}
+      <div className="flex items-start space-x-2">
+        <div className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+          <FaCalendarAlt className="text-blue-600 text-xs" />
+        </div>
+        <div>
+          <h4 className="font-medium text-gray-800 text-sm mb-1">
+            Payment Date
+          </h4>
+          <p className="text-xs text-gray-600 leading-relaxed">
+            The allowance will be included in the employee's payroll for the
+            month containing this payment date.
+          </p>
+        </div>
+      </div>
+
+      {/* Approval Process */}
+      <div className="flex items-start space-x-2">
+        <div className="flex-shrink-0 w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center">
+          <FaClock className="text-yellow-600 text-xs" />
+        </div>
+        <div>
+          <h4 className="font-medium text-gray-800 text-sm mb-1">
+            Approval Process
+          </h4>
+          <p className="text-xs text-gray-600 leading-relaxed">
+            <strong>Super Admin created allowances</strong> are automatically
+            approved. Individual allowances created by others require approval
+            from department head and HR manager before being applied to payroll.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    {/* Quick Tips */}
+    <div className="mt-4 pt-3 border-t border-green-200">
+      <div className="flex items-center mb-2">
+        <FaCheckCircle className="text-green-600 text-xs mr-1" />
+        <span className="text-xs font-medium text-gray-700">Quick Tips</span>
+      </div>
+      <div className="grid grid-cols-1 gap-1 text-xs text-gray-600">
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
+          <span>
+            Provide specific achievements or reasons for the allowance
+          </span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
+          <span>Set payment date to the month you want it applied</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>
+          <span>Ensure the employee is active and eligible</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-purple-400 rounded-full"></div>
+          <span>Super Admin allowances are automatically approved</span>
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 export default function AllowanceManagement() {
   const { isSuperAdmin, isAdmin } = useAuth();
@@ -385,94 +575,191 @@ export default function AllowanceManagement() {
     }
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header Section with Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-500">
-            Total Allowances
-          </h3>
-          <p className="mt-2 text-3xl font-semibold text-gray-900">
-            {(allowanceData as AllowancesListResponse)?.data?.pagination
-              ?.total || 0}
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-500">
-            Active Allowances
-          </h3>
-          <p className="mt-2 text-3xl font-semibold text-green-600">
-            {(
-              allowanceData as AllowancesListResponse
-            )?.data?.allowances?.filter(
-              (a: Allowance) => a.approvalStatus === "approved"
-            ).length || 0}
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-500">Departments</h3>
-          <p className="mt-2 text-3xl font-semibold text-blue-600">
-            {new Set(
-              (allowanceData as AllowancesListResponse)?.data?.allowances?.map(
-                (a: Allowance) => a.department
-              )
-            ).size || 0}
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-500">Total Amount</h3>
-          <p className="mt-2 text-3xl font-semibold text-purple-600">
-            ₦
-            {(allowanceData as AllowancesListResponse)?.data?.allowances
-              ?.reduce((sum: number, a: Allowance) => sum + (a.amount || 0), 0)
-              .toLocaleString() || 0}
-          </p>
-        </div>
-      </div>
+  // Calculate stats for beautiful cards
+  const totalAllowances =
+    (allowanceData as AllowancesListResponse)?.data?.pagination?.total || 0;
+  const activeAllowances =
+    (allowanceData as AllowancesListResponse)?.data?.allowances?.filter(
+      (a: Allowance) => a.approvalStatus === "approved"
+    ).length || 0;
+  const pendingAllowances =
+    (allowanceData as AllowancesListResponse)?.data?.allowances?.filter(
+      (a: Allowance) => a.approvalStatus === "PENDING"
+    ).length || 0;
+  const totalAmount =
+    (allowanceData as AllowancesListResponse)?.data?.allowances?.reduce(
+      (sum: number, a: Allowance) => sum + (a.amount || 0),
+      0
+    ) || 0;
 
-      {/* Action Bar */}
-      <div className="bg-white p-4 rounded-lg shadow">
-        <div className="flex justify-between items-center">
-          <div className="flex space-x-4"></div>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+      {/* Header Section */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Allowance Management
+            </h1>
+            <p className="text-gray-600">
+              Manage employee and department allowances with ease
+            </p>
+          </div>
           {(isSuperAdmin() || isAdmin()) && (
-            <div className="flex gap-4">
+            <div className="flex gap-3">
               <button
                 onClick={() => setShowDeptAllowanceModal(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md"
+                className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg shadow-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 font-medium"
               >
-                Add Department Allowance
+                <FaUsers className="mr-2" />
+                Department Allowance
               </button>
               <button
                 onClick={() => setShowEmployeeAllowanceModal(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-md"
+                className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg shadow-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 font-medium"
               >
-                Add Employee Allowance
+                <FaUser className="mr-2" />
+                Employee Allowance
               </button>
             </div>
           )}
         </div>
+
+        {/* Enhanced Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">
+                  Total Allowances
+                </p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {totalAllowances}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <FaHandHoldingUsd className="text-blue-600 text-xl" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center text-sm">
+              <span className="text-green-600 font-medium">Active</span>
+              <span className="mx-2">•</span>
+              <span className="text-gray-500">{activeAllowances} approved</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">
+                  Active Allowances
+                </p>
+                <p className="text-3xl font-bold text-green-600">
+                  {activeAllowances}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <FaCheckCircle className="text-green-600 text-xl" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center text-sm">
+              <span className="text-green-600 font-medium">Approved</span>
+              <span className="mx-2">•</span>
+              <span className="text-gray-500">Ready for payroll</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">
+                  Pending Review
+                </p>
+                <p className="text-3xl font-bold text-yellow-600">
+                  {pendingAllowances}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                <FaClock className="text-yellow-600 text-xl" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center text-sm">
+              <span className="text-yellow-600 font-medium">Awaiting</span>
+              <span className="mx-2">•</span>
+              <span className="text-gray-500">Approval needed</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">
+                  Total Amount
+                </p>
+                <p className="text-3xl font-bold text-purple-600">
+                  ₦{totalAmount.toLocaleString()}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                <FaMoneyBillWave className="text-purple-600 text-xl" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center text-sm">
+              <span className="text-purple-600 font-medium">Value</span>
+              <span className="mx-2">•</span>
+              <span className="text-gray-500">All allowances</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Main Content */}
-      <div className="bg-white shadow-sm rounded-lg">
-        <div className="p-6">
-          <div className="flex flex-wrap gap-2 mb-4">
+      {/* Enhanced Filters Section */}
+      <div className="bg-white rounded-xl shadow-lg p-6 mb-6 border border-gray-100">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+          <button
+            onClick={() =>
+              setFilters({
+                employee: "",
+                departmentId: "",
+                status: "",
+                type: "",
+                startDate: "",
+                endDate: "",
+              })
+            }
+            className="text-sm text-gray-600 hover:text-gray-800 font-medium"
+          >
+            Clear all
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Employee
+            </label>
             <input
               type="text"
-              placeholder="Employee name or email"
+              placeholder="Search by name or email"
               value={filters.employee}
               onChange={(e) =>
                 setFilters((f) => ({ ...f, employee: e.target.value }))
               }
-              className="border rounded px-2 py-1"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Department
+            </label>
             <select
               value={filters.departmentId}
               onChange={(e) =>
                 setFilters((f) => ({ ...f, departmentId: e.target.value }))
               }
-              className="border rounded px-2 py-1"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
             >
               <option value="">All Departments</option>
               {departments?.map((dept) => (
@@ -481,12 +768,18 @@ export default function AllowanceManagement() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status
+            </label>
             <select
               value={filters.status}
               onChange={(e) =>
                 setFilters((f) => ({ ...f, status: e.target.value }))
               }
-              className="border rounded px-2 py-1"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
             >
               <option value="">All Statuses</option>
               {Object.entries(AllowanceStatus).map(([key, value]) => (
@@ -495,12 +788,18 @@ export default function AllowanceManagement() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Type
+            </label>
             <select
               value={filters.type}
               onChange={(e) =>
                 setFilters((f) => ({ ...f, type: e.target.value }))
               }
-              className="border rounded px-2 py-1"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
             >
               <option value="">All Types</option>
               {Object.entries(AllowanceType).map(([key, value]) => (
@@ -509,126 +808,180 @@ export default function AllowanceManagement() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Start Date
+            </label>
             <input
               type="date"
               value={filters.startDate}
               onChange={(e) =>
                 setFilters((f) => ({ ...f, startDate: e.target.value }))
               }
-              className="border rounded px-2 py-1"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              End Date
+            </label>
             <input
               type="date"
               value={filters.endDate}
               onChange={(e) =>
                 setFilters((f) => ({ ...f, endDate: e.target.value }))
               }
-              className="border rounded px-2 py-1"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
             />
-            <button
-              onClick={() =>
-                setFilters({
-                  employee: "",
-                  departmentId: "",
-                  status: "",
-                  type: "",
-                  startDate: "",
-                  endDate: "",
-                })
-              }
-              className="border rounded px-2 py-1 bg-gray-100"
-              type="button"
-            >
-              Reset
-            </button>
           </div>
-          {/* Responsive Table Wrapper */}
-          <div className="w-full overflow-x-auto">
-            <table className="w-full min-w-[900px] divide-y divide-gray-200">
+        </div>
+      </div>
+
+      {/* Enhanced Table Section */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Allowance Requests
+          </h3>
+        </div>
+
+        <div className="overflow-x-auto">
+          {isAllowancesLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-gray-600 font-medium">
+                  Loading allowances...
+                </p>
+              </div>
+            </div>
+          ) : (allowanceData as AllowancesListResponse)?.data?.allowances
+              ?.length === 0 ? (
+            <div className="flex items-center justify-center py-16 px-6">
+              <div className="text-center max-w-md">
+                <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <FaHandHoldingUsd className="text-blue-600 text-3xl" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  No allowances found
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Get started by creating your first allowance for employees or
+                  departments.
+                </p>
+                {(isSuperAdmin() || isAdmin()) && (
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      onClick={() => setShowDeptAllowanceModal(true)}
+                      className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                    >
+                      <FaUsers className="mr-2" />
+                      Create Department Allowance
+                    </button>
+                    <button
+                      onClick={() => setShowEmployeeAllowanceModal(true)}
+                      className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                    >
+                      <FaUser className="mr-2" />
+                      Create Employee Allowance
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Employee
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Department
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Type
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Amount
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Reason
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Payment Date
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Approved By
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {isAllowancesLoading ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-2 text-center">
-                      <div className="text-gray-500">Loading allowances...</div>
-                    </td>
-                  </tr>
-                ) : (allowanceData as AllowancesListResponse)?.data?.allowances
-                    ?.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-2 text-center">
-                      <div className="text-gray-500">
-                        No allowances found. Click "Add Allowance" to create
-                        one.
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  (
-                    allowanceData as AllowancesListResponse
-                  )?.data?.allowances?.map((allowance: Allowance) => (
-                    <tr key={allowance._id}>
-                      <td className="px-4 py-2">
-                        <div className="text-sm">
-                          <div className="font-medium text-gray-900">
-                            {allowance.employee?.firstName}{" "}
-                            {allowance.employee?.lastName}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {allowance.employee?.email}
+                {(
+                  allowanceData as AllowancesListResponse
+                )?.data?.allowances?.map((allowance: Allowance) => {
+                  // Add log for each allowance row
+                  console.log(
+                    "[AllowanceManagement] Rendering allowance row:",
+                    allowance
+                  );
+                  return (
+                    <tr
+                      key={allowance._id}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center">
+                          <Avatar
+                            profileImage={allowance.employee?.profileImage}
+                            firstName={allowance.employee?.firstName}
+                            lastName={allowance.employee?.lastName}
+                            size="sm"
+                            className="mr-3"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-900 break-all">
+                              {allowance.employee?.firstName}{" "}
+                              {allowance.employee?.lastName}
+                            </span>
+                            <span className="text-xs text-gray-500 break-all">
+                              {allowance.employee?.email}
+                            </span>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-2">
+                      <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
                           {allowance.department?.name}
                         </div>
                       </td>
-                      <td className="px-4 py-2">
-                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                           {allowance.type}
                         </span>
                       </td>
-                      <td className="px-4 py-2">
-                        <div className="text-sm text-gray-900">
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-semibold text-gray-900">
                           ₦{allowance.amount?.toLocaleString()}
                         </div>
                       </td>
-                      <td className="px-4 py-2">
-                        <div className="text-sm text-gray-900">
+                      <td className="px-6 py-4">
+                        <div
+                          className="text-sm text-gray-900 max-w-xs truncate"
+                          title={allowance.reason}
+                        >
                           {allowance.reason}
                         </div>
                       </td>
-                      <td className="px-4 py-2">
+                      <td className="px-6 py-4">
                         <span
-                          className={`px-2 py-1 text-xs font-semibold rounded-full
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                             ${
                               allowance.approvalStatus === "approved"
                                 ? "bg-green-100 text-green-800"
@@ -640,14 +993,18 @@ export default function AllowanceManagement() {
                           {allowance.approvalStatus}
                         </span>
                       </td>
-                      <td className="px-4 py-2">
+                      <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
                           {new Date(allowance.paymentDate).toLocaleDateString()}
                         </div>
                       </td>
-                      <td className="px-4 py-2">
+                      <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
-                          {allowance.approvedBy?.fullName}
+                          {allowance.approvedBy?.fullName ||
+                            (allowance.approvedBy?.firstName &&
+                            allowance.approvedBy?.lastName
+                              ? `${allowance.approvedBy.firstName} ${allowance.approvedBy.lastName}`
+                              : "—")}
                         </div>
                         <div className="text-xs text-gray-500">
                           {allowance.approvedAt
@@ -658,65 +1015,82 @@ export default function AllowanceManagement() {
                         </div>
                       </td>
                     </tr>
-                  ))
-                )}
+                  );
+                })}
               </tbody>
             </table>
-          </div>
-          {allowanceData?.data?.pagination && (
-            <div className="flex justify-between items-center mt-4">
-              <div className="text-sm text-gray-600">
-                Showing {(page - 1) * limit + 1} to{" "}
-                {Math.min(page * limit, allowanceData.data.pagination.total)} of{" "}
-                {allowanceData.data.pagination.total} allowances
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-50"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() =>
-                    setPage((p) =>
-                      Math.min(
-                        Math.ceil(allowanceData.data.pagination.total / limit),
-                        p + 1
-                      )
-                    )
-                  }
-                  disabled={
-                    page >=
-                    Math.ceil(allowanceData.data.pagination.total / limit)
-                  }
-                  className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-50"
-                >
-                  Next
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600">Show</span>
-                <select
-                  value={limit}
-                  onChange={(e) => {
-                    setLimit(Number(e.target.value));
-                    setPage(1); // Reset to first page on limit change
-                  }}
-                  className="border rounded px-2 py-1 text-sm"
-                >
-                  {[10, 20, 50, 100].map((size) => (
-                    <option key={size} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-sm text-gray-600">per page</span>
-              </div>
-            </div>
           )}
         </div>
+
+        {/* Enhanced Pagination */}
+        {allowanceData?.data?.pagination && (
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                Showing{" "}
+                <span className="font-medium">{(page - 1) * limit + 1}</span> to{" "}
+                <span className="font-medium">
+                  {Math.min(page * limit, allowanceData.data.pagination.total)}
+                </span>{" "}
+                of{" "}
+                <span className="font-medium">
+                  {allowanceData.data.pagination.total}
+                </span>{" "}
+                allowances
+              </div>
+
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-700">Show</span>
+                  <select
+                    value={limit}
+                    onChange={(e) => {
+                      setLimit(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {[10, 20, 50, 100].map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-sm text-gray-700">per page</span>
+                </div>
+
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() =>
+                      setPage((p) =>
+                        Math.min(
+                          Math.ceil(
+                            allowanceData.data.pagination.total / limit
+                          ),
+                          p + 1
+                        )
+                      )
+                    }
+                    disabled={
+                      page >=
+                      Math.ceil(allowanceData.data.pagination.total / limit)
+                    }
+                    className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal Form */}
@@ -924,7 +1298,7 @@ export default function AllowanceManagement() {
       {/* Department Allowance Modal */}
       {showDeptAllowanceModal && (
         <div className="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">
                 Create Department Allowance
@@ -936,6 +1310,10 @@ export default function AllowanceManagement() {
                 ×
               </button>
             </div>
+
+            {/* Department Allowance Info Section */}
+            <DepartmentAllowanceInfoSection />
+
             <form onSubmit={handleDeptAllowanceSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">
@@ -974,6 +1352,12 @@ export default function AllowanceManagement() {
                   placeholder="Enter allowance amount"
                   required
                 />
+                {deptAllowanceForm.amount && (
+                  <p className="mt-1 text-sm text-gray-600">
+                    Formatted:{" "}
+                    {formatCurrency(Number(deptAllowanceForm.amount))}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
@@ -1030,10 +1414,17 @@ export default function AllowanceManagement() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                  className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 flex items-center justify-center gap-2"
                   disabled={deptAllowanceLoading}
+                  aria-busy={deptAllowanceLoading}
                 >
-                  {deptAllowanceLoading ? "Creating..." : "Create"}
+                  {deptAllowanceLoading ? (
+                    <>
+                      <FaSpinner className="animate-spin" /> Creating...
+                    </>
+                  ) : (
+                    "Create"
+                  )}
                 </button>
               </div>
             </form>
@@ -1044,7 +1435,7 @@ export default function AllowanceManagement() {
       {/* Employee Allowance Modal */}
       {showEmployeeAllowanceModal && (
         <div className="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">
                 Create Employee Allowance
@@ -1056,6 +1447,10 @@ export default function AllowanceManagement() {
                 ×
               </button>
             </div>
+
+            {/* Employee Allowance Info Section */}
+            <EmployeeAllowanceInfoSection />
+
             <form
               onSubmit={handleEmployeeAllowanceSubmit}
               className="space-y-4"
@@ -1123,6 +1518,12 @@ export default function AllowanceManagement() {
                   placeholder="Enter allowance amount"
                   required
                 />
+                {employeeAllowanceForm.amount && (
+                  <p className="mt-1 text-sm text-gray-600">
+                    Formatted:{" "}
+                    {formatCurrency(Number(employeeAllowanceForm.amount))}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
@@ -1179,10 +1580,17 @@ export default function AllowanceManagement() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+                  className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 flex items-center justify-center gap-2"
                   disabled={employeeAllowanceLoading}
+                  aria-busy={employeeAllowanceLoading}
                 >
-                  {employeeAllowanceLoading ? "Creating..." : "Create"}
+                  {employeeAllowanceLoading ? (
+                    <>
+                      <FaSpinner className="animate-spin" /> Creating...
+                    </>
+                  ) : (
+                    "Create"
+                  )}
                 </button>
               </div>
             </form>

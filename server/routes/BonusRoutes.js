@@ -10,6 +10,7 @@ import {
   createDepartmentEmployeeBonus,
   createDepartmentWideBonus,
   getMyBonuses,
+  cancelPersonalBonus,
 } from "../controllers/BonusController.js";
 
 const router = express.Router();
@@ -25,6 +26,7 @@ router.get("/requests/:id", getBonusRequestById);
 router.put("/requests/:id/approve", approveBonusRequest);
 router.put("/requests/:id/reject", rejectBonusRequest);
 router.delete("/requests/:id", deleteBonusRequest);
+router.put("/personal/:bonusId/cancel", cancelPersonalBonus);
 
 // Department-specific bonus routes
 router.post("/department/employee", createDepartmentEmployeeBonus);

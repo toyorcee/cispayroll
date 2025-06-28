@@ -36,6 +36,7 @@ Thumbs.db
 client/node_modules/
 client/.env
 client/.cache/
+client/dist/
 
 # Backend-specific
 server/node_modules/

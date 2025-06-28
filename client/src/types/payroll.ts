@@ -161,6 +161,7 @@ export interface IPayrollCalculationResult {
     }>;
     additionalAllowances: Array<{
       name: string;
+      type: string;
       amount: number;
     }>;
     totalAllowances: number;
@@ -324,6 +325,7 @@ export interface PayrollData {
   month: number;
   year: number;
   status: PayrollStatus;
+  processingTime?: number;
   allowances: {
     gradeAllowances: Array<{
       name: string;
@@ -331,10 +333,13 @@ export interface PayrollData {
       value: number;
       amount: number;
       _id: string;
+      calculationMethod?: string;
     }>;
     additionalAllowances: Array<{
       name: string;
+      type: string;
       amount: number;
+      value?: number;
     }>;
     totalAllowances: number;
   };
@@ -371,6 +376,28 @@ export interface PayrollData {
       amount: number;
     }>;
     totalDeductions: number;
+    breakdown?: {
+      statutory: Array<{
+        name: string;
+        type: string;
+        amount: number;
+        calculationMethod?: string;
+        description?: string;
+        code?: string;
+        scope?: string;
+        department?: any;
+      }>;
+      voluntary: Array<{
+        name: string;
+        type: string;
+        amount: number;
+        calculationMethod?: string;
+        description?: string;
+        code?: string;
+        scope?: string;
+        department?: any;
+      }>;
+    };
   };
   totals: {
     basicSalary: number;
@@ -396,7 +423,7 @@ export interface PayrollData {
       status: string;
       action: string;
       user: string;
-      timestamp: string;
+      timestamp?: string;
       remarks: string;
     }>;
   };

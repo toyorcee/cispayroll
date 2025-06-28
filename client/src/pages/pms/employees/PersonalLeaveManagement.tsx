@@ -38,6 +38,7 @@ import {
 } from "../../../services/leaveService";
 import { LeaveStatus } from "../../../types/employee";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { FaCalendarAlt } from "react-icons/fa";
 
 const PersonalLeaveManagement = () => {
   const [openLeaveModal, setOpenLeaveModal] = useState(false);
@@ -321,12 +322,16 @@ const PersonalLeaveManagement = () => {
         </Dialog>
 
         {/* Leave List */}
-        <Card>
+        <Card className="rounded-xl shadow-lg">
           <CardContent>
-            <Typography variant="h6" mb={2}>
+            <Typography
+              variant="h6"
+              mb={2}
+              className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-t-xl p-4"
+            >
               My Leave Requests
             </Typography>
-            <TableContainer component={Paper}>
+            <TableContainer component={Paper} className="rounded-xl">
               <Table>
                 <TableHead>
                   <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
@@ -359,8 +364,27 @@ const PersonalLeaveManagement = () => {
                     </TableRow>
                   ) : !leaves || leaves.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center">
-                        No leave requests found
+                      <TableCell
+                        colSpan={6}
+                        align="center"
+                        style={{ padding: 0 }}
+                      >
+                        <div style={{ padding: "48px 0" }}>
+                          <div className="flex flex-col items-center justify-center">
+                            <FaCalendarAlt
+                              className="text-blue-200"
+                              style={{ fontSize: 64, marginBottom: 16 }}
+                            />
+                            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                              No Leave Requests
+                            </h3>
+                            <p className="text-gray-500 mb-4 max-w-md mx-auto">
+                              You have not made any leave requests yet. When you
+                              do, they will appear here for tracking and
+                              management.
+                            </p>
+                          </div>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : (

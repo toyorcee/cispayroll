@@ -5,6 +5,7 @@ import { generatePayslipPDF } from "../../../utils/pdfGenerator";
 import { payrollService } from "../../../services/payrollService";
 import { useState } from "react";
 import { toast } from "react-toastify";
+import ReactDOM from "react-dom";
 
 interface PayslipDetailProps {
   payslip: Payslip;
@@ -26,6 +27,8 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
   onClose,
   setPayslip,
 }) => {
+  // Debug: Log all deductions received for this payslip
+  console.log("[PayslipDetail] deductions:", payslip.deductions);
   //   const { user } = useAuth();
   const [loading, setLoading] = useState({
     email: false,
@@ -81,17 +84,28 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
   const totalDeductions = payslip.deductions?.totalDeductions || 0;
   const netPay = payslip.totals?.netPay || 0;
 
-  return (
+  // Type guard for breakdown
+  const hasBreakdown = (
+    deductions: any
+  ): deductions is { breakdown: { statutory: any[]; voluntary: any[] } } => {
+    return (
+      deductions &&
+      typeof deductions === "object" &&
+      "breakdown" in deductions &&
+      deductions.breakdown
+    );
+  };
+
+  return ReactDOM.createPortal(
     <div
-      className="fixed inset-0 bg-white bg-opacity-80 overflow-y-auto h-full w-full z-50"
+      className="fixed inset-0 z-50 bg-white bg-opacity-80 flex items-center justify-center min-h-screen overflow-y-auto payslip-container"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
         }
       }}
     >
-      <div className="relative top-4 sm:top-8 md:top-20 mx-auto p-4 sm:p-6 border w-[95%] md:w-[600px] lg:w-[800px] shadow-xl rounded-lg bg-white mb-4 sm:mb-8 md:mb-20 ml-0 sm:ml-[280px] print:ml-0 print:w-full print:max-w-none print:shadow-none print:border-0 payslip-container">
-        {/* Header with Branding and Payslip ID */}
+      <div className="relative w-full max-w-3xl mx-auto p-4 sm:p-6 border shadow-xl rounded-lg bg-white overflow-y-auto max-h-[90vh]">
         <div className="border-b border-gray-200 pb-4 sm:pb-6 mb-4 sm:mb-6">
           <div className="mb-4 sm:mb-6">
             <div className="text-center">
@@ -326,54 +340,81 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
             </h3>
           </div>
           <div className="p-3 sm:p-4 space-y-2">
-            <div className="flex justify-between text-gray-700 text-xs sm:text-sm">
-              <span className="font-medium">
-                PAYE Tax ({payslip.deductions?.tax?.taxRate?.toFixed(2)}%)
-              </span>
-              <span className="font-semibold text-red-600">
-                {formatAmount(payslip.deductions?.tax?.amount)}
-              </span>
-            </div>
-            <div className="flex justify-between text-gray-700 text-xs sm:text-sm">
-              <span className="font-medium">
-                Pension ({payslip.deductions?.pension?.rate}%)
-              </span>
-              <span className="font-semibold text-red-600">
-                {formatAmount(payslip.deductions?.pension?.amount)}
-              </span>
-            </div>
-            <div className="flex justify-between text-gray-700 text-xs sm:text-sm">
-              <span className="font-medium">
-                NHF ({payslip.deductions?.nhf?.rate}%)
-              </span>
-              <span className="font-semibold text-red-600">
-                {formatAmount(payslip.deductions?.nhf?.amount)}
-              </span>
-            </div>
-
-            {payslip.deductions?.loans?.map((loan, index) => (
-              <div
-                key={index}
-                className="flex justify-between text-gray-700 text-xs sm:text-sm"
-              >
-                <span className="font-medium">{loan.description}</span>
-                <span className="font-semibold text-red-600">
-                  {formatAmount(loan.amount)}
-                </span>
-              </div>
-            ))}
-
-            {payslip.deductions?.others?.map((other, index) => (
-              <div
-                key={index}
-                className="flex justify-between text-gray-700 text-xs sm:text-sm"
-              >
-                <span className="font-medium">{other.description}</span>
-                <span className="font-semibold text-red-600">
-                  {formatAmount(other.amount)}
-                </span>
-              </div>
-            ))}
+            {/* Statutory Deductions */}
+            {hasBreakdown(payslip.deductions) &&
+              payslip.deductions.breakdown.statutory?.length > 0 && (
+                <>
+                  <div className="text-xs sm:text-sm font-semibold text-gray-500 mb-1 mt-2">
+                    Statutory Deductions
+                  </div>
+                  {payslip.deductions.breakdown.statutory.map(
+                    (ded: any, idx: number) => (
+                      <div
+                        key={ded._id || ded.code || idx}
+                        className="flex justify-between text-gray-700 text-xs sm:text-sm"
+                      >
+                        <span className="font-medium">
+                          {ded.name}
+                          {ded.name === "PAYE Tax"
+                            ? ` (${
+                                payslip.deductions?.tax?.taxRate ??
+                                "Progressive"
+                              }%)`
+                            : ded.calculationMethod &&
+                              ded.calculationMethod !== "fixed"
+                            ? ` (${
+                                ded.calculationMethod === "percentage" ||
+                                ded.calculationMethod === "PERCENTAGE"
+                                  ? `${ded.rate || ded.value || ""}%`
+                                  : ded.calculationMethod === "progressive"
+                                  ? "Progressive"
+                                  : ""
+                              })`
+                            : ""}
+                        </span>
+                        <span className="font-semibold text-red-600">
+                          {formatAmount(ded.amount)}
+                        </span>
+                      </div>
+                    )
+                  )}
+                </>
+              )}
+            {/* Voluntary Deductions */}
+            {hasBreakdown(payslip.deductions) &&
+              payslip.deductions.breakdown.voluntary?.length > 0 && (
+                <>
+                  <div className="text-xs sm:text-sm font-semibold text-gray-500 mb-1 mt-3">
+                    Voluntary Deductions
+                  </div>
+                  {payslip.deductions.breakdown.voluntary.map(
+                    (ded: any, idx: number) => (
+                      <div
+                        key={ded._id || ded.code || idx}
+                        className="flex justify-between text-gray-700 text-xs sm:text-sm"
+                      >
+                        <span className="font-medium">
+                          {ded.name}
+                          {ded.calculationMethod &&
+                          ded.calculationMethod !== "fixed"
+                            ? ` (${
+                                ded.calculationMethod === "percentage" ||
+                                ded.calculationMethod === "PERCENTAGE"
+                                  ? `${ded.rate || ded.value || ""}%`
+                                  : ded.calculationMethod === "progressive"
+                                  ? "Progressive"
+                                  : ""
+                              })`
+                            : ""}
+                        </span>
+                        <span className="font-semibold text-red-600">
+                          {formatAmount(ded.amount)}
+                        </span>
+                      </div>
+                    )
+                  )}
+                </>
+              )}
           </div>
         </div>
 
@@ -426,7 +467,8 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

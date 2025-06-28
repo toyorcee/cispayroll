@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Card, CardContent, CardHeader, Typography, Chip } from "@mui/material";
+import { Card, CardContent, Typography, Chip } from "@mui/material";
 import {
   auditService,
   RecentActivity,
@@ -30,6 +30,7 @@ import {
 } from "react-icons/fa";
 import { useAuth } from "../../context/AuthContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 
 // Action icons with distinct colors
 const actionIcons: Record<string, React.ReactElement> = {
@@ -182,124 +183,141 @@ export const RecentActivities: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Card className="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 shadow-lg">
-        <CardHeader className="border-b border-emerald-100 bg-white/80 shadow-sm">
-          <div className="flex items-center justify-between">
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 200 }}
+      >
+        <Card className="bg-gradient-to-br from-emerald-100 via-white to-emerald-50 border-0 shadow-2xl rounded-2xl">
+          <div className="px-6 py-4 rounded-t-2xl bg-gradient-to-r from-emerald-500 to-green-400 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <FaHistory className="text-emerald-600 text-xl" />
-              <Typography variant="h6" className="text-gray-800 font-semibold">
+              <FaHistory className="text-white text-2xl" />
+              <Typography
+                variant="h6"
+                className="text-white font-bold text-lg drop-shadow"
+              >
                 Recent Activities
               </Typography>
             </div>
             <Chip
               label={`${activities.length} Activities`}
               size="small"
-              className="bg-emerald-100 text-emerald-700 shadow-sm"
+              className="bg-white/20 text-white font-semibold shadow-sm"
             />
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4 p-4">
-            {[1, 2, 3].map((index) => (
-              <div
-                key={index}
-                className="flex items-center gap-4 p-4 bg-white rounded-lg shadow-md animate-pulse"
-              >
-                <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
-                <div className="flex-1">
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+          <CardContent>
+            <div className="space-y-4 p-4">
+              {[1, 2, 3].map((index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-4 p-4 bg-white/70 rounded-xl shadow animate-pulse"
+                >
+                  <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
     );
   }
 
   return (
-    <Card className="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 shadow-lg">
-      <CardHeader className="border-b border-emerald-100 bg-white/80 shadow-sm">
-        <div className="flex items-center justify-between">
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 200 }}
+    >
+      <Card className="bg-gradient-to-br from-emerald-100 via-white to-emerald-50 border-0 shadow-2xl rounded-2xl">
+        <div className="px-6 py-4 rounded-t-2xl bg-gradient-to-r from-emerald-500 to-green-400 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <FaHistory className="text-emerald-600 text-xl" />
-            <Typography variant="h6" className="text-gray-800 font-semibold">
+            <FaHistory className="text-white text-2xl" />
+            <Typography
+              variant="h6"
+              className="text-white font-bold text-lg drop-shadow"
+            >
               Recent Activities
             </Typography>
           </div>
           <Chip
             label={`${activities.length} Activities`}
             size="small"
-            className="bg-emerald-100 text-emerald-700 shadow-sm"
+            className="bg-white/20 text-white font-semibold shadow-sm"
           />
         </div>
-      </CardHeader>
-      <CardContent>
-        {activities.length === 0 ? (
-          <div className="p-8 text-center bg-white/50">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-50 mb-4 shadow-md">
-              <FaHistory className="text-4xl text-emerald-400" />
+        <CardContent>
+          {activities.length === 0 ? (
+            <div className="p-8 text-center bg-white/60 rounded-b-2xl">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-100 mb-4 shadow-md">
+                <FaHistory className="text-4xl text-emerald-400" />
+              </div>
+              <Typography variant="h6" className="text-gray-600 mb-2">
+                No Recent Activities
+              </Typography>
+              <Typography variant="body2" className="text-gray-500">
+                New activities will appear here as they occur
+              </Typography>
             </div>
-            <Typography variant="h6" className="text-gray-600 mb-2">
-              No Recent Activities
-            </Typography>
-            <Typography variant="body2" className="text-gray-500">
-              New activities will appear here as they occur
-            </Typography>
-          </div>
-        ) : (
-          <div className="divide-y divide-emerald-100">
-            {activities.map((activity) => {
-              const status = getStatusConfig(activity.details?.status);
-              const actionIcon = getActionIcon(activity.action);
+          ) : (
+            <div className="divide-y divide-emerald-100">
+              {activities.map((activity) => {
+                const status = getStatusConfig(activity.details?.status);
+                const actionIcon = getActionIcon(activity.action);
 
-              return (
-                <div
-                  key={activity._id}
-                  className="p-4 hover:bg-emerald-50/80 transition-colors duration-200 bg-white/70 shadow-sm"
-                >
-                  <div className="flex items-start gap-4">
-                    <div
-                      className={`p-3 rounded-full ${status.bgColor} shadow-md`}
-                    >
-                      <div className={status.color}>{actionIcon}</div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <Typography
-                          variant="subtitle2"
-                          className="text-gray-800 font-medium"
-                        >
-                          {formatActivityDescription(activity)}
-                        </Typography>
-                        <Chip
-                          icon={status.icon}
-                          label={activity.details.status}
-                          size="small"
-                          className={`${status.bgColor} ${status.color} border border-current/20 shadow-sm`}
-                        />
+                return (
+                  <motion.div
+                    key={activity._id}
+                    className="p-4 hover:bg-emerald-50/80 transition-colors duration-200 bg-white/80 shadow rounded-xl mb-2"
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ type: "spring", stiffness: 180 }}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div
+                        className={`p-3 rounded-full ${status.bgColor} shadow-md`}
+                      >
+                        <div className={status.color}>{actionIcon}</div>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50/50 px-3 py-1.5 rounded-full">
-                        <span className="font-medium">
-                          {activity.performedBy.firstName}{" "}
-                          {activity.performedBy.lastName}
-                        </span>
-                        <span className="text-gray-400">•</span>
-                        <span>
-                          {formatDistanceToNow(new Date(activity.createdAt), {
-                            addSuffix: true,
-                          })}
-                        </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <Typography
+                            variant="subtitle2"
+                            className="text-gray-800 font-medium"
+                          >
+                            {formatActivityDescription(activity)}
+                          </Typography>
+                          <Chip
+                            icon={status.icon}
+                            label={activity.details.status}
+                            size="small"
+                            className={`${status.bgColor} ${status.color} border border-current/20 shadow-sm`}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50/70 px-3 py-1.5 rounded-full">
+                          <span className="font-medium">
+                            {activity.performedBy.firstName}{" "}
+                            {activity.performedBy.lastName}
+                          </span>
+                          <span className="text-gray-400">•</span>
+                          <span>
+                            {formatDistanceToNow(new Date(activity.createdAt), {
+                              addSuffix: true,
+                            })}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 };

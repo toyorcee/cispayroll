@@ -111,6 +111,11 @@ export default function Deductions() {
   };
 
   const handleEdit = (deduction: Deduction) => {
+    setDeductionType(
+      deduction.type === DeductionType.STATUTORY
+        ? DeductionType.STATUTORY
+        : DeductionType.VOLUNTARY
+    );
     setEditingDeduction(deduction);
     setShowAddForm(true);
   };
@@ -194,6 +199,9 @@ export default function Deductions() {
                       </div>
                       <button
                         onClick={() => {
+                          console.log(
+                            "DEBUG: Statutory Deduction button clicked"
+                          );
                           setDeductionType(DeductionType.STATUTORY);
                           setShowAddForm(true);
                           setShowTypeMenu(false);
@@ -202,7 +210,10 @@ export default function Deductions() {
                         role="menuitem"
                       >
                         <div className="flex items-center">
-                          <div className="w-2 h-2 bg-red-500 rounded-full mr-3"></div>
+                          <div
+                            className="w-2 h-2 bg-red-500 rounded-ful
+                          l mr-3"
+                          ></div>
                           <div>
                             <div className="font-medium">
                               Statutory Deduction
@@ -215,6 +226,9 @@ export default function Deductions() {
                       </button>
                       <button
                         onClick={() => {
+                          console.log(
+                            "DEBUG: Voluntary Deduction button clicked"
+                          );
                           setDeductionType(DeductionType.VOLUNTARY);
                           setShowAddForm(true);
                           setShowTypeMenu(false);
@@ -342,14 +356,11 @@ export default function Deductions() {
         </div>
       </div>
 
-      {/* Inline Form Section - always inline, never overlay */}
+      {/* Modal Form */}
       {showAddForm && (
-        <div className="flex justify-center w-full mt-8">
-          <div
-            className="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-gray-200 p-8 mx-auto relative"
-            style={{ maxHeight: "80vh", overflowY: "auto" }}
-          >
-            <div className="flex justify-between items-center mb-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-start pt-10">
+          <div className="relative mx-auto w-full max-w-7xl bg-white rounded-2xl shadow-2xl min-h-[500px] max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200">
               <h3 className="text-xl font-semibold text-gray-900">
                 {editingDeduction ? "Edit Deduction" : "Add New Deduction"}
               </h3>
@@ -363,7 +374,7 @@ export default function Deductions() {
                 <span className="text-2xl">×</span>
               </button>
             </div>
-            <div className="overflow-y-auto" style={{ maxHeight: "65vh" }}>
+            <div className="p-6">
               <DeductionForm
                 deduction={editingDeduction}
                 deductionType={

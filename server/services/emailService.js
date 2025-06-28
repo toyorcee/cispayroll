@@ -1120,13 +1120,121 @@ export class EmailService {
         ...(payslipData.additionalAllowances || []),
       ];
 
+      // Format full payment date for subject and header
+      let paymentDateObj = null;
+      let fullDate = "";
+      if (
+        payslipData.paymentDetails &&
+        payslipData.paymentDetails.paymentDate
+      ) {
+        paymentDateObj = new Date(payslipData.paymentDetails.paymentDate);
+        const day = paymentDateObj.getDate();
+        const monthNames = [
+          "January",
+          "February",
+          "March",
+          "April",
+          "May",
+          "June",
+          "July",
+          "August",
+          "September",
+          "October",
+          "November",
+          "December",
+        ];
+        const month = monthNames[paymentDateObj.getMonth()];
+        const year = paymentDateObj.getFullYear();
+        fullDate = `${day} ${month} ${year}`;
+      } else {
+        fullDate = `${month} ${year}`;
+      }
+
+      // --- DEDUCTION BREAKDOWN FOR EMAIL ---
+      let deductionsRows = "";
+      const breakdown = deductions?.breakdown || {};
+      if (breakdown.statutory && breakdown.statutory.length > 0) {
+        deductionsRows += `<tr><td colspan="2" style="font-weight:bold;color:#16a34a;background:#f3f4f6;">Statutory Deductions</td></tr>`;
+        breakdown.statutory.forEach((ded) => {
+          let label = ded.name;
+          if (
+            ded.name === "PAYE Tax" &&
+            typeof deductions?.tax?.taxRate === "number"
+          ) {
+            label += ` (${deductions.tax.taxRate}%)`;
+          } else if (
+            ded.calculationMethod &&
+            ded.calculationMethod !== "fixed"
+          ) {
+            if (ded.calculationMethod.toLowerCase() === "percentage") {
+              label += ` (${ded.rate || ded.value || ""}%)`;
+            } else if (ded.calculationMethod.toLowerCase() === "progressive") {
+              label += ` (Progressive)`;
+            }
+          }
+          deductionsRows += `<tr><td>${label}</td><td class="deductions">-₦${ded.amount.toFixed(
+            2
+          )}</td></tr>`;
+        });
+      }
+      if (breakdown.voluntary && breakdown.voluntary.length > 0) {
+        deductionsRows += `<tr><td colspan="2" style="font-weight:bold;color:#16a34a;background:#f3f4f6;">Voluntary Deductions</td></tr>`;
+        breakdown.voluntary.forEach((ded) => {
+          let label = ded.name;
+          if (ded.calculationMethod && ded.calculationMethod !== "fixed") {
+            if (ded.calculationMethod.toLowerCase() === "percentage") {
+              label += ` (${ded.rate || ded.value || ""}%)`;
+            } else if (ded.calculationMethod.toLowerCase() === "progressive") {
+              label += ` (Progressive)`;
+            }
+          }
+          deductionsRows += `<tr><td>${label}</td><td class="deductions">-₦${ded.amount.toFixed(
+            2
+          )}</td></tr>`;
+        });
+      }
+      // Fallback for legacy fields if breakdown is missing
+      if (!deductionsRows) {
+        if (deductions?.tax) {
+          deductionsRows += `<tr><td>PAYE Tax</td><td class="deductions">-₦${deductions.tax.amount.toFixed(
+            2
+          )}</td></tr>`;
+        }
+        if (deductions?.pension) {
+          deductionsRows += `<tr><td>Pension</td><td class="deductions">-₦${deductions.pension.amount.toFixed(
+            2
+          )}</td></tr>`;
+        }
+        if (deductions?.nhf) {
+          deductionsRows += `<tr><td>NHF</td><td class="deductions">-₦${deductions.nhf.amount.toFixed(
+            2
+          )}</td></tr>`;
+        }
+        if (deductions?.loans && deductions.loans.length > 0) {
+          deductions.loans.forEach((loan) => {
+            deductionsRows += `<tr><td>${
+              loan.description
+            }</td><td class="deductions">-₦${loan.amount.toFixed(2)}</td></tr>`;
+          });
+        }
+        if (deductions?.others && deductions.others.length > 0) {
+          deductions.others.forEach((deduction) => {
+            deductionsRows += `<tr><td>${
+              deduction.description
+            }</td><td class="deductions">-₦${deduction.amount.toFixed(
+              2
+            )}</td></tr>`;
+          });
+        }
+      }
+
       const html = `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Payslip for ${month} ${year}</title>
+          <title>Payslip for ${fullDate}</title>
           <style>
             body {
               font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -1229,7 +1337,7 @@ export class EmailService {
           <div class="container">
             <div class="header">
               <h2>PMS</h2>
-              <h3>Payslip for ${month} ${year}</h3>
+              <h3>Payslip for ${fullDate}</h3>
             </div>
             
             <div class="content">
@@ -1241,7 +1349,7 @@ export class EmailService {
                 <p><strong>Employee ID:</strong> ${employee?.employeeId}</p>
                 <p><strong>Department:</strong> ${department?.name || "N/A"}</p>
                 <p><strong>Position:</strong> ${employee?.position || "N/A"}</p>
-                <p><strong>Period:</strong> ${month} ${year}</p>
+                <p><strong>Period:</strong> ${fullDate}</p>
               </div>
               
               <div class="summary">
@@ -1291,48 +1399,7 @@ export class EmailService {
                       )
                       .join("") || ""
                   }
-                  <tr>
-                    <td>PAYE Tax</td>
-                    <td class="deductions">-₦${deductions?.tax?.amount.toFixed(
-                      2
-                    )}</td>
-                  </tr>
-                  <tr>
-                    <td>Pension</td>
-                    <td class="deductions">-₦${deductions?.pension?.amount.toFixed(
-                      2
-                    )}</td>
-                  </tr>
-                  <tr>
-                    <td>NHF</td>
-                    <td class="deductions">-₦${deductions?.nhf?.amount.toFixed(
-                      2
-                    )}</td>
-                  </tr>
-                  ${
-                    deductions?.loans
-                      ?.map(
-                        (loan) => `
-                  <tr>
-                    <td>${loan.description}</td>
-                    <td class="deductions">-₦${loan.amount.toFixed(2)}</td>
-                  </tr>
-                `
-                      )
-                      .join("") || ""
-                  }
-                  ${
-                    deductions?.others
-                      ?.map(
-                        (deduction) => `
-                  <tr>
-                    <td>${deduction.description}</td>
-                    <td class="deductions">-₦${deduction.amount.toFixed(2)}</td>
-                  </tr>
-                `
-                      )
-                      .join("") || ""
-                  }
+                  ${deductionsRows}
                 </table>
                 
                 <div class="net-pay">
@@ -1356,11 +1423,11 @@ export class EmailService {
       const mailOptions = {
         from: process.env.EMAIL_FROM,
         to,
-        subject: `Your Payslip for ${month} ${year}`,
+        subject: `Your Payslip for ${fullDate}`,
         html,
         attachments: [
           {
-            filename: `payslip_${month}_${year}.pdf`,
+            filename: `payslip_${fullDate.replace(/ /g, "_")}.pdf`,
             content: pdfContent,
           },
         ],
@@ -1476,5 +1543,47 @@ export class EmailService {
       );
       return null;
     }
+  }
+
+  static async sendBatchSummaryEmail(to, batchSummary, sentPayslipsCount) {
+    const {
+      month,
+      year,
+      frequency,
+      processed,
+      skipped,
+      failed,
+      totalNetPay,
+      totalGrossPay,
+      totalDeductions,
+    } = batchSummary;
+    const content = `
+      <div style="padding: 24px;">
+        <h2 style="color: #16a34a;">Payroll Batch Summary</h2>
+        <p><strong>Period:</strong> ${month}/${year} (${frequency})</p>
+        <ul style="font-size: 16px;">
+          <li><strong>Processed:</strong> ${processed}</li>
+          <li><strong>Skipped:</strong> ${skipped}</li>
+          <li><strong>Failed:</strong> ${failed}</li>
+          <li style="color: #16a34a; font-weight: bold;"><strong>📧 Payslips Sent:</strong> ${sentPayslipsCount}</li>
+          <li><strong>Total Net Pay:</strong> ₦${totalNetPay.toLocaleString()}</li>
+          <li><strong>Total Gross Pay:</strong> ₦${totalGrossPay.toLocaleString()}</li>
+          <li><strong>Total Deductions:</strong> ₦${totalDeductions.toLocaleString()}</li>
+        </ul>
+        <p style="margin-top: 24px; color: #475569; font-style: italic;">
+          ✅ Employees were notified after their payslips were sent to their email addresses.
+        </p>
+        <p style="margin-top: 16px; color: #475569;">For more details, please log in to the Payroll Management System.</p>
+      </div>
+    `;
+    const html = this.getBaseEmailTemplate(content);
+    const mailOptions = {
+      from: process.env.EMAIL_FROM,
+      to,
+      subject: `Payroll Batch Summary for ${month}/${year} (${frequency})`,
+      html,
+    };
+    await EmailService.transporter.sendMail(mailOptions);
+    console.log(`[EMAIL] Sent batch summary email to: ${to}`);
   }
 }

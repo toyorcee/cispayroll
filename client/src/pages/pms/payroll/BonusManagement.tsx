@@ -9,6 +9,22 @@ import {
 import { bonusService } from "../../../services/bonusService";
 import { toast } from "react-toastify";
 import { IBonus } from "../../../types/payroll";
+import { formatCurrency } from "../../../utils/formatters";
+import {
+  FaInfoCircle,
+  FaCalendarAlt,
+  FaUsers,
+  FaUser,
+  FaClock,
+  FaCheckCircle,
+  FaExclamationTriangle,
+  FaMoneyBillWave,
+  FaTrophy,
+  FaStar,
+  FaSpinner,
+} from "react-icons/fa";
+import { Avatar } from "../../../components/shared/Avatar";
+import { getProfileImageUrl } from "../../../utils/imageUtils";
 
 // Constants from the model
 const BonusType = {
@@ -40,16 +56,245 @@ interface Bonus {
   updatedBy?: string;
 }
 
+// Beautiful Info Section Component for Department Bonus Modal
+const DepartmentBonusInfoSection = () => (
+  <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4 mb-4 shadow-sm">
+    <div className="flex items-center mb-3">
+      <FaInfoCircle className="text-purple-600 text-lg mr-2" />
+      <h3 className="text-base font-semibold text-gray-800">
+        Department-Wide Bonus Info
+      </h3>
+    </div>
+
+    <div className="space-y-3">
+      {/* Scope Info */}
+      <div className="flex items-start space-x-2">
+        <div className="flex-shrink-0 w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center">
+          <FaUsers className="text-purple-600 text-xs" />
+        </div>
+        <div>
+          <h4 className="font-medium text-gray-800 text-sm mb-1">Scope</h4>
+          <p className="text-xs text-gray-600 leading-relaxed">
+            This bonus will be awarded to <strong>all active employees</strong>{" "}
+            in the selected department.
+          </p>
+        </div>
+      </div>
+
+      {/* Payment Date Info */}
+      <div className="flex items-start space-x-2">
+        <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+          <FaCalendarAlt className="text-green-600 text-xs" />
+        </div>
+        <div>
+          <h4 className="font-medium text-gray-800 text-sm mb-1">
+            Payment Date
+          </h4>
+          <p className="text-xs text-gray-600 leading-relaxed">
+            The bonus will be included in payroll calculations for the month
+            containing this payment date.
+          </p>
+        </div>
+      </div>
+
+      {/* Approval Process */}
+      <div className="flex items-start space-x-2">
+        <div className="flex-shrink-0 w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center">
+          <FaClock className="text-yellow-600 text-xs" />
+        </div>
+        <div>
+          <h4 className="font-medium text-gray-800 text-sm mb-1">
+            Approval Process
+          </h4>
+          <p className="text-xs text-gray-600 leading-relaxed">
+            <strong>Super Admin created bonuses</strong> are automatically
+            approved. Department bonuses created by others require approval from
+            department head and HR manager before being applied to payroll.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    {/* Quick Tips */}
+    <div className="mt-4 pt-3 border-t border-purple-200">
+      <div className="flex items-center mb-2">
+        <FaCheckCircle className="text-purple-600 text-xs mr-1" />
+        <span className="text-xs font-medium text-gray-700">Quick Tips</span>
+      </div>
+      <div className="grid grid-cols-1 gap-1 text-xs text-gray-600">
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-purple-400 rounded-full"></div>
+          <span>
+            Use clear, descriptive reasons for better approval process
+          </span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
+          <span>Set payment date to the month you want it applied</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>
+          <span>Only active employees will receive the bonus</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
+          <span>Bonuses are typically taxable unless specified otherwise</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-purple-400 rounded-full"></div>
+          <span>Super Admin bonuses are automatically approved</span>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// Beautiful Info Section Component for Employee Bonus Modal
+const EmployeeBonusInfoSection = () => (
+  <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-4 mb-4 shadow-sm">
+    <div className="flex items-center mb-3">
+      <FaInfoCircle className="text-orange-600 text-lg mr-2" />
+      <h3 className="text-base font-semibold text-gray-800">
+        Individual Employee Bonus Info
+      </h3>
+    </div>
+
+    <div className="space-y-3">
+      {/* Scope Info */}
+      <div className="flex items-start space-x-2">
+        <div className="flex-shrink-0 w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center">
+          <FaUser className="text-orange-600 text-xs" />
+        </div>
+        <div>
+          <h4 className="font-medium text-gray-800 text-sm mb-1">Scope</h4>
+          <p className="text-xs text-gray-600 leading-relaxed">
+            This bonus will be awarded to <strong>one specific employee</strong>{" "}
+            in the selected department.
+          </p>
+        </div>
+      </div>
+
+      {/* Payment Date Info */}
+      <div className="flex items-start space-x-2">
+        <div className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+          <FaCalendarAlt className="text-blue-600 text-xs" />
+        </div>
+        <div>
+          <h4 className="font-medium text-gray-800 text-sm mb-1">
+            Payment Date
+          </h4>
+          <p className="text-xs text-gray-600 leading-relaxed">
+            The bonus will be included in the employee's payroll for the month
+            containing this payment date.
+          </p>
+        </div>
+      </div>
+
+      {/* Approval Process */}
+      <div className="flex items-start space-x-2">
+        <div className="flex-shrink-0 w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center">
+          <FaClock className="text-yellow-600 text-xs" />
+        </div>
+        <div>
+          <h4 className="font-medium text-gray-800 text-sm mb-1">
+            Approval Process
+          </h4>
+          <p className="text-xs text-gray-600 leading-relaxed">
+            <strong>Super Admin created bonuses</strong> are automatically
+            approved. Individual bonuses created by others require approval from
+            department head and HR manager before being applied to payroll.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    {/* Quick Tips */}
+    <div className="mt-4 pt-3 border-t border-orange-200">
+      <div className="flex items-center mb-2">
+        <FaCheckCircle className="text-orange-600 text-xs mr-1" />
+        <span className="text-xs font-medium text-gray-700">Quick Tips</span>
+      </div>
+      <div className="grid grid-cols-1 gap-1 text-xs text-gray-600">
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-orange-400 rounded-full"></div>
+          <span>Provide specific achievements or reasons for the bonus</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
+          <span>Set payment date to the month you want it applied</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>
+          <span>Ensure the employee is active and eligible</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
+          <span>Bonuses are typically taxable unless specified otherwise</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className="w-1.5 h-1.5 bg-purple-400 rounded-full"></div>
+          <span>Super Admin bonuses are automatically approved</span>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+function isEmployeeObject(emp: any): emp is {
+  profileImage?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+} {
+  return (
+    typeof emp === "object" &&
+    emp !== null &&
+    ("firstName" in emp ||
+      "lastName" in emp ||
+      "profileImage" in emp ||
+      "email" in emp)
+  );
+}
+
+function isUserObject(
+  user: any
+): user is { fullName?: string; firstName?: string; lastName?: string } {
+  return (
+    typeof user === "object" &&
+    user !== null &&
+    ("fullName" in user || "firstName" in user || "lastName" in user)
+  );
+}
+
+function getEmployeeName(employee: any) {
+  if (!employee) return "Unknown Employee";
+
+  // If employee is a string (ID), return it
+  if (typeof employee === "string") return employee;
+
+  // If employee is an object, handle the name properties
+  if (typeof employee === "object" && employee !== null) {
+    if (employee.fullName) return employee.fullName;
+    if (employee.firstName && employee.lastName)
+      return `${employee.firstName} ${employee.lastName}`;
+    if (employee.email) return employee.email;
+  }
+
+  return "Unknown Employee";
+}
+
 export default function BonusManagement() {
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [editingBonus, setEditingBonus] = useState<Bonus | undefined>(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_showAddForm, _setShowAddForm] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_editingBonus, _setEditingBonus] = useState<Bonus | undefined>(
     undefined
   );
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [employeeBonusLoading, setEmployeeBonusLoading] = useState(false);
   const [deptBonusLoading, setDeptBonusLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  const [_formData, _setFormData] = useState({
     employee: "",
     employeeId: "",
     type: BonusType.PERFORMANCE,
@@ -120,45 +365,21 @@ export default function BonusManagement() {
 
   const queryClient = useQueryClient();
 
-  const handleInputChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
-  ) => {
-    const { name, value, type } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]:
-        type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
-    }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Form submitted:", formData);
-    setShowAddForm(false);
-    setFormData({
-      employee: "",
-      employeeId: "",
-      type: BonusType.PERFORMANCE,
-      amount: 0,
-      description: "",
-      paymentDate: new Date().toISOString().split("T")[0],
-      approvalStatus: ApprovalStatus.PENDING,
-      department: "",
-      taxable: true,
-      departmentId: "",
-    });
-  };
-
-  // const handleEdit = (bonus: Bonus) => {
-  //   setEditingBonus(bonus);
-  //   setShowAddForm(true);
-  // };
-
-  // const handleDelete = async (id: string) => {
-  //   console.log("Delete bonus:", id);
-  // };
+  // Calculate stats for beautiful cards
+  const totalBonuses = bonusRequests?.data?.pagination?.total || 0;
+  const pendingBonuses =
+    bonusRequests?.data?.bonuses?.filter(
+      (bonus: IBonus) => bonus.approvalStatus === "pending"
+    ).length || 0;
+  const approvedBonuses =
+    bonusRequests?.data?.bonuses?.filter(
+      (bonus: IBonus) => bonus.approvalStatus === "approved"
+    ).length || 0;
+  const totalAmount =
+    bonusRequests?.data?.bonuses?.reduce(
+      (sum: number, bonus: IBonus) => sum + (bonus.amount || 0),
+      0
+    ) || 0;
 
   const handleDeptBonusChange = (
     e: React.ChangeEvent<
@@ -291,233 +512,402 @@ export default function BonusManagement() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header Section with Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-500">Total Bonuses</h3>
-          <p className="mt-2 text-3xl font-semibold text-gray-900">
-            {bonusRequests?.data?.pagination?.total || 0}
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-500">
-            Pending Approval
-          </h3>
-          <p className="mt-2 text-3xl font-semibold text-yellow-600">
-            {bonusRequests?.data?.bonuses?.filter(
-              (bonus: IBonus) => bonus.approvalStatus === "pending"
-            ).length || 0}
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-500">
-            Approved Bonuses
-          </h3>
-          <p className="mt-2 text-3xl font-semibold text-green-600">
-            {bonusRequests?.data?.bonuses?.filter(
-              (bonus: IBonus) => bonus.approvalStatus === "approved"
-            ).length || 0}
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-sm font-medium text-gray-500">Total Amount</h3>
-          <p className="mt-2 text-3xl font-semibold text-purple-600">
-            ₦
-            {bonusRequests?.data?.bonuses
-              ?.reduce(
-                (sum: number, bonus: IBonus) => sum + (bonus.amount || 0),
-                0
-              )
-              .toLocaleString() || 0}
-          </p>
-        </div>
-      </div>
-
-      {/* Action Bar */}
-      <div className="bg-white p-4 rounded-lg shadow">
-        <div className="flex justify-between items-center">
-          <div className="flex space-x-4"></div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+      {/* Header Section */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Bonus Management
+            </h1>
+            <p className="text-gray-600">
+              Manage employee and department bonuses with ease
+            </p>
+          </div>
           {(isSuperAdmin() || isAdmin()) && (
-            <div className="flex gap-4">
+            <div className="flex gap-3">
               <button
                 onClick={() => setShowDeptBonusModal(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md"
+                className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg shadow-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-200 font-medium cursor-pointer"
               >
-                Add Department Bonus
+                <FaUsers className="mr-2" />
+                Department Bonus
               </button>
               <button
                 onClick={() => setShowEmployeeBonusModal(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-md"
+                className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-lg shadow-lg hover:from-orange-700 hover:to-orange-800 transition-all duration-200 font-medium cursor-pointer"
               >
-                Add Employee Bonus
+                <FaUser className="mr-2" />
+                Employee Bonus
               </button>
             </div>
           )}
         </div>
+
+        {/* Enhanced Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">
+                  Total Bonuses
+                </p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {totalBonuses}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                <FaTrophy className="text-purple-600 text-xl" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center text-sm">
+              <span className="text-purple-600 font-medium">Awarded</span>
+              <span className="mx-2">•</span>
+              <span className="text-gray-500">{approvedBonuses} approved</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">
+                  Approved Bonuses
+                </p>
+                <p className="text-3xl font-bold text-green-600">
+                  {approvedBonuses}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <FaCheckCircle className="text-green-600 text-xl" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center text-sm">
+              <span className="text-green-600 font-medium">Ready</span>
+              <span className="mx-2">•</span>
+              <span className="text-gray-500">For payroll</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">
+                  Pending Review
+                </p>
+                <p className="text-3xl font-bold text-yellow-600">
+                  {pendingBonuses}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                <FaClock className="text-yellow-600 text-xl" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center text-sm">
+              <span className="text-yellow-600 font-medium">Awaiting</span>
+              <span className="mx-2">•</span>
+              <span className="text-gray-500">Approval needed</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">
+                  Total Amount
+                </p>
+                <p className="text-3xl font-bold text-orange-600">
+                  ₦{totalAmount.toLocaleString()}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                <FaMoneyBillWave className="text-orange-600 text-xl" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center text-sm">
+              <span className="text-orange-600 font-medium">Value</span>
+              <span className="mx-2">•</span>
+              <span className="text-gray-500">All bonuses</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Filter/Search Bar */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <input
-          type="text"
-          placeholder="Employee name or email"
-          value={filters.employee}
-          onChange={(e) =>
-            setFilters((f) => ({ ...f, employee: e.target.value }))
-          }
-          className="border rounded px-2 py-1"
-        />
-        <select
-          value={filters.departmentId}
-          onChange={(e) =>
-            setFilters((f) => ({ ...f, departmentId: e.target.value }))
-          }
-          className="border rounded px-2 py-1"
-        >
-          <option value="">All Departments</option>
-          {departments?.map((dept) => (
-            <option key={dept._id} value={dept._id}>
-              {dept.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filters.status}
-          onChange={(e) =>
-            setFilters((f) => ({ ...f, status: e.target.value }))
-          }
-          className="border rounded px-2 py-1"
-        >
-          <option value="">All Statuses</option>
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-        </select>
-        <select
-          value={filters.type}
-          onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))}
-          className="border rounded px-2 py-1"
-        >
-          <option value="">All Types</option>
-          {Object.entries(BonusType).map(([key, value]) => (
-            <option key={key} value={value}>
-              {key.replace(/_/g, " ")}
-            </option>
-          ))}
-        </select>
-        <input
-          type="date"
-          value={filters.startDate}
-          onChange={(e) =>
-            setFilters((f) => ({ ...f, startDate: e.target.value }))
-          }
-          className="border rounded px-2 py-1"
-        />
-        <input
-          type="date"
-          value={filters.endDate}
-          onChange={(e) =>
-            setFilters((f) => ({ ...f, endDate: e.target.value }))
-          }
-          className="border rounded px-2 py-1"
-        />
-        <button
-          onClick={() =>
-            setFilters({
-              employee: "",
-              departmentId: "",
-              status: "",
-              type: "",
-              startDate: "",
-              endDate: "",
-            })
-          }
-          className="border rounded px-2 py-1 bg-gray-100"
-          type="button"
-        >
-          Reset
-        </button>
+      {/* Enhanced Filters Section */}
+      <div className="bg-white rounded-xl shadow-lg p-6 mb-6 border border-gray-100">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+          <button
+            onClick={() =>
+              setFilters({
+                employee: "",
+                departmentId: "",
+                status: "",
+                type: "",
+                startDate: "",
+                endDate: "",
+              })
+            }
+            className="text-sm text-gray-600 hover:text-gray-800 font-medium"
+          >
+            Clear all
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Employee
+            </label>
+            <input
+              type="text"
+              placeholder="Search by name or email"
+              value={filters.employee}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, employee: e.target.value }))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Department
+            </label>
+            <select
+              value={filters.departmentId}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, departmentId: e.target.value }))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+            >
+              <option value="">All Departments</option>
+              {departments?.map((dept) => (
+                <option key={dept._id} value={dept._id}>
+                  {dept.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status
+            </label>
+            <select
+              value={filters.status}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, status: e.target.value }))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+            >
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Type
+            </label>
+            <select
+              value={filters.type}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, type: e.target.value }))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+            >
+              <option value="">All Types</option>
+              {Object.entries(BonusType).map(([key, value]) => (
+                <option key={key} value={value}>
+                  {key.replace(/_/g, " ")}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Start Date
+            </label>
+            <input
+              type="date"
+              value={filters.startDate}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, startDate: e.target.value }))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              End Date
+            </label>
+            <input
+              type="date"
+              value={filters.endDate}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, endDate: e.target.value }))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Main Content */}
-      <div className="bg-white shadow-sm rounded-lg">
-        <div className="p-6">
-          {/* Responsive Table Wrapper */}
-          <div className="w-full overflow-x-auto">
-            <table className="w-full min-w-[900px] divide-y divide-gray-200">
+      {/* Enhanced Table Section */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Bonus Requests
+          </h3>
+        </div>
+
+        <div className="overflow-x-auto">
+          {bonusesLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-gray-600 font-medium">Loading bonuses...</p>
+              </div>
+            </div>
+          ) : !bonusRequests?.data?.bonuses?.length ? (
+            <div className="flex items-center justify-center py-16 px-6">
+              <div className="text-center max-w-md">
+                <div className="w-24 h-24 bg-gradient-to-br from-purple-100 to-purple-200 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <FaTrophy className="text-purple-600 text-3xl" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  No bonuses found
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Get started by creating your first bonus for employees or
+                  departments to recognize their achievements.
+                </p>
+                {(isSuperAdmin() || isAdmin()) && (
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      onClick={() => setShowDeptBonusModal(true)}
+                      className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+                    >
+                      <FaUsers className="mr-2" />
+                      Create Department Bonus
+                    </button>
+                    <button
+                      onClick={() => setShowEmployeeBonusModal(true)}
+                      className="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
+                    >
+                      <FaUser className="mr-2" />
+                      Create Employee Bonus
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Employee
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Type
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Amount
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Department
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Payment Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     Status
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Approved By
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {bonusesLoading ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-4 text-center">
-                      <div className="text-gray-500 text-sm">Loading...</div>
-                    </td>
-                  </tr>
-                ) : !bonusRequests?.data?.bonuses?.length ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-4 text-center">
-                      <div className="text-gray-500 text-sm">
-                        No bonuses found. Click "Add Bonus" to create one.
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  bonusRequests.data.bonuses.map((bonus: IBonus) => (
+                {bonusRequests.data.bonuses.map((bonus: IBonus) => {
+                  console.log("[BonusManagement] Rendering bonus row:", bonus);
+
+                  if (
+                    typeof bonus.employee === "object" &&
+                    bonus.employee !== null
+                  ) {
+                    const employeeObj = bonus.employee as any;
+                    console.log("[BonusManagement] Employee image data:", {
+                      profileImage: employeeObj.profileImage,
+                      profileImageUrl: employeeObj.profileImageUrl,
+                      fullImageUrl: getProfileImageUrl(employeeObj),
+                    });
+                  }
+
+                  return (
                     <tr
                       key={bonus._id}
                       onClick={() => {
                         setSelectedBonus(bonus);
                         setShowApprovalModal(true);
                       }}
-                      className="cursor-pointer hover:bg-gray-50"
+                      className="cursor-pointer hover:bg-gray-50 transition-colors"
                     >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {typeof bonus.employee === "object" &&
-                          bonus.employee !== null
-                            ? (bonus.employee as any).fullName ||
-                              ((bonus.employee as any).firstName &&
-                              (bonus.employee as any).lastName
-                                ? `${(bonus.employee as any).firstName} ${
-                                    (bonus.employee as any).lastName
-                                  }`
-                                : (bonus.employee as any).email || "-")
-                            : bonus.employee || "-"}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center">
+                          <Avatar
+                            profileImage={
+                              isEmployeeObject(bonus.employee)
+                                ? bonus.employee.profileImage
+                                : undefined
+                            }
+                            firstName={
+                              isEmployeeObject(bonus.employee)
+                                ? bonus.employee.firstName
+                                : undefined
+                            }
+                            lastName={
+                              isEmployeeObject(bonus.employee)
+                                ? bonus.employee.lastName
+                                : undefined
+                            }
+                            size="sm"
+                            className="mr-3"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-900 break-all">
+                              {isEmployeeObject(bonus.employee)
+                                ? `${bonus.employee.firstName ?? ""} ${
+                                    bonus.employee.lastName ?? ""
+                                  }`.trim() ||
+                                  bonus.employee.email ||
+                                  "Unknown Employee"
+                                : bonus.employee}
+                            </span>
+                            <span className="text-xs text-gray-500 break-all">
+                              {isEmployeeObject(bonus.employee)
+                                ? bonus.employee.email || ""
+                                : ""}
+                            </span>
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                           {bonus.type}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          ₦{bonus.amount?.toLocaleString()}
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-semibold text-gray-900">
+                          {formatCurrency(bonus.amount)}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
                           {typeof bonus.department === "object" &&
                           bonus.department !== null
@@ -526,16 +916,16 @@ export default function BonusManagement() {
                             : bonus.department || "All"}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
                           {bonus.paymentDate
                             ? new Date(bonus.paymentDate).toLocaleDateString()
                             : "-"}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4">
                         <span
-                          className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
               ${
                 bonus.approvalStatus === "approved"
                   ? "bg-green-100 text-green-800"
@@ -547,250 +937,99 @@ export default function BonusManagement() {
                           {bonus.approvalStatus}
                         </span>
                       </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-gray-900 break-all">
+                            {isUserObject(bonus.approvedBy) &&
+                            bonus.approvedBy.fullName
+                              ? bonus.approvedBy.fullName
+                              : isUserObject(bonus.approvedBy) &&
+                                bonus.approvedBy.firstName &&
+                                bonus.approvedBy.lastName
+                              ? `${bonus.approvedBy.firstName} ${bonus.approvedBy.lastName}`
+                              : "—"}
+                          </span>
+                          <span className="text-xs text-gray-500 break-all">
+                            {bonus.approvedAt
+                              ? new Date(bonus.approvedAt).toLocaleDateString()
+                              : ""}
+                          </span>
+                        </div>
+                      </td>
                     </tr>
-                  ))
-                )}
+                  );
+                })}
               </tbody>
             </table>
-          </div>
-          {bonusRequests?.data?.pagination && (
-            <div className="flex justify-between items-center mt-4">
-              <div>
-                Page {bonusRequests.data.pagination.page} of{" "}
-                {bonusRequests.data.pagination.pages}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-3 py-1 border rounded disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() =>
-                    setPage((p) =>
-                      Math.min(bonusRequests.data.pagination.pages, p + 1)
-                    )
-                  }
-                  disabled={page === bonusRequests.data.pagination.pages}
-                  className="px-3 py-1 border rounded disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-              <div>
-                <select
-                  value={limit}
-                  onChange={(e) => {
-                    setLimit(Number(e.target.value));
-                    setPage(1); // Reset to first page on limit change
-                  }}
-                  className="border rounded px-2 py-1"
-                >
-                  {[10, 20, 50, 100].map((size) => (
-                    <option key={size} value={size}>
-                      {size} per page
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
           )}
         </div>
-      </div>
 
-      {/* Modal Form */}
-      {showAddForm && (
-        <div className="fixed inset-0 bg-white/80 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-lg bg-white lg:ml-[25%] md:ml-[20%] sm:ml-[10%]">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {editingBonus
-                  ? "Edit Employee Bonus"
-                  : "Create New Employee Bonus"}
-              </h3>
-              <button
-                onClick={() => {
-                  setShowAddForm(false);
-                  setEditingBonus(undefined);
-                }}
-                className="text-gray-400 hover:text-gray-500 focus:outline-none p-2 hover:bg-gray-100 rounded-full"
-              >
-                <span className="text-2xl">×</span>
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Employee Name
-                  </label>
-                  <input
-                    type="text"
-                    name="employee"
-                    value={formData.employee}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                    placeholder="Enter employee name"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Employee ID
-                  </label>
-                  <input
-                    type="text"
-                    name="employeeId"
-                    value={formData.employeeId || ""}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                    placeholder="Enter employee ID"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Bonus Type
-                  </label>
-                  <select
-                    name="type"
-                    value={formData.type}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                    required
-                  >
-                    {Object.entries(BonusType).map(([key, value]) => (
-                      <option key={key} value={value}>
-                        {key.replace(/_/g, " ")}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Amount
-                  </label>
-                  <input
-                    type="number"
-                    name="amount"
-                    value={formData.amount}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                    placeholder="Enter bonus amount"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Payment Date
-                  </label>
-                  <input
-                    type="date"
-                    name="paymentDate"
-                    value={formData.paymentDate}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Status
-                  </label>
-                  <select
-                    name="approvalStatus"
-                    value={formData.approvalStatus}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                    required
-                  >
-                    {Object.entries(ApprovalStatus).map(([key, value]) => (
-                      <option key={key} value={value}>
-                        {key.replace(/_/g, " ")}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {isSuperAdmin() && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Department
-                    </label>
-                    <select
-                      name="departmentId"
-                      value={formData.departmentId}
-                      onChange={handleInputChange}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                      required
-                      disabled={departmentsLoading}
-                    >
-                      <option value="">
-                        {departmentsLoading
-                          ? "Loading departments..."
-                          : "Select Department"}
-                      </option>
-                      {departments?.map((dept) => (
-                        <option key={dept._id} value={dept._id}>
-                          {dept.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+        {/* Enhanced Pagination */}
+        {bonusRequests?.data?.pagination && (
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                Showing{" "}
+                <span className="font-medium">{(page - 1) * limit + 1}</span> to{" "}
+                <span className="font-medium">
+                  {Math.min(page * limit, bonusRequests.data.pagination.total)}
+                </span>{" "}
+                of{" "}
+                <span className="font-medium">
+                  {bonusRequests.data.pagination.total}
+                </span>{" "}
+                bonuses
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Reason for Bonus
-                </label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  rows={3}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                  placeholder="Enter reason for awarding this bonus"
-                />
-              </div>
+
               <div className="flex items-center space-x-4">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    name="taxable"
-                    checked={formData.taxable}
-                    onChange={handleInputChange}
-                    className="rounded border-gray-300 text-green-600 shadow-sm focus:border-green-500 focus:ring-green-500"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">Taxable</span>
-                </label>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-700">Show</span>
+                  <select
+                    value={limit}
+                    onChange={(e) => {
+                      setLimit(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    {[10, 20, 50, 100].map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-sm text-gray-700">per page</span>
+                </div>
+
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() =>
+                      setPage((p) =>
+                        Math.min(bonusRequests.data.pagination.pages, p + 1)
+                      )
+                    }
+                    disabled={page === bonusRequests.data.pagination.pages}
+                    className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddForm(false);
-                    setEditingBonus(undefined);
-                  }}
-                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                >
-                  {editingBonus ? "Update" : "Create"}
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {showDeptBonusModal && (
         <div className="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">
                 Create Department Bonus
@@ -802,6 +1041,10 @@ export default function BonusManagement() {
                 ×
               </button>
             </div>
+
+            {/* Department Bonus Info Section */}
+            <DepartmentBonusInfoSection />
+
             <form onSubmit={handleDeptBonusSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">
@@ -811,7 +1054,7 @@ export default function BonusManagement() {
                   name="departmentId"
                   value={deptBonusForm.departmentId}
                   onChange={handleDeptBonusChange}
-                  className="mt-1 block w-full rounded-md border-gray-300"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                   required
                   disabled={departmentsLoading}
                 >
@@ -836,10 +1079,17 @@ export default function BonusManagement() {
                   name="amount"
                   value={deptBonusForm.amount}
                   onChange={handleDeptBonusChange}
-                  className="mt-1 block w-full rounded-md border-gray-300"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                   placeholder="Enter bonus amount"
                   required
+                  min="0"
+                  step="0.01"
                 />
+                {deptBonusForm.amount && (
+                  <p className="mt-1 text-sm text-gray-600">
+                    Formatted: {formatCurrency(Number(deptBonusForm.amount))}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
@@ -850,7 +1100,7 @@ export default function BonusManagement() {
                   value={deptBonusForm.reason}
                   onChange={handleDeptBonusChange}
                   rows={3}
-                  className="mt-1 block w-full rounded-md border-gray-300"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                   placeholder="Enter reason for awarding this bonus"
                   required
                 />
@@ -864,7 +1114,7 @@ export default function BonusManagement() {
                   name="paymentDate"
                   value={deptBonusForm.paymentDate}
                   onChange={handleDeptBonusChange}
-                  className="mt-1 block w-full rounded-md border-gray-300"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                   required
                 />
               </div>
@@ -876,7 +1126,7 @@ export default function BonusManagement() {
                   name="type"
                   value={deptBonusForm.type}
                   onChange={handleDeptBonusChange}
-                  className="mt-1 block w-full rounded-md border-gray-300"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                   required
                 >
                   {Object.entries(BonusType).map(([key, value]) => (
@@ -890,40 +1140,21 @@ export default function BonusManagement() {
                 <button
                   type="button"
                   onClick={() => setShowDeptBonusModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                  className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-lg cursor-pointer flex items-center justify-center gap-2"
                   disabled={deptBonusLoading}
                 >
                   {deptBonusLoading ? (
-                    <span>
-                      <svg
-                        className="animate-spin h-4 w-4 inline-block mr-2"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                          fill="none"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8v8z"
-                        />
-                      </svg>
-                      Submitting...
-                    </span>
+                    <>
+                      <FaSpinner className="animate-spin" /> Creating...
+                    </>
                   ) : (
-                    "Create"
+                    "Create Bonus"
                   )}
                 </button>
               </div>
@@ -934,7 +1165,7 @@ export default function BonusManagement() {
 
       {showEmployeeBonusModal && (
         <div className="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900">
                 Create Employee Bonus
@@ -946,6 +1177,10 @@ export default function BonusManagement() {
                 ×
               </button>
             </div>
+
+            {/* Employee Bonus Info Section */}
+            <EmployeeBonusInfoSection />
+
             <form onSubmit={handleEmployeeBonusSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">
@@ -955,7 +1190,7 @@ export default function BonusManagement() {
                   name="departmentId"
                   value={employeeBonusForm.departmentId}
                   onChange={handleEmployeeBonusChange}
-                  className="mt-1 block w-full rounded-md border-gray-300"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
                   required
                   disabled={departmentsLoading}
                 >
@@ -980,7 +1215,7 @@ export default function BonusManagement() {
                     name="employeeId"
                     value={employeeBonusForm.employeeId}
                     onChange={handleEmployeeBonusChange}
-                    className="mt-1 block w-full rounded-md border-gray-300"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
                     required
                     disabled={employeesLoading}
                   >
@@ -1008,10 +1243,18 @@ export default function BonusManagement() {
                   name="amount"
                   value={employeeBonusForm.amount}
                   onChange={handleEmployeeBonusChange}
-                  className="mt-1 block w-full rounded-md border-gray-300"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
                   placeholder="Enter bonus amount"
                   required
+                  min="0"
+                  step="0.01"
                 />
+                {employeeBonusForm.amount && (
+                  <p className="mt-1 text-sm text-gray-600">
+                    Formatted:{" "}
+                    {formatCurrency(Number(employeeBonusForm.amount))}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
@@ -1022,7 +1265,7 @@ export default function BonusManagement() {
                   value={employeeBonusForm.reason}
                   onChange={handleEmployeeBonusChange}
                   rows={3}
-                  className="mt-1 block w-full rounded-md border-gray-300"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
                   placeholder="Enter reason for awarding this bonus"
                   required
                 />
@@ -1036,7 +1279,7 @@ export default function BonusManagement() {
                   name="paymentDate"
                   value={employeeBonusForm.paymentDate}
                   onChange={handleEmployeeBonusChange}
-                  className="mt-1 block w-full rounded-md border-gray-300"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
                   required
                 />
               </div>
@@ -1048,7 +1291,7 @@ export default function BonusManagement() {
                   name="type"
                   value={employeeBonusForm.type}
                   onChange={handleEmployeeBonusChange}
-                  className="mt-1 block w-full rounded-md border-gray-300"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
                   required
                 >
                   {Object.entries(BonusType).map(([key, value]) => (
@@ -1062,40 +1305,21 @@ export default function BonusManagement() {
                 <button
                   type="button"
                   onClick={() => setShowEmployeeBonusModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+                  className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 transition-all duration-200 shadow-lg cursor-pointer flex items-center justify-center gap-2"
                   disabled={employeeBonusLoading}
                 >
                   {employeeBonusLoading ? (
-                    <span>
-                      <svg
-                        className="animate-spin h-4 w-4 inline-block mr-2"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                          fill="none"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8v8z"
-                        />
-                      </svg>
-                      Submitting...
-                    </span>
+                    <>
+                      <FaSpinner className="animate-spin" /> Creating...
+                    </>
                   ) : (
-                    "Create"
+                    "Create Bonus"
                   )}
                 </button>
               </div>
@@ -1114,63 +1338,77 @@ export default function BonusManagement() {
           }}
         >
           <div
-            className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md"
+            className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md border border-gray-100"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {selectedBonus.approvalStatus === "pending"
-                  ? "Approve/Reject Bonus"
-                  : "Bonus Details"}
-              </h3>
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-100 to-purple-200 rounded-full flex items-center justify-center mr-3">
+                  <FaTrophy className="text-purple-600 text-lg" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {selectedBonus.approvalStatus === "pending"
+                    ? "Approve/Reject Bonus"
+                    : "Bonus Details"}
+                </h3>
+              </div>
               <button
                 onClick={() => {
                   setShowApprovalModal(false);
                   setSelectedBonus(null);
                   setRejectionReason("");
                 }}
-                className="text-gray-400 hover:text-gray-500 p-2 text-2xl font-bold"
+                className="text-gray-400 hover:text-gray-500 p-2 hover:bg-gray-100 rounded-full transition-colors"
               >
-                ×
+                <span className="text-2xl font-bold">×</span>
               </button>
             </div>
 
             <div className="space-y-4">
-              <div>
-                <h4 className="text-sm font-medium text-gray-700">Employee</h4>
-                <p className="mt-1 text-sm text-gray-900">
-                  {typeof selectedBonus.employee === "object" &&
-                  selectedBonus.employee !== null
-                    ? (selectedBonus.employee as any).fullName ||
-                      ((selectedBonus.employee as any).firstName &&
-                      (selectedBonus.employee as any).lastName
-                        ? `${(selectedBonus.employee as any).firstName} ${
-                            (selectedBonus.employee as any).lastName
-                          }`
-                        : (selectedBonus.employee as any).email || "-")
-                    : selectedBonus.employee || "-"}
+              {/* Employee Info */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center mb-2">
+                  <FaUser className="text-gray-600 text-sm mr-2" />
+                  <h4 className="text-sm font-medium text-gray-700">
+                    Employee
+                  </h4>
+                </div>
+                <p className="text-sm text-gray-900 font-medium">
+                  {getEmployeeName(selectedBonus.employee)}
                 </p>
               </div>
 
-              <div>
-                <h4 className="text-sm font-medium text-gray-700">Amount</h4>
-                <p className="mt-1 text-sm text-gray-900">
-                  ₦{selectedBonus.amount?.toLocaleString()}
+              {/* Amount Info */}
+              <div className="bg-green-50 rounded-lg p-4">
+                <div className="flex items-center mb-2">
+                  <FaMoneyBillWave className="text-green-600 text-sm mr-2" />
+                  <h4 className="text-sm font-medium text-gray-700">Amount</h4>
+                </div>
+                <p className="text-lg font-bold text-green-600">
+                  {formatCurrency(selectedBonus.amount)}
                 </p>
               </div>
 
-              <div>
-                <h4 className="text-sm font-medium text-gray-700">Type</h4>
-                <p className="mt-1 text-sm text-gray-900">
+              {/* Type Info */}
+              <div className="bg-blue-50 rounded-lg p-4">
+                <div className="flex items-center mb-2">
+                  <FaStar className="text-blue-600 text-sm mr-2" />
+                  <h4 className="text-sm font-medium text-gray-700">Type</h4>
+                </div>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                   {selectedBonus.type}
-                </p>
+                </span>
               </div>
 
-              <div>
-                <h4 className="text-sm font-medium text-gray-700">
-                  Payment Date
-                </h4>
-                <p className="mt-1 text-sm text-gray-900">
+              {/* Payment Date Info */}
+              <div className="bg-yellow-50 rounded-lg p-4">
+                <div className="flex items-center mb-2">
+                  <FaCalendarAlt className="text-yellow-600 text-sm mr-2" />
+                  <h4 className="text-sm font-medium text-gray-700">
+                    Payment Date
+                  </h4>
+                </div>
+                <p className="text-sm text-gray-900">
                   {selectedBonus.paymentDate
                     ? new Date(selectedBonus.paymentDate).toLocaleDateString()
                     : "-"}
@@ -1179,82 +1417,47 @@ export default function BonusManagement() {
 
               {selectedBonus.approvalStatus === "pending" && (
                 <>
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-700">
-                      Reason for Rejection
-                    </h4>
+                  <div className="bg-red-50 rounded-lg p-4">
+                    <div className="flex items-center mb-2">
+                      <FaExclamationTriangle className="text-red-600 text-sm mr-2" />
+                      <h4 className="text-sm font-medium text-gray-700">
+                        Reason for Rejection
+                      </h4>
+                    </div>
                     <textarea
                       value={rejectionReason}
                       onChange={(e) => setRejectionReason(e.target.value)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
                       rows={3}
                       placeholder="Enter reason for rejection (required for rejection)"
                     />
                   </div>
 
-                  <div className="flex justify-end space-x-3 mt-6">
+                  <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
                     <button
                       onClick={handleApproveBonus}
                       disabled={approvalLoading || rejectionLoading}
-                      className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                      className="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                     >
                       {approvalLoading ? (
-                        <span className="flex items-center">
-                          <svg
-                            className="animate-spin h-4 w-4 mr-2"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                              fill="none"
-                            />
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8v8z"
-                            />
-                          </svg>
-                          Approving...
-                        </span>
+                        <>
+                          <FaSpinner className="animate-spin" /> Approving...
+                        </>
                       ) : (
-                        "Approve"
+                        "Approve Bonus"
                       )}
                     </button>
                     <button
                       onClick={handleRejectBonus}
                       disabled={approvalLoading || rejectionLoading}
-                      className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                      className="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                     >
                       {rejectionLoading ? (
-                        <span className="flex items-center">
-                          <svg
-                            className="animate-spin h-4 w-4 mr-2"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                              fill="none"
-                            />
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8v8z"
-                            />
-                          </svg>
-                          Rejecting...
-                        </span>
+                        <>
+                          <FaSpinner className="animate-spin" /> Rejecting...
+                        </>
                       ) : (
-                        "Reject"
+                        "Reject Bonus"
                       )}
                     </button>
                   </div>

@@ -30,7 +30,26 @@ const formatAmount = (amount: number | undefined | null) => {
   return `NGN ${formattedNumber}`;
 };
 
+// Type guard for breakdown
+const hasBreakdown = (
+  deductions: any
+): deductions is { breakdown: { statutory: any[]; voluntary: any[] } } => {
+  return (
+    deductions &&
+    typeof deductions === "object" &&
+    "breakdown" in deductions &&
+    deductions.breakdown
+  );
+};
+
 export const generatePayslipPDF = async (payslip: Payslip) => {
+  // Debug log: show all payslip details and bonuses
+  // console.log("[PDF GENERATOR] payslip:", payslip);
+  // console.log(
+  //   "[PDF GENERATOR] payslip.earnings.bonus:",
+  //   (payslip.earnings as any)?.bonus
+  // );
+
   const doc = new jsPDF();
   let yPos = 20;
 
@@ -95,22 +114,90 @@ export const generatePayslipPDF = async (payslip: Payslip) => {
   ).lastAutoTable;
   yPos = periodInfoLastAutoTable.finalY + 10;
 
-  // Earnings Table
+  // --- DETAILED EARNINGS BREAKDOWN (EXACTLY LIKE PAYSLIPDETAIL.TSX) ---
+  const earningsBody: (string | number)[][] = [];
+
+  // Basic Salary
+  earningsBody.push([
+    "Basic Salary",
+    formatAmount(payslip.earnings?.basicSalary),
+  ]);
+
+  // Grade Allowances section
+  const gradeAllowances = payslip.earnings?.allowances?.gradeAllowances || [];
+  if (gradeAllowances.length > 0) {
+    earningsBody.push([
+      {
+        content: "Grade Allowances",
+        colSpan: 2,
+        styles: { fontStyle: "bold" },
+      } as any,
+    ]);
+    gradeAllowances.forEach((a) => {
+      let label = a.name;
+      if (a.type === "percentage") {
+        label += ` (${a.value}%)`;
+      }
+      earningsBody.push([label, formatAmount(a.amount)]);
+    });
+  }
+
+  // Personal Allowances section
+  const additionalAllowances =
+    payslip.earnings?.allowances?.additionalAllowances || [];
+  if (additionalAllowances.length > 0) {
+    earningsBody.push([
+      {
+        content: "Personal Allowances",
+        colSpan: 2,
+        styles: { fontStyle: "bold" },
+      } as any,
+    ]);
+    additionalAllowances.forEach((a) => {
+      earningsBody.push([a.name, formatAmount(a.amount)]);
+    });
+  }
+
+  // Personal Bonuses section (using bonuses.items like in PayslipDetail.tsx)
+  // Handle both possible structures: earnings.bonus (actual data) and earnings.bonuses (type definition)
+  const bonuses =
+    (payslip.earnings as any)?.bonus ||
+    (payslip.earnings as any)?.bonuses?.items ||
+    [];
+  if (bonuses.length > 0) {
+    earningsBody.push([
+      {
+        content: "Personal Bonuses",
+        colSpan: 2,
+        styles: { fontStyle: "bold" },
+      } as any,
+    ]);
+    bonuses.forEach((b: any) => {
+      earningsBody.push([
+        b.description || "Personal Bonus",
+        formatAmount(b.amount),
+      ]);
+    });
+  }
+
+  // Totals (exactly like PayslipDetail.tsx)
+  if (gradeAllowances.length > 0 || additionalAllowances.length > 0) {
+    earningsBody.push([
+      "Total Allowances",
+      formatAmount(payslip.earnings?.allowances?.totalAllowances),
+    ]);
+  }
+  if (bonuses.length > 0) {
+    earningsBody.push([
+      "Total Bonuses",
+      formatAmount(payslip.totals?.totalBonuses),
+    ]);
+  }
+
   const earningsTable: TableConfig = {
     startY: yPos,
     head: [["Earnings", "Amount"]],
-    body: [
-      ["Basic Salary", formatAmount(payslip.earnings?.basicSalary)],
-      ...(payslip.earnings?.allowances?.gradeAllowances?.map((a) => [
-        `${a.name} ${a.type === "percentage" ? `(${a.value}%)` : ""}`,
-        formatAmount(a.amount),
-      ]) || []),
-      [
-        "Total Allowances",
-        formatAmount(payslip.earnings?.allowances?.totalAllowances),
-      ],
-      ["Total Bonuses", formatAmount(payslip.earnings?.bonuses?.totalBonuses)],
-    ],
+    body: earningsBody,
     theme: "grid",
     headStyles: {
       fillColor: [22, 163, 74],
@@ -124,32 +211,105 @@ export const generatePayslipPDF = async (payslip: Payslip) => {
   ).lastAutoTable;
   yPos = earningsLastAutoTable.finalY + 10;
 
-  // Deductions Table
+  // --- DETAILED DEDUCTION BREAKDOWN (EXACTLY LIKE PAYSLIPDETAIL.TSX) ---
+  const deductionsBody: (string | number)[][] = [];
+
+  // Use type guard like in PayslipDetail.tsx
+  if (hasBreakdown(payslip.deductions)) {
+    // Statutory Deductions section
+    if (payslip.deductions.breakdown.statutory?.length > 0) {
+      deductionsBody.push([
+        {
+          content: "Statutory Deductions",
+          colSpan: 2,
+          styles: { fontStyle: "bold" },
+        } as any,
+      ]);
+      payslip.deductions.breakdown.statutory.forEach(
+        (ded: any, _idx: number) => {
+          let label = ded.name;
+          if (ded.name === "PAYE Tax") {
+            label += ` (${payslip.deductions?.tax?.taxRate ?? "Progressive"}%)`;
+          } else if (
+            ded.calculationMethod &&
+            ded.calculationMethod !== "fixed"
+          ) {
+            if (
+              ded.calculationMethod === "percentage" ||
+              ded.calculationMethod === "PERCENTAGE"
+            ) {
+              label += ` (${ded.rate || ded.value || ""}%)`;
+            } else if (ded.calculationMethod === "progressive") {
+              label += ` (Progressive)`;
+            }
+          }
+          deductionsBody.push([label, formatAmount(ded.amount)]);
+        }
+      );
+    }
+
+    // Voluntary Deductions section
+    if (payslip.deductions.breakdown.voluntary?.length > 0) {
+      deductionsBody.push([
+        {
+          content: "Voluntary Deductions",
+          colSpan: 2,
+          styles: { fontStyle: "bold" },
+        } as any,
+      ]);
+      payslip.deductions.breakdown.voluntary.forEach(
+        (ded: any, _idx: number) => {
+          let label = ded.name;
+          if (ded.calculationMethod && ded.calculationMethod !== "fixed") {
+            if (
+              ded.calculationMethod === "percentage" ||
+              ded.calculationMethod === "PERCENTAGE"
+            ) {
+              label += ` (${ded.rate || ded.value || ""}%)`;
+            } else if (ded.calculationMethod === "progressive") {
+              label += ` (Progressive)`;
+            }
+          }
+          deductionsBody.push([label, formatAmount(ded.amount)]);
+        }
+      );
+    }
+  } else {
+    // Fallback for legacy fields if breakdown is missing
+    if (payslip.deductions?.tax) {
+      deductionsBody.push([
+        `PAYE Tax (${payslip.deductions?.tax?.taxRate?.toFixed(2)}%)`,
+        formatAmount(payslip.deductions?.tax?.amount),
+      ]);
+    }
+    if (payslip.deductions?.pension) {
+      deductionsBody.push([
+        `Pension (${payslip.deductions?.pension?.rate}%)`,
+        formatAmount(payslip.deductions?.pension?.amount),
+      ]);
+    }
+    if (payslip.deductions?.nhf) {
+      deductionsBody.push([
+        `NHF (${payslip.deductions?.nhf?.rate}%)`,
+        formatAmount(payslip.deductions?.nhf?.amount),
+      ]);
+    }
+    if (payslip.deductions?.loans && payslip.deductions.loans.length > 0) {
+      payslip.deductions.loans.forEach((loan) => {
+        deductionsBody.push([loan.description, formatAmount(loan.amount)]);
+      });
+    }
+    if (payslip.deductions?.others && payslip.deductions.others.length > 0) {
+      payslip.deductions.others.forEach((other) => {
+        deductionsBody.push([other.description, formatAmount(other.amount)]);
+      });
+    }
+  }
+
   const deductionsTable: TableConfig = {
     startY: yPos,
     head: [["Deductions", "Amount"]],
-    body: [
-      [
-        `PAYE Tax (${payslip.deductions?.tax?.taxRate?.toFixed(2)}%)`,
-        formatAmount(payslip.deductions?.tax?.amount),
-      ],
-      [
-        `Pension (${payslip.deductions?.pension?.rate}%)`,
-        formatAmount(payslip.deductions?.pension?.amount),
-      ],
-      [
-        `NHF (${payslip.deductions?.nhf?.rate}%)`,
-        formatAmount(payslip.deductions?.nhf?.amount),
-      ],
-      ...(payslip.deductions?.loans?.map((loan) => [
-        loan.description,
-        formatAmount(loan.amount),
-      ]) || []),
-      ...(payslip.deductions?.others?.map((other) => [
-        other.description,
-        formatAmount(other.amount),
-      ]) || []),
-    ],
+    body: deductionsBody,
     theme: "grid",
     headStyles: {
       fillColor: [22, 163, 74],

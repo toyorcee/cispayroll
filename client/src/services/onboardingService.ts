@@ -39,15 +39,16 @@ export interface OnboardingEmployee {
 }
 
 export const onboardingService = {
-  // Get all onboarding employees
-  getOnboardingEmployees: async (): Promise<OnboardingEmployee[]> => {
+  getOnboardingEmployees: async (params?: any) => {
     try {
-      const response = await api.get(
-        `${BASE_URL}/super-admin/onboarding-employees`
-      );
-      return response.data.data || [];
+      const response = await api.get(`/api/onboarding`, { params });
+      // console.log("[onboardingService] API response:", response);
+      return response.data;
     } catch (error: any) {
       console.error("Failed to fetch onboarding employees:", error);
+      if (error.response) {
+        console.log("[onboardingService] Error response:", error.response);
+      }
       toast.error(
         error.response?.data?.message || "Failed to fetch onboarding employees"
       );
@@ -99,14 +100,14 @@ export const onboardingService = {
   completeOnboardingTask: async (
     employeeId: string,
     taskId: string,
+    completed: boolean = true,
     notes?: string
   ): Promise<OnboardingTask> => {
     try {
-      const response = await api.post(
-        `${BASE_URL}/super-admin/onboarding-employees/${employeeId}/tasks/${taskId}/complete`,
-        { notes }
+      const response = await api.patch(
+        `${BASE_URL}/onboarding/${employeeId}/tasks/${taskId}`,
+        { completed, notes }
       );
-      toast.success("Onboarding task completed successfully");
       return response.data.data;
     } catch (error: any) {
       console.error("Failed to complete onboarding task:", error);

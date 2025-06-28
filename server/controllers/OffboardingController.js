@@ -10,13 +10,44 @@ import { calculateFinalSettlement } from "../utils/payrollUtils.js";
 import { generateFinalSettlementReport } from "../utils/documentGenerators.js";
 import { EmailService } from "../services/emailService.js";
 import mongoose from "mongoose";
+import { getOffboardingTasks } from "../utils/defaultTasks.js";
+import LeaveModel from "../models/Leave.js";
 
 export class OffboardingController {
+  // Get default offboarding tasks
+  static async getDefaultOffboardingTasks(req, res, next) {
+    try {
+      console.log(
+        "[OffboardingController.getDefaultOffboardingTasks] User:",
+        req.user?._id
+      );
+      const defaultTasks = getOffboardingTasks();
+      res.status(200).json({
+        success: true,
+        data: defaultTasks,
+      });
+    } catch (error) {
+      console.error(
+        "[OffboardingController.getDefaultOffboardingTasks] Error:",
+        error
+      );
+      next(error);
+    }
+  }
+
   static async initiateOffboarding(req, res, next) {
     try {
+      console.log(
+        "[OffboardingController.initiateOffboarding] User:",
+        req.user?._id,
+        "Params:",
+        req.params,
+        "Body:",
+        req.body
+      );
       if (!req.user.permissions.includes(Permission.MANAGE_OFFBOARDING)) {
         console.log(
-          "[OFFBOARDING CONTROLLER] Permission denied for user:",
+          "[OffboardingController.initiateOffboarding] Permission denied for user:",
           req.user._id
         );
         throw new ApiError(
@@ -55,7 +86,10 @@ export class OffboardingController {
 
       const user = await UserModel.findById(userId);
       if (!user) {
-        console.log("[OFFBOARDING CONTROLLER] User not found:", userId);
+        console.log(
+          "[OffboardingController.initiateOffboarding] User not found:",
+          userId
+        );
         throw new ApiError(404, "User not found");
       }
 
@@ -70,7 +104,8 @@ export class OffboardingController {
       // Check if user is already in offboarding
       if (
         user.offboarding &&
-        user.offboarding.status !== OffboardingStatus.NOT_STARTED
+        user.offboarding.status &&
+        user.offboarding.status !== "not_started"
       ) {
         console.log(
           "[OFFBOARDING CONTROLLER] User already in offboarding process"
@@ -78,14 +113,49 @@ export class OffboardingController {
         throw new ApiError(400, "User is already in offboarding process");
       }
 
-      // Call the model method to initiate offboarding
-      const updatedUser = await user.initiateOffboarding({
-        type,
-        reason,
-        targetExitDate: new Date(targetExitDate),
-        initiatedBy: req.user._id,
+      // Calculate unused leave days
+      const approvedLeaves = await LeaveModel.find({
+        user: userId,
+        status: "approved",
+        endDate: { $lte: new Date(targetExitDate) },
       });
+      const leaveTaken = approvedLeaves.reduce((sum, leave) => {
+        // Calculate days for each leave (inclusive)
+        const start = new Date(leave.startDate);
+        const end = new Date(leave.endDate);
+        const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+        return sum + days;
+      }, 0);
+      const annualEntitlement = user.leave?.annual || 0;
+      const unusedLeaveDays = Math.max(annualEntitlement - leaveTaken, 0);
 
+      // Get default offboarding tasks
+      const offboardingTasks = getOffboardingTasks();
+
+      // Update user with offboarding information
+      const updatedUser = await UserModel.findByIdAndUpdate(
+        userId,
+        {
+          $set: {
+            "offboarding.status": OffboardingStatus.IN_PROGRESS,
+            "offboarding.type": type,
+            "offboarding.reason": reason,
+            "offboarding.targetExitDate": new Date(targetExitDate),
+            "offboarding.initiatedBy": req.user._id,
+            "offboarding.initiatedAt": new Date(),
+            "offboarding.tasks": offboardingTasks,
+            "offboarding.unusedLeaveDays": unusedLeaveDays,
+            "lifecycle.currentState": UserLifecycleState.OFFBOARDING,
+          },
+        },
+        { new: true, runValidators: false }
+      );
+      console.log(
+        "[OffboardingController.initiateOffboarding] Offboarding initiated for user:",
+        userId,
+        "Updated offboarding:",
+        updatedUser.offboarding
+      );
       res.status(200).json({
         success: true,
         message: "Offboarding process initiated successfully",
@@ -93,7 +163,7 @@ export class OffboardingController {
       });
     } catch (error) {
       console.error(
-        "[OFFBOARDING CONTROLLER] Error initiating offboarding:",
+        "[OffboardingController.initiateOffboarding] Error:",
         error
       );
       next(error);
@@ -102,6 +172,14 @@ export class OffboardingController {
 
   static async updateOffboardingChecklist(req, res, next) {
     try {
+      console.log(
+        "[OffboardingController.updateOffboardingChecklist] User:",
+        req.user?._id,
+        "Params:",
+        req.params,
+        "Body:",
+        req.body
+      );
       if (!req.user.permissions.includes(Permission.MANAGE_OFFBOARDING)) {
         throw new ApiError(
           403,
@@ -124,12 +202,24 @@ export class OffboardingController {
         data: user.offboarding,
       });
     } catch (error) {
+      console.error(
+        "[OffboardingController.updateOffboardingChecklist] Error:",
+        error
+      );
       next(error);
     }
   }
 
   static async completeOffboarding(req, res, next) {
     try {
+      console.log(
+        "[OffboardingController.completeOffboarding] User:",
+        req.user?._id,
+        "Params:",
+        req.params,
+        "Body:",
+        req.body
+      );
       if (!req.user.permissions.includes(Permission.MANAGE_OFFBOARDING)) {
         throw new ApiError(
           403,
@@ -153,12 +243,22 @@ export class OffboardingController {
         data: user,
       });
     } catch (error) {
+      console.error(
+        "[OffboardingController.completeOffboarding] Error:",
+        error
+      );
       next(error);
     }
   }
 
   static async getOffboardingEmployees(req, res, next) {
     try {
+      console.log(
+        "[OffboardingController.getOffboardingEmployees] User:",
+        req.user?._id,
+        "Query:",
+        req.query
+      );
       if (!req.user.permissions.includes(Permission.VIEW_OFFBOARDING)) {
         throw new ApiError(
           403,
@@ -218,6 +318,10 @@ export class OffboardingController {
         },
       });
     } catch (error) {
+      console.error(
+        "[OffboardingController.getOffboardingEmployees] Error:",
+        error
+      );
       next(error);
     }
   }
@@ -225,6 +329,14 @@ export class OffboardingController {
   // Complete a specific offboarding task
   static async completeTask(req, res) {
     try {
+      console.log(
+        "[OffboardingController.completeTask] User:",
+        req.user?._id,
+        "Params:",
+        req.params,
+        "Body:",
+        req.body
+      );
       const { userId, taskName } = req.params;
       const { completed, notes, attachments } = req.body;
 
@@ -296,7 +408,7 @@ export class OffboardingController {
             finalUpdate,
             settlementDetails
           );
-          const pdfBuffer = await pdfDoc.output("arraybuffer");
+          const pdfBuffer = Buffer.from(pdfDoc.output("arraybuffer"));
 
           // Update task attachments with the report
           await UserModel.findOneAndUpdate(
@@ -339,7 +451,7 @@ export class OffboardingController {
         offboarding: finalUpdate.offboarding,
       });
     } catch (error) {
-      console.error("Error completing task:", error);
+      console.error("[OffboardingController.completeTask] Error:", error);
       res
         .status(500)
         .json({ message: "Error completing task", error: error.message });
@@ -349,6 +461,12 @@ export class OffboardingController {
   // Get offboarding details
   static async getOffboardingDetails(req, res, next) {
     try {
+      console.log(
+        "[OffboardingController.getOffboardingDetails] User:",
+        req.user?._id,
+        "Params:",
+        req.params
+      );
       if (!req.user.permissions.includes(Permission.VIEW_OFFBOARDING)) {
         throw new ApiError(
           403,
@@ -379,6 +497,10 @@ export class OffboardingController {
         data: user.offboarding,
       });
     } catch (error) {
+      console.error(
+        "[OffboardingController.getOffboardingDetails] Error:",
+        error
+      );
       next(error);
     }
   }
@@ -386,6 +508,14 @@ export class OffboardingController {
   // Cancel offboarding
   static async cancelOffboarding(req, res, next) {
     try {
+      console.log(
+        "[OffboardingController.cancelOffboarding] User:",
+        req.user?._id,
+        "Params:",
+        req.params,
+        "Body:",
+        req.body
+      );
       if (!req.user.permissions.includes(Permission.MANAGE_OFFBOARDING)) {
         throw new ApiError(
           403,
@@ -410,12 +540,21 @@ export class OffboardingController {
         data: user.offboarding,
       });
     } catch (error) {
+      console.error("[OffboardingController.cancelOffboarding] Error:", error);
       next(error);
     }
   }
 
   static async updateExitInterview(req, res, next) {
     try {
+      console.log(
+        "[OffboardingController.updateExitInterview] User:",
+        req.user?._id,
+        "Params:",
+        req.params,
+        "Body:",
+        req.body
+      );
       if (!req.user.permissions.includes(Permission.MANAGE_OFFBOARDING)) {
         throw new ApiError(
           403,
@@ -448,12 +587,24 @@ export class OffboardingController {
         data: user.offboarding.exitInterview,
       });
     } catch (error) {
+      console.error(
+        "[OffboardingController.updateExitInterview] Error:",
+        error
+      );
       next(error);
     }
   }
 
   static async updateRehireEligibility(req, res, next) {
     try {
+      console.log(
+        "[OffboardingController.updateRehireEligibility] User:",
+        req.user?._id,
+        "Params:",
+        req.params,
+        "Body:",
+        req.body
+      );
       if (!req.user.permissions.includes(Permission.MANAGE_OFFBOARDING)) {
         throw new ApiError(
           403,
@@ -484,12 +635,89 @@ export class OffboardingController {
         data: user.offboarding.rehireEligible,
       });
     } catch (error) {
+      console.error(
+        "[OffboardingController.updateRehireEligibility] Error:",
+        error
+      );
       next(error);
     }
   }
 
+  // Shared helper to prepare employee salary data and generate settlement details
+  static async prepareEmployeeSettlement(employee) {
+    // Check if salary grade information exists
+    if (!employee.salaryGrade || !employee.salaryGrade.basicSalary) {
+      console.warn(
+        `No salary grade information found for employee ${employee._id}`
+      );
+
+      if (employee.gradeLevel) {
+        console.log(
+          `Using grade level ${employee.gradeLevel} to determine salary`
+        );
+
+        const salaryGrade = await mongoose.model("SalaryGrade").findOne({
+          level: employee.gradeLevel,
+          isActive: true,
+        });
+
+        if (salaryGrade) {
+          console.log(
+            `Found salary grade for level ${employee.gradeLevel}: ${salaryGrade.basicSalary}`
+          );
+          employee.salaryGrade = salaryGrade;
+          employee.salary = {
+            basic: salaryGrade.basicSalary,
+            allowances: [],
+            deductions: [],
+          };
+        } else {
+          console.warn(
+            `No salary grade found for level ${employee.gradeLevel}`
+          );
+          throw new ApiError(
+            400,
+            "Employee salary information is incomplete. Please set up salary grade first."
+          );
+        }
+      } else {
+        throw new ApiError(
+          400,
+          "Employee salary information is incomplete. Please set up salary grade first."
+        );
+      }
+    } else {
+      // Create a salary object from the salary grade
+      employee.salary = {
+        basic: employee.salaryGrade.basicSalary,
+        allowances: [],
+        deductions: [],
+      };
+    }
+
+    // Calculate final settlement
+    const exitDate = employee.offboarding?.targetExitDate || new Date();
+    const exitMonth = new Date(exitDate).getMonth() + 1;
+    const exitYear = new Date(exitDate).getFullYear();
+
+    const settlementDetails = await calculateFinalSettlement(
+      employee,
+      exitMonth,
+      exitYear,
+      { bypassOnboardingCheck: true }
+    );
+
+    return { employee, settlementDetails };
+  }
+
   static async generateFinalSettlementReport(req, res, next) {
     try {
+      console.log(
+        "[OffboardingController.generateFinalSettlementReport] User:",
+        req.user?._id,
+        "Params:",
+        req.params
+      );
       if (!req.user.permissions.includes(Permission.MANAGE_OFFBOARDING)) {
         throw new ApiError(
           403,
@@ -509,63 +737,16 @@ export class OffboardingController {
         throw new ApiError(404, "Employee not found");
       }
 
-      if (!employee.salaryGrade || !employee.salaryGrade.basicSalary) {
-        console.warn(
-          `No salary grade information found for employee ${employeeId}`
-        );
-
-        if (employee.gradeLevel) {
-          console.log(
-            `Using grade level ${employee.gradeLevel} to determine salary`
-          );
-
-          const salaryGrade = await mongoose.model("SalaryGrade").findOne({
-            level: employee.gradeLevel,
-            isActive: true,
-          });
-
-          if (salaryGrade) {
-            console.log(
-              `Found salary grade for level ${employee.gradeLevel}: ${salaryGrade.basicSalary}`
-            );
-            employee.salary = {
-              basic: salaryGrade.basicSalary,
-              allowances: [],
-              deductions: [],
-            };
-          } else {
-            console.warn(
-              `No salary grade found for level ${employee.gradeLevel}`
-            );
-            throw new ApiError(
-              400,
-              "Employee salary information is incomplete. Please set up salary grade first."
-            );
-          }
-        } else {
-          throw new ApiError(
-            400,
-            "Employee salary information is incomplete. Please set up salary grade first."
-          );
-        }
-      } else {
-        // Create a salary object from the salary grade
-        employee.salary = {
-          basic: employee.salaryGrade.basicSalary,
-          allowances: [],
-          deductions: [],
-        };
-      }
-
-      // Calculate final settlement
-      const settlementDetails = await calculateFinalSettlement(employee);
+      // Use shared helper to prepare employee data
+      const { employee: preparedEmployee, settlementDetails } =
+        await OffboardingController.prepareEmployeeSettlement(employee);
 
       // Generate PDF report
       const doc = await generateFinalSettlementReport(
-        employee,
+        preparedEmployee,
         settlementDetails
       );
-      const pdfBuffer = doc.output("arraybuffer");
+      const pdfBuffer = Buffer.from(doc.output("arraybuffer"));
 
       // Set response headers for PDF download
       res.setHeader("Content-Type", "application/pdf");
@@ -575,14 +756,63 @@ export class OffboardingController {
       );
 
       // Send the PDF buffer
-      res.send(Buffer.from(pdfBuffer));
+      res.send(pdfBuffer);
     } catch (error) {
+      console.error(
+        "[OffboardingController.generateFinalSettlementReport] Error:",
+        error
+      );
       next(error);
     }
   }
 
-  static async emailFinalSettlementReport(req, res) {
+  static async sendFinalSettlementEmail(employee, reqUser) {
     try {
+      // Use shared helper to prepare employee data
+      const { employee: preparedEmployee, settlementDetails } =
+        await OffboardingController.prepareEmployeeSettlement(employee);
+
+      // Generate PDF
+      const doc = await generateFinalSettlementReport(
+        preparedEmployee,
+        settlementDetails
+      );
+      const pdfBuffer = Buffer.from(doc.output("arraybuffer"));
+
+      // Send email
+      const emailService = new EmailService();
+      const html = `
+        <!DOCTYPE html>
+        <html><head><meta charset='utf-8'><title>Final Settlement Report</title></head><body>
+        <div>Dear ${employee.firstName} ${employee.lastName},<br/>Please find attached your final settlement report.</div>
+        </body></html>
+      `;
+      await emailService.sendEmail({
+        to: employee.email,
+        subject: "Final Settlement Report",
+        html,
+        attachments: [
+          { filename: "Final Settlement Report.pdf", content: pdfBuffer },
+        ],
+      });
+      return { success: true, message: "Email sent", employeeId: employee._id };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message,
+        employeeId: employee._id,
+      };
+    }
+  }
+
+  static async emailFinalSettlementReport(req, res, next) {
+    try {
+      console.log(
+        "[OffboardingController.emailFinalSettlementReport] User:",
+        req.user?._id,
+        "Params:",
+        req.params
+      );
       console.log("Starting email final settlement report process...");
 
       if (!req.user.permissions.includes(Permission.MANAGE_OFFBOARDING)) {
@@ -616,66 +846,17 @@ export class OffboardingController {
         email: employee.email,
       });
 
-      // Check if salary grade information exists
-      if (!employee.salaryGrade || !employee.salaryGrade.basicSalary) {
-        console.warn(
-          `No salary grade information found for employee ${employeeId}`
-        );
-
-        if (employee.gradeLevel) {
-          console.log(
-            `Using grade level ${employee.gradeLevel} to determine salary`
-          );
-
-          const salaryGrade = await mongoose.model("SalaryGrade").findOne({
-            level: employee.gradeLevel,
-            isActive: true,
-          });
-
-          if (salaryGrade) {
-            console.log(
-              `Found salary grade for level ${employee.gradeLevel}: ${salaryGrade.basicSalary}`
-            );
-            employee.salary = {
-              basic: salaryGrade.basicSalary,
-              allowances: [],
-              deductions: [],
-            };
-          } else {
-            console.warn(
-              `No salary grade found for level ${employee.gradeLevel}`
-            );
-            throw new ApiError(
-              400,
-              "Employee salary information is incomplete. Please set up salary grade first."
-            );
-          }
-        } else {
-          throw new ApiError(
-            400,
-            "Employee salary information is incomplete. Please set up salary grade first."
-          );
-        }
-      } else {
-        employee.salary = {
-          basic: employee.salaryGrade.basicSalary,
-          allowances: [],
-          deductions: [],
-        };
-      }
-
-      // Calculate final settlement
-      console.log("Calculating final settlement details...");
-      const settlementDetails = await calculateFinalSettlement(employee);
-      console.log("Settlement details calculated:", settlementDetails);
+      // Use shared helper to prepare employee data
+      const { employee: preparedEmployee, settlementDetails } =
+        await OffboardingController.prepareEmployeeSettlement(employee);
 
       // Generate PDF report
       console.log("Generating PDF report...");
       const doc = await generateFinalSettlementReport(
-        employee,
+        preparedEmployee,
         settlementDetails
       );
-      const pdfBuffer = doc.output("arraybuffer");
+      const pdfBuffer = Buffer.from(doc.output("arraybuffer"));
       console.log("PDF report generated successfully");
 
       // Send email with PDF attachment
@@ -811,16 +992,16 @@ export class OffboardingController {
                 </table>
               </div>
               
-              <p>Please find attached your detailed final settlement report for your records.</p>
-            </div>
-            
-            <div class="footer">
-              <p>This is an automated message. Please do not reply to this email.</p>
-              <p>For any queries, please contact:</p>
-              <p class="contact-info">HR Department</p>
-              <p>Email: hr@centuryinfosystems.com</p>
-              <p>Phone: +234 1234567890</p>
-              <p>© ${new Date().getFullYear()} Century Information Systems. All rights reserved.</p>
+              <p>Please find attached your final settlement report for your records.</p>
+              
+              <p>If you have any questions regarding this settlement, please contact the HR department.</p>
+              
+              <div class="footer">
+                <p><strong>Century Information Systems</strong></p>
+                <p>HR Department</p>
+                <p class="contact-info">Email: hr@centuryis.com | Phone: +234-xxx-xxx-xxxx</p>
+                <p>Generated on: ${new Date().toLocaleString()}</p>
+              </div>
             </div>
           </div>
         </body>
@@ -833,8 +1014,8 @@ export class OffboardingController {
         html: html,
         attachments: [
           {
-            filename: `final_settlement_${employee.employeeId}.pdf`,
-            content: Buffer.from(pdfBuffer),
+            filename: "Final Settlement Report.pdf",
+            content: pdfBuffer,
           },
         ],
       });
@@ -843,10 +1024,311 @@ export class OffboardingController {
 
       res.status(200).json({
         success: true,
-        message: "Final settlement report sent via email",
+        message: "Final settlement report sent successfully",
       });
     } catch (error) {
-      console.error("Error in emailFinalSettlementReport:", error);
+      console.error(
+        "[OffboardingController.emailFinalSettlementReport] Error:",
+        error
+      );
+      res.status(500).json({
+        success: false,
+        message: "Failed to send final settlement report",
+        error: error.message,
+      });
+    }
+  }
+
+  // Bulk email final settlement reports
+  static async emailFinalSettlementReportBulk(req, res) {
+    try {
+      if (!req.user.permissions.includes(Permission.MANAGE_OFFBOARDING)) {
+        throw new ApiError(
+          403,
+          "You don't have permission to email final settlement report"
+        );
+      }
+      let employees = [];
+      if (
+        Array.isArray(req.body.employeeIds) &&
+        req.body.employeeIds.length > 0
+      ) {
+        employees = await UserModel.find({ _id: { $in: req.body.employeeIds } })
+          .populate("department", "name code")
+          .populate("salaryGrade", "level basicSalary")
+          .select("-password");
+      } else {
+        // All offboarding or completed
+        employees = await UserModel.find({
+          $or: [
+            { "lifecycle.currentState": "OFFBOARDING" },
+            { "offboarding.status": { $in: ["in_progress", "completed"] } },
+          ],
+        })
+          .populate("department", "name code")
+          .populate("salaryGrade", "level basicSalary")
+          .select("-password");
+      }
+      if (!employees.length)
+        return res
+          .status(404)
+          .json({ success: false, message: "No employees found" });
+      const results = [];
+      for (const emp of employees) {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await OffboardingController.sendFinalSettlementEmail(
+          emp,
+          req.user
+        );
+        results.push(result);
+      }
+      const success = results.filter((r) => r.success);
+      const failed = results.filter((r) => !r.success);
+      return res.status(200).json({
+        success: true,
+        total: results.length,
+        sent: success.length,
+        failed: failed.length,
+        details: { success, failed },
+      });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // Bulk generate final settlement reports
+  static async generateFinalSettlementReportBulk(req, res) {
+    try {
+      if (!req.user.permissions.includes(Permission.VIEW_OFFBOARDING)) {
+        throw new ApiError(
+          403,
+          "You don't have permission to generate final settlement reports"
+        );
+      }
+
+      let employees = [];
+      if (
+        Array.isArray(req.body.employeeIds) &&
+        req.body.employeeIds.length > 0
+      ) {
+        employees = await UserModel.find({ _id: { $in: req.body.employeeIds } })
+          .populate("department", "name code")
+          .populate("salaryGrade", "level basicSalary")
+          .select("-password");
+      } else {
+        // All offboarding or completed
+        employees = await UserModel.find({
+          $or: [
+            { "lifecycle.currentState": "OFFBOARDING" },
+            { "offboarding.status": { $in: ["in_progress", "completed"] } },
+          ],
+        })
+          .populate("department", "name code")
+          .populate("salaryGrade", "level basicSalary")
+          .select("-password");
+      }
+
+      if (!employees.length) {
+        return res
+          .status(404)
+          .json({ success: false, message: "No employees found" });
+      }
+
+      // Generate PDFs for all employees
+      const pdfBuffers = [];
+      const employeeNames = [];
+
+      for (const employee of employees) {
+        try {
+          const { settlementDetails } =
+            await OffboardingController.prepareEmployeeSettlement(employee);
+          const doc = await generateFinalSettlementReport(
+            employee,
+            settlementDetails
+          );
+          const pdfBuffer = Buffer.from(doc.output("arraybuffer"));
+
+          pdfBuffers.push(pdfBuffer);
+          employeeNames.push(`${employee.firstName}_${employee.lastName}`);
+        } catch (error) {
+          console.error(
+            `Error generating PDF for ${employee.fullName}:`,
+            error
+          );
+          // Continue with other employees
+        }
+      }
+
+      if (pdfBuffers.length === 0) {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to generate any PDFs",
+        });
+      }
+
+      // Create ZIP file with all PDFs
+      const JSZip = await import("jszip");
+      const zip = new JSZip.default();
+
+      pdfBuffers.forEach((buffer, index) => {
+        const fileName = `final_settlement_${employeeNames[index]}.pdf`;
+        zip.file(fileName, buffer);
+      });
+
+      const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+
+      // Set response headers for ZIP download
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="final_settlements_${
+          new Date().toISOString().split("T")[0]
+        }.zip"`
+      );
+
+      res.send(zipBuffer);
+    } catch (error) {
+      console.error("Error generating bulk final settlement reports:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to generate final settlement reports",
+        error: error.message,
+      });
+    }
+  }
+
+  // Bulk get final settlement details
+  static async getFinalSettlementDetailsBulk(req, res) {
+    try {
+      if (!req.user.permissions.includes(Permission.VIEW_OFFBOARDING)) {
+        throw new ApiError(
+          403,
+          "You don't have permission to view final settlement details"
+        );
+      }
+
+      let employees = [];
+      if (
+        Array.isArray(req.body.employeeIds) &&
+        req.body.employeeIds.length > 0
+      ) {
+        employees = await UserModel.find({ _id: { $in: req.body.employeeIds } })
+          .populate("department", "name code")
+          .populate("salaryGrade", "level basicSalary")
+          .select("-password");
+      } else {
+        // All offboarding or completed
+        employees = await UserModel.find({
+          $or: [
+            { "lifecycle.currentState": "OFFBOARDING" },
+            { "offboarding.status": { $in: ["in_progress", "completed"] } },
+          ],
+        })
+          .populate("department", "name code")
+          .populate("salaryGrade", "level basicSalary")
+          .select("-password");
+      }
+
+      if (!employees.length) {
+        return res
+          .status(404)
+          .json({ success: false, message: "No employees found" });
+      }
+
+      // Get settlement details for all employees
+      const settlementDetails = [];
+
+      for (const employee of employees) {
+        try {
+          const { settlementDetails: details } =
+            await OffboardingController.prepareEmployeeSettlement(employee);
+          settlementDetails.push({
+            employee: {
+              _id: employee._id,
+              fullName: employee.fullName,
+              department: employee.department,
+              position: employee.position,
+            },
+            settlementDetails: details,
+          });
+        } catch (error) {
+          console.error(
+            `Error getting settlement details for ${employee.fullName}:`,
+            error
+          );
+          // Continue with other employees
+        }
+      }
+
+      res.status(200).json({
+        success: true,
+        settlementDetails: settlementDetails,
+      });
+    } catch (error) {
+      console.error("Error getting bulk final settlement details:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to get final settlement details",
+        error: error.message,
+      });
+    }
+  }
+
+  static async getFinalSettlementDetails(req, res, next) {
+    try {
+      console.log(
+        "[OffboardingController.getFinalSettlementDetails] User:",
+        req.user?._id,
+        "Params:",
+        req.params
+      );
+
+      if (!req.user.permissions.includes(Permission.VIEW_OFFBOARDING)) {
+        throw new ApiError(
+          403,
+          "You don't have permission to view final settlement details"
+        );
+      }
+
+      const { employeeId } = req.params;
+
+      // Find the employee with salary grade information
+      const employee = await UserModel.findById(employeeId)
+        .populate("department", "name code")
+        .populate("salaryGrade", "level basicSalary")
+        .select("-password");
+
+      if (!employee) {
+        throw new ApiError(404, "Employee not found");
+      }
+
+      // Use shared helper to prepare employee data
+      const { settlementDetails } =
+        await OffboardingController.prepareEmployeeSettlement(employee);
+
+      console.log(
+        "Settlement details calculated for CSV/print:",
+        settlementDetails
+      );
+
+      res.status(200).json({
+        success: true,
+        employee: {
+          _id: employee._id,
+          fullName:
+            employee.fullName || `${employee.firstName} ${employee.lastName}`,
+          department: employee.department,
+          position: employee.position,
+          email: employee.email,
+          employeeId: employee.employeeId,
+        },
+        settlementDetails: settlementDetails,
+      });
+    } catch (error) {
+      console.error(
+        "[OffboardingController.getFinalSettlementDetails] Error:",
+        error
+      );
       next(error);
     }
   }

@@ -5,12 +5,19 @@ import { EmployeeService } from "../services/employeeService.js";
 import { EmailService } from "../services/emailService.js";
 import bcrypt from "bcryptjs";
 import { OnboardingStatus } from "../models/User.js";
+import {
+  getOnboardingTasks,
+  getOffboardingTasks,
+} from "../utils/defaultTasks.js";
 
 export class InvitationController {
   static async createInvitation(req, res) {
     try {
       const { email, role, departmentId } = req.body;
       const createdBy = req.user.id;
+
+      // Get default onboarding tasks
+      const onboardingTasks = getOnboardingTasks();
 
       const { employee } = await EmployeeService.createEmployee(
         {
@@ -19,38 +26,7 @@ export class InvitationController {
           department: departmentId,
           onboarding: {
             status: "NOT_STARTED",
-            tasks: [
-              {
-                name: "Welcome Meeting",
-                description: "Initial orientation and welcome meeting",
-                category: "orientation",
-                deadline: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days
-              },
-              {
-                name: "Department Introduction",
-                description: "Meet team and understand department workflow",
-                category: "orientation",
-                deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days
-              },
-              {
-                name: "System Access Setup",
-                description: "Set up system access and accounts",
-                category: "setup",
-                deadline: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000), // 4 days
-              },
-              {
-                name: "Policy Documentation Review",
-                description: "Review and acknowledge company policies",
-                category: "compliance",
-                deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days
-              },
-              {
-                name: "Initial Training Session",
-                description: "Complete initial training modules",
-                category: "training",
-                deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-              },
-            ],
+            tasks: onboardingTasks,
           },
         },
         { _id: createdBy }
@@ -110,8 +86,7 @@ export class InvitationController {
         return res.status(400).json({
           success: false,
           message: "Invalid or expired invitation token",
-        }
-      );
+        });
       }
 
       res.status(200).json({
@@ -205,49 +180,27 @@ export class InvitationController {
         user.profileImage = profileImage.replace(/\\/g, "/");
       }
 
+      // Get default onboarding tasks
+      const onboardingTasks = getOnboardingTasks();
+      // Get default offboarding tasks
+      const offboardingTasks = getOffboardingTasks();
+
       // Initialize onboarding
       user.onboarding = {
         status: OnboardingStatus.NOT_STARTED,
-        tasks: [
-          {
-            name: "Welcome Meeting",
-            description: "Initial orientation and welcome meeting",
-            category: "orientation",
-            deadline: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-            completed: false,
-          },
-          {
-            name: "Department Introduction",
-            description: "Meet team and understand department workflow",
-            category: "orientation",
-            deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-            completed: false,
-          },
-          {
-            name: "System Access Setup",
-            description: "Set up system access and accounts",
-            category: "setup",
-            deadline: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
-            completed: false,
-          },
-          {
-            name: "Policy Documentation Review",
-            description: "Review and acknowledge company policies",
-            category: "compliance",
-            deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-            completed: false,
-          },
-          {
-            name: "Initial Training Session",
-            description: "Complete initial training modules",
-            category: "training",
-            deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-            completed: false,
-          },
-        ],
+        tasks: onboardingTasks,
         progress: 0,
         startedAt: new Date(),
       };
+
+      // Initialize offboarding if missing or reset to default
+      if (!user.offboarding || typeof user.offboarding !== "object") {
+        user.offboarding = {
+          status: "not_started",
+          tasks: offboardingTasks,
+          progress: 0,
+        };
+      }
 
       // Clear invitation data
       user.invitationToken = undefined;

@@ -1,9 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
-  FaMoneyBill,
   FaExclamationTriangle,
-  FaFileAlt,
   FaCheck,
   FaTimes,
   FaChevronLeft,
@@ -17,7 +15,6 @@ import {
   FaPrint,
   FaEnvelope,
   FaFileCsv,
-  FaFileCode,
   FaClock,
 } from "react-icons/fa";
 import {
@@ -33,7 +30,6 @@ import { payrollService } from "../../../services/payrollService";
 import { adminPayrollService } from "../../../services/adminPayrollService";
 import payrollReportService from "../../../services/payrollReportService";
 import { useAuth } from "../../../context/AuthContext";
-import { UserRole } from "../../../types/auth";
 import TableSkeleton from "../../../components/skeletons/TableSkeleton";
 import { toast } from "react-toastify";
 import PayslipDetail from "../../../components/payroll/processpayroll/PayslipDetail";
@@ -187,6 +183,14 @@ interface Statistics {
   totalAmountPending: number;
   totalAmountProcessing: number;
   totalAmountPendingPayment: number;
+}
+
+function getEmployeeName(employee: any) {
+  if (!employee) return "Unknown Employee";
+  if (employee.fullName) return employee.fullName;
+  if (employee.firstName && employee.lastName)
+    return `${employee.firstName} ${employee.lastName}`;
+  return "Unknown Employee";
 }
 
 export default function ProcessPayment() {
@@ -494,7 +498,7 @@ export default function ProcessPayment() {
   });
 
   useEffect(() => {
-    console.log("All payrolls:", payrollsData?.data?.payrolls);
+    console.log("All payrolls:", payrollsData?.data?.payrolls); // Log all fetched payrolls
     console.log("Current filters:", filters);
 
     const filtered =
@@ -504,10 +508,10 @@ export default function ProcessPayment() {
         const matchesSearch =
           !filters.search ||
           payroll.employee.fullName
-            .toLowerCase()
+            ?.toLowerCase()
             .includes(filters.search.toLowerCase()) ||
           payroll.employee.employeeId
-            .toLowerCase()
+            ?.toLowerCase()
             .includes(filters.search.toLowerCase());
 
         return matchesStatus && matchesSearch;
@@ -557,30 +561,6 @@ export default function ProcessPayment() {
       toast.error("Failed to fetch employee history");
     }
   };
-
-  interface SummaryCardProps {
-    icon: React.ReactNode;
-    title: string;
-    value: string;
-  }
-
-  const SummaryCard = ({ icon, title, value }: SummaryCardProps) => (
-    <div className="bg-white overflow-hidden shadow rounded-lg transform transition-all duration-300 hover:scale-105 hover:-translate-y-1 hover:shadow-lg cursor-pointer">
-      <div className="p-5">
-        <div className="flex items-center">
-          <div className="flex-shrink-0">{icon}</div>
-          <div className="ml-5 w-0 flex-1">
-            <dl>
-              <dt className="text-sm font-medium text-gray-500 truncate">
-                {title}
-              </dt>
-              <dd className="text-lg font-medium text-gray-900">{value}</dd>
-            </dl>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 
   const PayrollTable = () => (
     <div className="space-y-4">
@@ -635,111 +615,81 @@ export default function ProcessPayment() {
           </TableHead>
           <TableBody>
             {(payrollsData?.data?.payrolls ?? []).length > 0 ? (
-              payrollsData?.data?.payrolls?.map((payroll: PayrollData) => (
-                <TableRow
-                  key={payroll._id}
-                  className={`hover:bg-gray-50 cursor-pointer ${
-                    selectedPayrolls.includes(payroll._id) ? "bg-blue-50" : ""
-                  }`}
-                  onClick={() => handleSelectPayroll(payroll._id)}
-                >
-                  <TableCell>
-                    <input
-                      type="checkbox"
-                      checked={selectedPayrolls.includes(payroll._id)}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        handleSelectPayroll(payroll._id);
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {payroll.employee?.fullName ?? "Unassigned"}
-                  </TableCell>
-                  <TableCell>
-                    {payroll.department?.name ?? "Unassigned"}
-                  </TableCell>
-                  <TableCell>{payroll.salaryGrade.level}</TableCell>
-                  <TableCell>{formatCurrency(payroll.totals.netPay)}</TableCell>
-                  <TableCell>
-                    <span
-                      className={`px-2 py-1 rounded-full text-sm font-medium ${
-                        statusColors[payroll.status]
-                      }`}
-                    >
-                      {statusLabels[payroll.status]}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(payroll.createdAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell align="center">
-                    <div className="flex items-center justify-center space-x-2">
-                      <button
-                        onClick={(e) => {
+              payrollsData?.data?.payrolls?.map((payroll: PayrollData) => {
+                // Log the employee field for debugging
+                console.log("Payroll employee field:", payroll.employee);
+                return (
+                  <TableRow
+                    key={payroll._id}
+                    className={`hover:bg-gray-50 cursor-pointer ${
+                      selectedPayrolls.includes(payroll._id) ? "bg-blue-50" : ""
+                    }`}
+                    onClick={() => handleSelectPayroll(payroll._id)}
+                  >
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedPayrolls.includes(payroll._id)}
+                        onChange={(e) => {
                           e.stopPropagation();
-                          handleViewEmployeeHistory(
-                            payroll.employee?._id ?? ""
-                          );
+                          handleSelectPayroll(payroll._id);
                         }}
-                        className="text-blue-600 hover:text-blue-800"
-                        title="View History"
-                        disabled={!payroll.employee}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {payroll.employee?.fullName ||
+                        (payroll.employee?.firstName &&
+                        payroll.employee?.lastName
+                          ? `${payroll.employee.firstName} ${payroll.employee.lastName}`
+                          : "Unassigned")}
+                    </TableCell>
+                    <TableCell>
+                      {payroll.department?.name ?? "Unassigned"}
+                    </TableCell>
+                    <TableCell>{payroll.salaryGrade.level}</TableCell>
+                    <TableCell>
+                      {formatCurrency(payroll.totals.netPay)}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`px-2 py-1 rounded-full text-sm font-medium ${
+                          statusColors[payroll.status]
+                        }`}
                       >
-                        <FaHistory />
-                      </button>
-                      {payroll.status === PayrollStatus.PAID && (
+                        {statusLabels[payroll.status]}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(payroll.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell align="center">
+                      <div className="flex items-center justify-center space-x-2">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleViewPayslip(payroll._id);
+                            handleViewEmployeeHistory(
+                              payroll.employee?._id ?? ""
+                            );
                           }}
-                          className="text-green-600 hover:text-green-800 relative flex items-center justify-center cursor-pointer"
-                          title="View Payslip"
-                          disabled={loadingPayslipId === payroll._id}
+                          className="text-blue-600 hover:text-blue-800"
+                          title="View History"
+                          disabled={!payroll.employee}
                         >
-                          {loadingPayslipId === payroll._id ? (
-                            <svg
-                              className="animate-spin h-5 w-5 text-green-600"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                                fill="none"
-                              />
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8v8z"
-                              />
-                            </svg>
-                          ) : (
-                            <FaFileInvoiceDollar />
-                          )}
+                          <FaHistory />
                         </button>
-                      )}
-                      {payroll.status === PayrollStatus.APPROVED && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleInitiatePayment(payroll);
-                          }}
-                          className="px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
-                          disabled={
-                            processPaymentMutation.isPending &&
-                            processPaymentMutation.variables === payroll._id
-                          }
-                        >
-                          {processPaymentMutation.isPending &&
-                          processPaymentMutation.variables === payroll._id ? (
-                            <span className="flex items-center">
+                        {payroll.status === PayrollStatus.PAID && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewPayslip(payroll._id);
+                            }}
+                            className="text-green-600 hover:text-green-800 relative flex items-center justify-center cursor-pointer"
+                            title="View Payslip"
+                            disabled={loadingPayslipId === payroll._id}
+                          >
+                            {loadingPayslipId === payroll._id ? (
                               <svg
-                                className="animate-spin h-4 w-4 mr-2"
+                                className="animate-spin h-5 w-5 text-green-600"
                                 viewBox="0 0 24 24"
                               >
                                 <circle
@@ -757,44 +707,84 @@ export default function ProcessPayment() {
                                   d="M4 12a8 8 0 018-8v8z"
                                 />
                               </svg>
-                              Initiating...
-                            </span>
-                          ) : (
-                            <span className="flex items-center">
-                              <FaRocket className="mr-1" />
-                              Initiate Payment
-                            </span>
-                          )}
-                        </button>
-                      )}
-                      {payroll.status === PayrollStatus.PENDING_PAYMENT && (
-                        <>
+                            ) : (
+                              <FaFileInvoiceDollar />
+                            )}
+                          </button>
+                        )}
+                        {payroll.status === PayrollStatus.APPROVED && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleMarkAsPaid(payroll._id);
+                              handleInitiatePayment(payroll);
                             }}
-                            className="flex items-center justify-center p-2 text-green-600 hover:text-white bg-green-50 hover:bg-green-600 rounded-full transition-all duration-200"
-                            title="Mark as Paid"
+                            className="px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+                            disabled={
+                              processPaymentMutation.isPending &&
+                              processPaymentMutation.variables === payroll._id
+                            }
                           >
-                            <FaCheck size={20} />
+                            {processPaymentMutation.isPending &&
+                            processPaymentMutation.variables === payroll._id ? (
+                              <span className="flex items-center">
+                                <svg
+                                  className="animate-spin h-4 w-4 mr-2"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <circle
+                                    className="opacity-25"
+                                    cx="12"
+                                    cy="12"
+                                    r="10"
+                                    stroke="currentColor"
+                                    strokeWidth="4"
+                                    fill="none"
+                                  />
+                                  <path
+                                    className="opacity-75"
+                                    fill="currentColor"
+                                    d="M4 12a8 8 0 018-8v8z"
+                                  />
+                                </svg>
+                                Initiating...
+                              </span>
+                            ) : (
+                              <span className="flex items-center">
+                                <FaRocket className="mr-1" />
+                                Initiate Payment
+                              </span>
+                            )}
                           </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleMarkAsFailed(payroll._id);
-                            }}
-                            className="flex items-center justify-center p-2 text-red-600 hover:text-white bg-red-50 hover:bg-red-600 rounded-full transition-all duration-200"
-                            title="Mark as Failed"
-                          >
-                            <FaTimes size={20} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                        )}
+                        {payroll.status === PayrollStatus.PENDING_PAYMENT && (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkAsPaid(payroll._id);
+                              }}
+                              className="flex items-center justify-center p-2 text-green-600 hover:text-white bg-green-50 hover:bg-green-600 rounded-full transition-all duration-200"
+                              title="Mark as Paid"
+                            >
+                              <FaCheck size={20} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkAsFailed(payroll._id);
+                              }}
+                              className="flex items-center justify-center p-2 text-red-600 hover:text-white bg-red-50 hover:bg-red-600 rounded-full transition-all duration-200"
+                              title="Mark as Failed"
+                            >
+                              <FaTimes size={20} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             ) : (
               <TableRow>
                 <TableCell colSpan={7} align="center">
@@ -1908,7 +1898,8 @@ export default function ProcessPayment() {
     "download-csv" | "download-pdf" | "email"
   >("download-csv");
   const [emailRecipient, setEmailRecipient] = useState("");
-  const [emailFormat, setEmailFormat] = useState<"csv" | "pdf">("pdf");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [emailFormat, _setEmailFormat] = useState<"csv" | "pdf">("pdf");
 
   // Email attachment format selection state
   const [emailFormats, setEmailFormats] = useState<{
@@ -2415,8 +2406,7 @@ export default function ProcessPayment() {
                       fontWeight: "600",
                     }}
                   >
-                    {selectedPaymentPayroll.employee?.fullName ||
-                      "Unknown Employee"}
+                    {getEmployeeName(selectedPaymentPayroll.employee)}
                   </Typography>
                   <span
                     style={{
@@ -3660,7 +3650,7 @@ export default function ProcessPayment() {
                     variant="h6"
                     sx={{ color: "white", fontWeight: "600" }}
                   >
-                    {singlePayrollData.employee?.fullName || "Unknown Employee"}
+                    {getEmployeeName(singlePayrollData.employee)}
                   </Typography>
                   <span
                     style={{

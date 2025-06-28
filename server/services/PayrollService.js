@@ -18,7 +18,7 @@ import Bonus from "../models/Bonus.js";
 const asObjectId = (id) => new Types.ObjectId(id);
 
 export class PayrollService {
-  static async validateAndGetEmployee(employeeId) {
+  static async validateAndGetEmployee(employeeId, options = {}) {
     console.log("🔍 Validating employee:", employeeId);
 
     const employee = await UserModel.findById(employeeId).lean();
@@ -35,6 +35,29 @@ export class PayrollService {
 
     if (!employee.department) {
       throw new ApiError(400, "Employee must be assigned to a department");
+    }
+
+    // Check onboarding eligibility
+    if (
+      !options?.bypassOnboardingCheck &&
+      employee.onboarding &&
+      employee.onboarding.status !== "completed"
+    ) {
+      throw new ApiError(
+        400,
+        `Employee ${employee.firstName} ${employee.lastName} must complete onboarding before payroll can be processed`
+      );
+    }
+
+    // Log successful onboarding check
+    if (employee.onboarding) {
+      console.log(
+        `✅ Onboarding check PASSED for ${employee.firstName} ${employee.lastName} - status: ${employee.onboarding.status}`
+      );
+    } else {
+      console.log(
+        `✅ Onboarding check PASSED for ${employee.firstName} ${employee.lastName} - no onboarding data (legacy user)`
+      );
     }
 
     // If department is a string, try to find the department by name
@@ -115,11 +138,23 @@ export class PayrollService {
   }
 
   static calculateAllowanceAmount(allowance, basicSalary) {
-    if (allowance.calculationMethod === "percentage") {
-      const base = allowance.baseAmount || basicSalary;
-      return (base * allowance.value) / 100;
+    if (allowance.calculationMethod === "fixed") {
+      return allowance.value;
     }
-    return allowance.value;
+    if (allowance.calculationMethod === "percentage") {
+      return (allowance.value / 100) * basicSalary;
+    }
+    return 0;
+  }
+
+  static calculateDeductionAmount(deduction, basicSalary) {
+    if (deduction.calculationMethod === "fixed") {
+      return deduction.value;
+    }
+    if (deduction.calculationMethod === "percentage") {
+      return (deduction.value / 100) * basicSalary;
+    }
+    return 0;
   }
 
   static async calculateSalaryComponents(salaryGradeId, employeeId) {
@@ -176,14 +211,69 @@ export class PayrollService {
     }
   }
 
-  static async calculateDeductions(basicSalary, grossSalary) {
-    console.log("🧮 Calculating deductions for salary:", {
+  // Helper: Calculate current period data based on frequency
+  static getCurrentPeriodData(frequency, payrollDate = new Date()) {
+    const currentMonth = payrollDate.getMonth() + 1;
+    const currentYear = payrollDate.getFullYear();
+
+    // Calculate week of year (1-53)
+    const startOfYear = new Date(currentYear, 0, 1);
+    const days = Math.floor(
+      (payrollDate - startOfYear) / (1000 * 60 * 60 * 24)
+    );
+    const currentWeek = Math.ceil((days + startOfYear.getDay() + 1) / 7);
+
+    // Calculate biweek (1-27, every 2 weeks)
+    const currentBiweek = Math.ceil(currentWeek / 2);
+
+    // Calculate quarter (1-4)
+    const currentQuarter = Math.ceil(currentMonth / 3);
+
+    return {
+      currentMonth,
+      currentYear,
+      currentWeek,
+      currentBiweek,
+      currentQuarter,
+    };
+  }
+
+  static async calculateDeductions(
+    basicSalary,
+    grossSalary,
+    frequency,
+    payrollDate,
+    scopeFilter = {}
+  ) {
+    console.log("🧮 [PayrollService] Calculating deductions for salary:", {
       basicSalary,
       grossSalary,
+      frequency,
+      payrollDate,
+      scopeFilter,
     });
 
-    // Get all active deductions
-    const deductions = await DeductionService.getActiveDeductions();
+    // Get current period data
+    const currentPeriodData = this.getCurrentPeriodData(frequency, payrollDate);
+
+    // Get all applicable deductions for this period
+    const deductions = await DeductionService.getApplicableDeductions(
+      frequency,
+      currentPeriodData,
+      scopeFilter
+    );
+
+    console.log(
+      "🔍 [PayrollService] All deductions fetched:",
+      deductions.map((d) => ({
+        name: d.name,
+        type: d.type,
+        scope: d.scope,
+        department: d.department,
+        value: d.value,
+        calculationMethod: d.calculationMethod,
+      }))
+    );
 
     // 1. Calculate Statutory Deductions
     const paye = this.calculatePAYE(grossSalary);
@@ -193,15 +283,71 @@ export class PayrollService {
     const statutoryTotal = paye + pension + nhf;
 
     // 2. Calculate Voluntary Deductions
-    const voluntaryDeductions = deductions.voluntary
-      .filter((d) => d.isActive)
-      .reduce((total, deduction) => {
-        const amount =
-          deduction.calculationMethod === "percentage"
-            ? (basicSalary * deduction.value) / 100
-            : deduction.value;
-        return total + amount;
-      }, 0);
+    let voluntaryTotal = 0;
+    const voluntaryDeductions = deductions.filter(
+      (d) => d.type === "VOLUNTARY" && d.isActive
+    );
+
+    console.log("🔍 Voluntary deductions found:", {
+      count: voluntaryDeductions.length,
+      deductions: voluntaryDeductions.map((d) => ({
+        name: d.name,
+        value: d.value,
+        calculationMethod: d.calculationMethod,
+        scope: d.scope,
+        department: d.department,
+      })),
+    });
+
+    // Calculate amounts for each voluntary deduction
+    const calculatedVoluntaryDeductions = [];
+    for (const deduction of voluntaryDeductions) {
+      let amount = 0;
+
+      switch (deduction.calculationMethod) {
+        case "FIXED":
+          amount = deduction.value;
+          break;
+        case "PERCENTAGE":
+          amount = (grossSalary * deduction.value) / 100;
+          break;
+        case "PROGRESSIVE":
+          amount = this.calculateProgressiveDeduction(
+            grossSalary,
+            deduction.taxBrackets
+          );
+          break;
+        default:
+          amount = deduction.value;
+      }
+
+      console.log(`💰 Voluntary deduction "${deduction.name}":`, {
+        calculationMethod: deduction.calculationMethod,
+        value: deduction.value,
+        calculatedAmount: amount,
+      });
+
+      calculatedVoluntaryDeductions.push({
+        ...deduction.toObject(),
+        calculatedAmount: amount,
+      });
+
+      voluntaryTotal += amount;
+    }
+
+    console.log("📊 Deduction totals:", {
+      statutory: {
+        paye,
+        pension,
+        nhf,
+        total: statutoryTotal,
+      },
+      voluntary: {
+        count: voluntaryDeductions.length,
+        total: voluntaryTotal,
+      },
+      grandTotal: statutoryTotal + voluntaryTotal,
+    });
 
     return {
       statutory: {
@@ -210,8 +356,11 @@ export class PayrollService {
         nhf,
         total: statutoryTotal,
       },
-      voluntary: voluntaryDeductions,
-      total: statutoryTotal + voluntaryDeductions,
+      voluntary: {
+        deductions: calculatedVoluntaryDeductions,
+        total: voluntaryTotal,
+      },
+      total: statutoryTotal + voluntaryTotal,
     };
   }
 
@@ -287,6 +436,7 @@ export class PayrollService {
 
       // Filter for approved allowances within the date range
       const validAllowances = user.personalAllowances.filter((item) => {
+        if (!item.allowanceId) return false; // skip malformed
         const isApproved = item.status === "APPROVED";
         const isWithinDateRange =
           (!item.allowanceId.effectiveDate ||
@@ -394,17 +544,11 @@ export class PayrollService {
 
       // Filter for approved bonuses within the date range
       const approvedBonuses = user.personalBonuses.filter((item) => {
+        if (!item.bonusId) return false; // skip malformed
         const isApproved = item.status === "APPROVED";
         const paymentDate = new Date(item.bonusId.paymentDate);
         const isWithinDateRange =
           paymentDate >= startDate && paymentDate <= endDate;
-
-        console.log(`Bonus ${item.bonusId._id}:`, {
-          status: item.status,
-          isApproved,
-          isWithinDateRange,
-          paymentDate: item.bonusId.paymentDate,
-        });
 
         return isApproved && isWithinDateRange;
       });
@@ -663,11 +807,11 @@ export class PayrollService {
 
       const allowanceIds = user.personalAllowances
         .filter((a) => a.status === "APPROVED")
-        .map((a) => a.allowanceId);
+        .map((a) => a.allowanceId._id);
 
       const bonusIds = user.personalBonuses
         .filter((b) => b.status === "APPROVED")
-        .map((b) => b.bonusId);
+        .map((b) => b.bonusId._id);
 
       console.log("📌 Items to mark as used:", {
         allowanceCount: allowanceIds.length,
@@ -722,7 +866,8 @@ export class PayrollService {
     salaryGradeId,
     month,
     year,
-    frequency = PayrollFrequency.MONTHLY
+    frequency = PayrollFrequency.MONTHLY,
+    departmentId = null
   ) {
     try {
       console.log("🧮 Calculating payroll for:", {
@@ -730,6 +875,7 @@ export class PayrollService {
         month,
         year,
         frequency,
+        departmentId,
       });
 
       // Get employee details using validateAndGetEmployee
@@ -906,31 +1052,79 @@ export class PayrollService {
         );
       }
 
-      // Calculate deductions
-      const deductionDetails =
-        await DeductionService.calculateStatutoryDeductions(
-          basicSalary,
-          salaryComponents.grossSalary +
-            (personalAllowances.totalPersonalAllowances || 0)
-        );
+      // Calculate deductions with scope filtering for voluntary deductions
+      const grossSalary =
+        salaryComponents.grossSalary +
+        (personalAllowances.totalPersonalAllowances || 0) +
+        (bonuses.totalBonuses || 0);
+
+      const scopeFilter = {
+        departmentId: departmentId || departmentData._id,
+        employeeId: employeeId,
+      };
+
+      const deductionDetails = await this.calculateDeductions(
+        basicSalary,
+        grossSalary,
+        frequency,
+        new Date(year, month - 1, 1), // Payroll date
+        scopeFilter
+      );
+      console.log(
+        "🧾 [PayrollService] Deductions details returned:",
+        deductionDetails
+      );
 
       // Calculate tax rate (PAYE)
       const taxRate =
-        salaryComponents.grossSalary +
-          (personalAllowances.totalPersonalAllowances || 0) >
-        0
+        grossSalary > 0
           ? Number(
-              (
-                (deductionDetails.paye /
-                  (salaryComponents.grossSalary +
-                    (personalAllowances.totalPersonalAllowances || 0))) *
-                100
-              ).toFixed(2)
+              ((deductionDetails.statutory.paye / grossSalary) * 100).toFixed(2)
             )
           : 0;
 
       // Calculate total deductions
       const totalDeductions = this.roundToKobo(deductionDetails.total);
+
+      // Build breakdown structure for deductions
+      const deductionsBreakdown = {
+        statutory: [
+          {
+            name: "PAYE Tax",
+            amount: this.roundToKobo(deductionDetails.statutory.paye),
+            code: "tax",
+            description: "Pay As You Earn Tax",
+            type: "statutory",
+            calculationMethod: "PROGRESSIVE",
+          },
+          {
+            name: "Pension",
+            amount: this.roundToKobo(deductionDetails.statutory.pension),
+            code: "pension",
+            description: "Pension Contribution",
+            type: "statutory",
+            calculationMethod: "PERCENTAGE",
+          },
+          {
+            name: "NHF",
+            amount: this.roundToKobo(deductionDetails.statutory.nhf),
+            code: "nhf",
+            description: "National Housing Fund",
+            type: "statutory",
+            calculationMethod: "PERCENTAGE",
+          },
+        ],
+        voluntary: deductionDetails.voluntary.deductions.map((deduction) => ({
+          name: deduction.name,
+          amount: this.roundToKobo(deduction.calculatedAmount),
+          code: deduction.category || "voluntary",
+          description: deduction.description || `${deduction.name} deduction`,
+          type: "voluntary",
+          calculationMethod: deduction.calculationMethod,
+          scope: deduction.scope,
+          department: deduction.department,
+        })),
+      };
 
       const calculationLogs = {
         basicSalary: {
@@ -964,31 +1158,39 @@ export class PayrollService {
         })),
         deductions: {
           tax: {
-            amount: this.roundToKobo(deductionDetails.paye),
-            description: `PAYE tax at ${taxRate}% rate`,
+            taxableAmount: grossSalary,
+            taxRate: taxRate,
+            amount: this.roundToKobo(deductionDetails.statutory.paye),
           },
           pension: {
-            amount: this.roundToKobo(deductionDetails.pension),
-            description: "Pension contribution at 8%",
+            pensionableAmount: salaryComponents.basicSalary,
+            rate: 8,
+            amount: this.roundToKobo(deductionDetails.statutory.pension),
           },
           nhf: {
-            amount: this.roundToKobo(deductionDetails.nhf),
-            description: "NHF contribution at 2.5%",
+            pensionableAmount: salaryComponents.basicSalary,
+            rate: 2.5,
+            amount: this.roundToKobo(deductionDetails.statutory.nhf),
           },
+          loans: [],
+          others: [],
+          breakdown: deductionsBreakdown,
+          totalDeductions,
         },
         totals: {
-          grossSalary:
-            salaryComponents.grossSalary +
-            (personalAllowances.totalPersonalAllowances || 0),
+          grossSalary,
           totalDeductions,
-          netSalary:
-            salaryComponents.grossSalary +
-            (personalAllowances.totalPersonalAllowances || 0) -
-            totalDeductions,
+          netSalary: grossSalary - totalDeductions,
         },
       };
 
       console.log("\n✅ Payroll calculation completed:", calculationLogs);
+
+      // Log the deductions breakdown for debugging
+      console.log(
+        "🔍 [PayrollService] Deductions breakdown being returned:",
+        deductionsBreakdown
+      );
 
       return {
         month,
@@ -1021,30 +1223,27 @@ export class PayrollService {
               (personalAllowances.totalPersonalAllowances || 0),
           },
           bonus: bonuses.bonus || [],
-          totalEarnings:
-            salaryComponents.grossSalary +
-            (personalAllowances.totalPersonalAllowances || 0),
+          totalEarnings: grossSalary,
         },
         deductions: {
           tax: {
-            taxableAmount:
-              salaryComponents.grossSalary +
-              (personalAllowances.totalPersonalAllowances || 0),
+            taxableAmount: grossSalary,
             taxRate: taxRate,
-            amount: this.roundToKobo(deductionDetails.paye),
+            amount: this.roundToKobo(deductionDetails.statutory.paye),
           },
           pension: {
             pensionableAmount: salaryComponents.basicSalary,
             rate: 8,
-            amount: this.roundToKobo(deductionDetails.pension),
+            amount: this.roundToKobo(deductionDetails.statutory.pension),
           },
           nhf: {
             pensionableAmount: salaryComponents.basicSalary,
             rate: 2.5,
-            amount: this.roundToKobo(deductionDetails.nhf),
+            amount: this.roundToKobo(deductionDetails.statutory.nhf),
           },
           loans: [],
           others: [],
+          breakdown: deductionsBreakdown,
           totalDeductions,
         },
         totals: {
@@ -1053,15 +1252,9 @@ export class PayrollService {
             salaryComponents.totalAllowances +
             (personalAllowances.totalPersonalAllowances || 0),
           totalBonuses: bonuses.totalBonuses || 0,
-          grossEarnings:
-            salaryComponents.grossSalary +
-            (personalAllowances.totalPersonalAllowances || 0),
+          grossEarnings: grossSalary,
           totalDeductions,
-          netPay: this.roundToKobo(
-            salaryComponents.grossSalary +
-              (personalAllowances.totalPersonalAllowances || 0) -
-              totalDeductions
-          ),
+          netPay: this.roundToKobo(grossSalary - totalDeductions),
         },
         allowances: {
           gradeAllowances: salaryComponents.components.filter(
@@ -1148,97 +1341,128 @@ export class PayrollService {
    */
   static async calculateEmployeePayroll(employee, salaryGrade, month, year) {
     try {
-      // Get all applicable deductions
-      const standardDeductions = await DeductionService.getStandardDeductions();
-      const departmentDeductions =
-        await DeductionService.getDepartmentDeductions(employee.department);
+      console.log(
+        "[PayrollService.calculateEmployeePayroll] employee:",
+        employee
+      );
+      console.log(
+        "[PayrollService.calculateEmployeePayroll] salaryGrade:",
+        salaryGrade
+      );
 
-      // Combine all deductions
-      const allDeductions = [
-        ...standardDeductions.statutory,
-        ...standardDeductions.voluntary,
-        ...departmentDeductions.departmentSpecific,
-      ];
-
-      // Calculate statutory deductions
-      const statutoryDeductions = allDeductions
-        .filter((d) => d.type === "statutory")
-        .map((deduction) => {
-          const amount = this.calculateDeductionAmount(
-            deduction,
-            salaryGrade.basicSalary
-          );
-          return {
-            name: deduction.name,
-            type: deduction.type,
-            description: deduction.description,
-            amount,
-            calculationMethod: deduction.calculationMethod,
-          };
-        });
-
-      // Calculate voluntary deductions
-      const voluntaryDeductions = allDeductions
-        .filter((d) => d.type === "voluntary")
-        .map((deduction) => {
-          const amount = this.calculateDeductionAmount(
-            deduction,
-            salaryGrade.basicSalary
-          );
-          return {
-            name: deduction.name,
-            type: deduction.type,
-            description: deduction.description,
-            amount,
-            calculationMethod: deduction.calculationMethod,
-          };
-        });
-
-      // Calculate department-specific deductions
-      const departmentSpecificDeductions = allDeductions
+      console.log(
+        "[calculateEmployeePayroll] Step 1: Calculating total allowances"
+      );
+      // Calculate allowances array with calculated amount
+      const allowances = salaryGrade.components
         .filter(
-          (d) =>
-            d.scope === "department" &&
-            d.department.toString() === employee.department.toString()
+          (component) => component.type === "allowance" && component.isActive
         )
-        .map((deduction) => {
-          const amount = this.calculateDeductionAmount(
-            deduction,
+        .map((component) => {
+          const amount = this.calculateAllowanceAmount(
+            component,
             salaryGrade.basicSalary
           );
           return {
-            name: deduction.name,
-            type: deduction.type,
-            description: deduction.description,
+            ...(component.toObject ? component.toObject() : component),
             amount,
-            calculationMethod: deduction.calculationMethod,
           };
         });
+      // Calculate total allowances from calculated amounts
+      const totalAllowances = allowances.reduce(
+        (total, a) => total + (a.amount || 0),
+        0
+      );
+      console.log(
+        "[calculateEmployeePayroll] Total allowances calculated:",
+        totalAllowances
+      );
 
-      // Calculate net salary
-      const grossSalary = salaryGrade.basicSalary + salaryGrade.totalAllowances;
-      const totalDeductions = [
-        ...statutoryDeductions,
-        ...voluntaryDeductions,
-        ...departmentSpecificDeductions,
-      ].reduce((sum, d) => sum + d.amount, 0);
+      console.log(
+        "[calculateEmployeePayroll] Step 2: Calculating gross salary"
+      );
+      const grossSalary = salaryGrade.basicSalary + totalAllowances;
+      console.log("[calculateEmployeePayroll] Gross salary:", grossSalary);
 
-      const netSalary = grossSalary - totalDeductions;
+      console.log(
+        "[calculateEmployeePayroll] Step 3: Getting deductions using calculateDeductions"
+      );
+      // Use the same method as the working calculatePayroll
+      const scopeFilter = {
+        departmentId: employee.department._id || employee.department,
+        employeeId: employee._id,
+      };
 
-      return {
+      const deductionDetails = await this.calculateDeductions(
+        salaryGrade.basicSalary,
+        grossSalary,
+        "monthly",
+        new Date(year, month - 1, 1), // Payroll date
+        scopeFilter
+      );
+      console.log(
+        "[calculateEmployeePayroll] Deduction details:",
+        deductionDetails
+      );
+
+      console.log("[calculateEmployeePayroll] Step 4: Building result");
+      const result = {
         employee: employee._id,
         basicSalary: salaryGrade.basicSalary,
-        allowances: salaryGrade.allowances,
+        allowances: allowances,
         deductions: {
-          statutory: statutoryDeductions,
-          voluntary: voluntaryDeductions,
-          departmentSpecific: departmentSpecificDeductions,
+          statutory: [
+            {
+              name: "PAYE Tax",
+              type: "statutory",
+              description: "Pay As You Earn Tax",
+              amount: deductionDetails.statutory.paye,
+              calculationMethod: "PROGRESSIVE",
+            },
+            {
+              name: "Pension",
+              type: "statutory",
+              description: "Pension Contribution",
+              amount: deductionDetails.statutory.pension,
+              calculationMethod: "PERCENTAGE",
+            },
+            {
+              name: "NHF",
+              type: "statutory",
+              description: "National Housing Fund",
+              amount: deductionDetails.statutory.nhf,
+              calculationMethod: "PERCENTAGE",
+            },
+          ],
+          voluntary: deductionDetails.voluntary.deductions.map((deduction) => ({
+            name: deduction.name,
+            type: "voluntary",
+            description: deduction.description || `${deduction.name} deduction`,
+            amount: deduction.calculatedAmount,
+            calculationMethod: deduction.calculationMethod,
+          })),
         },
         grossSalary,
-        totalDeductions,
-        netSalary,
+        totalDeductions: deductionDetails.total,
+        netSalary: grossSalary - deductionDetails.total,
       };
+
+      console.log("[calculateEmployeePayroll] Success! Returning result");
+      return result;
     } catch (error) {
+      console.error(
+        "[PayrollService.calculateEmployeePayroll] ERROR employee:",
+        employee
+      );
+      console.error(
+        "[PayrollService.calculateEmployeePayroll] ERROR salaryGrade:",
+        salaryGrade
+      );
+      console.error(
+        "[PayrollService.calculateEmployeePayroll] ERROR details:",
+        error.message,
+        error.stack
+      );
       throw new ApiError(500, "Failed to calculate employee payroll");
     }
   }
@@ -1303,7 +1527,8 @@ export class PayrollService {
         payrollData.salaryGrade,
         payrollData.month,
         payrollData.year,
-        payrollData.frequency
+        payrollData.frequency,
+        payrollData.department
       );
 
       // Check if payroll already exists
@@ -1383,6 +1608,131 @@ export class PayrollService {
         ...(departmentId ? { "details.departmentId": departmentId } : {}),
       });
 
+      // Calculate processing time statistics from audit logs
+      const currentDate = new Date();
+      const currentMonth = currentDate.getMonth() + 1;
+      const currentYear = currentDate.getFullYear();
+      const currentMonthStart = new Date(currentYear, currentMonth - 1, 1);
+      const currentMonthEnd = new Date(
+        currentYear,
+        currentMonth,
+        0,
+        23,
+        59,
+        59
+      );
+
+      const currentMonthProcessingStats = await Audit.aggregate([
+        {
+          $match: {
+            action: "PROCESS",
+            entity: "PAYROLL",
+            createdAt: { $gte: currentMonthStart, $lte: currentMonthEnd },
+            "details.processingTime": { $exists: true, $ne: null },
+            ...(departmentId ? { "details.departmentId": departmentId } : {}),
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            totalProcessingTime: { $sum: "$details.processingTime" },
+            avgProcessingTime: { $avg: "$details.processingTime" },
+            minProcessingTime: { $min: "$details.processingTime" },
+            maxProcessingTime: { $max: "$details.processingTime" },
+          },
+        },
+      ]);
+
+      // Get processing time data for current year
+      const currentYearStart = new Date(currentYear, 0, 1);
+      const currentYearEnd = new Date(currentYear, 11, 31, 23, 59, 59);
+
+      const currentYearProcessingStats = await Audit.aggregate([
+        {
+          $match: {
+            action: "PROCESS",
+            entity: "PAYROLL",
+            createdAt: { $gte: currentYearStart, $lte: currentYearEnd },
+            "details.processingTime": { $exists: true, $ne: null },
+            ...(departmentId ? { "details.departmentId": departmentId } : {}),
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            totalProcessingTime: { $sum: "$details.processingTime" },
+            avgProcessingTime: { $avg: "$details.processingTime" },
+            minProcessingTime: { $min: "$details.processingTime" },
+            maxProcessingTime: { $max: "$details.processingTime" },
+          },
+        },
+      ]);
+
+      // Get monthly processing time breakdown for the current year
+      const monthlyProcessingStats = await Audit.aggregate([
+        {
+          $match: {
+            action: "PROCESS",
+            entity: "PAYROLL",
+            createdAt: { $gte: currentYearStart, $lte: currentYearEnd },
+            "details.processingTime": { $exists: true, $ne: null },
+            ...(departmentId ? { "details.departmentId": departmentId } : {}),
+          },
+        },
+        {
+          $group: {
+            _id: { $month: "$createdAt" },
+            count: { $sum: 1 },
+            avgProcessingTime: { $avg: "$details.processingTime" },
+            totalProcessingTime: { $sum: "$details.processingTime" },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]);
+
+      // Get processing efficiency metrics
+      const processingEfficiencyStats = await Audit.aggregate([
+        {
+          $match: {
+            action: "PROCESS",
+            entity: "PAYROLL",
+            "details.processingTime": { $exists: true, $ne: null },
+            ...(departmentId ? { "details.departmentId": departmentId } : {}),
+          },
+        },
+        {
+          $addFields: {
+            efficiencyCategory: {
+              $switch: {
+                branches: [
+                  {
+                    case: { $lt: ["$details.processingTime", 2000] },
+                    then: "excellent",
+                  },
+                  {
+                    case: { $lt: ["$details.processingTime", 5000] },
+                    then: "good",
+                  },
+                  {
+                    case: { $lt: ["$details.processingTime", 10000] },
+                    then: "average",
+                  },
+                ],
+                default: "slow",
+              },
+            },
+          },
+        },
+        {
+          $group: {
+            _id: "$efficiencyCategory",
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
       // Calculate rates
       const processingRate =
         totalPayrolls > 0 ? (processingPayrolls / totalPayrolls) * 100 : 0;
@@ -1423,6 +1773,78 @@ export class PayrollService {
         { $group: { _id: null, total: { $sum: "$totals.netPay" } } },
       ]);
 
+      // Extract processing time statistics
+      const currentMonthStats = currentMonthProcessingStats[0] || {
+        count: 0,
+        totalProcessingTime: 0,
+        avgProcessingTime: 0,
+        minProcessingTime: 0,
+        maxProcessingTime: 0,
+      };
+
+      const currentYearStats = currentYearProcessingStats[0] || {
+        count: 0,
+        totalProcessingTime: 0,
+        avgProcessingTime: 0,
+        minProcessingTime: 0,
+        maxProcessingTime: 0,
+      };
+
+      // Convert efficiency stats to object
+      const efficiencyBreakdown = {};
+      processingEfficiencyStats.forEach((stat) => {
+        efficiencyBreakdown[stat._id] = stat.count;
+      });
+
+      // Calculate last month's start and end
+      const now = new Date();
+      const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+      const lastMonthYear =
+        now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+      const lastMonthStart = new Date(lastMonthYear, lastMonth, 1);
+      const lastMonthEnd = new Date(
+        lastMonthYear,
+        lastMonth + 1,
+        0,
+        23,
+        59,
+        59
+      );
+
+      // Last month counts
+      const approvedLastMonth = await PayrollModel.countDocuments({
+        ...baseQuery,
+        status: PAYROLL_STATUS.APPROVED,
+        createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd },
+      });
+      const paidLastMonth = await PayrollModel.countDocuments({
+        ...baseQuery,
+        status: PAYROLL_STATUS.PAID,
+        createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd },
+      });
+      const completedLastMonth = await PayrollModel.countDocuments({
+        ...baseQuery,
+        status: PAYROLL_STATUS.COMPLETED,
+        createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd },
+      });
+
+      // This month counts (NO redeclaration!)
+      const approvedThisMonth = await PayrollModel.countDocuments({
+        ...baseQuery,
+        status: PAYROLL_STATUS.APPROVED,
+        createdAt: { $gte: currentMonthStart, $lte: currentMonthEnd },
+      });
+      const paidThisMonth = await PayrollModel.countDocuments({
+        ...baseQuery,
+        status: PAYROLL_STATUS.PAID,
+        createdAt: { $gte: currentMonthStart, $lte: currentMonthEnd },
+      });
+      const completedThisMonth = await PayrollModel.countDocuments({
+        ...baseQuery,
+        status: PAYROLL_STATUS.COMPLETED,
+        createdAt: { $gte: currentMonthStart, $lte: currentMonthEnd },
+      });
+
       return {
         totalPayrolls,
         processingPayrolls,
@@ -1443,10 +1865,88 @@ export class PayrollService {
         totalAmountPending: totalAmountPending[0]?.total || 0,
         totalAmountProcessing: totalAmountProcessing[0]?.total || 0,
         totalAmountPendingPayment: totalAmountPendingPayment[0]?.total || 0,
+        processingTime: {
+          currentMonth: {
+            count: currentMonthStats.count,
+            average: Math.round(currentMonthStats.avgProcessingTime || 0),
+            total: currentMonthStats.totalProcessingTime || 0,
+            min: currentMonthStats.minProcessingTime || 0,
+            max: currentMonthStats.maxProcessingTime || 0,
+          },
+          currentYear: {
+            count: currentYearStats.count,
+            average: Math.round(currentYearStats.avgProcessingTime || 0),
+            total: currentYearStats.totalProcessingTime || 0,
+            min: currentYearStats.minProcessingTime || 0,
+            max: currentYearStats.maxProcessingTime || 0,
+          },
+          monthlyBreakdown: monthlyProcessingStats.map((stat) => ({
+            month: stat._id,
+            monthName: new Date(currentYear, stat._id - 1).toLocaleString(
+              "default",
+              { month: "long" }
+            ),
+            count: stat.count,
+            average: Math.round(stat.avgProcessingTime || 0),
+            total: stat.totalProcessingTime || 0,
+          })),
+          efficiencyBreakdown,
+        },
+        lastMonth: {
+          approved: approvedLastMonth,
+          paid: paidLastMonth,
+          completed: completedLastMonth,
+        },
+        thisMonth: {
+          approved: approvedThisMonth,
+          paid: paidThisMonth,
+          completed: completedThisMonth,
+        },
       };
     } catch (error) {
       console.error("Error calculating processing statistics:", error);
       throw error;
+    }
+  }
+
+  /**
+   * Check if employee is eligible for payroll processing based on onboarding status
+   * @param {string} employeeId - Employee ID to check
+   * @returns {Object} - { eligible: boolean, reason: string }
+   */
+  static async checkOnboardingEligibility(employeeId) {
+    try {
+      const employee = await UserModel.findById(employeeId)
+        .select("firstName lastName onboarding status")
+        .lean();
+
+      if (!employee) {
+        return { eligible: false, reason: "Employee not found" };
+      }
+
+      // If employee is not active, not eligible
+      if (employee.status !== "active") {
+        return { eligible: false, reason: "Employee is not active" };
+      }
+
+      // If no onboarding data exists, consider eligible (backward compatibility)
+      if (!employee.onboarding) {
+        return { eligible: true, reason: "No onboarding data (legacy user)" };
+      }
+
+      // If onboarding is completed, eligible
+      if (employee.onboarding.status === "completed") {
+        return { eligible: true, reason: "Onboarding completed" };
+      }
+
+      // If onboarding is not completed, not eligible
+      return {
+        eligible: false,
+        reason: `Employee ${employee.firstName} ${employee.lastName} must complete onboarding before payroll can be processed`,
+      };
+    } catch (error) {
+      console.error("Error checking onboarding eligibility:", error);
+      return { eligible: false, reason: "Error checking eligibility" };
     }
   }
 }

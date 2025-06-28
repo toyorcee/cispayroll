@@ -162,13 +162,51 @@ export class PayrollStatisticsLogger {
     userId,
     details = {}
   ) {
-    return this.logPayrollAction({
-      action: AuditAction.BATCH_OPERATION,
-      payrollId: payrollIds,
-      userId,
-      status: operationType,
-      details: { operationType, payrollIds, ...details },
-    });
+    try {
+      // For batch operations, we need to handle multiple payroll IDs
+      // Create separate audit entries for each payroll ID
+      if (Array.isArray(payrollIds) && payrollIds.length > 0) {
+        for (const payrollId of payrollIds) {
+          await Audit.create({
+            action: AuditAction.BATCH_OPERATION,
+            entity: AuditEntity.PAYROLL,
+            entityId: payrollId,
+            performedBy: userId,
+            details: {
+              ...details,
+              operationType,
+              batchSize: payrollIds.length,
+              processingTime: details.processingTime,
+            },
+            timestamp: new Date(),
+          });
+        }
+      } else {
+        // Fallback for single payroll ID or invalid input
+        await Audit.create({
+          action: AuditAction.BATCH_OPERATION,
+          entity: AuditEntity.PAYROLL,
+          entityId: Array.isArray(payrollIds) ? payrollIds[0] : payrollIds,
+          performedBy: userId,
+          details: {
+            ...details,
+            operationType,
+            batchSize: Array.isArray(payrollIds) ? payrollIds.length : 1,
+            processingTime: details.processingTime,
+          },
+          timestamp: new Date(),
+        });
+      }
+
+      // Log statistics change for batch operations
+      await this.logStatisticsChange(AuditAction.BATCH_OPERATION, {
+        operationType,
+        batchSize: Array.isArray(payrollIds) ? payrollIds.length : 1,
+        ...details,
+      });
+    } catch (error) {
+      console.error("❌ Error in batch operation logger:", error);
+    }
   }
 
   /**
@@ -654,26 +692,43 @@ export class PayrollStatisticsLogger {
    * Log bonus actions (create, update, delete, approve, etc.)
    * For backward compatibility with existing controller code
    */
-  static async logBonusAction({ action, bonusId, userId, details = {} }) {
+  static async logBonusAction({
+    action,
+    bonusId,
+    bonusIds,
+    userId,
+    details = {},
+    statisticsDetails = {},
+    auditDetails = {},
+  }) {
     try {
+      // Handle both single bonusId and multiple bonusIds
+      const entityIds = bonusIds || (bonusId ? [bonusId] : []);
+
       // Create audit log entry for bonus actions
       await Audit.create({
         action,
         entity: AuditEntity.BONUS,
-        entityId: bonusId,
+        entityId: entityIds[0] || bonusId, // Use first ID or single ID
         performedBy: userId,
         details: {
           ...details,
-          bonusId,
+          ...auditDetails,
+          bonusId: bonusId || entityIds[0],
+          bonusIds: entityIds,
+          statisticsDetails,
         },
         timestamp: new Date(),
       });
 
       console.log(`📊 [BONUS] Action logged - ${action}:`, {
         action,
-        bonusId,
+        bonusId: bonusId || entityIds[0],
+        bonusIds: entityIds,
         userId,
         details,
+        statisticsDetails,
+        auditDetails,
       });
     } catch (error) {
       console.error("❌ Error in bonus logger:", error);
@@ -687,28 +742,40 @@ export class PayrollStatisticsLogger {
   static async logAllowanceAction({
     action,
     allowanceId,
+    allowanceIds,
     userId,
     details = {},
+    statisticsDetails = {},
+    auditDetails = {},
   }) {
     try {
+      // Handle both single allowanceId and multiple allowanceIds
+      const entityIds = allowanceIds || (allowanceId ? [allowanceId] : []);
+
       // Create audit log entry for allowance actions
       await Audit.create({
         action,
         entity: AuditEntity.ALLOWANCE,
-        entityId: allowanceId,
+        entityId: entityIds[0] || allowanceId, // Use first ID or single ID
         performedBy: userId,
         details: {
           ...details,
-          allowanceId,
+          ...auditDetails,
+          allowanceId: allowanceId || entityIds[0],
+          allowanceIds: entityIds,
+          statisticsDetails,
         },
         timestamp: new Date(),
       });
 
       console.log(`📊 [ALLOWANCE] Action logged - ${action}:`, {
         action,
-        allowanceId,
+        allowanceId: allowanceId || entityIds[0],
+        allowanceIds: entityIds,
         userId,
         details,
+        statisticsDetails,
+        auditDetails,
       });
     } catch (error) {
       console.error("❌ Error in allowance logger:", error);

@@ -3,6 +3,7 @@ import { DeductionService } from "../services/DeductionService.js";
 import { handleError, ApiError } from "../utils/errorHandler.js";
 import User from "../models/User.js";
 import Deduction from "../models/Deduction.js";
+import PayrollStatisticsLogger from "../utils/payrollStatisticsLogger.js";
 
 export class DeductionController {
   // Get user's deduction preferences

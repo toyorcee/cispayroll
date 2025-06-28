@@ -97,7 +97,7 @@ export const deductionService = {
 
   updateDeduction: async (id: string, data: UpdateDeductionInput) => {
     try {
-      const response = await api.put(
+      const response = await api.patch(
         `${BASE_URL}/super-admin/deductions/${id}`,
         data
       );

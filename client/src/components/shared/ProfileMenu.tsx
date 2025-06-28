@@ -13,6 +13,18 @@ interface ProfileMenuProps {
   onToggle?: () => void;
 }
 
+function getDisplayRole(role?: string) {
+  if (!role) return "";
+  const map: Record<string, string> = {
+    SUPER_ADMIN: "Super Administrator",
+    ADMIN: "Administrator",
+    USER: "User",
+  };
+  return (
+    map[role] || role.charAt(0).toUpperCase() + role.slice(1).toLowerCase()
+  );
+}
+
 export function ProfileMenu({
   variant = "header",
   isOpen,
@@ -135,7 +147,7 @@ export function ProfileMenu({
           <p className="text-sm font-medium text-gray-700 text-left">
             {getFullName()}
           </p>
-          <p className="text-xs text-gray-500">{user?.role}</p>
+          <p className="text-xs text-gray-500">{getDisplayRole(user?.role)}</p>
         </div>
       </button>
 

@@ -1,123 +1,16 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
+import React, { useState, useEffect, useRef } from "react";
+import { onboardingService } from "../../services/onboardingService";
 import { OnboardingEmployee, Task } from "../../types/employee";
 import { toast } from "react-toastify";
-
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api`;
-
-export interface OnboardingFilters {
-  page?: number;
-  limit?: number;
-  status?: string;
-  department?: string;
-  search?: string;
-  sortBy?: string;
-  sortOrder?: "asc" | "desc";
-}
-
-export interface OnboardingResponse {
-  success: boolean;
-  data: OnboardingEmployee[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
-  stats: {
-    total: number;
-    byStatus: Record<string, number>;
-    departments: string[];
-  };
-}
-
-export const onboardingService = {
-  // Get all employees in onboarding with pagination and filtering
-  getOnboardingEmployees: async (
-    filters?: OnboardingFilters
-  ): Promise<OnboardingResponse> => {
-    try {
-      const response = await axios.get(`${BASE_URL}/onboarding`, {
-        params: filters,
-      });
-      return response.data;
-    } catch (error: any) {
-      console.error("Failed to fetch onboarding employees:", error);
-      toast.error(error.response?.data?.message || "Failed to fetch employees");
-      return {
-        success: false,
-        data: [],
-        pagination: {
-          total: 0,
-          page: 1,
-          limit: 10,
-          totalPages: 0,
-        },
-        stats: {
-          total: 0,
-          byStatus: {},
-          departments: [],
-        },
-      };
-    }
-  },
-
-  // Update onboarding progress
-  updateProgress: async (userId: string, progress: number): Promise<void> => {
-    try {
-      await axios.patch(`${BASE_URL}/onboarding/${userId}/progress`, {
-        progress,
-      });
-      toast.success("Progress updated successfully");
-    } catch (error: any) {
-      console.error("Failed to update progress:", error);
-      toast.error(error.response?.data?.message || "Failed to update progress");
-      throw error;
-    }
-  },
-
-  // Complete a specific task
-  completeTask: async (userId: string, taskName: string): Promise<void> => {
-    try {
-      await axios.patch(`${BASE_URL}/onboarding/${userId}/tasks/${taskName}`);
-      toast.success("Task completed successfully");
-    } catch (error: any) {
-      console.error("Failed to complete task:", error);
-      toast.error(error.response?.data?.message || "Failed to complete task");
-      throw error;
-    }
-  },
-
-  // Get onboarding tasks for an employee
-  getEmployeeTasks: async (userId: string): Promise<Task[]> => {
-    try {
-      const response = await axios.get(
-        `${BASE_URL}/onboarding/${userId}/tasks`
-      );
-      return response.data.data;
-    } catch (error: any) {
-      console.error("Failed to fetch tasks:", error);
-      toast.error(error.response?.data?.message || "Failed to fetch tasks");
-      return [];
-    }
-  },
-
-  // Add the updateOnboardingStage method here
-  updateOnboardingStage: async (employeeId: string, stage: string) => {
-    try {
-      const response = await axios.put(
-        `${BASE_URL}/onboarding/${employeeId}/stage`,
-        { stage }
-      );
-      toast.success("Onboarding stage updated successfully");
-      return response.data;
-    } catch (error: any) {
-      console.error("Failed to update onboarding stage:", error);
-      toast.error(error.response?.data?.message || "Failed to update stage");
-      throw error;
-    }
-  },
-};
+import {
+  FaCheckCircle,
+  FaUser,
+  FaIdBadge,
+  FaBuilding,
+  FaRegCalendarCheck,
+  FaClipboardList,
+} from "react-icons/fa";
+import Confetti from "react-dom-confetti";
 
 interface OnboardingDetailsModalProps {
   employee: OnboardingEmployee;
@@ -125,6 +18,16 @@ interface OnboardingDetailsModalProps {
   onClose: () => void;
   onTaskComplete: (updatedEmployee: OnboardingEmployee) => void;
 }
+
+const taskIcons: Record<string, React.ReactNode> = {
+  "Welcome Meeting": <FaUser className="text-blue-500" />,
+  "Department Introduction": <FaBuilding className="text-green-500" />,
+  "System Access Setup": <FaIdBadge className="text-purple-500" />,
+  "Policy Documentation Review": (
+    <FaClipboardList className="text-yellow-500" />
+  ),
+  "Initial Training Session": <FaRegCalendarCheck className="text-pink-500" />,
+};
 
 export const OnboardingDetailsModal: React.FC<OnboardingDetailsModalProps> = ({
   employee,
@@ -137,30 +40,57 @@ export const OnboardingDetailsModal: React.FC<OnboardingDetailsModalProps> = ({
   );
   const [localEmployee, setLocalEmployee] =
     useState<OnboardingEmployee>(employee);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const confettiRef = useRef<HTMLDivElement>(null);
+  const prevAllTasksComplete = useRef(false);
+  const [_isEditing, _setIsEditing] = useState(false);
+  const [_editedTasks, setEditedTasks] = useState<Task[]>([]);
+
+  useEffect(() => {
+    if (employee?.onboarding?.tasks) {
+      setEditedTasks(employee.onboarding.tasks);
+    }
+  }, [employee]);
 
   useEffect(() => {
     setLocalEmployee(employee);
   }, [employee]);
 
-  const handleTaskComplete = async (taskName: string) => {
-    if (!isOpen) return;
+  const tasks = localEmployee.onboarding.tasks;
+  const hasTasks = tasks && tasks.length > 0;
+  const allTasksComplete = hasTasks && tasks.every((task) => task.completed);
 
+  // Only trigger confetti when allTasksComplete transitions from false to true and there are tasks
+  useEffect(() => {
+    if (hasTasks && !prevAllTasksComplete.current && allTasksComplete) {
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 4000);
+    }
+    prevAllTasksComplete.current = allTasksComplete;
+  }, [allTasksComplete, hasTasks]);
+
+  const handleTaskComplete = async (
+    taskName: string,
+    completed: boolean = true
+  ) => {
+    if (!isOpen) return;
     try {
       setLoadingTasks((prev) => ({ ...prev, [taskName]: true }));
-
       const updatedTasks = localEmployee.onboarding.tasks.map((task) =>
         task.name === taskName
-          ? { ...task, completed: true, completedAt: new Date().toISOString() }
+          ? {
+              ...task,
+              completed,
+              completedAt: completed ? new Date().toISOString() : undefined,
+            }
           : task
       );
-
       const completedTasks = updatedTasks.filter(
         (task) => task.completed
       ).length;
       const newProgress = Math.round(
         (completedTasks / updatedTasks.length) * 100
       );
-
       const updatedEmployee = {
         ...localEmployee,
         onboarding: {
@@ -169,21 +99,29 @@ export const OnboardingDetailsModal: React.FC<OnboardingDetailsModalProps> = ({
           progress: newProgress,
         },
       };
-
-      // Update local state immediately
       setLocalEmployee(updatedEmployee);
-
-      // Make API call in the background
-      const encodedTaskName = encodeURIComponent(taskName);
-      await axios.patch(
-        `/api/onboarding/${employee._id}/tasks/${encodedTaskName}`
+      await onboardingService.completeOnboardingTask(
+        employee._id,
+        taskName,
+        completed
       );
-
       onTaskComplete(updatedEmployee);
-      toast.success(`Task "${taskName}" marked as complete`);
-    } catch (error) {
-      console.error("Failed to complete task:", error);
 
+      // console.log("✅ [TASK COMPLETED]", {
+      //   employee: employee.fullName,
+      //   task: taskName,
+      //   action: completed ? "completed" : "uncompleted",
+      //   progress: `${newProgress}%`,
+      //   completedTasks,
+      //   totalTasks: updatedTasks.length,
+      // });
+
+      toast.success(
+        `Task "${taskName}" ${
+          completed ? "marked as complete" : "marked as incomplete"
+        }`
+      );
+    } catch (error) {
       setLocalEmployee((prev) => ({
         ...prev,
         onboarding: {
@@ -196,7 +134,6 @@ export const OnboardingDetailsModal: React.FC<OnboardingDetailsModalProps> = ({
           progress: employee.onboarding.progress,
         },
       }));
-
       toast.error("Failed to mark task as complete");
     } finally {
       setLoadingTasks((prev) => ({ ...prev, [taskName]: false }));
@@ -206,121 +143,208 @@ export const OnboardingDetailsModal: React.FC<OnboardingDetailsModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-gray-100 bg-opacity-30 overflow-y-auto h-full w-full">
-      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white max-h-[80vh] flex flex-col">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium">Onboarding Progress</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-500"
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-40 z-50 flex items-center justify-center px-2">
+      <div className="relative w-full max-w-md mx-auto bg-white rounded-2xl shadow-2xl p-6 flex flex-col max-h-[90vh] overflow-y-auto">
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 focus:outline-none"
+        >
+          <svg
+            className="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
           >
-            <svg
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M6 18L18 6M6 6l12 12"
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+
+        {/* Employee Info */}
+        <div className="flex flex-col items-center mb-6">
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-400 to-sky-500 flex items-center justify-center shadow-lg mb-2">
+            {employee.profileImage ? (
+              <img
+                src={`${import.meta.env.VITE_API_URL}/${employee.profileImage}`}
+                alt={employee.fullName}
+                className="w-20 h-20 rounded-full object-cover border-2 border-white"
               />
-            </svg>
-          </button>
-        </div>
-
-        <div className="mb-6">
-          <div className="flex justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">
-              Overall Progress
-            </span>
-            <span className="text-sm font-medium text-gray-700">
-              {localEmployee.onboarding.progress}%
-            </span>
+            ) : (
+              <FaUser className="text-white text-4xl" />
+            )}
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2.5">
-            <div
-              className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-              style={{ width: `${localEmployee.onboarding.progress}%` }}
-            ></div>
+          <h2 className="text-xl font-bold text-gray-800 text-center">
+            {employee.fullName}
+          </h2>
+          <div className="text-sm text-gray-500 text-center">
+            {employee.position} &bull;{" "}
+            {typeof employee.department === "string"
+              ? employee.department
+              : employee.department?.name}
           </div>
         </div>
 
-        <div className="space-y-4 overflow-y-auto flex-1">
-          {localEmployee.onboarding.tasks.map((task) => (
-            <div
-              key={task._id}
-              className="flex items-center justify-between p-4 bg-white rounded-lg shadow-sm border border-gray-200"
-            >
-              <div className="flex items-center space-x-3">
-                <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors duration-200
-                  ${task.completed ? "bg-green-500" : "bg-gray-200"}`}
-                >
-                  {task.completed && (
-                    <svg
-                      className="w-4 h-4 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  )}
-                </div>
-                <div>
-                  <h3 className="font-medium text-gray-900">{task.name}</h3>
-                  {task.completedAt && (
-                    <p className="text-sm text-gray-500">
-                      Completed:{" "}
-                      {new Date(task.completedAt).toLocaleDateString()}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {!task.completed && (
-                <div className="flex items-center space-x-2">
-                  {loadingTasks[task.name] && (
-                    <svg
-                      className="animate-spin h-4 w-4 text-blue-600"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                  )}
-                  <button
-                    onClick={() => handleTaskComplete(task.name)}
-                    disabled={loadingTasks[task.name]}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 cursor-pointer transition-colors duration-200"
+        {/* Main Content */}
+        {hasTasks ? (
+          <>
+            {/* Circular Progress Bar */}
+            <div className="flex flex-col items-center mb-6">
+              <div className="relative w-24 h-24 mb-2">
+                <svg className="w-24 h-24" viewBox="0 0 100 100">
+                  <circle
+                    className="text-gray-200"
+                    strokeWidth="8"
+                    stroke="currentColor"
+                    fill="transparent"
+                    r="44"
+                    cx="50"
+                    cy="50"
+                  />
+                  <circle
+                    className="text-blue-500 transition-all duration-500"
+                    strokeWidth="8"
+                    strokeDasharray={276.46}
+                    strokeDashoffset={
+                      276.46 -
+                      (276.46 * localEmployee.onboarding.progress) / 100
+                    }
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    fill="transparent"
+                    r="44"
+                    cx="50"
+                    cy="50"
+                  />
+                  <text
+                    x="50"
+                    y="54"
+                    textAnchor="middle"
+                    className="text-2xl font-bold text-blue-600"
+                    fill="#2563eb"
                   >
-                    Mark Complete
-                  </button>
+                    {localEmployee.onboarding.progress}%
+                  </text>
+                </svg>
+              </div>
+              <span className="text-sm font-medium text-gray-700">
+                Onboarding Progress
+              </span>
+            </div>
+
+            {/* Task Checklist */}
+            <div className="space-y-4 flex-1 overflow-y-auto mb-4">
+              {tasks.map((task) => (
+                <div
+                  key={task._id}
+                  className={`flex items-center justify-between p-4 rounded-xl shadow border transition-all duration-300 ${
+                    task.completed
+                      ? "bg-green-50 border-green-200"
+                      : "bg-white border-gray-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">
+                      {taskIcons[task.name] || (
+                        <FaClipboardList className="text-gray-400" />
+                      )}
+                    </span>
+                    <div>
+                      <h3
+                        className={`font-semibold ${
+                          task.completed
+                            ? "text-green-700 line-through"
+                            : "text-gray-900"
+                        }`}
+                      >
+                        {task.name}
+                      </h3>
+                      {task.completedAt && (
+                        <p className="text-xs text-gray-500">
+                          Completed:{" "}
+                          {new Date(task.completedAt).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!task.completed && !allTasksComplete && (
+                      <button
+                        onClick={() => handleTaskComplete(task.name, true)}
+                        disabled={loadingTasks[task.name]}
+                        className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50 transition-all duration-200"
+                      >
+                        {loadingTasks[task.name] ? "..." : "Mark Complete"}
+                      </button>
+                    )}
+                    {task.completed && (
+                      <div className="flex items-center gap-2">
+                        <FaCheckCircle className="text-green-500 text-xl animate-bounceIn" />
+                        <button
+                          onClick={() => handleTaskComplete(task.name, false)}
+                          disabled={loadingTasks[task.name]}
+                          className="px-3 py-1 text-xs font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 focus:outline-none focus:ring-2 focus:ring-orange-400 disabled:opacity-50 transition-all duration-200"
+                          title="Mark as incomplete"
+                        >
+                          {loadingTasks[task.name] ? "..." : "Undo"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
+              ))}
+            </div>
+
+            {/* Completion Celebration */}
+            <div className="flex flex-col items-center mt-4 relative">
+              <div
+                ref={confettiRef}
+                className="absolute top-0 left-1/2 -translate-x-1/2"
+              >
+                <Confetti active={showConfetti} />
+              </div>
+              {allTasksComplete && (
+                <>
+                  <FaCheckCircle className="text-green-500 text-4xl mb-2 animate-bounceIn" />
+                  <h3 className="text-lg font-bold text-green-700 mb-1">
+                    Fully Onboarded!
+                  </h3>
+                  <p className="text-gray-500 text-sm mb-2 text-center">
+                    All onboarding tasks are complete. This employee is now
+                    fully onboarded and eligible for payroll.
+                  </p>
+                  <button
+                    onClick={onClose}
+                    className="mt-2 px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all"
+                  >
+                    Close
+                  </button>
+                </>
               )}
             </div>
-          ))}
-        </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-12">
+            <FaClipboardList className="text-4xl text-gray-300 mb-4" />
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">
+              No onboarding tasks assigned
+            </h3>
+            <p className="text-gray-500 text-center max-w-xs">
+              This employee does not have any onboarding tasks assigned yet.
+              Please contact HR or an administrator to assign tasks.
+            </p>
+            <button
+              onClick={onClose}
+              className="mt-6 px-6 py-2 bg-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-400 transition-all"
+            >
+              Close
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import {
   getAllowanceRequests,
   createPersonalAllowance,
   getPersonalAllowances,
+  cancelPersonalAllowance,
 } from "../controllers/AllowancesController.js";
 
 const router = express.Router();
@@ -15,7 +16,20 @@ const router = express.Router();
 router.use(requireAuth);
 
 // GET route for fetching allowances
-router.get("/requests", getAllowanceRequests);
+router.get(
+  "/requests",
+  (req, res, next) => {
+    console.log("🔍 [AllowanceRoutes] /requests accessed by:", {
+      userRole: req.user?.role,
+      userId: req.user?._id,
+      method: req.method,
+      url: req.url,
+      timestamp: new Date().toISOString(),
+    });
+    next();
+  },
+  getAllowanceRequests
+);
 
 // General allowance (Super Admin)
 router.post("/", createAllowance);
@@ -31,5 +45,8 @@ router.post("/personal", createPersonalAllowance);
 
 // Personal allowance requests (for all users)
 router.get("/personal-requests", getPersonalAllowances);
+
+// Cancel personal allowance request (for the requesting user only)
+router.patch("/personal/:allowanceId/cancel", cancelPersonalAllowance);
 
 export default router;

@@ -16,6 +16,8 @@ import {
   // FaUserCog,
   // FaCheckDouble,
 } from "react-icons/fa";
+import { useAuth } from "../context/AuthContext";
+import { Permission } from "../types/auth";
 
 interface ModuleItem {
   title: string;
@@ -23,9 +25,11 @@ interface ModuleItem {
   path: string;
   icon: React.ReactElement;
   isReady: boolean;
+  requiredPermissions?: Permission[];
+  requiredRoles?: string[];
 }
 
-const modules: ModuleItem[] = [
+const allModules: ModuleItem[] = [
   {
     title: "Personnel Onboarding",
     description:
@@ -33,6 +37,8 @@ const modules: ModuleItem[] = [
     icon: <FaUserPlus className="w-full h-full text-green-600" />,
     path: "/pms/employees/onboarding",
     isReady: true,
+    requiredPermissions: [Permission.MANAGE_ONBOARDING],
+    requiredRoles: ["SUPER_ADMIN", "ADMIN"],
   },
   {
     title: "Payroll & Benefits",
@@ -41,6 +47,8 @@ const modules: ModuleItem[] = [
     icon: <FaMoneyCheckAlt className="w-full h-full text-green-600" />,
     path: "/pms/dashboard",
     isReady: true,
+    requiredPermissions: [Permission.VIEW_DASHBOARD],
+    requiredRoles: ["SUPER_ADMIN", "ADMIN", "USER"],
   },
   {
     title: "Offboarding",
@@ -48,6 +56,8 @@ const modules: ModuleItem[] = [
     icon: <FaUserMinus className="w-full h-full text-green-600" />,
     path: "/pms/employees/offboarding",
     isReady: true,
+    requiredPermissions: [Permission.MANAGE_OFFBOARDING],
+    requiredRoles: ["SUPER_ADMIN", "ADMIN"],
   },
   {
     title: "Transfer Management",
@@ -55,6 +65,8 @@ const modules: ModuleItem[] = [
     icon: <FaExchangeAlt className="w-full h-full text-green-600" />,
     path: "/pms/employees/transfers",
     isReady: false,
+    requiredPermissions: [],
+    requiredRoles: ["SUPER_ADMIN", "ADMIN"],
   },
   // {
   //   title: "ID System",
@@ -116,8 +128,41 @@ const modules: ModuleItem[] = [
 
 function ModuleSelectorLanding() {
   const navigate = useNavigate();
-  const [currentIndex, setCurrentIndex] = React.useState(1);
+  const { user, hasPermission, hasRole } = useAuth();
+  const [currentIndex, setCurrentIndex] = React.useState(0);
   const [direction, setDirection] = React.useState(0);
+
+  // Filter modules based on user permissions and roles
+  const modules = React.useMemo(() => {
+    if (!user) return [];
+
+    return allModules.filter((module) => {
+      // Check if user has required role
+      if (module.requiredRoles && module.requiredRoles.length > 0) {
+        const hasRequiredRole = module.requiredRoles.some((role) =>
+          hasRole(role as any)
+        );
+        if (!hasRequiredRole) return false;
+      }
+
+      // Check if user has required permissions
+      if (module.requiredPermissions && module.requiredPermissions.length > 0) {
+        const hasRequiredPermission = module.requiredPermissions.some(
+          (permission) => hasPermission(permission)
+        );
+        if (!hasRequiredPermission) return false;
+      }
+
+      return true;
+    });
+  }, [user, hasPermission, hasRole]);
+
+  // Reset current index if it's out of bounds after filtering
+  React.useEffect(() => {
+    if (currentIndex >= modules.length && modules.length > 0) {
+      setCurrentIndex(0);
+    }
+  }, [modules.length, currentIndex]);
 
   const getVisibleModules = () => {
     const visibleIndexes = [];
@@ -146,6 +191,7 @@ function ModuleSelectorLanding() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const variants = {
     enter: (direction: number) => ({
       x: direction > 0 ? 1000 : -1000,

@@ -178,6 +178,30 @@ const PayrollSchema = new Schema(
           },
         },
       ],
+      breakdown: {
+        statutory: [
+          {
+            name: { type: String, required: true },
+            amount: { type: Number, required: true },
+            code: String,
+            description: String,
+            type: { type: String, default: "statutory" },
+            calculationMethod: String,
+          },
+        ],
+        voluntary: [
+          {
+            name: { type: String, required: true },
+            amount: { type: Number, required: true },
+            code: String,
+            description: String,
+            type: { type: String, default: "voluntary" },
+            calculationMethod: String,
+            scope: String,
+            department: Schema.Types.ObjectId,
+          },
+        ],
+      },
       totalDeductions: {
         type: Number,
         required: [true, "Total deductions is required"],

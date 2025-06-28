@@ -7,6 +7,7 @@ import {
   FaSpinner,
   FaSignOutAlt,
   FaExclamationTriangle,
+  FaUsers,
 } from "react-icons/fa";
 import { Employee, EmployeeFilters } from "../../../types/employee";
 import { Status } from "../../../types/common";
@@ -325,7 +326,6 @@ export default function AllEmployees() {
   const handleOffboardingSubmit = async () => {
     try {
       if (!selectedEmployeeId) return;
-
       setIsSubmitting(true);
       console.log("[OFFBOARDING UI] Submitting offboarding form with data:", {
         employeeId: selectedEmployeeId,
@@ -333,19 +333,16 @@ export default function AllEmployees() {
         reason: offboardingData.reason,
         targetExitDate: offboardingData.targetExitDate,
       });
-
       await offboardingService.initiateOffboarding(selectedEmployeeId, {
         type: offboardingData.type as OffboardingType,
         reason: offboardingData.reason,
         targetExitDate: new Date(offboardingData.targetExitDate),
       });
-
       console.log(
         "[OFFBOARDING UI] Offboarding process initiated successfully"
       );
       toast.success("Offboarding process initiated successfully");
       setShowOffboardingModal(false);
-      // Only refetch once after successful offboarding
       refetch();
     } catch (error) {
       console.error("[OFFBOARDING UI] Error initiating offboarding:", error);
@@ -505,12 +502,41 @@ export default function AllEmployees() {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
       className="p-4"
     >
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-8">
+      {/* Header Section */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="mb-8"
+      >
+        <div className="flex items-center gap-4 mb-2">
+          <div className="bg-gradient-to-br from-green-500 to-blue-500 rounded-full p-3 shadow-lg">
+            <FaUsers className="w-8 h-8 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-1">
+              All Employees
+            </h1>
+            <p className="text-gray-600 text-sm">
+              View, manage, and onboard employees. Use filters and actions to
+              manage your workforce efficiently.
+            </p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Action Buttons and Filters Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="bg-white rounded-xl shadow-lg p-6 mb-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4"
+      >
         <div className="w-full sm:w-auto sm:flex-1 max-w-md">
           <EmployeeSearch onSearch={handleSearch} />
         </div>
@@ -518,27 +544,31 @@ export default function AllEmployees() {
           {canCreate && (
             <button
               onClick={() => setShowCreateModal(true)}
-              className="min-w-[120px] px-3 py-1.5 text-sm !bg-green-600 !text-white rounded-lg hover:!bg-green-700 
-                       transition-colors flex items-center justify-center gap-2"
+              className="min-w-[140px] px-4 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
             >
-              <FaPlus className="w-3.5 h-3.5" />
+              <FaPlus className="w-4 h-4" />
               <span>Add Employee</span>
             </button>
           )}
           {isSuperAdmin && (
             <button
               onClick={() => setShowDepartmentModal(true)}
-              className="min-w-[120px] px-3 py-1.5 text-sm !bg-blue-600 !text-white rounded-lg hover:!bg-blue-700 
-                       transition-colors flex items-center justify-center gap-2"
+              className="min-w-[140px] px-4 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
             >
-              <FaBuilding className="w-3.5 h-3.5" />
+              <FaBuilding className="w-4 h-4" />
               <span>Manage Departments</span>
             </button>
           )}
         </div>
-      </div>
+      </motion.div>
 
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6 w-full">
+      {/* Filters/Status Bar Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl shadow p-4 mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full"
+      >
         <div className="flex-1 w-full sm:w-auto">
           <StatusFilter
             currentStatus={filters.status as Status | undefined}
@@ -547,7 +577,6 @@ export default function AllEmployees() {
             buttonClassName="px-3 py-1.5 text-xs rounded-lg whitespace-nowrap"
           />
         </div>
-
         {isSuperAdmin && (
           <div className="w-full sm:w-56">
             <select
@@ -567,7 +596,8 @@ export default function AllEmployees() {
             </select>
           </div>
         )}
-      </div>
+      </motion.div>
+      <div className="border-b border-gray-200 mb-6" />
 
       <div className="bg-white rounded-lg shadow mt-6 overflow-hidden">
         {isLoadingEmployees ? (
@@ -587,91 +617,96 @@ export default function AllEmployees() {
           <>
             {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Employee
-                    </th>
-                    {isSuperAdmin && (
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Department
+              <div className="rounded-xl shadow-lg bg-gradient-to-br from-white via-blue-50 to-purple-50">
+                <table className="w-full divide-y divide-gray-200">
+                  <thead className="bg-gradient-to-r from-blue-500 to-purple-500">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-bold text-white uppercase tracking-wider">
+                        Employee
                       </th>
-                    )}
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Position
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Role
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {employees.map((employee) => (
-                    <tr
-                      key={employee._id}
-                      onClick={() => handleEmployeeClick(employee._id || "")}
-                      className={`hover:bg-gray-50 transition-colors ${
-                        employee.status.toLowerCase() === "active"
-                          ? "cursor-pointer"
-                          : "cursor-not-allowed"
-                      }`}
-                    >
-                      <td className="px-3 py-2">
-                        <div className="flex items-center">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 truncate max-w-[200px]">
-                              {employee.firstName} {employee.lastName}
-                            </div>
-                            <div className="text-xs text-gray-500 truncate max-w-[200px]">
-                              {employee.email}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
                       {isSuperAdmin && (
+                        <th className="px-3 py-2 text-left text-xs font-bold text-white uppercase tracking-wider">
+                          Department
+                        </th>
+                      )}
+                      <th className="px-3 py-2 text-left text-xs font-bold text-white uppercase tracking-wider">
+                        Position
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-bold text-white uppercase tracking-wider">
+                        Role
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-bold text-white uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-3 py-2 text-right text-xs font-bold text-white uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {employees.map((employee, idx) => (
+                      <motion.tr
+                        key={employee._id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.03 }}
+                        onClick={() => handleEmployeeClick(employee._id || "")}
+                        className={`transition-colors duration-200 ${
+                          employee.status.toLowerCase() === "active"
+                            ? "hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 cursor-pointer"
+                            : "cursor-not-allowed"
+                        } ${idx % 2 === 0 ? "bg-white" : "bg-blue-50"}`}
+                      >
                         <td className="px-3 py-2">
-                          <div className="text-sm text-gray-900 truncate max-w-[150px]">
-                            {renderDepartmentName(employee.department)}
+                          <div className="flex items-center">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900 truncate max-w-[200px]">
+                                {employee.firstName} {employee.lastName}
+                              </div>
+                              <div className="text-xs text-gray-500 truncate max-w-[200px]">
+                                {employee.email}
+                              </div>
+                            </div>
                           </div>
                         </td>
-                      )}
-                      <td className="px-3 py-2">
-                        <div className="text-sm text-gray-900 truncate max-w-[150px]">
-                          {employee.position}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="text-sm">
-                          {(employee as any).role === "SUPER_ADMIN"
-                            ? "Super Admin"
-                            : (employee as any).role === "ADMIN"
-                            ? "Admin"
-                            : "Employee"}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <span
-                          className={`px-2 py-1 text-xs leading-5 font-semibold rounded-full
-                            ${getStatusColor(employee.status)}`}
-                        >
-                          {employee.status.charAt(0).toUpperCase() +
-                            employee.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-right text-sm font-medium">
-                        {renderActions(employee)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        {isSuperAdmin && (
+                          <td className="px-3 py-2">
+                            <div className="text-sm text-gray-900 truncate max-w-[150px]">
+                              {renderDepartmentName(employee.department)}
+                            </div>
+                          </td>
+                        )}
+                        <td className="px-3 py-2">
+                          <div className="text-sm text-gray-900 truncate max-w-[150px]">
+                            {employee.position}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="text-sm">
+                            {(employee as any).role === "SUPER_ADMIN"
+                              ? "Super Admin"
+                              : (employee as any).role === "ADMIN"
+                              ? "Admin"
+                              : "Employee"}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={`px-2 py-1 text-xs leading-5 font-semibold rounded-full
+                              ${getStatusColor(employee.status)}`}
+                          >
+                            {employee.status.charAt(0).toUpperCase() +
+                              employee.status.slice(1)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right text-sm font-medium">
+                          {renderActions(employee)}
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Mobile View */}
@@ -799,31 +834,37 @@ export default function AllEmployees() {
         onClose={() => setShowCreateModal(false)}
         className="relative z-50"
       >
-        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+          aria-hidden="true"
+        />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="mx-auto max-w-2xl w-full rounded-xl bg-white p-6 shadow-xl">
-            <div className="flex justify-between items-center mb-6">
-              <Dialog.Title className="text-xl font-semibold text-gray-900">
-                Create New Employee
-              </Dialog.Title>
+          <Dialog.Panel className="mx-auto max-w-2xl w-full rounded-2xl shadow-2xl bg-gradient-to-br from-white via-blue-50 to-emerald-50 p-0">
+            {/* Gradient Header */}
+            <div className="bg-gradient-to-r from-green-500 via-emerald-500 to-blue-500 rounded-t-2xl px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FaPlus className="text-white text-xl" />
+                <h2 className="text-lg font-bold text-white">
+                  Create New Employee
+                </h2>
+              </div>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-white hover:text-emerald-200 focus:outline-none text-xl bg-white/20 rounded-full p-2 hover:bg-white/30 transition-all duration-200"
               >
-                <FaTimes />
+                <FaTimes className="w-5 h-5" />
               </button>
             </div>
-
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 handleCreateEmployee(formData);
               }}
-              className="space-y-4"
+              className="space-y-4 px-6 py-6"
             >
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
                     First Name *
                   </label>
                   <input
@@ -831,7 +872,7 @@ export default function AllEmployees() {
                     required
                     pattern="[A-Za-z\s]+"
                     title="Please enter a valid name (letters and spaces only)"
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                     value={formData.firstName}
                     onChange={(e) =>
                       setFormData((prev) => ({
@@ -843,7 +884,7 @@ export default function AllEmployees() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Last Name *
                   </label>
                   <input
@@ -851,7 +892,7 @@ export default function AllEmployees() {
                     required
                     pattern="[A-Za-z\s]+"
                     title="Please enter a valid name (letters and spaces only)"
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                     value={formData.lastName}
                     onChange={(e) =>
                       setFormData((prev) => ({
@@ -863,13 +904,13 @@ export default function AllEmployees() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Email *
                   </label>
                   <input
                     type="email"
                     required
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                     value={formData.email}
                     onChange={(e) =>
                       setFormData((prev) => ({
@@ -881,7 +922,7 @@ export default function AllEmployees() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Phone *
                   </label>
                   <input
@@ -889,7 +930,7 @@ export default function AllEmployees() {
                     required
                     pattern="[\+]?[0-9\s\-]+"
                     title="Please enter a valid phone number"
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                     value={formData.phone}
                     onChange={(e) =>
                       setFormData((prev) => ({
@@ -902,13 +943,13 @@ export default function AllEmployees() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Position *
                   </label>
                   <input
                     type="text"
                     required
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                     value={formData.position}
                     onChange={(e) =>
                       setFormData((prev) => ({
@@ -920,13 +961,13 @@ export default function AllEmployees() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Grade Level *
                   </label>
                   <div className="relative">
                     <select
                       required
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                      className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                       value={formData.gradeLevel}
                       onChange={(e) =>
                         setFormData((prev) => ({
@@ -958,13 +999,13 @@ export default function AllEmployees() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Work Location *
                   </label>
                   <input
                     type="text"
                     required
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                     value={formData.workLocation}
                     onChange={(e) =>
                       setFormData((prev) => ({
@@ -977,13 +1018,13 @@ export default function AllEmployees() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Date Joined *
                   </label>
                   <input
                     type="date"
                     required
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                    className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                     value={formData.dateJoined}
                     onChange={(e) =>
                       setFormData((prev) => ({
@@ -997,12 +1038,12 @@ export default function AllEmployees() {
 
                 {isSuperAdmin && (
                   <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
                       Role *
                     </label>
                     <select
                       required
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                      className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                       value={formData.role}
                       onChange={(e) =>
                         setFormData((prev) => ({
@@ -1019,13 +1060,13 @@ export default function AllEmployees() {
 
                 {isSuperAdmin && (
                   <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
                       Department *
                     </label>
                     <div className="relative">
                       <select
                         required
-                        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                        className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-blue-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition"
                         value={formData.department}
                         onChange={(e) => {
                           const selectedId = e.target.value;
@@ -1062,7 +1103,7 @@ export default function AllEmployees() {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  className="px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-400 transition"
                   disabled={isCreating}
                 >
                   Cancel
@@ -1070,7 +1111,7 @@ export default function AllEmployees() {
                 <button
                   type="submit"
                   disabled={isCreating}
-                  className="inline-flex items-center px-4 py-2 text-sm font-medium text-white !bg-green-600 rounded-md hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed"
+                  className="inline-flex items-center px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-lg shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-400 transition disabled:bg-green-400 disabled:cursor-not-allowed"
                 >
                   {isCreating ? (
                     <>
@@ -1104,35 +1145,41 @@ export default function AllEmployees() {
         onClose={() => setShowOffboardingModal(false)}
         className="relative z-50"
       >
-        <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+          aria-hidden="true"
+        />
         <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="mx-auto max-w-md w-full rounded-xl bg-white p-6 shadow-xl">
-            <div className="flex justify-between items-center mb-6">
-              <Dialog.Title className="text-xl font-semibold text-gray-900">
-                Initiate Offboarding
-              </Dialog.Title>
+          <Dialog.Panel className="mx-auto max-w-md w-full rounded-2xl shadow-2xl bg-gradient-to-br from-white via-blue-50 to-emerald-50 p-0">
+            {/* Gradient Header */}
+            <div className="bg-gradient-to-r from-orange-500 via-yellow-500 to-pink-500 rounded-t-2xl px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FaSignOutAlt className="text-white text-xl" />
+                <h2 className="text-lg font-bold text-white">
+                  Initiate Offboarding
+                </h2>
+              </div>
               <button
                 onClick={() => setShowOffboardingModal(false)}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-white hover:text-yellow-200 focus:outline-none text-xl bg-white/20 rounded-full p-2 hover:bg-white/30 transition-all duration-200"
               >
-                <FaTimes />
+                <FaTimes className="w-5 h-5" />
               </button>
             </div>
-
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 handleOffboardingSubmit();
               }}
-              className="space-y-4"
+              className="space-y-4 px-6 py-6"
             >
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Type
                 </label>
                 <select
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-yellow-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400 transition"
                   value={offboardingData.type}
                   onChange={(e) =>
                     setOffboardingData((prev) => ({
@@ -1154,12 +1201,12 @@ export default function AllEmployees() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Reason
                 </label>
                 <textarea
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-yellow-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400 transition"
                   value={offboardingData.reason}
                   onChange={(e) =>
                     setOffboardingData((prev) => ({
@@ -1172,13 +1219,13 @@ export default function AllEmployees() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Target Exit Date
                 </label>
                 <input
                   type="date"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="w-full rounded-lg border border-gray-200 bg-gradient-to-r from-white to-yellow-50 shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400 transition"
                   value={offboardingData.targetExitDate}
                   onChange={(e) =>
                     setOffboardingData((prev) => ({
@@ -1193,14 +1240,14 @@ export default function AllEmployees() {
                 <button
                   type="button"
                   onClick={() => setShowOffboardingModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-400 transition"
                   disabled={isSubmitting}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-lg shadow-lg hover:from-orange-600 hover:to-pink-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-400 transition disabled:opacity-50 flex items-center gap-2"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (

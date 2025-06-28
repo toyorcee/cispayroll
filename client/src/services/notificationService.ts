@@ -17,14 +17,14 @@ export const getUnreadNotificationCount = async () => {
 // Fetch all notifications
 export const getNotifications = async () => {
   try {
-    console.log("🔔 [notificationService] Fetching notifications from API...");
+    // console.log("🔔 [notificationService] Fetching notifications from API...");
     const response = await api.get(`${BASE_URL}/notifications`);
-    console.log("🔔 [notificationService] API response:", {
-      status: response.status,
-      data: response.data,
-      notificationsCount: response.data?.data?.notifications?.length,
-      unreadCount: response.data?.data?.unreadCount,
-    });
+    // console.log("🔔 [notificationService] API response:", {
+    //   status: response.status,
+    //   data: response.data,
+    //   notificationsCount: response.data?.data?.notifications?.length,
+    //   unreadCount: response.data?.data?.unreadCount,
+    // });
     return response.data;
   } catch (error) {
     console.error(

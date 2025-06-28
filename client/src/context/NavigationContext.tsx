@@ -386,6 +386,12 @@ export const menuItems: NavigationItem[] = [
         permissions: [Permission.VIEW_OWN_BONUS],
         roles: [UserRole.ADMIN, UserRole.USER],
       },
+      {
+        name: "Processing Summary",
+        href: "/pms/payroll/summaries",
+        permissions: [Permission.VIEW_PAYROLL_STATS],
+        roles: [UserRole.SUPER_ADMIN, UserRole.ADMIN],
+      },
     ],
   },
   // {
