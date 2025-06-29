@@ -54,58 +54,56 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
     // For Admin, check specific permissions
     if (user.role === UserRole.ADMIN) {
-      if (
-        user.permissions.some((p) =>
-          [
-            Permission.VIEW_ALL_USERS,
-            Permission.MANAGE_DEPARTMENT_USERS,
-            Permission.MANAGE_ONBOARDING,
-            Permission.VIEW_ONBOARDING,
-            Permission.MANAGE_OFFBOARDING,
-            Permission.VIEW_OFFBOARDING,
-            Permission.APPROVE_OFFBOARDING,
-            Permission.REQUEST_LEAVE,
-            Permission.VIEW_OWN_LEAVE,
-            Permission.CANCEL_OWN_LEAVE,
-            Permission.VIEW_TEAM_LEAVE,
-            Permission.APPROVE_LEAVE,
-          ].includes(p)
-        )
-      ) {
+      // Employees - check if they have any employee-related permissions
+      const employeePermissions = [
+        Permission.VIEW_ALL_USERS,
+        Permission.MANAGE_DEPARTMENT_USERS,
+        Permission.MANAGE_ONBOARDING,
+        Permission.VIEW_ONBOARDING,
+        Permission.MANAGE_OFFBOARDING,
+        Permission.VIEW_OFFBOARDING,
+        Permission.APPROVE_OFFBOARDING,
+        Permission.REQUEST_LEAVE,
+        Permission.VIEW_OWN_LEAVE,
+        Permission.CANCEL_OWN_LEAVE,
+        Permission.VIEW_TEAM_LEAVE,
+        Permission.APPROVE_LEAVE,
+      ];
+
+      if (user.permissions.some((p) => employeePermissions.includes(p))) {
         availableMenus.push("Employees");
       }
 
-      // Payroll Management
-      if (
-        user.permissions.some((p) =>
-          [
-            Permission.VIEW_ALL_PAYROLL,
-            Permission.VIEW_DEPARTMENT_PAYROLL,
-            Permission.VIEW_OWN_PAYSLIP,
-            Permission.VIEW_ALLOWANCES,
-            Permission.EDIT_ALLOWANCES,
-            Permission.VIEW_DEDUCTIONS,
-            Permission.EDIT_DEDUCTIONS,
-            Permission.VIEW_OWN_ALLOWANCES,
-            Permission.REQUEST_ALLOWANCES,
-            Permission.VIEW_OWN_DEDUCTIONS,
-            Permission.MANAGE_DEPARTMENT_DEDUCTIONS,
-            Permission.VIEW_DEPARTMENT_DEDUCTIONS,
-            Permission.MANAGE_DEPARTMENT_ALLOWANCES,
-            Permission.VIEW_DEPARTMENT_ALLOWANCES,
-            Permission.MANAGE_DEPARTMENT_BONUSES,
-            Permission.VIEW_DEPARTMENT_BONUSES,
-            Permission.VIEW_BONUSES,
-            Permission.MANAGE_BONUSES,
-            Permission.CREATE_BONUSES,
-            Permission.DELETE_BONUSES,
-            Permission.EDIT_BONUSES,
-            Permission.CREATE_PAYROLL,
-            Permission.EDIT_PAYROLL,
-            Permission.GENERATE_PAYSLIP,
-          ].includes(p)
-        )
-      ) {
+      // Payroll Management - check if they have any payroll-related permissions
+      const payrollPermissions = [
+        Permission.VIEW_ALL_PAYROLL,
+        Permission.VIEW_DEPARTMENT_PAYROLL,
+        Permission.VIEW_OWN_PAYSLIP,
+        Permission.VIEW_ALLOWANCES,
+        Permission.EDIT_ALLOWANCES,
+        Permission.VIEW_DEDUCTIONS,
+        Permission.EDIT_DEDUCTIONS,
+        Permission.VIEW_OWN_ALLOWANCES,
+        Permission.REQUEST_ALLOWANCES,
+        Permission.VIEW_OWN_DEDUCTIONS,
+        Permission.MANAGE_DEPARTMENT_DEDUCTIONS,
+        Permission.VIEW_DEPARTMENT_DEDUCTIONS,
+        Permission.MANAGE_DEPARTMENT_ALLOWANCES,
+        Permission.VIEW_DEPARTMENT_ALLOWANCES,
+        Permission.MANAGE_DEPARTMENT_BONUSES,
+        Permission.VIEW_DEPARTMENT_BONUSES,
+        Permission.VIEW_BONUSES,
+        Permission.MANAGE_BONUSES,
+        Permission.CREATE_BONUSES,
+        Permission.DELETE_BONUSES,
+        Permission.EDIT_BONUSES,
+        Permission.CREATE_PAYROLL,
+        Permission.EDIT_PAYROLL,
+        Permission.GENERATE_PAYSLIP,
+        Permission.VIEW_OWN_BONUS,
+      ];
+
+      if (user.permissions.some((p) => payrollPermissions.includes(p))) {
         availableMenus.push("Payroll");
       }
 
@@ -140,36 +138,26 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
     if (user.role === UserRole.USER) {
       // Check for employee-related permissions
-      if (
-        user.permissions.some((p) =>
-          [
-            Permission.VIEW_ALL_USERS,
-            Permission.MANAGE_DEPARTMENT_USERS,
-            Permission.MANAGE_ONBOARDING,
-            Permission.VIEW_ONBOARDING,
-            Permission.MANAGE_OFFBOARDING,
-            Permission.VIEW_OFFBOARDING,
-            Permission.APPROVE_OFFBOARDING,
-            Permission.REQUEST_LEAVE,
-            Permission.VIEW_OWN_LEAVE,
-            Permission.CANCEL_OWN_LEAVE,
-          ].includes(p)
-        )
-      ) {
+      const userEmployeePermissions = [
+        Permission.REQUEST_LEAVE,
+        Permission.VIEW_OWN_LEAVE,
+        Permission.CANCEL_OWN_LEAVE,
+      ];
+
+      if (user.permissions.some((p) => userEmployeePermissions.includes(p))) {
         availableMenus.push("Employees");
       }
 
-      if (
-        user.permissions.some((p) =>
-          [
-            Permission.VIEW_OWN_PAYSLIP,
-            Permission.VIEW_OWN_ALLOWANCES,
-            Permission.REQUEST_ALLOWANCES,
-            Permission.VIEW_OWN_DEDUCTIONS,
-            Permission.VIEW_OWN_BONUS,
-          ].includes(p)
-        )
-      ) {
+      // Check for payroll-related permissions
+      const userPayrollPermissions = [
+        Permission.VIEW_OWN_PAYSLIP,
+        Permission.VIEW_OWN_ALLOWANCES,
+        Permission.REQUEST_ALLOWANCES,
+        Permission.VIEW_OWN_DEDUCTIONS,
+        Permission.VIEW_OWN_BONUS,
+      ];
+
+      if (user.permissions.some((p) => userPayrollPermissions.includes(p))) {
         availableMenus.push("Payroll");
       }
 
