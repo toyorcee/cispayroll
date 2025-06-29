@@ -5,7 +5,7 @@ import { generatePayslipPDF } from "../../../utils/pdfGenerator";
 import { payrollService } from "../../../services/payrollService";
 import { useState } from "react";
 import { toast } from "react-toastify";
-import ReactDOM from "react-dom";
+import { createPortal } from "react-dom";
 
 interface PayslipDetailProps {
   payslip: Payslip;
@@ -96,7 +96,7 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({
     );
   };
 
-  return ReactDOM.createPortal(
+  return createPortal(
     <div
       className="fixed inset-0 z-50 bg-white bg-opacity-80 flex items-center justify-center min-h-screen overflow-y-auto payslip-container"
       onClick={(e) => {
