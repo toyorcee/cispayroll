@@ -472,12 +472,22 @@ const approveBonusRequest = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Bonus request not found");
   }
 
-  if (bonus.status !== "pending") {
-    throw new ApiError(400, "Bonus request is not pending");
+  console.log("🔍 Bonus status check:", {
+    bonusId: bonus._id,
+    currentStatus: bonus.approvalStatus,
+    expectedStatus: "pending",
+    isPending: bonus.approvalStatus === "pending",
+  });
+
+  if (bonus.approvalStatus !== "pending") {
+    throw new ApiError(
+      400,
+      `Bonus request is not pending. Current status: ${bonus.approvalStatus}`
+    );
   }
 
   // Update bonus status
-  bonus.status = "approved";
+  bonus.approvalStatus = "approved";
   bonus.approvedBy = userId;
   bonus.approvedAt = new Date();
   bonus.approvalRemarks = remarks || "";
@@ -485,6 +495,27 @@ const approveBonusRequest = asyncHandler(async (req, res) => {
   bonus.updatedAt = new Date();
 
   await bonus.save();
+
+  // Add the approved bonus to the employee's personalBonuses array
+  const personalBonus = {
+    bonusId: bonus._id,
+    status: "APPROVED",
+    usedInPayroll: { 
+      month: null,
+      year: null,
+      payrollId: null,
+    },
+  };
+
+  // Remove any existing entry for this bonus (if exists)
+  await User.findByIdAndUpdate(bonus.employee, {
+    $pull: { personalBonuses: { bonusId: bonus._id } },
+  });
+
+  // Add the new approved bonus entry
+  await User.findByIdAndUpdate(bonus.employee, {
+    $push: { personalBonuses: personalBonus },
+  });
 
   // Add audit logging
   await PayrollStatisticsLogger.logBonusAction({
@@ -538,12 +569,22 @@ const rejectBonusRequest = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Bonus request not found");
   }
 
-  if (bonus.status !== "pending") {
-    throw new ApiError(400, "Bonus request is not pending");
+  console.log("�� Bonus status check (reject):", {
+    bonusId: bonus._id,
+    currentStatus: bonus.approvalStatus,
+    expectedStatus: "pending",
+    isPending: bonus.approvalStatus === "pending",
+  });
+
+  if (bonus.approvalStatus !== "pending") {
+    throw new ApiError(
+      400,
+      `Bonus request is not pending. Current status: ${bonus.approvalStatus}`
+    );
   }
 
   // Update bonus status
-  bonus.status = "rejected";
+  bonus.approvalStatus = "rejected";
   bonus.approvedBy = userId;
   bonus.approvedAt = new Date();
   bonus.approvalRemarks = remarks || "";
@@ -551,6 +592,11 @@ const rejectBonusRequest = asyncHandler(async (req, res) => {
   bonus.updatedAt = new Date();
 
   await bonus.save();
+
+  // Remove the rejected bonus from the employee's personalBonuses array
+  await User.findByIdAndUpdate(bonus.employee, {
+    $pull: { personalBonuses: { bonusId: bonus._id } },
+  });
 
   // Add audit logging
   await PayrollStatisticsLogger.logBonusAction({
@@ -610,7 +656,7 @@ const deleteBonusRequest = asyncHandler(async (req, res) => {
     type: bonus.type,
     reason: bonus.reason,
     paymentDate: bonus.paymentDate,
-    status: bonus.status,
+    status: bonus.approvalStatus,
   };
 
   await Bonus.findByIdAndDelete(id);

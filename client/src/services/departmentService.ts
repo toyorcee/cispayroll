@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Department, DepartmentFormData } from "../types/department";
 import { AdminResponse } from "./employeeService";
 import { toast } from "react-toastify";
+import axios from "axios";
 
 const BASE_URL = `/api`;
 
@@ -154,13 +155,78 @@ export const prefetchDepartments = async (queryClient: QueryClient) => {
  * This is the current working implementation - do not change without testing
  */
 export const departmentService = {
-  getAllDepartments: async (): Promise<Department[]> => {
+  getAllDepartments: async (
+    userRole?: string,
+    userPermissions?: string[]
+  ): Promise<Department[]> => {
     try {
-      const response = await api.get(`${BASE_URL}/super-admin/departments`);
+      // Check if user has super admin role or VIEW_ALL_DEPARTMENTS permission
+      const isSuperAdmin = userRole === "SUPER_ADMIN";
+      const hasPermission = userPermissions?.includes("VIEW_ALL_DEPARTMENTS");
+
+      // Use super-admin endpoint only if user is super admin or has the permission
+      const endpoint =
+        isSuperAdmin || hasPermission
+          ? `${BASE_URL}/super-admin/departments`
+          : `${BASE_URL}/departments`;
+
+      const response = await api.get(endpoint);
       return response.data.data || [];
     } catch (error) {
       console.error("Error fetching departments:", error);
+      // Don't show toast for permission errors to avoid spam
+      if (axios.isAxiosError(error) && error.response?.status === 403) {
+        console.warn(
+          "Permission denied for departments - this is expected for regular users"
+        );
+        return [];
+      }
+      // If regular user endpoint doesn't exist (404), try super-admin endpoint as fallback
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        console.warn(
+          "Regular user departments endpoint not found, trying super-admin endpoint"
+        );
+        try {
+          const fallbackResponse = await api.get(
+            `${BASE_URL}/super-admin/departments`
+          );
+          return fallbackResponse.data.data || [];
+        } catch (fallbackError) {
+          console.error("Fallback endpoint also failed:", fallbackError);
+          return [];
+        }
+      }
       toast.error("Failed to fetch departments");
+      throw error;
+    }
+  },
+
+  // Role-aware version for AuthContext
+  getAllDepartmentsForUser: async (
+    userRole?: string,
+    userPermissions?: string[]
+  ): Promise<Department[]> => {
+    try {
+      const isSuperAdmin = userRole === "SUPER_ADMIN";
+      const hasPermission = userPermissions?.includes("VIEW_ALL_DEPARTMENTS");
+
+      // Use super-admin endpoint only if user is super admin or has the permission
+      const endpoint =
+        isSuperAdmin || hasPermission
+          ? `${BASE_URL}/super-admin/departments`
+          : `${BASE_URL}/departments`;
+
+      const response = await api.get(endpoint);
+      return response.data.data || [];
+    } catch (error) {
+      console.error("Error fetching departments:", error);
+      // Don't show toast for permission errors to avoid spam
+      if (axios.isAxiosError(error) && error.response?.status === 403) {
+        console.warn(
+          "Permission denied for departments - this is expected for regular users"
+        );
+        return [];
+      }
       throw error;
     }
   },
@@ -236,7 +302,20 @@ export const departmentService = {
   useGetDepartments: () => {
     return useQuery<Department[]>({
       queryKey: DEPARTMENTS_QUERY_KEY,
-      queryFn: departmentService.getAllDepartments,
+      queryFn: () => departmentService.getAllDepartments(),
+    });
+  },
+
+  // Role-aware version for components that have access to user context
+  useGetDepartmentsWithRole: (
+    userRole?: string,
+    userPermissions?: string[]
+  ) => {
+    return useQuery<Department[]>({
+      queryKey: [...DEPARTMENTS_QUERY_KEY, userRole, userPermissions],
+      queryFn: () =>
+        departmentService.getAllDepartments(userRole, userPermissions),
+      enabled: !!userRole,
     });
   },
 

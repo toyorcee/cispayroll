@@ -95,4 +95,11 @@ router.get(
   RegularUserController.getMyDeductions
 );
 
+// ===== Department Management Routes =====
+router.get(
+  "/departments",
+  requirePermission([Permission.VIEW_ALL_DEPARTMENTS]),
+  RegularUserController.getAllDepartments
+);
+
 export default router;

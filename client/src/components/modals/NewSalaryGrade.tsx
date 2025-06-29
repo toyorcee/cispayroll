@@ -106,7 +106,10 @@ export default function NewSalaryGrade({
       try {
         setLoading(true);
         if (canManageAllDepartments) {
-          const deps = await departmentService.getAllDepartments();
+          const deps = await departmentService.getAllDepartments(
+            user?.role,
+            user?.permissions
+          );
           setDepartments(deps);
         }
       } catch (error) {

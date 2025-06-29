@@ -60,7 +60,10 @@ const useOnboardingData = () => {
     async (page = 1, filters: OnboardingFilters = {}) => {
       setIsLoading(true);
       try {
-        const deps = await departmentService.getAllDepartments();
+        const deps = await departmentService.getAllDepartments(
+          user?.role,
+          user?.permissions
+        );
         setDepartments(deps);
         const response = await onboardingService.getOnboardingEmployees({
           page,
@@ -143,7 +146,7 @@ const useOnboardingData = () => {
         setIsLoading(false);
       }
     },
-    []
+    [user]
   );
 
   useEffect(() => {

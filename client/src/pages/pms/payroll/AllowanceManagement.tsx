@@ -250,7 +250,7 @@ const EmployeeAllowanceInfoSection = () => (
 );
 
 export default function AllowanceManagement() {
-  const { isSuperAdmin, isAdmin } = useAuth();
+  const { isSuperAdmin, isAdmin, user } = useAuth();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingAllowance, setEditingAllowance] = useState<
     Allowance | undefined
@@ -322,7 +322,10 @@ export default function AllowanceManagement() {
   const { data: departmentsData, isLoading: isDepartmentsLoading } = useQuery({
     queryKey: ["departments"],
     queryFn: async () => {
-      const response = await departmentService.getAllDepartments();
+      const response = await departmentService.getAllDepartments(
+        user?.role,
+        user?.permissions
+      );
       return response;
     },
   });
@@ -947,11 +950,15 @@ export default function AllowanceManagement() {
                           />
                           <div className="flex flex-col">
                             <span className="text-sm font-medium text-gray-900 break-all">
-                              {allowance.employee?.firstName}{" "}
-                              {allowance.employee?.lastName}
+                              {allowance.employee?.firstName &&
+                              allowance.employee?.lastName
+                                ? `${allowance.employee.firstName} ${allowance.employee.lastName}`
+                                : allowance.employee?.fullName ||
+                                  allowance.employee?.email ||
+                                  "Unknown Employee"}
                             </span>
                             <span className="text-xs text-gray-500 break-all">
-                              {allowance.employee?.email}
+                              {allowance.employee?.email || ""}
                             </span>
                           </div>
                         </div>

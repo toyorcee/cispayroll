@@ -1,4 +1,5 @@
 import api from "./api";
+import axios from "axios";
 
 export interface PayrollSummaryFilters {
   month?: number;
@@ -128,14 +129,33 @@ export interface PayrollSummaryAnalytics {
 
 class PayrollSummaryService {
   /**
-   * Get all payroll summaries with pagination and filtering
+   * Get all summaries with filtering and pagination
    */
   static async getAllSummaries(
-    filters: PayrollSummaryFilters = {}
+    filters: PayrollSummaryFilters = {},
+    userRole?: string,
+    userPermissions?: string[]
   ): Promise<PayrollSummaryResponse> {
     try {
-      console.log("🔍 [PayrollSummaryService] getAllSummaries called");
-      console.log("📝 [PayrollSummaryService] Filters:", filters);
+      // Check if user has the required permission
+      const hasPermission = userPermissions?.includes("VIEW_PAYROLL_STATS");
+      const isSuperAdmin = userRole === "SUPER_ADMIN";
+
+      if (!hasPermission && !isSuperAdmin) {
+        console.warn(
+          "User lacks VIEW_PAYROLL_STATS permission - returning empty summaries"
+        );
+        return {
+          success: true,
+          data: [],
+          pagination: {
+            currentPage: 1,
+            totalPages: 0,
+            totalItems: 0,
+            itemsPerPage: 10,
+          },
+        };
+      }
 
       const params = new URLSearchParams();
 
@@ -177,6 +197,22 @@ class PayrollSummaryService {
         response: error.response?.data,
         status: error.response?.status,
       });
+      // Don't show toast for permission errors to avoid spam
+      if (axios.isAxiosError(error) && error.response?.status === 403) {
+        console.warn(
+          "Permission denied for payroll summaries - this is expected for users without VIEW_PAYROLL_STATS permission"
+        );
+        return {
+          success: true,
+          data: [],
+          pagination: {
+            currentPage: 1,
+            totalPages: 0,
+            totalItems: 0,
+            itemsPerPage: 10,
+          },
+        };
+      }
       throw error;
     }
   }
@@ -219,8 +255,32 @@ class PayrollSummaryService {
   /**
    * Get processing statistics
    */
-  static async getProcessingStatistics(): Promise<PayrollSummaryStatistics> {
+  static async getProcessingStatistics(
+    userRole?: string,
+    userPermissions?: string[]
+  ): Promise<PayrollSummaryStatistics> {
     try {
+      // Check if user has the required permission
+      const hasPermission = userPermissions?.includes("VIEW_PAYROLL_STATS");
+      const isSuperAdmin = userRole === "SUPER_ADMIN";
+
+      if (!hasPermission && !isSuperAdmin) {
+        console.warn(
+          "User lacks VIEW_PAYROLL_STATS permission - returning empty statistics"
+        );
+        return {
+          totalBatches: 0,
+          totalEmployees: 0,
+          totalProcessed: 0,
+          totalSkipped: 0,
+          totalFailed: 0,
+          totalNetPay: 0,
+          totalGrossPay: 0,
+          totalDeductions: 0,
+          avgProcessingTime: 0,
+        };
+      }
+
       console.log("🔍 [PayrollSummaryService] getProcessingStatistics called");
 
       const url = "/api/payroll-summaries/statistics/processing";
@@ -246,6 +306,23 @@ class PayrollSummaryService {
         response: error.response?.data,
         status: error.response?.status,
       });
+      // Don't show toast for permission errors to avoid spam
+      if (axios.isAxiosError(error) && error.response?.status === 403) {
+        console.warn(
+          "Permission denied for processing statistics - this is expected for users without VIEW_PAYROLL_STATS permission"
+        );
+        return {
+          totalBatches: 0,
+          totalEmployees: 0,
+          totalProcessed: 0,
+          totalSkipped: 0,
+          totalFailed: 0,
+          totalNetPay: 0,
+          totalGrossPay: 0,
+          totalDeductions: 0,
+          avgProcessingTime: 0,
+        };
+      }
       throw error;
     }
   }
@@ -254,9 +331,22 @@ class PayrollSummaryService {
    * Get recent summaries for dashboard
    */
   static async getRecentSummaries(
-    limit: number = 5
+    limit: number = 5,
+    userRole?: string,
+    userPermissions?: string[]
   ): Promise<PayrollSummary[]> {
     try {
+      // Check if user has the required permission
+      const hasPermission = userPermissions?.includes("VIEW_PAYROLL_STATS");
+      const isSuperAdmin = userRole === "SUPER_ADMIN";
+
+      if (!hasPermission && !isSuperAdmin) {
+        console.warn(
+          "User lacks VIEW_PAYROLL_STATS permission - returning empty recent summaries"
+        );
+        return [];
+      }
+
       console.log("🔍 [PayrollSummaryService] getRecentSummaries called");
       console.log("📝 [PayrollSummaryService] Limit:", limit);
 
@@ -283,6 +373,13 @@ class PayrollSummaryService {
         response: error.response?.data,
         status: error.response?.status,
       });
+      // Don't show toast for permission errors to avoid spam
+      if (axios.isAxiosError(error) && error.response?.status === 403) {
+        console.warn(
+          "Permission denied for recent summaries - this is expected for users without VIEW_PAYROLL_STATS permission"
+        );
+        return [];
+      }
       throw error;
     }
   }
@@ -291,9 +388,22 @@ class PayrollSummaryService {
    * Get summary analytics for charts
    */
   static async getSummaryAnalytics(
-    filters: PayrollSummaryFilters = {}
+    filters: PayrollSummaryFilters = {},
+    userRole?: string,
+    userPermissions?: string[]
   ): Promise<PayrollSummaryAnalytics[]> {
     try {
+      // Check if user has the required permission
+      const hasPermission = userPermissions?.includes("VIEW_PAYROLL_STATS");
+      const isSuperAdmin = userRole === "SUPER_ADMIN";
+
+      if (!hasPermission && !isSuperAdmin) {
+        console.warn(
+          "User lacks VIEW_PAYROLL_STATS permission - returning empty analytics"
+        );
+        return [];
+      }
+
       const params = new URLSearchParams();
 
       if (filters.month) params.append("month", filters.month.toString());
@@ -305,6 +415,13 @@ class PayrollSummaryService {
       return response.data.data;
     } catch (error: any) {
       console.error("❌ Error fetching summary analytics:", error);
+      // Don't show toast for permission errors to avoid spam
+      if (axios.isAxiosError(error) && error.response?.status === 403) {
+        console.warn(
+          "Permission denied for payroll analytics - this is expected for users without VIEW_PAYROLL_STATS permission"
+        );
+        return [];
+      }
       throw error;
     }
   }

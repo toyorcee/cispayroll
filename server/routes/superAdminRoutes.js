@@ -22,7 +22,6 @@ const router = Router();
 
 // Apply base middleware
 router.use(requireAuth);
-router.use(requireSuperAdmin);
 
 // ===== Admin Management Routes =====
 router.get(
@@ -39,18 +38,21 @@ router.get(
 
 router.post(
   "/admins",
+  requireSuperAdmin,
   requirePermission([Permission.CREATE_ADMIN]),
   SuperAdminController.createAdmin
 );
 
 router.put(
   "/admins/:id",
+  requireSuperAdmin,
   requirePermission([Permission.EDIT_ADMIN]),
   SuperAdminController.updateAdmin
 );
 
 router.delete(
   "/admins/:id",
+  requireSuperAdmin,
   requirePermission([Permission.DELETE_ADMIN]),
   SuperAdminController.deleteAdmin
 );
@@ -76,18 +78,21 @@ router.get(
 
 router.post(
   "/users",
+  requireSuperAdmin,
   requirePermission([Permission.CREATE_USER]),
   SuperAdminController.createUser
 );
 
 router.put(
   "/users/:id",
+  requireSuperAdmin,
   requirePermission([Permission.EDIT_USER]),
   SuperAdminController.updateUser
 );
 
 router.delete(
   "/users/:id",
+  requireSuperAdmin,
   requirePermission([Permission.DELETE_USER]),
   SuperAdminController.deleteUser
 );
@@ -190,6 +195,7 @@ router.post(
 // Update payroll (only allowed for DRAFT status)
 router.patch(
   "/payroll/:id",
+  requireSuperAdmin,
   requirePermission([Permission.CREATE_PAYROLL]),
   validatePayrollUpdate,
   SuperAdminController.updatePayroll
@@ -198,6 +204,7 @@ router.patch(
 // Create new payroll (DRAFT status)
 router.post(
   "/payroll",
+  requireSuperAdmin,
   requirePermission([Permission.CREATE_PAYROLL]),
   validatePayrollCreate,
   SuperAdminController.createPayroll
@@ -206,6 +213,7 @@ router.post(
 // Start processing payroll (PENDING -> PROCESSING)
 router.patch(
   "/payroll/:id/process",
+  requireSuperAdmin,
   requirePermission([Permission.APPROVE_PAYROLL]),
   SuperAdminController.updatePayrollStatus
 );
@@ -213,6 +221,7 @@ router.patch(
 // Single payment route
 router.post(
   "/payroll/:id/mark-paid",
+  requireSuperAdmin,
   requirePermission([Permission.APPROVE_PAYROLL]),
   SuperAdminController.markPaymentPaid
 );
@@ -220,6 +229,7 @@ router.post(
 // Batch payment route
 router.post(
   "/payroll/mark-paid-batch",
+  requireSuperAdmin,
   requirePermission([Permission.APPROVE_PAYROLL]),
   SuperAdminController.markPaymentPaid
 );
@@ -227,6 +237,7 @@ router.post(
 // Approve payroll (PROCESSING/PENDING -> APPROVED)
 router.patch(
   "/payroll/:id/approve",
+  requireSuperAdmin,
   requirePermission([Permission.APPROVE_PAYROLL]),
   validatePayrollApproval,
   SuperAdminController.approvePayroll
@@ -235,6 +246,7 @@ router.patch(
 // Mark payroll as failed (PAID -> FAILED)
 router.post(
   "/payroll/:id/mark-failed",
+  requireSuperAdmin,
   requirePermission([Permission.APPROVE_PAYROLL]),
   SuperAdminController.markPaymentFailed
 );
@@ -242,6 +254,7 @@ router.post(
 // Batch mark as failed
 router.post(
   "/payroll/mark-failed-batch",
+  requireSuperAdmin,
   requirePermission([Permission.APPROVE_PAYROLL]),
   SuperAdminController.markPaymentFailed
 );
@@ -249,6 +262,7 @@ router.post(
 // Cancel payroll (Any status -> CANCELLED)
 router.patch(
   "/payroll/:id/cancel",
+  requireSuperAdmin,
   requirePermission([Permission.APPROVE_PAYROLL]),
   SuperAdminController.updatePayrollStatus
 );
@@ -256,6 +270,7 @@ router.patch(
 // Archive payroll (PAID -> ARCHIVED)
 router.patch(
   "/payroll/:id/archive",
+  requireSuperAdmin,
   requirePermission([Permission.APPROVE_PAYROLL]),
   SuperAdminController.updatePayrollStatus
 );
@@ -278,6 +293,7 @@ router.get(
 // Delete payroll (only allowed for DRAFT status)
 router.delete(
   "/payroll/:id",
+  requireSuperAdmin,
   requirePermission([Permission.DELETE_PAYROLL]),
   SuperAdminController.deletePayroll
 );
@@ -297,24 +313,28 @@ router.get(
 
 router.post(
   "/employees/:employeeId/offboard",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_OFFBOARDING]),
   SuperAdminController.initiateOffboarding
 );
 
 router.post(
   "/employees/:employeeId/revert-onboarding",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_ONBOARDING]),
   SuperAdminController.revertToOnboarding
 );
 
 router.patch(
   "/employees/:employeeId/offboarding",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_OFFBOARDING]),
   SuperAdminController.updateOffboardingStatus
 );
 
 router.post(
   "/employees/:employeeId/archive",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_OFFBOARDING]),
   SuperAdminController.archiveEmployee
 );
@@ -334,12 +354,14 @@ router.get(
 
 router.patch(
   "/leave/:id/approve",
+  requireSuperAdmin,
   requirePermission([Permission.APPROVE_LEAVE]),
   SuperAdminController.approveLeave
 );
 
 router.patch(
   "/leave/:id/reject",
+  requireSuperAdmin,
   requirePermission([Permission.APPROVE_LEAVE]),
   SuperAdminController.rejectLeave
 );
@@ -347,6 +369,7 @@ router.patch(
 // Salary Structure Routes
 router.post(
   "/salary-grades",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_SALARY_STRUCTURE]),
   SuperAdminController.createSalaryGrade
 );
@@ -359,18 +382,21 @@ router.get(
 
 router.patch(
   "/salary-grades/:id",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_SALARY_STRUCTURE]),
   SuperAdminController.updateSalaryGrade
 );
 
 router.post(
   "/salary-grades/:id/components",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_SALARY_STRUCTURE]),
   SuperAdminController.addSalaryComponent
 );
 
 router.patch(
   "/salary-grades/:id/components/:componentId",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_SALARY_STRUCTURE]),
   SuperAdminController.updateSalaryComponent
 );
@@ -383,6 +409,7 @@ router.get(
 
 router.delete(
   "/salary-grades/:id",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_SALARY_STRUCTURE]),
   SuperAdminController.deleteSalaryGrade
 );
@@ -391,6 +418,7 @@ router.delete(
 // ===== Deduction Management Routes =====
 router.post(
   "/deductions/statutory",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_DEDUCTIONS]),
   SuperAdminController.setupStatutoryDeductions
 );
@@ -403,18 +431,21 @@ router.get(
 
 router.post(
   "/deductions/voluntary",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_DEDUCTIONS]),
   SuperAdminController.createVoluntaryDeduction
 );
 
 router.post(
   "/deductions/statutory/custom",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_DEDUCTIONS]),
   SuperAdminController.createCustomStatutoryDeduction
 );
 
 router.post(
   "/deductions/statutory/department",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_DEDUCTIONS]),
   SuperAdminController.createDepartmentStatutoryDeduction
 );
@@ -422,12 +453,14 @@ router.post(
 // Employee-specific deduction routes
 router.post(
   "/deductions/:deductionId/assign/:employeeId",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_DEDUCTIONS]),
   SuperAdminController.assignDeductionToEmployee
 );
 
 router.delete(
   "/deductions/:deductionId/employees/:employeeId",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_DEDUCTIONS]),
   SuperAdminController.removeDeductionFromEmployee
 );
@@ -441,18 +474,21 @@ router.get(
 // General deduction management routes
 router.patch(
   "/deductions/:id",
+  requireSuperAdmin,
   requirePermission([Permission.EDIT_DEDUCTIONS]),
   SuperAdminController.updateDeduction
 );
 
 router.patch(
   "/deductions/:id/toggle",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_DEDUCTIONS]),
   SuperAdminController.toggleDeductionStatus
 );
 
 router.delete(
   "/deductions/:id",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_DEDUCTIONS]),
   SuperAdminController.deleteDeduction
 );
@@ -460,12 +496,14 @@ router.delete(
 // Batch operations
 router.post(
   "/deductions/:deductionId/assign-batch",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_DEDUCTIONS]),
   SuperAdminController.assignDeductionToMultipleEmployees
 );
 
 router.delete(
   "/deductions/:deductionId/remove-batch",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_DEDUCTIONS]),
   SuperAdminController.removeDeductionFromMultipleEmployees
 );
@@ -480,6 +518,7 @@ router.get(
 // Allowance Routes
 router.post(
   "/allowances",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_ALLOWANCES]),
   SuperAdminController.createAllowance
 );
@@ -492,18 +531,21 @@ router.get(
 
 router.patch(
   "/allowances/:id",
+  requireSuperAdmin,
   requirePermission([Permission.EDIT_ALLOWANCES]),
   SuperAdminController.updateAllowance
 );
 
 router.patch(
   "/allowances/:id/toggle",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_ALLOWANCES]),
   SuperAdminController.toggleAllowanceStatus
 );
 
 router.delete(
   "/allowances/:id",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_ALLOWANCES]),
   SuperAdminController.deleteAllowance
 );
@@ -511,6 +553,7 @@ router.delete(
 // Bonus Routes
 router.post(
   "/bonuses",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_BONUSES]),
   SuperAdminController.createBonus
 );
@@ -523,18 +566,21 @@ router.get(
 
 router.patch(
   "/bonuses/:id",
+  requireSuperAdmin,
   requirePermission([Permission.EDIT_BONUSES]),
   SuperAdminController.updateBonus
 );
 
 router.patch(
   "/bonuses/:id/approve",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_BONUSES]),
   SuperAdminController.approveBonus
 );
 
 router.delete(
   "/bonuses/:id",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_BONUSES]),
   SuperAdminController.deleteBonus
 );
@@ -563,18 +609,21 @@ router.get(
 
 router.post(
   "/payment-methods",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_PAYMENT_METHODS]),
   SuperAdminController.createPaymentMethod
 );
 
 router.patch(
   "/payment-methods/:id",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_PAYMENT_METHODS]),
   SuperAdminController.updatePaymentMethod
 );
 
 router.delete(
   "/payment-methods/:id",
+  requireSuperAdmin,
   requirePermission([Permission.MANAGE_PAYMENT_METHODS]),
   SuperAdminController.deletePaymentMethod
 );
@@ -582,6 +631,7 @@ router.delete(
 // Add these new routes for bulk processing
 router.post(
   "/payroll/process-department",
+  requireSuperAdmin,
   requirePermission([Permission.CREATE_PAYROLL]),
   validateBulkPayrollCreate,
   SuperAdminController.processDepartmentEmployeesPayroll
@@ -589,6 +639,7 @@ router.post(
 
 router.post(
   "/payroll/process-all-departments",
+  requireSuperAdmin,
   requirePermission([Permission.CREATE_PAYROLL]),
   validateBulkPayrollCreate,
   SuperAdminController.processAllDepartmentsPayroll
@@ -597,6 +648,7 @@ router.post(
 // Add route for processing single employee payroll
 router.post(
   "/payroll/process-single-employee",
+  requireSuperAdmin,
   validateSuperAdminSingleEmployeePayroll,
   SuperAdminController.processSingleEmployeePayroll
 );
@@ -604,6 +656,7 @@ router.post(
 // Add route for processing multiple employees payroll
 router.post(
   "/payroll/process-multiple-employees",
+  requireSuperAdmin,
   requirePermission([Permission.CREATE_PAYROLL]),
   validateSuperAdminMultipleEmployeesPayroll,
   SuperAdminController.processMultipleEmployeesPayroll
@@ -612,6 +665,7 @@ router.post(
 // Add route for processing all employees payroll
 router.post(
   "/payroll/process-all-employees",
+  requireSuperAdmin,
   requirePermission([Permission.CREATE_PAYROLL]),
   validateBulkPayrollCreate,
   SuperAdminController.processAllEmployeesPayroll
@@ -620,6 +674,7 @@ router.post(
 // Single payment initiation route
 router.post(
   "/payroll/:id/initiate-payment",
+  requireSuperAdmin,
   requirePermission([Permission.APPROVE_PAYROLL]),
   SuperAdminController.initiatePayment
 );
@@ -627,6 +682,7 @@ router.post(
 // Batch payment initiation route
 router.post(
   "/payroll/initiate-payment",
+  requireSuperAdmin,
   requirePermission([Permission.APPROVE_PAYROLL]),
   SuperAdminController.initiatePayment
 );

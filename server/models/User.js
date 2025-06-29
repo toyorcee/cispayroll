@@ -1154,6 +1154,9 @@ UserSchema.pre("save", function (next) {
           Permission.VIEW_OWN_DEDUCTIONS,
           Permission.VIEW_OWN_BONUS,
 
+          // Department Access (for dropdowns and basic info)
+          Permission.VIEW_ALL_DEPARTMENTS,
+
           // Document Management
           Permission.VIEW_OWN_DOCUMENTS,
           Permission.UPLOAD_DOCUMENTS,

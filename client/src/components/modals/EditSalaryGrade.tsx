@@ -89,7 +89,10 @@ export default function EditSalaryGrade({
 
         // Load departments if user has permission
         if (canManageAllDepartments) {
-          const deps = await departmentService.getAllDepartments();
+          const deps = await departmentService.getAllDepartments(
+            user?.role,
+            user?.permissions
+          );
           setDepartments(deps);
         }
 

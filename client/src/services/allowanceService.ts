@@ -104,13 +104,9 @@ export const allowanceService = {
           : `/api/regular-user/allowances/${id}/approve`;
 
       const response = await api.patch(endpoint);
-      toast.success("Allowance approved successfully");
       return response.data;
     } catch (error: any) {
       console.error("❌ Error approving allowance:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to approve allowance"
-      );
       throw error;
     }
   },
@@ -127,13 +123,9 @@ export const allowanceService = {
           : `/api/regular-user/allowances/${id}/reject`;
 
       const response = await api.patch(endpoint, { reason });
-      toast.success("Allowance rejected successfully");
       return response.data;
     } catch (error: any) {
       console.error("❌ Error rejecting allowance:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to reject allowance"
-      );
       throw error;
     }
   },
@@ -256,14 +248,9 @@ export const allowanceService = {
         `/api/admin/allowances/${id}/approve`,
         {}
       );
-      toast.success("Department allowance approved successfully");
       return response.data;
     } catch (error: any) {
       console.error("❌ Error approving department allowance:", error);
-      toast.error(
-        error.response?.data?.message ||
-          "Failed to approve department allowance"
-      );
       throw error;
     }
   },
@@ -276,13 +263,9 @@ export const allowanceService = {
       const response = await api.patch(`/api/admin/allowances/${id}/reject`, {
         reason,
       });
-      toast.success("Department allowance rejected successfully");
       return response.data;
     } catch (error: any) {
       console.error("❌ Error rejecting department allowance:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to reject department allowance"
-      );
       throw error;
     }
   },

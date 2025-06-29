@@ -159,15 +159,29 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       }
     }
 
-    // Settings Routes - be more permissive
+    // Settings Routes - check permissions instead of hardcoded role restrictions
     if (path.startsWith("/pms/settings")) {
-      // Allow access to main settings page
-      if (path === "/pms/settings" || path === "/pms/settings/") {
+      if (
+        path === "/pms/settings" ||
+        path === "/pms/settings/" ||
+        path === "/pms/settings/general"
+      ) {
         return <>{children || element}</>;
       }
-      // Block access to settings pages that are only for Super Admin
-      if (path.includes("/company") || path.includes("/integrations")) {
-        return <Navigate to="/pms/dashboard" replace />;
+
+      // Check specific permissions for different settings pages
+      if (path.includes("/company")) {
+        if (!user.permissions?.includes(Permission.MANAGE_SYSTEM_SETTINGS)) {
+          return <Navigate to="/pms/dashboard" replace />;
+        }
+      }
+
+      if (path.includes("/integrations")) {
+        if (
+          !user.permissions?.includes(Permission.MANAGE_INTEGRATION_SETTINGS)
+        ) {
+          return <Navigate to="/pms/dashboard" replace />;
+        }
       }
     }
 

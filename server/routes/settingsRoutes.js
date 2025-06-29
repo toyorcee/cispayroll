@@ -5,21 +5,30 @@ import { IntegrationSettingsController } from "../controllers/IntegrationSetting
 import {
   requireAuth,
   requireSuperAdmin,
+  requirePermission,
 } from "../middleware/authMiddleware.js";
+import { Permission } from "../models/User.js";
 
 const router = express.Router();
+
+router.get(
+  "/general",
+  requireAuth,
+  SystemSettingsController.getGeneralSettings
+);
 
 // Company Profile
 router.get(
   "/company-profile",
   requireAuth,
-  requireSuperAdmin,
+  requirePermission([Permission.MANAGE_SYSTEM_SETTINGS]),
   CompanyProfileController.getProfile
 );
 router.put(
   "/company-profile",
   requireAuth,
   requireSuperAdmin,
+  requirePermission([Permission.MANAGE_SYSTEM_SETTINGS]),
   CompanyProfileController.updateProfile
 );
 
@@ -27,13 +36,14 @@ router.put(
 router.get(
   "/system-settings",
   requireAuth,
-  requireSuperAdmin,
+  requirePermission([Permission.MANAGE_SYSTEM_SETTINGS]),
   SystemSettingsController.getSettings
 );
 router.put(
   "/system-settings",
   requireAuth,
   requireSuperAdmin,
+  requirePermission([Permission.MANAGE_SYSTEM_SETTINGS]),
   SystemSettingsController.updateSettings
 );
 
@@ -41,13 +51,14 @@ router.put(
 router.get(
   "/integration-settings",
   requireAuth,
-  requireSuperAdmin,
+  requirePermission([Permission.MANAGE_INTEGRATION_SETTINGS]),
   IntegrationSettingsController.getSettings
 );
 router.put(
   "/integration-settings",
   requireAuth,
   requireSuperAdmin,
+  requirePermission([Permission.MANAGE_INTEGRATION_SETTINGS]),
   IntegrationSettingsController.updateSettings
 );
 
@@ -56,12 +67,14 @@ router.post(
   "/integration-settings/api-key",
   requireAuth,
   requireSuperAdmin,
+  requirePermission([Permission.MANAGE_INTEGRATION_SETTINGS]),
   IntegrationSettingsController.generateApiKey
 );
 router.put(
   "/integration-settings/webhook-url",
   requireAuth,
   requireSuperAdmin,
+  requirePermission([Permission.MANAGE_INTEGRATION_SETTINGS]),
   IntegrationSettingsController.updateWebhookUrl
 );
 
@@ -69,7 +82,7 @@ router.put(
 router.get(
   "/validate-pay-period/:frequency",
   requireAuth,
-  requireSuperAdmin,
+  requirePermission([Permission.MANAGE_PAYROLL_SETTINGS]),
   SystemSettingsController.validatePayPeriodSettings
 );
 

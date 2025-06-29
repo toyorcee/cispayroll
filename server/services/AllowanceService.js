@@ -29,7 +29,7 @@ export class AllowanceService {
     });
 
     // Only send notification if the allowance is pending
-    if (allowance.status === AllowanceStatus.PENDING) {
+    if (allowance.approvalStatus === AllowanceStatus.PENDING) {
       // Notify department head and HR
       await NotificationService.createNotification({
         recipient: employee.departmentHead,
@@ -95,7 +95,7 @@ export class AllowanceService {
       const allowance = await Allowance.create({
         ...data,
         employee: userId,
-        status: AllowanceStatus.PENDING,
+        approvalStatus: AllowanceStatus.PENDING,
       });
 
       // Send notification to department head
@@ -120,11 +120,11 @@ export class AllowanceService {
       throw new ApiError(404, "Allowance not found");
     }
 
-    if (allowance.status !== AllowanceStatus.PENDING) {
+    if (allowance.approvalStatus !== AllowanceStatus.PENDING) {
       throw new ApiError(400, "Allowance is not in pending status");
     }
 
-    allowance.status = AllowanceStatus.APPROVED;
+    allowance.approvalStatus = AllowanceStatus.APPROVED;
     allowance.approvedBy = approverId;
     allowance.approvedAt = new Date();
     await allowance.save();
@@ -147,11 +147,11 @@ export class AllowanceService {
       throw new ApiError(404, "Allowance not found");
     }
 
-    if (allowance.status !== AllowanceStatus.PENDING) {
+    if (allowance.approvalStatus !== AllowanceStatus.PENDING) {
       throw new ApiError(400, "Allowance is not in pending status");
     }
 
-    allowance.status = AllowanceStatus.REJECTED;
+    allowance.approvalStatus = AllowanceStatus.REJECTED;
     allowance.rejectedBy = rejectorId;
     allowance.rejectedAt = new Date();
     allowance.rejectionReason = rejectionReason;
@@ -177,7 +177,7 @@ export class AllowanceService {
     const allowance = await Allowance.findOne({
       _id: allowanceId,
       employee: employeeId,
-      status: AllowanceStatus.PENDING,
+      approvalStatus: AllowanceStatus.PENDING,
     });
 
     if (!allowance) {

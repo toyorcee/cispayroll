@@ -25,6 +25,7 @@ import PayrollSummaryService, {
   PayrollSummaryAnalytics,
 } from "../../services/payrollSummaryService";
 import { formatCurrency } from "../../utils/formatters";
+import { useAuth } from "../../context/AuthContext";
 
 ChartJS.register(
   CategoryScale,
@@ -56,6 +57,7 @@ const PayrollAnalyticsChart: React.FC<PayrollAnalyticsChartProps> = ({
   className = "",
   height = "400px",
 }) => {
+  const { user } = useAuth();
   const [analyticsData, setAnalyticsData] = useState<PayrollSummaryAnalytics[]>(
     []
   );
@@ -147,9 +149,13 @@ const PayrollAnalyticsChart: React.FC<PayrollAnalyticsChartProps> = ({
       try {
         setIsLoading(true);
         setError(null);
-        const data = await PayrollSummaryService.getSummaryAnalytics({
-          year: selectedYear,
-        });
+        const data = await PayrollSummaryService.getSummaryAnalytics(
+          {
+            year: selectedYear,
+          },
+          user?.role,
+          user?.permissions
+        );
         setAnalyticsData(data);
       } catch (err: any) {
         setError(err.message || "Failed to fetch analytics data");
@@ -160,7 +166,7 @@ const PayrollAnalyticsChart: React.FC<PayrollAnalyticsChartProps> = ({
     };
 
     fetchAnalytics();
-  }, [selectedYear]);
+  }, [selectedYear, user?.role, user?.permissions]);
 
   // Process data for chart
   const chartData = useMemo(() => {

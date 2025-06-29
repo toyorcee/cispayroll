@@ -396,7 +396,10 @@ export default function Dashboard() {
     fetchDashboardData();
     // Fetch payroll summary processing statistics for SUPER_ADMIN
     if (user?.role === UserRole.SUPER_ADMIN) {
-      PayrollSummaryService.getProcessingStatistics()
+      PayrollSummaryService.getProcessingStatistics(
+        user?.role,
+        user?.permissions
+      )
         .then((stats) => {
           setAvgProcessingTime(stats.avgProcessingTime || 0);
           console.log(
@@ -427,7 +430,7 @@ export default function Dashboard() {
           );
         });
     }
-  }, [user?.role]);
+  }, [user?.role, user?.permissions]);
 
   useEffect(() => {
     auditService.getRecentActivities(1000).then((activities) => {

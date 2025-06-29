@@ -306,6 +306,7 @@ export default function BonusManagement() {
     taxable: true,
     departmentId: "",
   });
+  const { user } = useAuth();
   const { isSuperAdmin } = useAuth();
   const { isAdmin } = useAuth();
   const [showDeptBonusModal, setShowDeptBonusModal] = useState(false);
@@ -341,7 +342,8 @@ export default function BonusManagement() {
 
   const { data: departments, isLoading: departmentsLoading } = useQuery({
     queryKey: ["departments"],
-    queryFn: departmentService.getAllDepartments,
+    queryFn: () =>
+      departmentService.getAllDepartments(user?.role, user?.permissions),
   });
 
   const { data: employeeList, isLoading: employeesLoading } =
@@ -474,6 +476,15 @@ export default function BonusManagement() {
 
   const handleApproveBonus = async () => {
     if (!selectedBonus) return;
+
+    // Check if bonus is already approved or rejected
+    if (selectedBonus.approvalStatus !== "pending") {
+      toast.error(
+        `Cannot approve bonus that is already ${selectedBonus.approvalStatus}`
+      );
+      return;
+    }
+
     setApprovalLoading(true);
     try {
       await bonusService.approveBonusRequest(selectedBonus._id);
@@ -481,9 +492,12 @@ export default function BonusManagement() {
       await queryClient.invalidateQueries({ queryKey: ["bonusRequests"] });
       setShowApprovalModal(false);
       setSelectedBonus(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error("[Approve Bonus] API error:", err);
-      toast.error("Failed to approve bonus");
+      // Don't show error toast if it's a 400 error (already handled by backend)
+      if (err.response?.status !== 400) {
+        toast.error(err.message || "Failed to approve bonus");
+      }
     } finally {
       setApprovalLoading(false);
     }
@@ -491,6 +505,15 @@ export default function BonusManagement() {
 
   const handleRejectBonus = async () => {
     if (!selectedBonus) return;
+
+    // Check if bonus is already approved or rejected
+    if (selectedBonus.approvalStatus !== "pending") {
+      toast.error(
+        `Cannot reject bonus that is already ${selectedBonus.approvalStatus}`
+      );
+      return;
+    }
+
     if (!rejectionReason.trim()) {
       toast.error("Please provide a reason for rejection");
       return;
@@ -503,9 +526,12 @@ export default function BonusManagement() {
       setShowApprovalModal(false);
       setSelectedBonus(null);
       setRejectionReason("");
-    } catch (err) {
+    } catch (err: any) {
       console.error("[Reject Bonus] API error:", err);
-      toast.error("Failed to reject bonus");
+      // Don't show error toast if it's a 400 error (already handled by backend)
+      if (err.response?.status !== 400) {
+        toast.error(err.message || "Failed to reject bonus");
+      }
     } finally {
       setRejectionLoading(false);
     }
@@ -856,7 +882,11 @@ export default function BonusManagement() {
                         setSelectedBonus(bonus);
                         setShowApprovalModal(true);
                       }}
-                      className="cursor-pointer hover:bg-gray-50 transition-colors"
+                      className={`${
+                        bonus.approvalStatus === "pending"
+                          ? "cursor-pointer hover:bg-gray-50"
+                          : "cursor-default"
+                      } transition-colors`}
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center">
@@ -924,8 +954,9 @@ export default function BonusManagement() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                        <div className="flex flex-col">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
               ${
                 bonus.approvalStatus === "approved"
                   ? "bg-green-100 text-green-800"
@@ -933,9 +964,15 @@ export default function BonusManagement() {
                   ? "bg-yellow-100 text-yellow-800"
                   : "bg-red-100 text-red-800"
               }`}
-                        >
-                          {bonus.approvalStatus}
-                        </span>
+                          >
+                            {bonus.approvalStatus}
+                          </span>
+                          {bonus.approvalStatus === "pending" && (
+                            <span className="text-xs text-gray-500 mt-1">
+                              Click to review
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col">

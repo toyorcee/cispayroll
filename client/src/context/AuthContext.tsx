@@ -136,6 +136,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.data.success) {
         const userData = parseUserData(response.data.user);
         setUser(userData);
+
+        // Prefetch departments using role-aware function
+        await queryClient.prefetchQuery({
+          queryKey: DEPARTMENTS_QUERY_KEY,
+          queryFn: () =>
+            departmentService.getAllDepartmentsForUser(
+              userData.role,
+              userData.permissions
+            ),
+          staleTime: 5 * 60 * 1000,
+          gcTime: 30 * 60 * 1000,
+        });
       } else {
         console.error(
           "❌ [AuthContext] Failed to fetch user data:",
@@ -191,12 +203,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
       });
       if (data.user) {
-        setUser(parseUserData(data.user));
+        const userData = parseUserData(data.user);
+        setUser(userData);
 
-        // Prefetch departments using updated options
+        // Prefetch departments using role-aware function
         await queryClient.prefetchQuery({
           queryKey: DEPARTMENTS_QUERY_KEY,
-          queryFn: departmentService.getAllDepartments,
+          queryFn: () =>
+            departmentService.getAllDepartmentsForUser(
+              userData.role,
+              userData.permissions
+            ),
           staleTime: 5 * 60 * 1000,
           gcTime: 30 * 60 * 1000,
         });
@@ -237,7 +254,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       await axios.get("/api/auth/logout");
       setUser(null);
-      toast.success("Logged out successfully");
     } catch (error: unknown) {
       console.error("Logout failed:", error);
       setUser(null);

@@ -271,7 +271,10 @@ export default function AllEmployees() {
 
   const refreshDepartments = async () => {
     try {
-      const departments = await departmentService.getAllDepartments();
+      const departments = await departmentService.getAllDepartments(
+        user?.role,
+        user?.permissions
+      );
       setDepartments(departments);
     } catch (error) {
       console.error("Failed to refresh departments:", error);
@@ -491,14 +494,17 @@ export default function AllEmployees() {
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
-        const departments = await departmentService.getAllDepartments();
+        const departments = await departmentService.getAllDepartments(
+          user?.role,
+          user?.permissions
+        );
         setDepartments(departments);
       } catch (error) {
         console.error("Failed to fetch departments:", error);
       }
     };
     fetchDepartments();
-  }, []);
+  }, [user?.role, user?.permissions]);
 
   return (
     <motion.div

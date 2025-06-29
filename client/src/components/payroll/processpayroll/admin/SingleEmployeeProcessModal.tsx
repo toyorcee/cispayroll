@@ -175,7 +175,8 @@ const SingleEmployeeProcessModal = ({
 
   const { data: departments, isLoading: departmentsLoading } = useQuery({
     queryKey: ["departments"],
-    queryFn: departmentService.getAllDepartments,
+    queryFn: () =>
+      departmentService.getAllDepartments(user?.role, user?.permissions),
     enabled: isSuperAdmin(),
   });
 

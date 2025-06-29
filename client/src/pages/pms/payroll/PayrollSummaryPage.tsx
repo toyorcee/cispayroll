@@ -302,44 +302,45 @@ const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {summary.employeeDetails.map((employee, index) => (
-                          <motion.tr
-                            key={employee._id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.05 }}
-                            className="hover:bg-gray-50"
-                          >
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div>
-                                <div className="text-sm font-medium text-gray-900">
-                                  {employee.name}
+                        {summary.employeeDetails &&
+                          summary.employeeDetails.map((employee, index) => (
+                            <motion.tr
+                              key={employee._id}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: index * 0.05 }}
+                              className="hover:bg-gray-50"
+                            >
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div>
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {employee.name}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {getEmployeeId(employee.employeeId)}
+                                  </div>
                                 </div>
-                                <div className="text-sm text-gray-500">
-                                  {getEmployeeId(employee.employeeId)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center space-x-2">
+                                  {getStatusIcon(employee.status)}
+                                  <span
+                                    className={`text-sm font-medium px-2 py-1 rounded-full border ${getStatusColor(
+                                      employee.status
+                                    )}`}
+                                  >
+                                    {employee.status.toUpperCase()}
+                                  </span>
                                 </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center space-x-2">
-                                {getStatusIcon(employee.status)}
-                                <span
-                                  className={`text-sm font-medium px-2 py-1 rounded-full border ${getStatusColor(
-                                    employee.status
-                                  )}`}
-                                >
-                                  {employee.status.toUpperCase()}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {getDepartmentName(employee.department)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {formatCurrency(employee.netPay)}
-                            </td>
-                          </motion.tr>
-                        ))}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {getDepartmentName(employee.department)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {formatCurrency(employee.netPay)}
+                              </td>
+                            </motion.tr>
+                          ))}
                       </tbody>
                     </table>
                   </div>
@@ -347,9 +348,10 @@ const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
               </div>
 
               {/* Errors and Warnings */}
-              {(summary.errors.length > 0 || summary.warnings.length > 0) && (
+              {((summary.errors && summary.errors.length > 0) ||
+                (summary.warnings && summary.warnings.length > 0)) && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {summary.errors.length > 0 && (
+                  {summary.errors && summary.errors.length > 0 && (
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                         <FaTimesCircle className="w-5 h-5 mr-2 text-red-500" />
@@ -384,7 +386,7 @@ const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                     </div>
                   )}
 
-                  {summary.warnings.length > 0 && (
+                  {summary.warnings && summary.warnings.length > 0 && (
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                         <FaExclamationTriangle className="w-5 h-5 mr-2 text-yellow-500" />
@@ -429,7 +431,6 @@ const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
 };
 
 const PayrollSummaryPage: React.FC = () => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { user } = useAuth();
   const [summaries, setSummaries] = useState<PayrollSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -438,17 +439,15 @@ const PayrollSummaryPage: React.FC = () => {
     null
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [filters, setFilters] = useState<PayrollSummaryFilters>({
-    month: undefined,
-    year: undefined,
-    frequency: "",
-    page: 1,
-    limit: 20,
-  });
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 20,
+    limit: 10,
     total: 0,
+  });
+
+  const [filters, setFilters] = useState<PayrollSummaryFilters>({
+    page: 1,
+    limit: 10,
   });
 
   const formatCurrency = (amount: number) => {
@@ -460,16 +459,7 @@ const PayrollSummaryPage: React.FC = () => {
   };
 
   const formatBatchId = (batchId: string) => {
-    const parts = batchId.split("_");
-    if (parts.length >= 2) {
-      return (
-        <div className="text-xs">
-          <div className="font-mono text-gray-900">{parts[0]}</div>
-          <div className="font-mono text-gray-500">{parts[1]}</div>
-        </div>
-      );
-    }
-    return <span className="font-mono text-xs text-gray-900">{batchId}</span>;
+    return batchId.length > 20 ? `${batchId.substring(0, 20)}...` : batchId;
   };
 
   const formatDate = (dateString: string) => {
@@ -487,7 +477,11 @@ const PayrollSummaryPage: React.FC = () => {
       setLoading(true);
       console.log("🔍 Loading payroll summaries with filters:", filters);
 
-      const response = await PayrollSummaryService.getAllSummaries(filters);
+      const response = await PayrollSummaryService.getAllSummaries(
+        filters,
+        user?.role,
+        user?.permissions
+      );
       console.log("✅ Payroll summaries loaded:", response);
       console.log(
         "📊 Response data structure:",
@@ -515,7 +509,7 @@ const PayrollSummaryPage: React.FC = () => {
 
   useEffect(() => {
     loadSummaries();
-  }, [filters]);
+  }, [filters, user?.role, user?.permissions]);
 
   const handleRowClick = async (summary: PayrollSummary) => {
     try {

@@ -2,6 +2,37 @@ import SystemSettings from "../models/SystemSettings.js";
 import { PayrollService } from "../services/PayrollService.js";
 
 export const SystemSettingsController = {
+  async getGeneralSettings(req, res) {
+    try {
+      let settings = await SystemSettings.findOne();
+      if (!settings) {
+        settings = await SystemSettings.create({});
+      }
+
+      // Only return safe settings for all users
+      const generalSettings = {
+        quickSettings: settings.quickSettings || {},
+        // Don't include payrollSettings or other sensitive data
+      };
+
+      res.json({
+        success: true,
+        message: "General settings retrieved successfully",
+        data: generalSettings,
+      });
+    } catch (err) {
+      console.error(
+        "[SystemSettingsController] Error getting general settings:",
+        err.message
+      );
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch general settings",
+        error: err.message,
+      });
+    }
+  },
+
   async getSettings(req, res) {
     try {
       let settings = await SystemSettings.findOne();

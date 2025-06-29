@@ -124,20 +124,38 @@ export default function General() {
   const fetchSystemSettings = async () => {
     try {
       setLoading(true);
-      const response = await settingsService.getSystemSettings();
-      const settings = response.data.data;
-      setSystemSettings(settings);
 
-      // Update local state with fetched data
-      if (settings.payrollSettings) {
-        setPayrollSettings(settings.payrollSettings);
-        setTempPayrollSettings(settings.payrollSettings);
+      // Fetch general settings (accessible to all users)
+      const generalResponse = await settingsService.getGeneralSettings();
+      const generalSettings = generalResponse.data.data;
+
+      // Update local state with fetched general data
+      if (generalSettings.quickSettings) {
+        setNotifications(generalSettings.quickSettings.notifications);
       }
-      if (settings.quickSettings) {
-        setNotifications(settings.quickSettings.notifications);
+
+      // Only fetch payroll settings if user is SUPER_ADMIN
+      if (user?.role === "SUPER_ADMIN") {
+        try {
+          const response = await settingsService.getSystemSettings(
+            user?.role,
+            user?.permissions
+          );
+          const settings = response.data.data;
+          setSystemSettings(settings);
+
+          // Update local state with fetched payroll data
+          if (settings.payrollSettings) {
+            setPayrollSettings(settings.payrollSettings);
+            setTempPayrollSettings(settings.payrollSettings);
+          }
+        } catch (payrollError) {
+          console.warn("Could not fetch payroll settings:", payrollError);
+          // Continue without payroll settings
+        }
       }
     } catch (error) {
-      toast.error("Failed to load system settings");
+      toast.error("Failed to load settings");
     } finally {
       setLoading(false);
     }
@@ -155,7 +173,11 @@ export default function General() {
         payrollSettings: tempPayrollSettings,
       };
 
-      await settingsService.updateSystemSettings(updatedSettings);
+      await settingsService.updateSystemSettings(
+        updatedSettings,
+        user?.role,
+        user?.permissions
+      );
       setPayrollSettings(tempPayrollSettings);
       setEditingPayroll(false);
       toast.success("Payroll settings updated successfully");

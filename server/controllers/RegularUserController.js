@@ -470,6 +470,69 @@ export class RegularUserController {
       });
     }
   }
+
+  // ===== Department Management Methods =====
+  static async getAllDepartments(req, res) {
+    try {
+      const departments = await Department.find({ status: "active" })
+        .select("name code description location status")
+        .populate("headOfDepartment", "firstName lastName email")
+        .sort({ name: 1 });
+
+      // Get employee counts for each department
+      const departmentsWithCounts = await Promise.all(
+        departments.map(async (dept) => {
+          const employeeCounts = await UserModel.aggregate([
+            { $match: { department: dept._id, status: "active" } },
+            {
+              $group: {
+                _id: null,
+                total: { $sum: 1 },
+                admins: {
+                  $sum: { $cond: [{ $eq: ["$role", "ADMIN"] }, 1, 0] },
+                },
+                regularUsers: {
+                  $sum: { $cond: [{ $eq: ["$role", "USER"] }, 1, 0] },
+                },
+              },
+            },
+          ]);
+
+          const counts = employeeCounts[0] || {
+            total: 0,
+            admins: 0,
+            regularUsers: 0,
+          };
+
+          return {
+            _id: dept._id,
+            name: dept.name,
+            code: dept.code,
+            description: dept.description,
+            location: dept.location,
+            status: dept.status,
+            headOfDepartment: dept.headOfDepartment,
+            employeeCounts: {
+              total: counts.total,
+              admins: counts.admins,
+              regularUsers: counts.regularUsers,
+            },
+          };
+        })
+      );
+
+      res.status(200).json({
+        success: true,
+        data: departmentsWithCounts,
+      });
+    } catch (error) {
+      const { statusCode, message } = handleError(error);
+      res.status(statusCode).json({
+        success: false,
+        message,
+      });
+    }
+  }
 }
 
 // Replace the determineApproverRole function with a more professional approach

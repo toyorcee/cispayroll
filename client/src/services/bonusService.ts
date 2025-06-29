@@ -333,18 +333,40 @@ export const bonusService = {
   },
 
   approveBonusRequest: async (bonusId: string) => {
-    const response = await api.put(
-      `${BASE_URL}/bonus/requests/${bonusId}/approve`
-    );
-    return response.data;
+    try {
+      const response = await api.put(
+        `${BASE_URL}/bonus/requests/${bonusId}/approve`
+      );
+      return response.data;
+    } catch (error: unknown) {
+      console.error("❌ Error approving bonus:", error);
+      if (isAxiosError(error)) {
+        throw new Error(
+          error.response?.data?.message || "Failed to approve bonus"
+        );
+      } else {
+        throw new Error("An unexpected error occurred");
+      }
+    }
   },
 
   rejectBonusRequest: async (bonusId: string, comment: string) => {
-    const response = await api.put(
-      `${BASE_URL}/bonus/requests/${bonusId}/reject`,
-      { comment }
-    );
-    return response.data;
+    try {
+      const response = await api.put(
+        `${BASE_URL}/bonus/requests/${bonusId}/reject`,
+        { comment }
+      );
+      return response.data;
+    } catch (error: unknown) {
+      console.error("❌ Error rejecting bonus:", error);
+      if (isAxiosError(error)) {
+        throw new Error(
+          error.response?.data?.message || "Failed to reject bonus"
+        );
+      } else {
+        throw new Error("An unexpected error occurred");
+      }
+    }
   },
 };
 

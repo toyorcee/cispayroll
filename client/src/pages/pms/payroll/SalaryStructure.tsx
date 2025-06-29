@@ -66,7 +66,7 @@ export default function SalaryStructure() {
       setError(null);
     } catch (error) {
       console.error("Error fetching salary grades:", error);
-      setSalaryGrades([]); 
+      setSalaryGrades([]);
       setError("Failed to fetch salary grades");
     } finally {
       setIsLoading(false);
@@ -76,14 +76,17 @@ export default function SalaryStructure() {
   const fetchDepartments = useCallback(async () => {
     try {
       console.log("🔍 Fetching departments...");
-      const departments = await departmentService.getAllDepartments();
+      const departments = await departmentService.getAllDepartments(
+        user?.role,
+        user?.permissions
+      );
       console.log("📥 Received departments:", departments);
       setDepartments(departments);
     } catch (error) {
       console.error("Error fetching departments:", error);
       toast.error("Failed to fetch departments");
     }
-  }, []);
+  }, [user?.role, user?.permissions]);
 
   // Single fetch on mount
   useEffect(() => {
