@@ -201,6 +201,32 @@ app.get("/api/health", (_req, res) =>
   })
 );
 
+// Debug route to check environment and paths
+app.get("/api/debug", (_req, res) => {
+  const clientBuildPath = path.join(__dirname, "../client/dist");
+  const alternativePaths = [
+    path.join(process.cwd(), "../client/dist"),
+    path.join(process.cwd(), "client/dist"),
+    path.join(__dirname, "client/dist"),
+  ];
+
+  res.json({
+    environment: process.env.NODE_ENV,
+    isProduction: isProduction,
+    currentDir: process.cwd(),
+    serverDir: __dirname,
+    clientBuildPath,
+    clientBuildExists: existsSync(clientBuildPath),
+    alternativePaths: alternativePaths.map((p) => ({
+      path: p,
+      exists: existsSync(p),
+    })),
+    availableDirs: existsSync(path.dirname(clientBuildPath))
+      ? readdirSync(path.dirname(clientBuildPath))
+      : "Directory not found",
+  });
+});
+
 // Email Configuration Test (No auth required for quick testing)
 app.get("/api/email-test", async (_req, res) => {
   try {
@@ -290,6 +316,25 @@ if (isProduction) {
       "📂 Available directories:",
       readdirSync(path.dirname(clientBuildPath))
     );
+
+    // Fallback: Try alternative paths
+    const alternativePaths = [
+      path.join(process.cwd(), "../client/dist"),
+      path.join(process.cwd(), "client/dist"),
+      path.join(__dirname, "client/dist"),
+    ];
+
+    for (const altPath of alternativePaths) {
+      console.log("🔍 Trying alternative path:", altPath);
+      if (existsSync(altPath)) {
+        console.log("✅ Found client build at:", altPath);
+        app.use(express.static(altPath));
+        app.get("*", (req, res) => {
+          res.sendFile(path.join(altPath, "index.html"));
+        });
+        break;
+      }
+    }
   }
 } else {
   // Development: Default Route
