@@ -269,15 +269,41 @@ app.get(
   express.static(path.join(process.cwd(), "uploads", "profiles"))
 );
 
-// Default Route
-app.get("/", (req, res) => {
-  res.send("API is running...");
-});
+// Production: Serve React App
+if (isProduction) {
+  const clientBuildPath = path.join(__dirname, "../client/dist");
+  console.log("🔍 Production client path:", clientBuildPath);
 
-// 404 Route
-app.use((_req, res) => {
-  res.status(404).json({ message: "Route not found" });
-});
+  if (existsSync(clientBuildPath)) {
+    console.log("📂 Client build found, serving static files");
+
+    // Serve static files from the React build
+    app.use(express.static(clientBuildPath));
+
+    // Handle React routing, return all requests to React app
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(clientBuildPath, "index.html"));
+    });
+  } else {
+    console.error("❌ Client build not found at:", clientBuildPath);
+    console.log(
+      "📂 Available directories:",
+      readdirSync(path.dirname(clientBuildPath))
+    );
+  }
+} else {
+  // Development: Default Route
+  app.get("/", (req, res) => {
+    res.send("API is running...");
+  });
+}
+
+// 404 Route (only for development or if production static serving fails)
+if (!isProduction) {
+  app.use((_req, res) => {
+    res.status(404).json({ message: "Route not found" });
+  });
+}
 
 // Error Handler
 app.use((err, req, res, next) => {
@@ -305,33 +331,6 @@ if (isDevelopment) {
   import("./routes/testRoutes.js").then((testRoutes) => {
     app.use("/api/test", testRoutes.default);
   });
-}
-
-// Production: Serve React App
-if (isProduction) {
-  const clientBuildPath = path.join(__dirname, "../client/dist");
-  console.log("🔍 Production client path:", clientBuildPath);
-
-  if (existsSync(clientBuildPath)) {
-    console.log("📂 Client build found, serving static files");
-
-    // Serve static files from the React build
-    app.use(express.static(clientBuildPath));
-
-    // Handle API routes
-    app.get("/api/*", (req, res, next) => next());
-
-    // Handle React routing, return all requests to React app
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(clientBuildPath, "index.html"));
-    });
-  } else {
-    console.error("❌ Client build not found at:", clientBuildPath);
-    console.log(
-      "📂 Available directories:",
-      readdirSync(path.dirname(clientBuildPath))
-    );
-  }
 }
 
 // Connect to DB and start server
